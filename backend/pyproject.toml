@@ -1,0 +1,27 @@
+[project]
+name = "question-bank-backend"
+version = "0.1.0"
+description = "Question Bank — AI-assisted question extraction, review and knowledge-point management backend (FastAPI + SQLAlchemy async + ChromaDB)."
+readme = "README.md"
+requires-python = ">=3.13"
+license = { text = "AGPL-3.0-or-later" }
+dependencies = [
+    "alembic>=1.17.2",
+    "fastapi[standard]>=0.124.0",
+    "openpyxl>=3.1.5",
+    "pandas>=2.3.3",
+    "pydantic-settings>=2.12.0",
+    "python-slugify>=8.0.4",
+    "sqlalchemy>=2.0.44",
+    "pypandoc-binary>=1.16.2",
+    "google-genai>=1.54.0",
+    "python-multipart>=0.0.20",
+    "passlib[bcrypt]>=1.7.4",
+    "python-jose[cryptography]>=3.5.0",
+    "bcrypt==4.0.1",
+    "aiomysql>=0.3.2",
+    "cryptography>=46.0.3",
+    "openai>=1.0.0",
+    "aiofiles>=25.1.0",
+    "chromadb>=1.3.7",
+]

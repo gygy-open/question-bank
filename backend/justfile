@@ -1,0 +1,5 @@
+migrate:
+    alembic upgrade head
+
+make_migration msg: 
+    uv run alembic revision --autogenerate -m "{{msg}}"

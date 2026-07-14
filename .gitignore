@@ -1,0 +1,22 @@
+# Editor / IDE
+.vscode
+.idea
+.fleet
+.DS_Store
+
+# Env files
+.env
+.env.*
+!.env.example
+
+# Runtime data (should not be committed)
+chromadb_data/
+backend/uploads/
+backend/static/media/
+*.sqlite
+*.sqlite3
+*.db
+
+# OS / logs
+*.log
+logs/

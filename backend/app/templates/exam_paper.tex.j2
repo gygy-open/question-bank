@@ -1,0 +1,105 @@
+\documentclass[addpoints,12pt,a4paper]{exam}
+\usepackage[margin=2cm]{geometry}
+
+% 中文支持：使用 ctex 宏包，自动适配系统字体
+% 建议使用 xelatex 编译
+\usepackage[UTF8, scheme=plain]{ctex}
+
+\usepackage{amsmath, amssymb}
+\usepackage{graphicx}
+\usepackage{enumitem}
+\usepackage{hyperref}
+\usepackage{booktabs} % 表格支持
+\usepackage{longtable} % 长表格支持
+
+% Pandoc 兼容性定义
+\providecommand{\tightlist}{%
+  \setlength{\itemsep}{0pt}\setlength{\parskip}{0pt}}
+
+% 字体设置 (如果 ctex 自动检测失败，可以取消注释以下行手动指定)
+% \setCJKmainfont{SimSun} % Windows 宋体
+% \setCJKmainfont{PingFang SC} % Mac
+% \setCJKmainfont{Noto Sans CJK SC} % Linux
+
+% 试卷头尾设置
+\pagestyle{headandfoot}
+\firstpageheader{\VAR{ title }}{}{}
+\runningheader{\VAR{ title }}{}{第 \thepage 页，共 \numpages 页}
+\runningfooter{}{第 \thepage 页，共 \numpages 页}{}
+
+% 选项样式调整
+\renewcommand{\thechoice}{\Alph{choice}}
+\renewcommand{\choicelabel}{\thechoice.}
+\renewcommand{\questionshook}{\setlength{\itemsep}{1em}} % 题目间距
+
+\begin{document}
+
+\begin{center}
+    \huge\textbf{ \VAR{ title } }
+\end{center}
+
+\vspace{0.5cm}
+
+\BLOCK{ if parts.choice }
+\section*{一、选择题（共 \VAR{ parts.choice|length } 小题）}
+\begin{questions}
+    \BLOCK{ for q in parts.choice }
+    \question \VAR{ q.content_tex }
+    \begin{choices}
+        \BLOCK{ for opt in q.options_tex }
+        \choice \VAR{ opt }
+        \BLOCK{ endfor }
+    \end{choices}
+    \BLOCK{ if q.answer_tex } \par \textbf{【答案】} \VAR{ q.answer_tex } \BLOCK{ endif }
+    \BLOCK{ if q.thinking_tex } \par \textbf{【分析】} \VAR{ q.thinking_tex } \BLOCK{ endif }
+    \BLOCK{ if q.analysis_tex } \par \textbf{【解析】} \VAR{ q.analysis_tex } \BLOCK{ endif }
+    \BLOCK{ if q.summary_tex } \par \textbf{【总结】} \VAR{ q.summary_tex } \BLOCK{ endif }
+    \BLOCK{ if q.source_tex } \par \textbf{【来源】} \VAR{ q.source_tex } \BLOCK{ endif }
+    \BLOCK{ endfor }
+\end{questions}
+\BLOCK{ endif }
+
+\BLOCK{ if parts.true_false }
+\section*{二、判断题（共 \VAR{ parts.true_false|length } 小题）}
+\begin{questions}
+    \BLOCK{ for q in parts.true_false }
+    \question \VAR{ q.content_tex }
+    \BLOCK{ if q.answer_tex } \par \textbf{【答案】} \VAR{ q.answer_tex } \BLOCK{ endif }
+    \BLOCK{ if q.thinking_tex } \par \textbf{【分析】} \VAR{ q.thinking_tex } \BLOCK{ endif }
+    \BLOCK{ if q.analysis_tex } \par \textbf{【解析】} \VAR{ q.analysis_tex } \BLOCK{ endif }
+    \BLOCK{ if q.summary_tex } \par \textbf{【总结】} \VAR{ q.summary_tex } \BLOCK{ endif }
+    \BLOCK{ if q.source_tex } \par \textbf{【来源】} \VAR{ q.source_tex } \BLOCK{ endif }
+    \BLOCK{ endfor }
+\end{questions}
+\BLOCK{ endif }
+
+\BLOCK{ if parts.fill }
+\section*{三、填空题（共 \VAR{ parts.fill|length } 小题）}
+\begin{questions}
+    \BLOCK{ for q in parts.fill }
+    \question \VAR{ q.content_tex }
+    \BLOCK{ if q.answer_tex } \par \textbf{【答案】} \VAR{ q.answer_tex } \BLOCK{ endif }
+    \BLOCK{ if q.thinking_tex } \par \textbf{【分析】} \VAR{ q.thinking_tex } \BLOCK{ endif }
+    \BLOCK{ if q.analysis_tex } \par \textbf{【解析】} \VAR{ q.analysis_tex } \BLOCK{ endif }
+    \BLOCK{ if q.summary_tex } \par \textbf{【总结】} \VAR{ q.summary_tex } \BLOCK{ endif }
+    \BLOCK{ if q.source_tex } \par \textbf{【来源】} \VAR{ q.source_tex } \BLOCK{ endif }
+    \BLOCK{ endfor }
+\end{questions}
+\BLOCK{ endif }
+
+\BLOCK{ if parts.essay }
+\section*{四、解答题（共 \VAR{ parts.essay|length } 小题）}
+\begin{questions}
+    \BLOCK{ for q in parts.essay }
+    \question \VAR{ q.content_tex }
+    \vspace{5cm} % 预留答题空间
+    \BLOCK{ if q.answer_tex } \par \textbf{【答案】} \VAR{ q.answer_tex } \BLOCK{ endif }
+    \BLOCK{ if q.thinking_tex } \par \textbf{【分析】} \VAR{ q.thinking_tex } \BLOCK{ endif }
+    \BLOCK{ if q.analysis_tex } \par \textbf{【解析】} \VAR{ q.analysis_tex } \BLOCK{ endif }
+    \BLOCK{ if q.summary_tex } \par \textbf{【总结】} \VAR{ q.summary_tex } \BLOCK{ endif }
+    \BLOCK{ if q.source_tex } \par \textbf{【来源】} \VAR{ q.source_tex } \BLOCK{ endif }
+    \BLOCK{ endfor }
+\end{questions}
+\BLOCK{ endif }
+
+\end{document}

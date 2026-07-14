@@ -1,0 +1,28 @@
+<svg width="200" height="200" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <!-- 设计理念：去框化、开放、流动的题库系统 -->
+    <!-- 形状：一个隐喻的 "Q" 字母，由圆环和对勾组成 -->
+
+    <defs>
+        <style>
+            .logo-main {
+                stroke: #3B82F6; /* 现代科技蓝，可调整 */
+                stroke-width: 10; /* 线条粗细 */
+                stroke-linecap: round; /* 圆头端点，更亲和 */
+                stroke-linejoin: round; /* 圆润转角 */
+            }
+        </style>
+    </defs>
+
+    <!-- 1. 开放的圆环 (The System/Q) -->
+    <!-- 从右上角开始，逆时针画一个大半圆，代表海量数据的汇聚 -->
+    <!-- 故意留出右侧缺口，避免封闭感 -->
+    <path d="M78 35C72 26 62 20 50 20C33.4315 20 20 33.4315 20 50C20 66.5685 33.4315 80 50 80C60.5 80 69.5 74 74.5 65" class="logo-main" opacity="0.3"/>
+    
+    <!-- 这里的 opacity="0.3" 是为了让圆环作为背景衬托，
+         如果您希望圆环也是实色，请删除 opacity="0.3" -->
+
+    <!-- 2. 核心对勾 (The Answer/Check) -->
+    <!-- 对勾的尾部延伸出圆环外部，形成字母 "Q" 的尾巴，充满动感 -->
+    <path d="M38 52L52 66L82 30" class="logo-main" style="stroke: #3B82F6;"/>
+
+</svg>

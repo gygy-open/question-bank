@@ -1,0 +1,168 @@
+<!--
+  设计灵感：数学之美 - 斐波那契螺旋 (Fibonacci Spiral)
+  
+  这个加载动画基于自然界中的叶序模式（如向日葵、松果）。
+  它使用黄金角（约 137.5 度）呈螺旋状分布点阵。
+  
+  数学公式：
+  - 角度 (Angle) = n * 137.508 度
+  - 半径 (Radius) = c * sqrt(n)
+  
+  动画利用相位延迟的脉冲创造出一种有机的“呼吸”效果，
+  象征着数学增长中有序而充满活力的本质。
+-->
+<div class="spa-loading-container">
+  <div class="math-loader">
+    <div class="dot" style="--x: 0.00px; --y: 0.00px; --d: -0.00s"></div>
+    <div class="dot" style="--x: -2.95px; --y: 2.70px; --d: -0.05s"></div>
+    <div class="dot" style="--x: 0.49px; --y: -5.64px; --d: -0.10s"></div>
+    <div class="dot" style="--x: 4.22px; --y: 5.50px; --d: -0.15s"></div>
+    <div class="dot" style="--x: -7.88px; --y: -1.39px; --d: -0.20s"></div>
+    <div class="dot" style="--x: 7.55px; --y: -4.80px; --d: -0.25s"></div>
+    <div class="dot" style="--x: -2.54px; --y: 9.46px; --d: -0.30s"></div>
+    <div class="dot" style="--x: -4.88px; --y: -9.39px; --d: -0.35s"></div>
+    <div class="dot" style="--x: 10.63px; --y: 3.88px; --d: -0.40s"></div>
+    <div class="dot" style="--x: -11.09px; --y: 4.58px; --d: -0.45s"></div>
+    <div class="dot" style="--x: 5.36px; --y: -11.46px; --d: -0.50s"></div>
+    <div class="dot" style="--x: 3.97px; --y: 12.66px; --d: -0.55s"></div>
+    <div class="dot" style="--x: -11.99px; --y: -6.95px; --d: -0.60s"></div>
+    <div class="dot" style="--x: 14.09px; --y: -3.10px; --d: -0.65s"></div>
+    <div class="dot" style="--x: -8.61px; --y: 12.24px; --d: -0.70s"></div>
+    <div class="dot" style="--x: -1.99px; --y: -15.36px; --d: -0.75s"></div>
+    <div class="dot" style="--x: 12.23px; --y: 10.31px; --d: -0.80s"></div>
+    <div class="dot" style="--x: -16.48px; --y: 0.68px; --d: -0.85s"></div>
+    <div class="dot" style="--x: 12.03px; --y: -11.97px; --d: -0.90s"></div>
+    <div class="dot" style="--x: -0.81px; --y: 17.42px; --d: -0.95s"></div>
+    <div class="dot" style="--x: -11.46px; --y: -13.74px; --d: -1.00s"></div>
+    <div class="dot" style="--x: 18.17px; --y: 2.45px; --d: -1.05s"></div>
+    <div class="dot" style="--x: -15.40px; --y: 10.71px; --d: -1.10s"></div>
+    <div class="dot" style="--x: 4.21px; --y: -18.72px; --d: -1.15s"></div>
+    <div class="dot" style="--x: 9.74px; --y: 17.00px; --d: -1.20s"></div>
+    <div class="dot" style="--x: -19.05px; --y: -6.08px; --d: -1.25s"></div>
+    <div class="dot" style="--x: 18.52px; --y: -8.55px; --d: -1.30s"></div>
+    <div class="dot" style="--x: -8.03px; --y: 19.17px; --d: -1.35s"></div>
+    <div class="dot" style="--x: -7.16px; --y: -19.92px; --d: -1.40s"></div>
+    <div class="dot" style="--x: 19.07px; --y: 10.02px; --d: -1.45s"></div>
+    <div class="dot" style="--x: -21.19px; --y: 5.58px; --d: -1.50s"></div>
+    <div class="dot" style="--x: 12.05px; --y: -18.73px; --d: -1.55s"></div>
+    <div class="dot" style="--x: 3.83px; --y: 22.30px; --d: -1.60s"></div>
+    <div class="dot" style="--x: -18.17px; --y: -14.07px; --d: -1.65s"></div>
+    <div class="dot" style="--x: 23.24px; --y: -1.92px; --d: -1.70s"></div>
+    <div class="dot" style="--x: -16.07px; --y: 17.37px; --d: -1.75s"></div>
+    <div class="dot" style="--x: 0.12px; --y: -24.00px; --d: -1.80s"></div>
+    <div class="dot" style="--x: 16.34px; --y: 18.02px; --d: -1.85s"></div>
+    <div class="dot" style="--x: -24.55px; --y: -2.28px; --d: -1.90s"></div>
+    <div class="dot" style="--x: 19.90px; --y: -15.10px; --d: -1.95s"></div>
+    <div class="dot" style="--x: -4.53px; --y: 24.89px; --d: -2.00s"></div>
+    <div class="dot" style="--x: -13.64px; --y: -21.68px; --d: -2.05s"></div>
+    <div class="dot" style="--x: 25.00px; --y: 6.86px; --d: -2.10s"></div>
+    <div class="dot" style="--x: -23.34px; --y: 11.97px; --d: -2.15s"></div>
+    <div class="dot" style="--x: 9.23px; --y: -24.88px; --d: -2.20s"></div>
+    <div class="dot" style="--x: 10.11px; --y: 24.85px; --d: -2.25s"></div>
+    <div class="dot" style="--x: -24.51px; --y: -11.62px; --d: -2.30s"></div>
+    <div class="dot" style="--x: 26.21px; --y: -8.07px; --d: -2.35s"></div>
+    <div class="dot" style="--x: -14.02px; --y: 23.91px; --d: -2.40s"></div>
+    <div class="dot" style="--x: -5.87px; --y: -27.38px; --d: -2.45s"></div>
+    <div class="dot" style="--x: 23.06px; --y: 16.38px; --d: -2.50s"></div>
+    <div class="dot" style="--x: -28.35px; --y: 3.53px; --d: -2.55s"></div>
+    <div class="dot" style="--x: 18.70px; --y: -21.96px; --d: -2.60s"></div>
+    <div class="dot" style="--x: 1.05px; --y: 29.10px; --d: -2.65s"></div>
+    <div class="dot" style="--x: -20.63px; --y: -20.94px; --d: -2.70s"></div>
+    <div class="dot" style="--x: 29.63px; --y: 1.52px; --d: -2.75s"></div>
+    <div class="dot" style="--x: -23.08px; --y: 19.06px; --d: -2.80s"></div>
+    <div class="dot" style="--x: 4.18px; --y: -29.91px; --d: -2.85s"></div>
+    <div class="dot" style="--x: 17.27px; --y: 25.09px; --d: -2.90s"></div>
+    <div class="dot" style="--x: -29.94px; --y: -6.90px; --d: -2.95s"></div>
+    <div class="dot" style="--x: 26.96px; --y: -15.27px; --d: -3.00s"></div>
+    <div class="dot" style="--x: -9.65px; --y: 29.71px; --d: -3.05s"></div>
+    <div class="dot" style="--x: -13.06px; --y: -28.66px; --d: -3.10s"></div>
+    <div class="dot" style="--x: 29.22px; --y: 12.41px; --d: -3.15s"></div>
+    <div class="dot" style="--x: -30.17px; --y: 10.68px; --d: -3.20s"></div>
+    <div class="dot" style="--x: 15.15px; --y: -28.47px; --d: -3.25s"></div>
+    <div class="dot" style="--x: 8.12px; --y: 31.47px; --d: -3.30s"></div>
+    <div class="dot" style="--x: -27.45px; --y: -17.85px; --d: -3.35s"></div>
+    <div class="dot" style="--x: 32.54px; --y: -5.42px; --d: -3.40s"></div>
+    <div class="dot" style="--x: -20.48px; --y: 26.16px; --d: -3.45s"></div>
+    <div class="dot" style="--x: -2.59px; --y: -33.37px; --d: -3.50s"></div>
+    <div class="dot" style="--x: 24.62px; --y: 23.02px; --d: -3.55s"></div>
+    <div class="dot" style="--x: -33.94px; --y: -0.34px; --d: -3.60s"></div>
+    <div class="dot" style="--x: 25.43px; --y: -22.83px; --d: -3.65s"></div>
+    <div class="dot" style="--x: -3.35px; --y: 34.25px; --d: -3.70s"></div>
+    <div class="dot" style="--x: -20.80px; --y: -27.70px; --d: -3.75s"></div>
+    <div class="dot" style="--x: 34.28px; --y: 6.42px; --d: -3.80s"></div>
+    <div class="dot" style="--x: -29.80px; --y: 18.54px; --d: -3.85s"></div>
+    <div class="dot" style="--x: 9.51px; --y: -34.02px; --d: -3.90s"></div>
+    <div class="dot" style="--x: 16.07px; --y: 31.71px; --d: -3.95s"></div>
+  </div>
+  <div class="loading-text">加载中...</div>
+</div>
+
+<style>
+  .spa-loading-container {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    background: #0f172a; /* Slate 900 */
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    z-index: 9999;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+    color: #94a3b8; /* Slate 400 */
+  }
+
+  .math-loader {
+    position: relative;
+    width: 200px;
+    height: 200px;
+    animation: rotate 60s linear infinite;
+  }
+
+  .dot {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 4px;
+    height: 4px;
+    background: #38bdf8; /* Sky 400 */
+    border-radius: 50%;
+    /* Scale up the coordinates by 2.5 */
+    transform: translate(calc(var(--x) * 2.5), calc(var(--y) * 2.5));
+    opacity: 0;
+    animation: pulse 3s ease-in-out infinite;
+    animation-delay: var(--d);
+    box-shadow: 0 0 5px rgba(56, 189, 248, 0.5);
+  }
+
+  @keyframes pulse {
+    0%, 100% { 
+      opacity: 0.1; 
+      transform: translate(calc(var(--x) * 2.5), calc(var(--y) * 2.5)) scale(0.5); 
+    }
+    50% { 
+      opacity: 1; 
+      transform: translate(calc(var(--x) * 2.5), calc(var(--y) * 2.5)) scale(1.5); 
+    }
+  }
+
+  @keyframes rotate {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+  }
+
+  .loading-text {
+    margin-top: 2rem;
+    font-size: 0.875rem;
+    letter-spacing: 0.2em;
+    animation: blink 2s infinite;
+    text-transform: uppercase;
+  }
+
+  @keyframes blink {
+    0%, 100% { opacity: 0.5; }
+    50% { opacity: 1; }
+  }
+</style>
