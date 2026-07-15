@@ -34,7 +34,7 @@ AI 原生的题库系统
 
 ```bash
 # 1. 克隆仓库
-git clone <your-fork-url> question-bank && cd question-bank
+git clone https://github.com/gygy-open/question-bank.git question-bank && cd question-bank
 
 # 2. 生成环境变量文件并修改
 cp .env.example .env
