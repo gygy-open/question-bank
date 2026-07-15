@@ -5,7 +5,7 @@ import StarterKit from '@tiptap/starter-kit'
 import { Markdown } from 'tiptap-markdown'
 import Placeholder from '@tiptap/extension-placeholder'
 import Image from '@tiptap/extension-image'
-import { Bold, Italic, List, ListOrdered, Sigma, Quote, ImageIcon, FileCode } from 'lucide-vue-next'
+import { Bold, Italic, List, ListOrdered, Sigma, Quote, ImageIcon, FileCode, Square } from 'lucide-vue-next'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import {
@@ -228,6 +228,12 @@ const openMathDialog = () => {
   isMathDialogOpen.value = true
 }
 
+const insertBoxedText = () => {
+  currentLatex.value = '\\boxed{\\text{内容}}'
+  currentMathUpdate.value = null
+  isMathDialogOpen.value = true
+}
+
 const insertMath = () => {
   if (!currentLatex.value) return
   
@@ -277,6 +283,11 @@ const insertMath = () => {
         <Sigma class="w-4 h-4" />
       </Button>
       
+      <!-- Boxed Text Button -->
+      <Button variant="ghost" size="icon" @click="insertBoxedText" title="带框文字" :disabled="isSourceMode">
+        <Square class="w-4 h-4" />
+      </Button>
+
       <!-- Image Button -->
       <Button variant="ghost" size="icon" @click="triggerImageUpload" title="插入图片" :disabled="isSourceMode">
         <ImageIcon class="w-4 h-4" />
