@@ -48,6 +48,7 @@ datas += [
 
 # App modules are frequently referenced dynamically (CRUD, models, endpoints).
 hiddenimports += collect_submodules("app")
+hiddenimports += collect_submodules("scripts")
 hiddenimports += [
     "aiosqlite",
     "passlib.handlers.bcrypt",
