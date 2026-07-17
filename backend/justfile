@@ -3,3 +3,18 @@ migrate:
 
 make_migration msg: 
     uv run alembic revision --autogenerate -m "{{msg}}"
+
+# --- Desktop packaging ---------------------------------------------------
+
+# Build the frontend SPA so it can be bundled into the desktop executable.
+build-frontend:
+    cd ../frontend && pnpm install && pnpm generate
+
+# Produce the single-file desktop executable (runs migrations + API + worker
+# + serves the bundled SPA). Requires `build-frontend` to have run first.
+package: build-frontend
+    uv run --with pyinstaller pyinstaller run.spec --clean
+
+# Run the unified launcher locally (dev): migrations + worker + API + open UI.
+run-desktop:
+    uv run python run.py

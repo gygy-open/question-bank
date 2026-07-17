@@ -1,7 +1,8 @@
 from fastapi import APIRouter
-from app.api.v1.endpoints import subjects, knowledge_points, tags, tag_categories, questions, upload, login, users, system_settings, papers, ai_config, chat, tools, activity_logs, import_tasks, prompts
+from app.api.v1.endpoints import subjects, knowledge_points, tags, tag_categories, questions, upload, login, users, system_settings, papers, ai_config, chat, tools, activity_logs, import_tasks, prompts, setup
 
 api_router = APIRouter()
+api_router.include_router(setup.router, prefix="/setup", tags=["setup"])
 api_router.include_router(login.router, tags=["login"])
 api_router.include_router(users.router, prefix="/users", tags=["users"])
 api_router.include_router(subjects.router, prefix="/subjects", tags=["subjects"])

@@ -11,8 +11,21 @@ definePageMeta({
 
 const { login } = useAuth()
 const router = useRouter()
+const { $api } = useNuxtApp()
 
 const isLoading = ref(false)
+
+// 若系统尚未完成首次初始化，引导至安装向导
+onMounted(async () => {
+  try {
+    const res = await $api<{ configured: boolean }>('/setup/status')
+    if (!res.configured) {
+      router.replace('/setup')
+    }
+  } catch {
+    // 忽略状态探测失败
+  }
+})
 
 const formSchema = toTypedSchema(z.object({
   username: z.string().min(1, '请输入用户名'),

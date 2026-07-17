@@ -1,5 +1,5 @@
 import chromadb
-from app.core.config import settings
+from app.core.config import settings, chroma_mode, chroma_path
 
 class VectorStore:
     _client = None
@@ -12,12 +12,17 @@ class VectorStore:
     @classmethod
     def get_client(cls):
         if cls._client is None:
-            # Default to localhost:8001 for local development
-            # In Docker, these should be set to "chromadb" and "8000"
-            cls._client = chromadb.HttpClient(
-                host=settings.CHROMADB_HOST,
-                port=settings.CHROMADB_PORT
-            )
+            if chroma_mode() == "embedded":
+                # Desktop / single-file: no separate ChromaDB server needed.
+                path = chroma_path()
+                path.mkdir(parents=True, exist_ok=True)
+                cls._client = chromadb.PersistentClient(path=str(path))
+            else:
+                # Server / Docker: connect to a standalone ChromaDB service.
+                cls._client = chromadb.HttpClient(
+                    host=settings.CHROMADB_HOST,
+                    port=settings.CHROMADB_PORT
+                )
         return cls._client
 
     @classmethod

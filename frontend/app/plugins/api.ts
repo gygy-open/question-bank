@@ -11,6 +11,11 @@ export default defineNuxtPlugin((nuxtApp) => {
       }
     },
     onResponseError({ response }) {
+      // 后端尚未完成首次安装：跳转到安装向导
+      if (response.status === 503 && response._data?.detail === 'setup_required') {
+        navigateTo('/setup')
+        return
+      }
       if (response.status === 401) {
         token.value = null
         navigateTo('/login')

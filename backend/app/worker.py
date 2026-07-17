@@ -11,6 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 sys.path.append(str(Path(__file__).parent.parent))
 
 from app.db.session import SessionLocal
+from app.core.config import get_db_url, is_configured
 from app.models.import_task import ImportTask, ImportTaskStatus
 from app.models.question import QuestionStatus, QuestionType
 from app.models.user import User
@@ -191,7 +192,14 @@ async def process_task(db: AsyncSession, task: ImportTask):
 
 async def worker():
     logger.info("Worker started, initializing...")
-    
+
+    # In a packaged desktop build the worker is spawned before the first-run
+    # setup wizard has picked a database. Wait until the app is configured
+    # before touching the DB or the embedding model.
+    while not is_configured():
+        logger.info("Worker: database not configured yet, waiting for setup...")
+        await asyncio.sleep(5)
+
     # Initialize Embedding Function
     try:
         await reload_embedding_function()
@@ -200,6 +208,11 @@ async def worker():
         logger.error(f"Failed to initialize embedding function: {e}")
 
     logger.info("Worker waiting for tasks...")
+    # SQLite does not support ``SELECT ... FOR UPDATE SKIP LOCKED``. In the
+    # single-writer SQLite (desktop) case there is only one worker anyway, so
+    # row-level locking is unnecessary; on MySQL we keep SKIP LOCKED so multiple
+    # workers can pull tasks concurrently without contention.
+    use_row_lock = not get_db_url().startswith("sqlite")
     while True:
         async with SessionLocal() as db:
             try:
@@ -209,8 +222,9 @@ async def worker():
                     ImportTask.source == "batch_upload"
                 )\
                     .order_by(ImportTask.created_at)\
-                    .limit(1)\
-                    .with_for_update(skip_locked=True)
+                    .limit(1)
+                if use_row_lock:
+                    stmt = stmt.with_for_update(skip_locked=True)
                 
                 result = await db.execute(stmt)
                 task = result.scalar_one_or_none()
@@ -224,5 +238,11 @@ async def worker():
                 logger.error(f"Worker loop error: {e}")
                 await asyncio.sleep(5)
 
-if __name__ == "__main__":
+def main():
+    """Blocking entry point. Importable so the packaged desktop launcher can run
+    the worker in a child process (see the packaging plan)."""
     asyncio.run(worker())
+
+
+if __name__ == "__main__":
+    main()

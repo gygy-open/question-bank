@@ -21,14 +21,16 @@ from app.models import (
     ActivityLog,
     SystemSetting
 )
-from app.core.config import settings
+from app.core.config import settings, get_db_url
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.
 config = context.config
 
-# Override sqlalchemy.url with settings
-config.set_main_option("sqlalchemy.url", settings.DB_URL)
+# Override sqlalchemy.url. Precedence: an explicit URL set by the programmatic
+# runner (config.set_main_option) > resolved runtime URL (env/.env/config.json).
+_url = config.get_main_option("sqlalchemy.url") or get_db_url() or settings.DB_URL
+config.set_main_option("sqlalchemy.url", _url)
 
 # Interpret the config file for Python logging.
 # This line sets up loggers basically.
