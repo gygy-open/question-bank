@@ -9,6 +9,7 @@ sys.path.append(str(Path(__file__).resolve().parent.parent))
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
+from app._version import __version__
 from app.api.v1.api import api_router
 from app.core.config import settings, is_configured
 from app.services.embedding import reload_embedding_function
@@ -28,10 +29,12 @@ async def lifespan(app: FastAPI):
     yield
     # Shutdown
 
-app = FastAPI(title="Question Bank API", lifespan=lifespan)
+app = FastAPI(title="Question Bank API", version=__version__, lifespan=lifespan)
 
 
 _SETUP_PREFIX = f"{settings.API_V1_STR}/setup"
+# Endpoints that must work even before first-run setup (e.g. version/update check).
+_SETUP_EXEMPT = (_SETUP_PREFIX, f"{settings.API_V1_STR}/system/version")
 
 
 @app.middleware("http")
@@ -40,7 +43,7 @@ async def require_setup(request: Request, call_next):
     wizard so the frontend can detect first-run state and redirect to /setup."""
     if not is_configured():
         path = request.url.path
-        if path.startswith("/api") and not path.startswith(_SETUP_PREFIX):
+        if path.startswith("/api") and not path.startswith(_SETUP_EXEMPT):
             return JSONResponse(status_code=503, content={"detail": "setup_required"})
     return await call_next(request)
 
