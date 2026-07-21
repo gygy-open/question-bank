@@ -1,14 +1,14 @@
 name: Build Desktop
 
-# Build the Windows server package and publish a draft GitHub Release.
+# Build the Windows desktop package and publish a draft GitHub Release.
 # Version is driven entirely by the git tag:
 #   git tag v0.2.0 && git push origin v0.2.0
 # The tag (minus the leading "v") is stamped into the app before packaging and
 # used to name the Release and its assets.
 #
 # NOTE: Currently Windows-only. macOS/Linux are intentionally not built yet
-# (the app code stays cross-platform; only the service tooling is per-OS).
-# To re-enable them later, add a matrix + systemd/launchd packaging.
+# (the app code stays cross-platform; only the tray/installer tooling is
+# per-OS). To re-enable them later, add a matrix + platform packaging.
 
 on:
   push:
@@ -18,10 +18,6 @@ on:
 
 permissions:
   contents: write
-
-env:
-  # Pinned WinSW release used to wrap the app as a Windows service.
-  WINSW_URL: https://github.com/winsw/winsw/releases/download/v2.12.0/WinSW-x64.exe
 
 jobs:
   build:
@@ -87,11 +83,7 @@ jobs:
           $payload = "installer_payload"
           New-Item -ItemType Directory -Force -Path $payload | Out-Null
           Copy-Item backend/dist/question-bank.exe "$payload/question-bank.exe"
-          Invoke-WebRequest -Uri "$env:WINSW_URL" -OutFile "$payload/question-bank-service.exe"
-          Copy-Item backend/deploy/windows/question-bank-service.xml "$payload/"
-          Copy-Item backend/deploy/windows/README.txt                "$payload/"
-          Copy-Item backend/deploy/windows/install-service.ps1        "$payload/"
-          Copy-Item backend/deploy/windows/uninstall-service.ps1      "$payload/"
+          Copy-Item backend/deploy/windows/README.txt "$payload/"
 
           # Compile with Inno Setup (preinstalled on GitHub windows runners).
           $iscc = "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe"

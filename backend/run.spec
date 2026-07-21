@@ -2,15 +2,31 @@
 #
 # Build with:  uv run pyinstaller run.spec --clean
 #
-# Produces a single console executable that runs migrations, the API, the
-# background worker and serves the bundled Nuxt SPA. Keep console=True until the
-# build is verified, then flip to False for a windowed app.
+# Produces a single windowed executable that shows a system-tray icon, runs
+# migrations, the API, the background worker and serves the bundled Nuxt SPA.
 #
 # Prerequisites:
 #   1. Build the frontend:  (cd ../frontend && pnpm generate)
 #   2. Copy/point the output so the datas entry below can find it.
 
 from PyInstaller.utils.hooks import collect_all, collect_submodules
+
+import os
+import sys
+
+# Make ``app`` importable so we can generate the brand icon below.
+sys.path.insert(0, os.path.abspath("."))
+
+# Render the brand logo (frontend/public/logo.svg) to a multi-size .ico that is
+# embedded into the executable. Drawn with PIL, so no SVG renderer is required.
+_ICON = os.path.abspath(os.path.join("build", "logo.ico"))
+os.makedirs(os.path.dirname(_ICON), exist_ok=True)
+try:
+    from app.branding import save_ico
+
+    save_ico(_ICON)
+except Exception:
+    _ICON = None  # fall back to the default PyInstaller icon
 
 datas, binaries, hiddenimports = [], [], []
 
@@ -26,6 +42,8 @@ for pkg in [
     "passlib",
     "aiosqlite",
     "aiomysql",
+    "pystray",
+    "PIL",
 ]:
     try:
         d, b, h = collect_all(pkg)
@@ -57,6 +75,7 @@ hiddenimports += [
     "uvicorn.protocols.http.auto",
     "uvicorn.protocols.websockets.auto",
     "uvicorn.lifespan.on",
+    "pystray._win32",
 ]
 
 a = Analysis(
@@ -84,7 +103,8 @@ exe = EXE(
     bootloader_ignore_signals=False,
     strip=False,
     upx=True,
-    console=True,  # set to False once verified
+    console=False,  # tray app: no console window
     disable_windowed_traceback=False,
     argv_emulation=False,
+    icon=_ICON,
 )
