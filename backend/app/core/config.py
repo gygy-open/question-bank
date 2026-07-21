@@ -58,7 +58,12 @@ class Settings(BaseSettings):
     # Explicit values: "embedded" | "http".
     CHROMADB_MODE: str = ""
 
-    model_config = SettingsConfigDict(env_file=".env", case_sensitive=True)
+    # ``extra="ignore"``: a packaged desktop build may run in a directory that
+    # happens to contain an unrelated ``.env`` (or the host may export unrelated
+    # env vars). Ignore unknown keys instead of crashing on startup.
+    model_config = SettingsConfigDict(
+        env_file=".env", case_sensitive=True, extra="ignore"
+    )
 
     @model_validator(mode="after")
     def _resolve_data_paths(self) -> "Settings":

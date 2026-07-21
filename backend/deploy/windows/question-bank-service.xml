@@ -1,0 +1,37 @@
+<!--
+  WinSW service definition for Question Bank (intranet team server).
+
+  This XML is read by the WinSW wrapper (question-bank-service.exe, which must
+  sit next to this file with the SAME base name). The wrapper runs the app as a
+  Windows service: auto-start on boot, auto-restart on crash, no console window,
+  survives logout / RDP disconnect.
+
+  HOST=0.0.0.0 makes the server reachable from other machines on the LAN.
+  If you change PORT here, also re-run install-service.ps1 -Port <newport> so the
+  firewall rule matches.
+-->
+<service>
+  <id>question-bank</id>
+  <name>Question Bank</name>
+  <description>Question Bank intranet server (FastAPI API + background worker + bundled SPA).</description>
+
+  <executable>%BASE%\question-bank.exe</executable>
+  <workingdirectory>%BASE%</workingdirectory>
+
+  <env name="HOST" value="0.0.0.0" />
+  <env name="PORT" value="8000" />
+  <env name="OPEN_UI" value="0" />
+  <!-- Predictable machine-wide data location (db, config.json, uploads).
+       Without this, a LocalSystem service would write to the obscure
+       system-profile AppData path. -->
+  <env name="DATA_DIR" value="C:\ProgramData\QuestionBank" />
+
+  <startmode>Automatic</startmode>
+  <onfailure action="restart" delay="5 sec" />
+  <resetfailure>1 hour</resetfailure>
+
+  <log mode="roll-by-size">
+    <sizeThreshold>10240</sizeThreshold>
+    <keepFiles>8</keepFiles>
+  </log>
+</service>
