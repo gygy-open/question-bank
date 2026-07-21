@@ -131,7 +131,7 @@ async function complete() {
             >1</span>
             <span class="text-sm" :class="step >= 1 ? 'font-medium' : 'text-muted-foreground'">数据库</span>
           </div>
-          <Separator class="w-8" />
+          <Separator class="w-8 shrink-0 data-[orientation=horizontal]:w-8" />
           <div class="flex items-center gap-2">
             <span
               class="flex h-7 w-7 items-center justify-center rounded-full text-sm"
