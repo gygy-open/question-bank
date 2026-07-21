@@ -1,10 +1,43 @@
 import json
 import os
+import secrets
 import sys
 from pathlib import Path
 
 from pydantic import model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+# Sentinel: any value other than this means SECRET_KEY was supplied explicitly
+# (env / .env / docker) and must be respected. When left at the default we fall
+# back to a random key persisted in config.json (see validator below).
+_INSECURE_DEFAULT_SECRET = "insecure-dev-only-CHANGE-ME"
+
+
+def _load_or_create_secret_key(data_dir: Path) -> str:
+    """Return a stable random secret key, persisted in ``config.json``.
+
+    Used when no SECRET_KEY was provided via env/.env so that tokens survive
+    restarts and a packaged desktop build is never left on the insecure default.
+    """
+    path = data_dir / "config.json"
+    data: dict = {}
+    if path.exists():
+        try:
+            data = json.loads(path.read_text(encoding="utf-8"))
+        except (json.JSONDecodeError, OSError):
+            data = {}
+    key = data.get("secret_key")
+    if not key:
+        key = secrets.token_hex(32)
+        data["secret_key"] = key
+        try:
+            data_dir.mkdir(parents=True, exist_ok=True)
+            path.write_text(
+                json.dumps(data, indent=2, ensure_ascii=False), encoding="utf-8"
+            )
+        except OSError:
+            pass
+    return key
 
 
 def _default_data_dir() -> Path:
@@ -32,9 +65,9 @@ class Settings(BaseSettings):
     LOG_LEVEL: str = "INFO"
 
     # Security
-    # Must be overridden via SECRET_KEY env var in any non-dev deployment.
-    # Generate with: openssl rand -hex 32
-    SECRET_KEY: str = "insecure-dev-only-CHANGE-ME"
+    # If left at the default, a random key is generated and persisted in
+    # config.json (see validator). Override via SECRET_KEY env for docker/server.
+    SECRET_KEY: str = _INSECURE_DEFAULT_SECRET
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24 * 8 # 8 days
 
@@ -72,6 +105,9 @@ class Settings(BaseSettings):
             self.UPLOAD_DIR = self.DATA_DIR / self.UPLOAD_DIR
         if not self.MEDIA_DIR.is_absolute():
             self.MEDIA_DIR = self.DATA_DIR / self.MEDIA_DIR
+        # No explicit secret provided -> use a stable random key from config.json.
+        if self.SECRET_KEY == _INSECURE_DEFAULT_SECRET:
+            self.SECRET_KEY = _load_or_create_secret_key(self.DATA_DIR)
         return self
 
     @property
@@ -147,3 +183,12 @@ def chroma_mode() -> str:
 def chroma_path() -> Path:
     """Filesystem location for the embedded (PersistentClient) ChromaDB store."""
     return settings.DATA_DIR / "chroma"
+
+
+def get_lan_share() -> bool:
+    """Whether the tray app should bind 0.0.0.0 to share on the local network."""
+    return bool(load_runtime_config().get("lan_share", False))
+
+
+def set_lan_share(enabled: bool) -> None:
+    save_runtime_config({"lan_share": bool(enabled)})

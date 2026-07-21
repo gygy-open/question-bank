@@ -1,14 +1,13 @@
 """Unified desktop launcher.
 
-Starts the whole application as a single process tree:
+Two roles, selected automatically:
 
-1. Runs pending database migrations (only once configured).
-2. Spawns the background import worker as a child process.
-3. Opens the default browser (or a native window) at the local server.
-4. Serves the FastAPI app (which also hosts the built Nuxt SPA).
+* **tray** (default for the packaged build): shows a notification-area icon and
+  runs the whole app in-process. See ``app.tray``.
+* **server**: runs migrations, the background worker and uvicorn in the
+  foreground. Used in development (``uv run python run.py``) and by docker.
 
-Designed to be the PyInstaller entry point, but also runnable in dev with
-``uv run python run.py``.
+Force a role with ``--tray`` / ``--server`` or ``QB_ROLE=tray|server``.
 """
 
 import multiprocessing
@@ -58,9 +57,8 @@ def start_worker() -> None:
     worker.main()
 
 
-def main() -> None:
-    multiprocessing.freeze_support()  # required for frozen Windows builds
-
+def run_server() -> None:
+    """Run migrations, the worker and uvicorn in THIS process (foreground)."""
     from app.core.config import get_db_url, is_configured, settings
     from app.db.migrations import run_migrations
 
@@ -92,6 +90,26 @@ def main() -> None:
     from app.main import app
 
     uvicorn.run(app, host=host, port=port, log_level=settings.LOG_LEVEL.lower())
+
+
+def run_tray() -> None:
+    from app.tray import run_tray as _run_tray
+
+    _run_tray()
+
+
+def main() -> None:
+    multiprocessing.freeze_support()  # required for frozen Windows builds
+
+    role = os.getenv("QB_ROLE", "").strip().lower()
+    if "--server" in sys.argv or role == "server":
+        run_server()
+    elif "--tray" in sys.argv or role == "tray":
+        run_tray()
+    elif getattr(sys, "frozen", False):
+        run_tray()
+    else:
+        run_server()
 
 
 if __name__ == "__main__":

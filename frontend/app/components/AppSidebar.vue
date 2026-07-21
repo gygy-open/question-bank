@@ -142,15 +142,15 @@ const handleLogout = () => {
     </SidebarContent>
     <SidebarFooter>
       <SidebarMenu>
-        <SidebarMenuItem>
+        <SidebarMenuItem v-if="user?.is_superuser">
           <SidebarMenuButton
             :class="updateState.hasUpdate ? 'text-primary' : ''"
-            :tooltip="updateState.hasUpdate ? `发现新版本 v${updateState.latest}` : '检查更新'"
+            :tooltip="updateState.hasUpdate ? `发现新版本 v${updateState.latest}，点击下载安装程序` : '检查更新'"
             @click="handleCheckUpdate"
           >
             <Download v-if="updateState.hasUpdate" />
             <RefreshCw v-else :class="updateState.checking ? 'animate-spin' : ''" />
-            <span>{{ updateState.hasUpdate ? `更新到 v${updateState.latest}` : '检查更新' }}</span>
+            <span>{{ updateState.hasUpdate ? `有新版 v${updateState.latest}` : '检查更新' }}</span>
           </SidebarMenuButton>
         </SidebarMenuItem>
         <SidebarMenuItem>
