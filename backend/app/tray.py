@@ -48,9 +48,37 @@ def _acquire_single_instance() -> bool:
 
 def _start_worker() -> None:
     """Top-level target so it is picklable for the spawn start method."""
+    ensure_std_streams()
     from app import worker
 
     worker.main()
+
+
+def ensure_std_streams() -> None:
+    """Give the windowed build usable stdout/stderr.
+
+    A frozen ``console=False`` build has ``sys.stdout``/``sys.stderr`` set to
+    ``None``, which crashes uvicorn's log formatter (``isatty``) and any
+    ``print()``. Redirect them to a log file under the data dir (or devnull).
+    """
+    if sys.stdout is not None and sys.stderr is not None:
+        return
+    stream = None
+    try:
+        from app.core.config import settings
+
+        log_dir = settings.DATA_DIR / "logs"
+        log_dir.mkdir(parents=True, exist_ok=True)
+        stream = open(log_dir / "app.log", "a", encoding="utf-8", buffering=1)
+    except Exception:  # noqa: BLE001
+        try:
+            stream = open(os.devnull, "w")
+        except OSError:
+            return
+    if sys.stdout is None:
+        sys.stdout = stream
+    if sys.stderr is None:
+        sys.stderr = stream
 
 
 def _wait_for_port(host: str, port: int, timeout: float = 30.0) -> bool:
@@ -168,6 +196,8 @@ def run_tray() -> None:
     from pystray import Menu, MenuItem
 
     from app.core.config import get_lan_share, set_lan_share
+
+    ensure_std_streams()
 
     # Bring the existing instance's UI forward instead of starting a second one.
     if not _acquire_single_instance():

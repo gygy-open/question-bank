@@ -52,6 +52,9 @@ def _open_browser(url: str) -> None:
 
 
 def start_worker() -> None:
+    from app.tray import ensure_std_streams
+
+    ensure_std_streams()
     from app import worker
 
     worker.main()
@@ -100,6 +103,10 @@ def run_tray() -> None:
 
 def main() -> None:
     multiprocessing.freeze_support()  # required for frozen Windows builds
+
+    from app.tray import ensure_std_streams
+
+    ensure_std_streams()
 
     role = os.getenv("QB_ROLE", "").strip().lower()
     if "--server" in sys.argv or role == "server":
