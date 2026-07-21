@@ -1,0 +1,121 @@
+name: Build Desktop
+
+# Build the single-file desktop executable for each OS and publish a GitHub
+# Release. Version is driven entirely by the git tag:
+#   git tag v0.2.0 && git push origin v0.2.0
+# The tag (minus the leading "v") is stamped into the app before packaging and
+# used to name the Release and its assets.
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            bin: backend/dist/question-bank.exe
+            ext: .exe
+          - os: macos-latest
+            bin: backend/dist/question-bank
+            ext: ''
+          - os: ubuntu-latest
+            bin: backend/dist/question-bank
+            ext: ''
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # --- Resolve version from the tag (v0.2.0 -> 0.2.0) ---
+      - name: Resolve version
+        id: ver
+        shell: bash
+        run: |
+          if [[ "${GITHUB_REF_TYPE}" == "tag" ]]; then
+            echo "version=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
+          else
+            echo "version=0.0.0-dev+${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"
+          fi
+
+      # --- Stamp the version into the app + package metadata ---
+      - name: Stamp version
+        working-directory: backend
+        shell: bash
+        run: |
+          v="${{ steps.ver.outputs.version }}"
+          printf '__version__ = "%s"\n' "$v" > app/_version.py
+          sed -i.bak -E "0,/^version = .*/s//version = \"$v\"/" pyproject.toml
+          rm -f pyproject.toml.bak
+          echo "Stamped version $v"
+          cat app/_version.py
+
+      # --- Frontend: build the SPA that gets bundled into the executable ---
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: frontend/pnpm-lock.yaml
+      - name: Build frontend
+        working-directory: frontend
+        run: |
+          pnpm install --frozen-lockfile
+          pnpm generate
+
+      # --- Backend: PyInstaller single-file build ---
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          python-version: '3.13'
+      - name: Package backend
+        working-directory: backend
+        run: uv run --with pyinstaller pyinstaller run.spec --clean
+
+      # --- Name the asset with version + OS and upload ---
+      - name: Rename artifact
+        shell: bash
+        run: |
+          asset="question-bank-${{ steps.ver.outputs.version }}-${{ runner.os }}${{ matrix.ext }}"
+          mv "${{ matrix.bin }}" "$asset"
+          echo "ASSET=$asset" >> "$GITHUB_ENV"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: question-bank-${{ runner.os }}
+          path: ${{ env.ASSET }}
+          if-no-files-found: error
+
+  release:
+    needs: build
+    if: github.ref_type == 'tag'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+      - name: Publish Release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: Question Bank ${{ github.ref_name }}
+          tag_name: ${{ github.ref_name }}
+          files: artifacts/**/*
+          generate_release_notes: true
+          # Build first, publish later: create a DRAFT so users never see a
+          # release without assets. Review the notes on GitHub, then click
+          # "Publish release" to make it public.
+          draft: true
+          # Tags with a hyphen (e.g. v0.2.0-beta.1) are marked pre-release.
+          prerelease: ${{ contains(github.ref_name, '-') }}

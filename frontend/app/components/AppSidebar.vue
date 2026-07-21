@@ -19,7 +19,8 @@ import {
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import UserProfileDialog from '~/components/UserProfileDialog.vue'
 import ChangePasswordDialog from '~/components/ChangePasswordDialog.vue'
-import { BookOpen, ChevronsUpDown, CirclePlus, ListTree, LogOut, Settings, Sparkles, User, Users, Tags, Library, HelpCircle, MessageSquare, KeyRound, Activity, ListTodo } from 'lucide-vue-next'
+import { BookOpen, ChevronsUpDown, CirclePlus, ListTree, LogOut, Settings, Sparkles, User, Users, Tags, Library, HelpCircle, MessageSquare, KeyRound, Activity, ListTodo, Download, RefreshCw } from 'lucide-vue-next'
+import { toast } from 'vue-sonner'
 
 const route = useRoute()
 const { user, logout } = useAuth()
@@ -27,6 +28,19 @@ const router = useRouter()
 const isProfileOpen = ref(false)
 const isChangePasswordOpen = ref(false)
 const config = useRuntimeConfig()
+
+const { state: updateState, check: checkUpdate } = useUpdateCheck()
+
+const handleCheckUpdate = async () => {
+  await checkUpdate(true)
+  if (updateState.value.error) {
+    toast.error('检查更新失败', { description: updateState.value.error })
+  } else if (updateState.value.hasUpdate) {
+    window.open(updateState.value.releaseUrl, '_blank')
+  } else {
+    toast.success('已是最新版本', { description: `当前版本 v${updateState.value.current}` })
+  }
+}
 
 const handleLogout = () => {
   logout()
@@ -128,6 +142,17 @@ const handleLogout = () => {
     </SidebarContent>
     <SidebarFooter>
       <SidebarMenu>
+        <SidebarMenuItem>
+          <SidebarMenuButton
+            :class="updateState.hasUpdate ? 'text-primary' : ''"
+            :tooltip="updateState.hasUpdate ? `发现新版本 v${updateState.latest}` : '检查更新'"
+            @click="handleCheckUpdate"
+          >
+            <Download v-if="updateState.hasUpdate" />
+            <RefreshCw v-else :class="updateState.checking ? 'animate-spin' : ''" />
+            <span>{{ updateState.hasUpdate ? `更新到 v${updateState.latest}` : '检查更新' }}</span>
+          </SidebarMenuButton>
+        </SidebarMenuItem>
         <SidebarMenuItem>
           <SidebarMenuButton as-child :is-active="route.path === '/manual'">
             <NuxtLink to="/manual">
