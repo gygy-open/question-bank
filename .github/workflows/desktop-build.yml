@@ -1,10 +1,14 @@
 name: Build Desktop
 
-# Build the single-file desktop executable for each OS and publish a GitHub
-# Release. Version is driven entirely by the git tag:
+# Build the Windows server package and publish a draft GitHub Release.
+# Version is driven entirely by the git tag:
 #   git tag v0.2.0 && git push origin v0.2.0
 # The tag (minus the leading "v") is stamped into the app before packaging and
 # used to name the Release and its assets.
+#
+# NOTE: Currently Windows-only. macOS/Linux are intentionally not built yet
+# (the app code stays cross-platform; only the service tooling is per-OS).
+# To re-enable them later, add a matrix + systemd/launchd packaging.
 
 on:
   push:
@@ -15,23 +19,13 @@ on:
 permissions:
   contents: write
 
+env:
+  # Pinned WinSW release used to wrap the app as a Windows service.
+  WINSW_URL: https://github.com/winsw/winsw/releases/download/v2.12.0/WinSW-x64.exe
+
 jobs:
   build:
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - os: windows-latest
-            bin: backend/dist/question-bank.exe
-            ext: .exe
-          - os: macos-latest
-            bin: backend/dist/question-bank
-            ext: ''
-          - os: ubuntu-latest
-            bin: backend/dist/question-bank
-            ext: ''
-    runs-on: ${{ matrix.os }}
-
+    runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
 
@@ -82,18 +76,40 @@ jobs:
         working-directory: backend
         run: uv run --with pyinstaller pyinstaller run.spec --clean
 
-      # --- Name the asset with version + OS and upload ---
-      - name: Rename artifact
-        shell: bash
+      # --- Stage payload + build the GUI installer (Inno Setup) ---
+      - name: Build installer
+        id: pkg
+        shell: pwsh
         run: |
-          asset="question-bank-${{ steps.ver.outputs.version }}-${{ runner.os }}${{ matrix.ext }}"
-          mv "${{ matrix.bin }}" "$asset"
-          echo "ASSET=$asset" >> "$GITHUB_ENV"
+          $ver = "${{ steps.ver.outputs.version }}"
+
+          # Stage everything the installer bundles into Program Files.
+          $payload = "installer_payload"
+          New-Item -ItemType Directory -Force -Path $payload | Out-Null
+          Copy-Item backend/dist/question-bank.exe "$payload/question-bank.exe"
+          Invoke-WebRequest -Uri "$env:WINSW_URL" -OutFile "$payload/question-bank-service.exe"
+          Copy-Item backend/deploy/windows/question-bank-service.xml "$payload/"
+          Copy-Item backend/deploy/windows/README.txt                "$payload/"
+          Copy-Item backend/deploy/windows/install-service.ps1        "$payload/"
+          Copy-Item backend/deploy/windows/uninstall-service.ps1      "$payload/"
+
+          # Compile with Inno Setup (preinstalled on GitHub windows runners).
+          $iscc = "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe"
+          if (-not (Test-Path $iscc)) {
+            choco install innosetup -y --no-progress
+          }
+          $out = "installer_out"
+          New-Item -ItemType Directory -Force -Path $out | Out-Null
+          & $iscc "/DMyAppVersion=$ver" "/DPayloadDir=$((Resolve-Path $payload).Path)" "/O$((Resolve-Path $out).Path)" backend/deploy/windows/installer.iss
+
+          $setup = "$out/QuestionBank-Setup-$ver.exe"
+          if (-not (Test-Path $setup)) { throw "Installer not produced: $setup" }
+          echo "setup=$setup" >> $env:GITHUB_OUTPUT
 
       - uses: actions/upload-artifact@v4
         with:
-          name: question-bank-${{ runner.os }}
-          path: ${{ env.ASSET }}
+          name: question-bank-windows-installer
+          path: ${{ steps.pkg.outputs.setup }}
           if-no-files-found: error
 
   release:
