@@ -20,3 +20,8 @@ backend/static/media/
 # OS / logs
 *.log
 logs/
+
+# VitePress docs build output
+docs/.vitepress/dist/
+docs/.vitepress/cache/
+docs/node_modules/
