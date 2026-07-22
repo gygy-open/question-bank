@@ -2,7 +2,9 @@
 
 AI 原生的题库系统
 
-![](./docs/example-imports.png)
+📖 在线文档：<https://gygy-open.github.io/question-bank/>
+
+![](./docs/public/example-imports.png)
 
 ## 核心特性
 
