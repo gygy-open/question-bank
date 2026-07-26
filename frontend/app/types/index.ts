@@ -111,6 +111,7 @@ export interface ImportItem {
   knowledge_point_ids: number[]
   subject_id?: number
   ai_suggested_tags?: Record<string, string[]>
+  warnings?: string[]
 }
 
 export interface QuestionPage {

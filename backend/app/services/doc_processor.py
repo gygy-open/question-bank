@@ -9,6 +9,7 @@ from app.core.config import settings
 from app.crud.crud_system_setting import system_setting
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.services.ai_provider import get_ai_provider
+from app.services.structured_parser import parse_structured
 from app.models.ai_config import AIModel, AIProvider
 from app.models.tag import Tag
 from app.models.tag_category import TagCategory
@@ -283,7 +284,7 @@ class DocProcessor:
         
         return extracted_questions
 
-    async def process_markdown(self, content: str, db: AsyncSession, filename: str = None, task_id: str = None, mode: str = "extract") -> dict:
+    async def process_markdown(self, content: str, db: AsyncSession, filename: str = None, task_id: str = None, mode: str = "extract", method: str = "ai") -> dict:
         """
         Process markdown content directly and extract questions.
         
@@ -293,6 +294,7 @@ class DocProcessor:
             filename: Optional filename
             task_id: Optional task ID (if not provided, a new one will be generated)
             mode: Processing mode ("extract" or "solve")
+            method: Parsing method ("ai" for AI extraction, "structured" for tag-based parsing)
         
         Returns:
             Dict with task_id, content, and extracted questions
@@ -307,8 +309,11 @@ class DocProcessor:
         output_path = task_dir / "content.md"
         await asyncio.to_thread(output_path.write_text, content, encoding='utf-8')
         
-        # Extract questions using AI
-        extracted_questions = await self._call_ai_for_questions(content, db, filename=filename, mode=mode)
+        # Extract questions
+        if method == "structured":
+            extracted_questions = parse_structured(content)
+        else:
+            extracted_questions = await self._call_ai_for_questions(content, db, filename=filename, mode=mode)
         
         return {
             "task_id": task_id,
@@ -357,7 +362,7 @@ class DocProcessor:
             "questions": extracted_questions
         }
 
-    async def process_docx(self, file_path: Path, db: AsyncSession = None, task_id: str = None, mode: str = "extract") -> dict:
+    async def process_docx(self, file_path: Path, db: AsyncSession = None, task_id: str = None, mode: str = "extract", method: str = "ai") -> dict:
         """
         Convert docx to markdown, extract media, and parse questions using Gemini.
         """
@@ -414,8 +419,11 @@ class DocProcessor:
 
         content = await asyncio.to_thread(handle_media_and_update_content, content)
 
-        # Extract questions using AI
-        extracted_questions = await self._call_ai_for_questions(content, db, filename=file_path.name, mode=mode)
+        # Extract questions
+        if method == "structured":
+            extracted_questions = parse_structured(content)
+        else:
+            extracted_questions = await self._call_ai_for_questions(content, db, filename=file_path.name, mode=mode)
         
         return {
             "task_id": task_id,

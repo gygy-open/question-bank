@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, watch } from 'vue'
 import { Upload, Loader2, FileText, CheckCircle2, AlertCircle, Sparkles, Trash2, Plus, Save, FileCode, Image as ImageIcon } from 'lucide-vue-next'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -29,6 +29,7 @@ definePageMeta({
 // --- State ---
 const step = ref<'upload' | 'review' | 'success'>('upload')
 const activeTab = ref('docx')
+const parseMethod = ref<'ai' | 'structured'>('ai')
 const importMode = ref<'extract' | 'solve'>('extract')
 const file = ref<File | null>(null)
 const markdownContent = ref('')
@@ -46,6 +47,13 @@ const globalSettings = ref({
     subject_id: undefined as number | undefined,
     status: 'pending' as 'draft' | 'pending' | 'published',
     source: '' as string,
+})
+
+// Image recognition is AI-only; leave the image tab when switching to structured parsing.
+watch(parseMethod, (method) => {
+    if (method === 'structured' && activeTab.value === 'image') {
+        activeTab.value = 'docx'
+    }
 })
 
 // --- Data Fetching ---
@@ -157,13 +165,14 @@ const transformQuestionsData = (questions: any[]) => {
             selected: true,
             content: cleanContent,
             q_type: q_type,
-            options: q_type === 'single_choice' ? parseOptions(q.options) : [],
+            options: (q_type === 'single_choice' || q_type === 'multiple_choice') ? parseOptions(q.options) : [],
             answer: q.answer || '',
             thinking: q.thinking || '',
             analysis: q.analysis || '',
             difficulty: q.difficulty || 1,
             knowledge_point_ids: q.knowledge_point_ids || [],
-            ai_suggested_tags
+            ai_suggested_tags,
+            warnings: Array.isArray(q.warnings) ? q.warnings : []
         }
     })
 }
@@ -177,7 +186,7 @@ const handleUploadDocx = async () => {
     formData.append('file', file.value)
 
     try {
-        const data = await $api<any>(`/upload/docx?mode=${importMode.value}`, {
+        const data = await $api<any>(`/upload/docx?mode=${importMode.value}&method=${parseMethod.value}`, {
             method: 'POST',
             body: formData,
         })
@@ -209,14 +218,14 @@ const handleUploadMarkdown = async (isFile: boolean = false) => {
         if (isFile) {
             const formData = new FormData()
             formData.append('file', file.value!)
-            data = await $api<any>(`/upload/markdown?mode=${importMode.value}`, {
+            data = await $api<any>(`/upload/markdown?mode=${importMode.value}&method=${parseMethod.value}`, {
                 method: 'POST',
                 body: formData,
             })
         } else {
             data = await $api<any>('/upload/markdown-text', {
                 method: 'POST',
-                body: { content: markdownContent.value, mode: importMode.value },
+                body: { content: markdownContent.value, mode: importMode.value, method: parseMethod.value },
             })
         if (data.file_path) {
             uploadedFilePath.value = data.file_path
@@ -377,6 +386,41 @@ const reset = () => {
                 </CardHeader>
                 <CardContent>
                     <div class="mb-6">
+                        <Label class="text-base font-medium mb-2 block">解析方法</Label>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div
+                                class="flex items-start space-x-3 border rounded-lg p-4 cursor-pointer transition-all hover:border-primary/50"
+                                :class="{ 'bg-accent/50 border-primary ring-1 ring-primary': parseMethod === 'ai' }"
+                                @click="parseMethod = 'ai'"
+                            >
+                                <div class="mt-1 h-4 w-4 rounded-full border border-primary flex items-center justify-center shrink-0">
+                                    <div v-if="parseMethod === 'ai'" class="h-2 w-2 rounded-full bg-primary" />
+                                </div>
+                                <div>
+                                    <div class="font-medium flex items-center gap-2">
+                                        AI 智能抽取
+                                        <Sparkles class="h-3 w-3 text-amber-500" />
+                                    </div>
+                                    <div class="text-sm text-muted-foreground mt-1">由 AI 自动识别题目结构，适用于格式不固定的文档与图片。</div>
+                                </div>
+                            </div>
+                            <div
+                                class="flex items-start space-x-3 border rounded-lg p-4 cursor-pointer transition-all hover:border-primary/50"
+                                :class="{ 'bg-accent/50 border-primary ring-1 ring-primary': parseMethod === 'structured' }"
+                                @click="parseMethod = 'structured'"
+                            >
+                                <div class="mt-1 h-4 w-4 rounded-full border border-primary flex items-center justify-center shrink-0">
+                                    <div v-if="parseMethod === 'structured'" class="h-2 w-2 rounded-full bg-primary" />
+                                </div>
+                                <div>
+                                    <div class="font-medium">标签精准解析</div>
+                                    <div class="text-sm text-muted-foreground mt-1">按【题目】【选项】【答案】等标签精准解析，无需 AI、即时且可控。</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div v-if="parseMethod === 'ai'" class="mb-6">
                         <Label class="text-base font-medium mb-2 block">处理模式</Label>
                         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <div 
@@ -411,8 +455,12 @@ const reset = () => {
                         </div>
                     </div>
 
+                    <div v-if="parseMethod === 'structured'" class="mb-6 rounded-md bg-muted/50 border p-4 text-sm text-muted-foreground">
+                        使用 <code class="text-foreground">【题目】</code> 分隔每道题，可选 <code class="text-foreground">【选项】【答案】【解析】【题型】【难度】</code> 等标签；除 <code class="text-foreground">【题目】</code> 外均可省略，题型可自动推断。
+                    </div>
+
                     <Tabs v-model="activeTab" class="w-full">
-                        <TabsList class="grid w-full grid-cols-3">
+                        <TabsList class="grid w-full" :class="parseMethod === 'ai' ? 'grid-cols-3' : 'grid-cols-2'">
                             <TabsTrigger value="docx" class="gap-2">
                                 <FileText class="h-4 w-4" />
                                 Word 文档
@@ -421,7 +469,7 @@ const reset = () => {
                                 <FileCode class="h-4 w-4" />
                                 Markdown
                             </TabsTrigger>
-                            <TabsTrigger value="image" class="gap-2">
+                            <TabsTrigger v-if="parseMethod === 'ai'" value="image" class="gap-2">
                                 <ImageIcon class="h-4 w-4" />
                                 图片识别
                             </TabsTrigger>

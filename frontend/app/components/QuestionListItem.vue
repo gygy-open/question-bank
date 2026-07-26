@@ -4,7 +4,7 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Card } from '@/components/ui/card'
-import { Pencil, Trash2, Copy, ChevronDown, Star, ShoppingBasket, CheckCircle, History, Workflow, CornerDownRight, GitFork, FileText } from 'lucide-vue-next'
+import { Pencil, Trash2, Copy, ChevronDown, Star, ShoppingBasket, CheckCircle, History, Workflow, CornerDownRight, GitFork, FileText, AlertTriangle } from 'lucide-vue-next'
 import MarkdownPreview from './MarkdownPreview.vue'
 import type { Question as DbQuestion, KnowledgePoint, ImportItem } from '@/types'
 import { usePaperBasket } from '@/composables/usePaperBasket'
@@ -85,6 +85,12 @@ const typeColor = computed(() => {
     'free_response': 'bg-yellow-100 text-yellow-800'
   }
   return colors[props.item.q_type] || 'bg-gray-100 text-gray-800'
+})
+
+const warnings = computed<string[]>(() => {
+  if (props.mode !== 'import') return []
+  const w = (props.item as ImportItem).warnings
+  return Array.isArray(w) ? w : []
 })
 
 const contentPreview = computed(() => {
@@ -336,6 +342,12 @@ const sourceFileUrl = computed(() => {
 
         <!-- Content -->
         <div class="w-full">
+          <div v-if="warnings.length > 0" class="mb-2 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-800 dark:border-amber-700 dark:bg-amber-900/20 dark:text-amber-300">
+            <div v-for="(w, wi) in warnings" :key="wi" class="flex items-center gap-1.5">
+              <AlertTriangle class="h-3.5 w-3.5 shrink-0" />
+              <span>{{ w }}</span>
+            </div>
+          </div>
           <div :class="mode === 'library' ? 'prose prose-sm max-w-none dark:prose-invert' : 'text-sm text-gray-600 mb-2'">
             <MarkdownPreview :content="contentPreview" />
           </div>
