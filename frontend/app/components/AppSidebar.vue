@@ -185,6 +185,7 @@ const handleLogout = () => {
             </NuxtLink>
           </SidebarMenuButton>
         </SidebarMenuItem>
+        <LanShareDialog />
         <SidebarMenuItem>
           <DropdownMenu>
             <DropdownMenuTrigger as-child>

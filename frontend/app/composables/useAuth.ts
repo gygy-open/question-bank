@@ -11,20 +11,22 @@ export const useAuth = () => {
 
   const { $api } = useNuxtApp()
 
-  const fetchUser = async () => {
+  const fetchUser = async (): Promise<User | null> => {
     if (!token.value) {
       user.value = null
-      return
+      return null
     }
     
     try {
       loading.value = true
       const data = await $api<User>('/users/me')
       user.value = data
+      return data
     } catch (error) {
       console.error('Failed to fetch user', error)
       token.value = null
       user.value = null
+      return null
     } finally {
       loading.value = false
     }
@@ -43,7 +45,14 @@ export const useAuth = () => {
       })
       
       token.value = data.access_token
-      await fetchUser()
+      // 校验令牌是否真的可用：拉取当前用户成功才算登录成功。
+      // 否则（如手机端时钟偏差、Cookie 未持久化导致 /users/me 失败）
+      // fetchUser 会清空 token，此处需抛出真实错误，避免"假成功"。
+      const loggedInUser = await fetchUser()
+      if (!loggedInUser) {
+        token.value = null
+        throw new Error('登录校验失败，请检查网络连接与设备时间后重试')
+      }
       return true
     } catch (error) {
       console.error('Login failed', error)

@@ -1,6 +1,7 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
 
 from app._version import __version__
+from app.api import deps
 
 router = APIRouter()
 
@@ -20,4 +21,44 @@ async def get_version() -> dict:
         "version": __version__,
         "repo": GITHUB_REPO,
         "releases_url": f"https://github.com/{GITHUB_REPO}/releases/latest",
+    }
+
+
+def _lan_ip() -> str:
+    """Best-effort primary LAN IPv4 address (no packets are actually sent)."""
+    import socket
+
+    try:
+        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        try:
+            s.connect(("8.8.8.8", 80))
+            return s.getsockname()[0]
+        finally:
+            s.close()
+    except OSError:
+        return "127.0.0.1"
+
+
+@router.get("/network")
+async def get_network_info(
+    current_user=Depends(deps.get_current_active_user),
+) -> dict:
+    """Return LAN-sharing status and the address colleagues can use.
+
+    Lets non-technical desktop users read the access URL directly in the UI
+    instead of running ``ipconfig``. When sharing is off, no address is
+    returned (the app is bound to 127.0.0.1 and only reachable locally).
+    """
+    import os
+
+    from app.core.config import get_lan_share
+
+    lan_share = get_lan_share()
+    port = int(os.getenv("PORT", "8000"))
+    ip = _lan_ip() if lan_share else None
+    return {
+        "lan_share": lan_share,
+        "port": port,
+        "host_ip": ip,
+        "lan_url": f"http://{ip}:{port}/" if ip else None,
     }
