@@ -4,7 +4,7 @@ import json
 import sys
 from pathlib import Path
 from datetime import datetime, timezone
-from sqlalchemy import select, update, func
+from sqlalchemy import select, update, func, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 # Add backend directory to path so we can import app modules
@@ -190,6 +190,25 @@ async def process_task(db: AsyncSession, task: ImportTask):
         task.updated_at = datetime.now(timezone.utc)
         await db.commit()
 
+async def wait_for_schema() -> None:
+    """Block until the database schema has been migrated.
+
+    ``is_configured()`` only tells us a database URL exists — the tables may not
+    be there yet because migrations run in a *different* process (the backend
+    entrypoint / the setup wizard) and can still be in progress. Probing a core
+    table here prevents the worker from querying (and erroring on) tables that
+    have not been created yet.
+    """
+    while True:
+        try:
+            async with SessionLocal() as db:
+                await db.execute(text("SELECT 1 FROM import_tasks LIMIT 1"))
+            return
+        except Exception:
+            logger.info("Worker: waiting for database schema (migrations)...")
+            await asyncio.sleep(5)
+
+
 async def worker():
     logger.info("Worker started, initializing...")
 
@@ -199,6 +218,11 @@ async def worker():
     while not is_configured():
         logger.info("Worker: database not configured yet, waiting for setup...")
         await asyncio.sleep(5)
+
+    # A configured URL does not guarantee the schema exists yet: migrations may
+    # still be running in another process. Wait for the tables before touching
+    # the DB or the embedding model (which reads ``system_settings``).
+    await wait_for_schema()
 
     # Initialize Embedding Function
     try:
