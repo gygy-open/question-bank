@@ -4,6 +4,10 @@ AI 原生的题库系统
 
 📖 在线文档：<https://gygy-open.github.io/question-bank/>
 
+> 扫码关注微信公众号，获取项目最新动态；有任何问题或建议，也欢迎后台私信交流 👇
+>
+> <img src="./docs/public/qrcode_for_gh_ef2f2e31e4f8_258.jpg" alt="微信公众号二维码" width="180" />
+
 ![](./docs/public/example-imports.png)
 
 ## 核心特性
