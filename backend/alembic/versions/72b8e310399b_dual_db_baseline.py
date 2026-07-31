@@ -34,6 +34,9 @@ def upgrade() -> None:
         batch_op.create_index(batch_op.f('ix_ai_providers_id'), ['id'], unique=False)
         batch_op.create_index(batch_op.f('ix_ai_providers_name'), ['name'], unique=True)
 
+    # NOTE: The 'subjects.created_by/updated_by' -> 'user' and 'user.subject_id'
+    # -> 'subjects' form a circular FK dependency. Create 'subjects' without
+    # those FKs first, then add them after 'user' exists (see below).
     op.create_table('subjects',
     sa.Column('id', sa.Integer(), nullable=False),
     sa.Column('name', sa.String(length=255), nullable=False),
@@ -44,8 +47,6 @@ def upgrade() -> None:
     sa.Column('updated_at', sa.DateTime(), nullable=True),
     sa.Column('created_by', sa.Integer(), nullable=True),
     sa.Column('updated_by', sa.Integer(), nullable=True),
-    sa.ForeignKeyConstraint(['created_by'], ['user.id'], ),
-    sa.ForeignKeyConstraint(['updated_by'], ['user.id'], ),
     sa.PrimaryKeyConstraint('id')
     )
     with op.batch_alter_table('subjects', schema=None) as batch_op:
@@ -93,6 +94,10 @@ def upgrade() -> None:
         batch_op.create_index(batch_op.f('ix_user_id'), ['id'], unique=False)
         batch_op.create_index(batch_op.f('ix_user_subject_id'), ['subject_id'], unique=False)
         batch_op.create_index(batch_op.f('ix_user_username'), ['username'], unique=True)
+
+    # Now that 'user' exists, add the deferred FKs on 'subjects'.
+    op.create_foreign_key('fk_subjects_created_by_user', 'subjects', 'user', ['created_by'], ['id'])
+    op.create_foreign_key('fk_subjects_updated_by_user', 'subjects', 'user', ['updated_by'], ['id'])
 
     op.create_table('activity_logs',
     sa.Column('id', sa.Integer(), nullable=False),
@@ -311,6 +316,9 @@ def downgrade() -> None:
         batch_op.drop_index(batch_op.f('ix_activity_logs_id'))
 
     op.drop_table('activity_logs')
+    # Drop the deferred circular FKs before dropping 'user'/'subjects'.
+    op.drop_constraint('fk_subjects_updated_by_user', 'subjects', type_='foreignkey')
+    op.drop_constraint('fk_subjects_created_by_user', 'subjects', type_='foreignkey')
     with op.batch_alter_table('user', schema=None) as batch_op:
         batch_op.drop_index(batch_op.f('ix_user_username'))
         batch_op.drop_index(batch_op.f('ix_user_subject_id'))
