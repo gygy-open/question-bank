@@ -12,6 +12,7 @@ from typing import Any, Dict, List, Optional, Tuple
 import pandas as pd
 from openpyxl import Workbook
 from openpyxl.styles import Font, PatternFill
+from openpyxl.utils import get_column_letter
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -28,14 +29,24 @@ from app.schemas.knowledge_point import (
 
 # Template column headers (Chinese, matched exactly on import).
 SUBJECT_COL = "学科名称"
-LEVEL_COLS = ["一级目录", "二级目录", "三级目录", "四级目录", "五级目录"]
+LEVEL_COLS = [
+    "一级目录",
+    "二级目录",
+    "三级目录",
+    "四级目录",
+    "五级目录",
+    "六级目录",
+    "七级目录",
+    "八级目录",
+]
 ALL_COLS = [SUBJECT_COL] + LEVEL_COLS
 
 # Example rows shipped inside the template so users see the expected format.
+# Rows are padded to the full column count in generate_template().
 EXAMPLE_ROWS = [
-    ["数学", "代数", "方程", "一元一次方程", "", ""],
+    ["数学", "代数", "方程", "一元一次方程"],
     ["数学", "代数", "方程", "一元二次方程", "解法", "公式法"],
-    ["数学", "几何", "平面几何", "三角形", "", ""],
+    ["数学", "几何", "平面几何", "三角形"],
 ]
 
 
@@ -54,12 +65,13 @@ def generate_template() -> bytes:
         cell.fill = header_fill
 
     for row in EXAMPLE_ROWS:
-        ws.append(row)
+        padded = list(row) + [""] * (len(ALL_COLS) - len(row))
+        ws.append(padded)
 
     # Reasonable column widths.
     ws.column_dimensions["A"].width = 16
-    for col in ["B", "C", "D", "E", "F"]:
-        ws.column_dimensions[col].width = 18
+    for idx in range(2, len(ALL_COLS) + 1):
+        ws.column_dimensions[get_column_letter(idx)].width = 18
 
     buffer = io.BytesIO()
     wb.save(buffer)

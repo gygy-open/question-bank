@@ -185,7 +185,7 @@ const modeName = computed(() => importMode.value === 'incremental' ? '增量新�
           <BookOpen class="h-4 w-4" />
           <AlertTitle>使用说明</AlertTitle>
           <AlertDescription>
-            <p class="mb-1">本功能用于批量创建知识点树，支持五级嵌套。请按以下步骤操作：</p>
+            <p class="mb-1">本功能用于批量创建知识点树，支持八级嵌套。请按以下步骤操作：</p>
             <ol class="list-decimal list-inside space-y-0.5 text-sm">
               <li>下载 Excel 模板，查看格式示例</li>
               <li>在模板中填写知识点数据</li>
@@ -203,7 +203,7 @@ const modeName = computed(() => importMode.value === 'incremental' ? '增量新�
                   <FileSpreadsheet class="w-9 h-9 text-green-600 shrink-0" />
                   <div class="flex-1 text-sm">
                     <p class="font-medium">knowledge_points_template.xlsx</p>
-                    <p class="text-muted-foreground mt-1">模板列：学科名称(必填)、一级目录(必填)、二级~五级目录(可选)</p>
+                    <p class="text-muted-foreground mt-1">模板列：学科名称(必填)、一级目录(必填)、二级~八级目录(可选)</p>
                   </div>
                 </div>
                 <Button variant="outline" class="mt-3 w-full" @click="downloadTemplate">
