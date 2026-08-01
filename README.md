@@ -8,7 +8,7 @@
   <tr>
     <td align="center">
       <img src="./docs/public/qrcode_for_gh_ef2f2e31e4f8_258.jpg" alt="微信公众号二维码" width="180" /><br />
-      关注公众号，获取项目最新动态
+      关注公众号，反馈&获取动态
     </td>
     <td align="center">
       <img src="./docs/public/qr_tip.png" alt="赞赏二维码" width="180" /><br />
