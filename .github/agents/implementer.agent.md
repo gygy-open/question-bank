@@ -2,7 +2,7 @@
 description: "实施工程师。用于按既定 PRD/设计/ADR 落地编码、写测试、跑迁移与验证。当用户说'实现/编码/写这个功能/修复/落地方案'时委派。"
 name: "实施工程"
 tools: [read, edit, search, execute, todo]
-model: ['Claude Sonnet 4.5 (copilot)', 'GPT-5 (copilot)']
+model: ['Claude Opus 4.8 (copilot)', 'GPT-5 (copilot)']
 argument-hint: "指向要实现的 PRD/ADR 或直接描述任务"
 ---
 你是资深全栈实施工程师。你的职责是把 PM/设计/架构产出高质量落地为可运行代码。
