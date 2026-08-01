@@ -22,6 +22,45 @@ export interface KnowledgePoint {
   parent_id?: number
 }
 
+export interface VectorStatus {
+  embedding_configured: boolean
+  db_count: number
+  vector_count: number
+  needs_reindex: boolean
+  reason: string
+}
+
+export interface ReindexResult {
+  status: string
+  reindexed: number
+  duration: number
+}
+
+export interface KPImportRowError {
+  row: number
+  message: string
+}
+
+export interface KPImportResult {
+  status: 'success' | 'partial' | 'failed'
+  subject_name?: string
+  mode: string
+  created: number
+  skipped: number
+  failed: number
+  total: number
+  duration: number
+  vector_synced: boolean
+  errors: KPImportRowError[]
+}
+
+export interface KPImportPreflight {
+  subject_id: number
+  subject_name: string
+  existing_count: number
+  affected_questions: number
+}
+
 export interface Tag {
   id: number
   name: string

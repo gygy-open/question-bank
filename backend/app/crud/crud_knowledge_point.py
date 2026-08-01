@@ -1,6 +1,7 @@
 from typing import List, Optional, Union, Dict, Any
+from slugify import slugify
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
+from sqlalchemy import select, update, delete, text
 from app.crud.base import CRUDBase
 from app.models.knowledge_point import KnowledgePoint
 from app.schemas.knowledge_point import KnowledgePointCreate, KnowledgePointUpdate
@@ -49,6 +50,10 @@ class CRUDKnowledgePoint(CRUDBase[KnowledgePoint, KnowledgePointCreate, Knowledg
         """
         Sync a knowledge point to the vector store.
         """
+        # Deferred indexing: skip entirely when no embedding model is configured.
+        # The user can trigger a manual reindex later via reindex_vectors().
+        if not VectorStore.is_available():
+            return
         try:
             text = await self._build_path_text(db, kp)
             metadata = {
@@ -104,9 +109,10 @@ class CRUDKnowledgePoint(CRUDBase[KnowledgePoint, KnowledgePointCreate, Knowledg
             await log_activity(db, user_id, "delete", "knowledge_point", id)
             await db.commit()
             
-            # Remove from vector store
-            for desc_id in descendant_ids:
-                VectorStore.delete_knowledge_point(desc_id)
+            # Remove from vector store (skip if no embedding configured)
+            if VectorStore.is_available():
+                for desc_id in descendant_ids:
+                    VectorStore.delete_knowledge_point(desc_id)
             
         return obj
 
@@ -145,5 +151,135 @@ class CRUDKnowledgePoint(CRUDBase[KnowledgePoint, KnowledgePointCreate, Knowledg
                 queue.extend(children)
                 
         return ids
+
+    # --- Batch import helpers ---
+
+    async def make_unique_slug(self, db: AsyncSession, subject_id: int, name: str,
+                               used_slugs: Optional[set] = None) -> str:
+        """
+        Generate a slug unique within a subject. `used_slugs` (optional) lets a
+        batch operation reserve slugs in-memory before they are committed.
+        """
+        base_slug = slugify(name) or "kp"
+        candidate = base_slug
+        counter = 1
+        while True:
+            if used_slugs is not None and candidate in used_slugs:
+                candidate = f"{base_slug}-{counter}"
+                counter += 1
+                continue
+            result = await db.execute(
+                select(KnowledgePoint.id).where(
+                    KnowledgePoint.subject_id == subject_id,
+                    KnowledgePoint.slug == candidate,
+                )
+            )
+            if result.scalars().first() is None:
+                break
+            candidate = f"{base_slug}-{counter}"
+            counter += 1
+        if used_slugs is not None:
+            used_slugs.add(candidate)
+        return candidate
+
+    async def create_batch(self, db: AsyncSession, *, nodes: List[Dict[str, Any]],
+                           user_id: Optional[int] = None) -> List[KnowledgePoint]:
+        """
+        Create many knowledge points in a single transaction (one commit).
+        Does NOT sync to the vector store per-node; the caller handles batch
+        vectorization afterwards. `nodes` items: {name, slug, subject_id, parent_id}.
+        """
+        db_objs: List[KnowledgePoint] = []
+        for node in nodes:
+            db_obj = KnowledgePoint(
+                name=node["name"],
+                slug=node["slug"],
+                subject_id=node["subject_id"],
+                parent_id=node.get("parent_id"),
+            )
+            if user_id:
+                db_obj.created_by = user_id
+                db_obj.updated_by = user_id
+            db.add(db_obj)
+            db_objs.append(db_obj)
+        await db.commit()
+        for obj in db_objs:
+            await db.refresh(obj)
+        return db_objs
+
+    async def clear_by_subject(self, db: AsyncSession, *, subject_id: int) -> List[int]:
+        """
+        Delete all knowledge points of a subject. Returns the deleted ids so the
+        caller can clean up the vector store. Handles the self-referential FK for
+        both SQLite and MySQL/Postgres.
+        """
+        result = await db.execute(
+            select(KnowledgePoint.id).where(KnowledgePoint.subject_id == subject_id)
+        )
+        ids = [row for row in result.scalars().all()]
+        if not ids:
+            return []
+
+        is_sqlite = db.bind.dialect.name == "sqlite"
+        try:
+            if is_sqlite:
+                await db.execute(text("PRAGMA foreign_keys = OFF"))
+            else:
+                # Break self-references first so the mass delete doesn't violate FK.
+                await db.execute(
+                    update(KnowledgePoint)
+                    .where(KnowledgePoint.subject_id == subject_id)
+                    .values(parent_id=None)
+                )
+                await db.flush()
+
+            await db.execute(
+                delete(KnowledgePoint).where(KnowledgePoint.subject_id == subject_id)
+            )
+            await db.commit()
+        finally:
+            if is_sqlite:
+                await db.execute(text("PRAGMA foreign_keys = ON"))
+
+        if VectorStore.is_available():
+            VectorStore.delete_knowledge_points_batch(ids)
+        return ids
+
+    # --- Manual vector reindex (deferred indexing) ---
+
+    async def reindex_vectors(self, db: AsyncSession, *, subject_id: Optional[int] = None) -> int:
+        """
+        Rebuild the vector store from the database (source of truth).
+        If subject_id is given, only that subject's points are reindexed;
+        otherwise the whole collection is reset and rebuilt.
+        Returns the number of knowledge points reindexed.
+        """
+        if not VectorStore.is_available():
+            raise ValueError("Embedding model is not configured.")
+
+        if subject_id is not None:
+            kps = await self.get_by_subject(db, subject_id=subject_id, limit=None)
+            # Remove any stale vectors for this subject before re-adding.
+            VectorStore.delete_knowledge_points_batch([kp.id for kp in kps])
+        else:
+            VectorStore.reset_collection()
+            kps = await self.get_multi(db, limit=None)
+
+        items: List[Dict[str, Any]] = []
+        for kp in kps:
+            path_text = await self._build_path_text(db, kp)
+            items.append({
+                "id": kp.id,
+                "text": path_text,
+                "metadata": {
+                    "id": kp.id,
+                    "subject_id": kp.subject_id,
+                    "name": kp.name,
+                    "slug": kp.slug,
+                },
+            })
+
+        VectorStore.upsert_knowledge_points_batch(items)
+        return len(items)
 
 knowledge_point = CRUDKnowledgePoint(KnowledgePoint)

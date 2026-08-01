@@ -1,11 +1,13 @@
 <script setup lang="ts">
 import PageHeader from '~/components/PageHeader.vue'
-import type { KnowledgePoint, Subject } from '~/types'
+import type { KnowledgePoint, Subject, VectorStatus, ReindexResult } from '~/types'
 import { useAPI } from '~/composables/useAPI'
-import { Loader2, Plus, Save, X, Folder } from 'lucide-vue-next'
+import { Loader2, Plus, Save, X, Folder, Upload, Download, RefreshCw, Database } from 'lucide-vue-next'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
+import { Alert, AlertDescription } from '@/components/ui/alert'
+import KnowledgePointImportDialog from '@/components/manager/KnowledgePointImportDialog.vue'
 import { toast } from 'vue-sonner'
 
 const { $api } = useNuxtApp()
@@ -22,6 +24,8 @@ const newRootSlug = ref('')
 
 // --- Data Fetching ---
 const { data: subjects } = await useAPI<Subject[]>('/subjects')
+const { data: currentUser } = await useAPI<{ is_superuser?: boolean }>('/users/me')
+const isSuperuser = computed(() => !!currentUser.value?.is_superuser)
 
 const selectedSubjectId = ref<string>('')
 
@@ -29,6 +33,10 @@ const selectedSubjectId = ref<string>('')
 if (subjects.value && subjects.value.length > 0) {
   selectedSubjectId.value = String(subjects.value[0].id)
 }
+
+const selectedSubjectName = computed(() =>
+  subjects.value?.find(s => String(s.id) === selectedSubjectId.value)?.name || ''
+)
 
 const { data: knowledgePoints, refresh, status } = await useAPI<KnowledgePoint[]>('/knowledge-points', {
   query: computed(() => ({ subject_id: selectedSubjectId.value, limit: -1 })),
@@ -217,6 +225,40 @@ watch(newRootName, (val) => {
   if (!isCreatingRoot.value) return
   newRootSlug.value = val.toLowerCase().replace(/\s+/g, '-')
 })
+
+// --- Batch import & vector sync ---
+const showImportDialog = ref(false)
+const vectorStatus = ref<VectorStatus | null>(null)
+const isReindexing = ref(false)
+
+const fetchVectorStatus = async () => {
+  if (!isSuperuser.value) return
+  try {
+    vectorStatus.value = await $api<VectorStatus>('/knowledge-points/vector-status')
+  } catch {
+    vectorStatus.value = null
+  }
+}
+
+const handleImported = async () => {
+  await refresh()
+  await fetchVectorStatus()
+}
+
+const handleReindex = async () => {
+  isReindexing.value = true
+  try {
+    const res = await $api<ReindexResult>('/knowledge-points/reindex-vectors', { method: 'POST' })
+    toast.success(`向量索引已重建（${res.reindexed} 个知识点，耗时 ${res.duration}s）`)
+    await fetchVectorStatus()
+  } catch (e: any) {
+    toast.error('重建失败: ' + (e.data?.detail || e.message))
+  } finally {
+    isReindexing.value = false
+  }
+}
+
+onMounted(fetchVectorStatus)
 </script>
 
 <template>
@@ -236,13 +278,32 @@ watch(newRootName, (val) => {
         </TabsList>
 
         <div class="mt-4 border rounded-lg p-4 min-h-[500px] bg-card">
-          <div class="flex justify-between items-center mb-4">
+          <div class="flex justify-between items-center mb-4 gap-2 flex-wrap">
             <h3 class="text-lg font-medium">知识点树</h3>
-            <Button v-if="!isCreatingRoot" size="sm" @click="isCreatingRoot = true">
-              <Plus class="w-4 h-4 mr-2" />
-              添加根目录
-            </Button>
+            <div class="flex items-center gap-2">
+              <template v-if="isSuperuser">
+                <Button variant="outline" size="sm" @click="showImportDialog = true">
+                  <Upload class="w-4 h-4 mr-2" />批量导入
+                </Button>
+              </template>
+              <Button v-if="!isCreatingRoot" size="sm" @click="isCreatingRoot = true">
+                <Plus class="w-4 h-4 mr-2" />
+                添加根目录
+              </Button>
+            </div>
           </div>
+
+          <!-- Vector index status (superuser only, only when reindex needed) -->
+          <Alert v-if="isSuperuser && vectorStatus?.needs_reindex" class="mb-4">
+            <Database class="h-4 w-4" />
+            <AlertDescription class="flex items-center justify-between gap-2">
+              <span class="text-sm">{{ vectorStatus.reason }}，建议重建向量索引以启用语义检索。</span>
+              <Button size="sm" variant="outline" :disabled="isReindexing" @click="handleReindex">
+                <RefreshCw class="w-4 h-4 mr-2" :class="{ 'animate-spin': isReindexing }" />
+                重建向量索引
+              </Button>
+            </AlertDescription>
+          </Alert>
 
           <!-- Root Creation Form -->
           <div v-if="isCreatingRoot" class="mb-4 p-3 border rounded-md bg-muted/30 flex items-center gap-2">
@@ -276,5 +337,12 @@ watch(newRootName, (val) => {
         </div>
       </Tabs>
     </div>
+
+    <KnowledgePointImportDialog
+      v-model:open="showImportDialog"
+      :subject-id="selectedSubjectId ? Number(selectedSubjectId) : null"
+      :subject-name="selectedSubjectName"
+      @imported="handleImported"
+    />
   </div>
 </template>

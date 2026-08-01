@@ -1,3 +1,4 @@
+from typing import Any, Dict, List
 import chromadb
 from app.core.config import settings, chroma_mode, chroma_path
 
@@ -26,6 +27,14 @@ class VectorStore:
         return cls._client
 
     @classmethod
+    def is_available(cls) -> bool:
+        """
+        Whether an embedding function is configured. Write paths use this to
+        decide whether to sync (deferred indexing when no embedding model set up).
+        """
+        return cls._embedding_function is not None
+
+    @classmethod
     def get_collection(cls, name: str = "knowledge_points"):
         if cls._embedding_function is None:
             raise ValueError("Embedding function is not initialized. Please configure an AI Embedding Model in System Settings.")
@@ -33,6 +42,56 @@ class VectorStore:
         client = cls.get_client()
         # get_or_create_collection handles the existence check
         return client.get_or_create_collection(name=name, embedding_function=cls._embedding_function)
+
+    @classmethod
+    def count(cls, name: str = "knowledge_points") -> int:
+        """Number of vectors currently in the collection (for sync-status comparison)."""
+        if not cls.is_available():
+            return 0
+        try:
+            return cls.get_collection(name).count()
+        except Exception as e:
+            print(f"Error counting vector store collection {name}: {e}")
+            return 0
+
+    @classmethod
+    def reset_collection(cls, name: str = "knowledge_points"):
+        """Delete the collection so it can be rebuilt from scratch (full reindex)."""
+        try:
+            client = cls.get_client()
+            client.delete_collection(name)
+        except Exception as e:
+            # Collection may not exist yet; that's fine.
+            print(f"Note: could not delete collection {name} (may not exist): {e}")
+
+    @classmethod
+    def upsert_knowledge_points_batch(cls, items: List[Dict[str, Any]]):
+        """
+        Batch upsert knowledge points in a single call.
+        items: [{"id": int, "text": str, "metadata": dict}, ...]
+        """
+        if not cls.is_available() or not items:
+            return
+        try:
+            collection = cls.get_collection()
+            collection.upsert(
+                ids=[str(i["id"]) for i in items],
+                documents=[i["text"] for i in items],
+                metadatas=[i["metadata"] for i in items],
+            )
+        except Exception as e:
+            print(f"Error batch upserting {len(items)} knowledge points to vector store: {e}")
+
+    @classmethod
+    def delete_knowledge_points_batch(cls, ids: List[int]):
+        """Batch delete knowledge points from the vector store by id."""
+        if not cls.is_available() or not ids:
+            return
+        try:
+            collection = cls.get_collection()
+            collection.delete(ids=[str(i) for i in ids])
+        except Exception as e:
+            print(f"Error batch deleting knowledge points from vector store: {e}")
 
     @classmethod
     def upsert_knowledge_point(cls, id: int, text: str, metadata: dict):
