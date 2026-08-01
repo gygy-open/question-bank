@@ -126,12 +126,12 @@ class CRUDQuestion(CRUDBase[Question, QuestionCreate, QuestionUpdate]):
         if knowledge_point_id:
             kp_ids = await knowledge_point_crud.get_descendant_ids(db, knowledge_point_id)
             if kp_ids:
-                query = query.join(self.model.knowledge_points).filter(KnowledgePoint.id.in_(kp_ids))
+                query = query.filter(self.model.knowledge_points.any(KnowledgePoint.id.in_(kp_ids)))
             else:
                 query = query.filter(self.model.id == -1)
             
         if tag_ids:
-            query = query.join(self.model.tags).filter(Tag.id.in_(tag_ids))
+            query = query.filter(self.model.tags.any(Tag.id.in_(tag_ids)))
             
         if q_type:
             query = query.filter(self.model.q_type == q_type)
