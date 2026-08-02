@@ -40,59 +40,23 @@
 
 \vspace{0.5cm}
 
-\BLOCK{ if parts.choice }
-\section*{一、选择题（共 \VAR{ parts.choice|length } 小题）}
+\BLOCK{ for section in sections }
+\BLOCK{ if section.title }
+\section*{\VAR{ section.title }}
+\BLOCK{ endif }
 \begin{questions}
-    \BLOCK{ for q in parts.choice }
+    \BLOCK{ for q in section.questions }
     \question \VAR{ q.content_tex }
+    \BLOCK{ if q.options_tex }
     \begin{choices}
         \BLOCK{ for opt in q.options_tex }
         \choice \VAR{ opt }
         \BLOCK{ endfor }
     \end{choices}
-    \BLOCK{ if q.answer_tex } \par \textbf{【答案】} \VAR{ q.answer_tex } \BLOCK{ endif }
-    \BLOCK{ if q.thinking_tex } \par \textbf{【分析】} \VAR{ q.thinking_tex } \BLOCK{ endif }
-    \BLOCK{ if q.analysis_tex } \par \textbf{【解析】} \VAR{ q.analysis_tex } \BLOCK{ endif }
-    \BLOCK{ if q.summary_tex } \par \textbf{【总结】} \VAR{ q.summary_tex } \BLOCK{ endif }
-    \BLOCK{ if q.source_tex } \par \textbf{【来源】} \VAR{ q.source_tex } \BLOCK{ endif }
-    \BLOCK{ endfor }
-\end{questions}
-\BLOCK{ endif }
-
-\BLOCK{ if parts.true_false }
-\section*{二、判断题（共 \VAR{ parts.true_false|length } 小题）}
-\begin{questions}
-    \BLOCK{ for q in parts.true_false }
-    \question \VAR{ q.content_tex }
-    \BLOCK{ if q.answer_tex } \par \textbf{【答案】} \VAR{ q.answer_tex } \BLOCK{ endif }
-    \BLOCK{ if q.thinking_tex } \par \textbf{【分析】} \VAR{ q.thinking_tex } \BLOCK{ endif }
-    \BLOCK{ if q.analysis_tex } \par \textbf{【解析】} \VAR{ q.analysis_tex } \BLOCK{ endif }
-    \BLOCK{ if q.summary_tex } \par \textbf{【总结】} \VAR{ q.summary_tex } \BLOCK{ endif }
-    \BLOCK{ if q.source_tex } \par \textbf{【来源】} \VAR{ q.source_tex } \BLOCK{ endif }
-    \BLOCK{ endfor }
-\end{questions}
-\BLOCK{ endif }
-
-\BLOCK{ if parts.fill }
-\section*{三、填空题（共 \VAR{ parts.fill|length } 小题）}
-\begin{questions}
-    \BLOCK{ for q in parts.fill }
-    \question \VAR{ q.content_tex }
-    \BLOCK{ if q.answer_tex } \par \textbf{【答案】} \VAR{ q.answer_tex } \BLOCK{ endif }
-    \BLOCK{ if q.thinking_tex } \par \textbf{【分析】} \VAR{ q.thinking_tex } \BLOCK{ endif }
-    \BLOCK{ if q.analysis_tex } \par \textbf{【解析】} \VAR{ q.analysis_tex } \BLOCK{ endif }
-    \BLOCK{ if q.summary_tex } \par \textbf{【总结】} \VAR{ q.summary_tex } \BLOCK{ endif }
-    \BLOCK{ if q.source_tex } \par \textbf{【来源】} \VAR{ q.source_tex } \BLOCK{ endif }
-    \BLOCK{ endfor }
-\end{questions}
-\BLOCK{ endif }
-
-\BLOCK{ if parts.essay }
-\section*{四、解答题（共 \VAR{ parts.essay|length } 小题）}
-\begin{questions}
-    \BLOCK{ for q in parts.essay }
-    \question \VAR{ q.content_tex }
+    \BLOCK{ endif }
+    \BLOCK{ if q.reserve_space }
     \vspace{5cm} % 预留答题空间
+    \BLOCK{ endif }
     \BLOCK{ if q.answer_tex } \par \textbf{【答案】} \VAR{ q.answer_tex } \BLOCK{ endif }
     \BLOCK{ if q.thinking_tex } \par \textbf{【分析】} \VAR{ q.thinking_tex } \BLOCK{ endif }
     \BLOCK{ if q.analysis_tex } \par \textbf{【解析】} \VAR{ q.analysis_tex } \BLOCK{ endif }
@@ -100,6 +64,6 @@
     \BLOCK{ if q.source_tex } \par \textbf{【来源】} \VAR{ q.source_tex } \BLOCK{ endif }
     \BLOCK{ endfor }
 \end{questions}
-\BLOCK{ endif }
+\BLOCK{ endfor }
 
 \end{document}

@@ -11,3 +11,4 @@ from .system_setting import SystemSetting
 from .ai_config import AIProvider, AIModel
 from .chat import ChatSession, ChatMessage
 from .prompt import PromptTemplate
+from .paper import Paper, PaperQuestion

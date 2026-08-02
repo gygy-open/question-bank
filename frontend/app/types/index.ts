@@ -161,6 +161,39 @@ export interface QuestionPage {
   pages: number
 }
 
+export interface QuestionBrief {
+  id: number
+  content: string
+  q_type: string
+  difficulty: number
+}
+
+export interface PaperItem {
+  id: number
+  question_id: number
+  sequence: number
+  section_title?: string | null
+  score?: number | null
+  question?: QuestionBrief | null
+}
+
+export interface Paper {
+  id: number
+  title: string
+  description?: string | null
+  status: 'draft' | 'archived'
+  subject_id?: number | null
+  owner_id: number
+  created_at: string
+  updated_at: string
+  question_count: number
+}
+
+export interface PaperDetail extends Paper {
+  items: PaperItem[]
+}
+
+
 export interface User {
   id: number
   username: string

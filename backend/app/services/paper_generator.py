@@ -96,39 +96,57 @@ class PaperGenerator:
         text = self._process_images(text, image_handler)
         return pypandoc.convert_text(text, 'latex', format='markdown+tex_math_dollars')
 
+    def _build_sections(
+        self,
+        questions: List[Question],
+        section_titles: Optional[List[Optional[str]]],
+    ) -> List[Dict[str, Any]]:
+        """按手动 section_title 将有序题目切分为分节；无标题则合并为单一无标题节，保持提交顺序。"""
+        titles = section_titles or [None] * len(questions)
+        sections: List[Dict[str, Any]] = []
+        current: Dict[str, Any] = {"title": None, "questions": []}
+        started = False
+        for q, raw_title in zip(questions, titles):
+            title = (raw_title or "").strip() or None
+            if title:
+                if started:
+                    sections.append(current)
+                current = {"title": title, "questions": [q]}
+                started = True
+            else:
+                current["questions"].append(q)
+                started = True
+        if current["questions"]:
+            sections.append(current)
+        return sections
+
     def generate_latex_via_jinja(self, title: str, questions: List[Question],
                                  include_answer: bool = True, include_analysis: bool = True, 
                                  include_explanation: bool = True, include_summary: bool = True,
                                  include_source: bool = False,
+                                 section_titles: Optional[List[Optional[str]]] = None,
                                  image_handler: Optional[Callable[[Path], str]] = None) -> str:
-        # Group questions
-        parts = {
-            "choice": [],
-            "true_false": [],
-            "fill": [],
-            "essay": []
-        }
-        
-        for q in questions:
-            # Convert content
-            q_data = {
-                "score": 5, # Default score
+        def build_q_data(q: Question) -> Dict[str, Any]:
+            q_type = q.q_type
+            if hasattr(q_type, "value"):
+                q_type = q_type.value
+            q_data: Dict[str, Any] = {
                 "content_tex": self._md_to_latex(q.content, image_handler),
                 "options_tex": [],
                 "answer_tex": self._md_to_latex(self._format_answer(q), image_handler) if include_answer else "",
                 "thinking_tex": self._md_to_latex(q.thinking, image_handler) if include_analysis else "",
                 "analysis_tex": self._md_to_latex(q.analysis, image_handler) if include_explanation else "",
                 "summary_tex": self._md_to_latex(q.summary, image_handler) if include_summary else "",
-                "source_tex": self._md_to_latex(q.source, image_handler) if include_source else ""
+                "source_tex": self._md_to_latex(q.source, image_handler) if include_source else "",
+                "reserve_space": q_type == QuestionType.FREE_RESPONSE.value,
             }
-            
-            # Handle options
             if q.options:
                 opts = q.options
                 if isinstance(opts, str):
-                    try: opts = json.loads(opts)
-                    except: pass
-                
+                    try:
+                        opts = json.loads(opts)
+                    except Exception:
+                        pass
                 if isinstance(opts, list):
                     for opt in opts:
                         # Try 'content' first (frontend uses this), then 'text' (legacy/import), then string
@@ -138,26 +156,16 @@ class PaperGenerator:
                         else:
                             text = str(opt)
                         q_data["options_tex"].append(self._md_to_latex(text, image_handler))
+            return q_data
 
-            # Categorize
-            q_type = q.q_type
-            if hasattr(q_type, "value"): q_type = q_type.value
-            
-            if q_type in [QuestionType.SINGLE_CHOICE.value, QuestionType.MULTIPLE_CHOICE.value, "选择题"]:
-                parts["choice"].append(q_data)
-            elif q_type in [QuestionType.TRUE_FALSE.value, "判断题"]:
-                parts["true_false"].append(q_data)
-            elif q_type in [QuestionType.FILL_IN_THE_BLANK.value, "填空题"]:
-                parts["fill"].append(q_data)
-            elif q_type in [QuestionType.FREE_RESPONSE.value, "解答题"]:
-                parts["essay"].append(q_data)
-            else:
-                # Fallback to essay if unknown
-                parts["essay"].append(q_data)
+        raw_sections = self._build_sections(questions, section_titles)
+        sections = [
+            {"title": s["title"], "questions": [build_q_data(q) for q in s["questions"]]}
+            for s in raw_sections
+        ]
 
-        # Render template
         template = self.jinja_env.get_template("exam_paper.tex.j2")
-        return template.render(title=title, parts=parts)
+        return template.render(title=title, sections=sections)
 
     def _append_question_details(self, md_lines: List[str], q: Question, 
                                  include_answer: bool, include_analysis: bool, 
@@ -183,103 +191,53 @@ class PaperGenerator:
     def generate_markdown(self, title: str, questions: List[Question],
                           include_answer: bool = True, include_analysis: bool = True, 
                           include_explanation: bool = True, include_summary: bool = True,
-                          include_source: bool = False) -> str:
+                          include_source: bool = False,
+                          section_titles: Optional[List[Optional[str]]] = None) -> str:
         md_lines = [f"# {title}", ""]
-        
-        # Grouping
-        choice_qs = []
-        true_false_qs = []
-        fill_qs = []
-        essay_qs = []
-        others = []
-        
-        for q in questions:
-            # q.q_type is an Enum, so compare with value or Enum member
-            q_type = q.q_type
-            if hasattr(q_type, "value"):
-                q_type = q_type.value
-                
-            if q_type in [QuestionType.SINGLE_CHOICE.value, QuestionType.MULTIPLE_CHOICE.value, "选择题"]:
-                choice_qs.append(q)
-            elif q_type in [QuestionType.TRUE_FALSE.value, "判断题"]:
-                true_false_qs.append(q)
-            elif q_type in [QuestionType.FILL_IN_THE_BLANK.value, "填空题"]:
-                fill_qs.append(q)
-            elif q_type in [QuestionType.FREE_RESPONSE.value, "解答题", "essay"]:
-                essay_qs.append(q)
-            else:
-                others.append(q)
-        
-        if choice_qs:
-            md_lines.append("## 一、选择题")
-            for i, q in enumerate(choice_qs, 1):
+        sections = self._build_sections(questions, section_titles)
+        for section in sections:
+            if section["title"]:
+                md_lines.append(f"## {section['title']}")
+                md_lines.append("")
+            for i, q in enumerate(section["questions"], 1):
                 # Use bold number instead of list to avoid indentation issues
                 md_lines.append(f"**{i}.** {self._process_images(q.content)}")
                 md_lines.append("")
-                
+
                 if q.options:
                     opts = q.options
                     if isinstance(opts, str):
                         try:
                             opts = json.loads(opts)
-                        except:
+                        except Exception:
                             pass
-                    
+
                     if isinstance(opts, list):
-                        # Check structure
                         if opts and isinstance(opts[0], dict) and "label" in opts[0]:
-                            # Format: A. xxx
-                            #         B. xxx
                             for o in opts:
                                 label = o.get('label', '')
                                 text = o.get('content') or o.get('text', '')
                                 # Escape dot to prevent list conversion, use double space for line break
                                 md_lines.append(f"{label}\\. {self._process_images(text)}  ")
                         else:
-                            # Just list them
                             for idx, opt in enumerate(opts):
-                                label = chr(65 + idx) # A, B, C...
-                                md_lines.append(f"{label}\\. {self._process_images(str(opt))}  ")
-                        
-                        md_lines.append("") # Blank line after options
-                
+                                label = chr(65 + idx)  # A, B, C...
+                                text = opt
+                                if isinstance(opt, dict):
+                                    text = opt.get('content') or opt.get('text', '')
+                                md_lines.append(f"{label}\\. {self._process_images(str(text))}  ")
+                        md_lines.append("")  # Blank line after options
+
                 self._append_question_details(md_lines, q, include_answer, include_analysis, include_explanation, include_summary, include_source)
                 md_lines.append("")
 
-        if true_false_qs:
-            md_lines.append("## 二、判断题")
-            for i, q in enumerate(true_false_qs, 1):
-                md_lines.append(f"**{i}.** {self._process_images(q.content)}")
-                md_lines.append("")
-                self._append_question_details(md_lines, q, include_answer, include_analysis, include_explanation, include_summary, include_source)
-
-        if fill_qs:
-            md_lines.append("## 三、填空题")
-            for i, q in enumerate(fill_qs, 1):
-                md_lines.append(f"**{i}.** {self._process_images(q.content)}")
-                md_lines.append("")
-                self._append_question_details(md_lines, q, include_answer, include_analysis, include_explanation, include_summary, include_source)
-
-        if essay_qs:
-            md_lines.append("## 四、解答题")
-            for i, q in enumerate(essay_qs, 1):
-                md_lines.append(f"**{i}.** {self._process_images(q.content)}")
-                md_lines.append("")
-                self._append_question_details(md_lines, q, include_answer, include_analysis, include_explanation, include_summary, include_source)
-                
-        if others:
-            md_lines.append("## 五、其他")
-            for i, q in enumerate(others, 1):
-                md_lines.append(f"**{i}.** {self._process_images(q.content)}")
-                md_lines.append("")
-                self._append_question_details(md_lines, q, include_answer, include_analysis, include_explanation, include_summary, include_source)
-                
         return "\n".join(md_lines)
 
     def generate_file(self, title: str, questions: List[Question], format: OutputFormat,
                       include_answer: bool = True, include_analysis: bool = True, 
                       include_explanation: bool = True, include_summary: bool = True,
-                      include_source: bool = False) -> str:
+                      include_source: bool = False,
+                      section_titles: Optional[List[Optional[str]]] = None) -> str:
         logger.debug(f"Generating paper file in format: {format.value}")
         
         if format == OutputFormat.LATEX:
@@ -301,6 +259,7 @@ class PaperGenerator:
                     latex_content = self.generate_latex_via_jinja(
                         title, questions, 
                         include_answer, include_analysis, include_explanation, include_summary, include_source,
+                        section_titles=section_titles,
                         image_handler=latex_image_handler
                     )
                     
@@ -335,7 +294,7 @@ class PaperGenerator:
         fd, path = tempfile.mkstemp(suffix=suffix)
         os.close(fd)
 
-        markdown_content = self.generate_markdown(title, questions, include_answer, include_analysis, include_explanation, include_summary, include_source)
+        markdown_content = self.generate_markdown(title, questions, include_answer, include_analysis, include_explanation, include_summary, include_source, section_titles=section_titles)
         extra_args = ['--standalone']
         if format == OutputFormat.DOCX:
             reference_doc = os.path.join(self.template_dir, "yuanxuan-standard-math.docx")

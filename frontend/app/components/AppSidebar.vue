@@ -19,7 +19,7 @@ import {
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import UserProfileDialog from '~/components/UserProfileDialog.vue'
 import ChangePasswordDialog from '~/components/ChangePasswordDialog.vue'
-import { BookOpen, ChevronsUpDown, CirclePlus, ListTree, LogOut, Settings, Sparkles, User, Users, Tags, Library, HelpCircle, MessageSquare, KeyRound, Activity, ListTodo, Download, RefreshCw } from 'lucide-vue-next'
+import { BookOpen, ChevronsUpDown, CirclePlus, ListTree, LogOut, Settings, Sparkles, User, Users, Tags, Library, HelpCircle, MessageSquare, KeyRound, Activity, ListTodo, Download, RefreshCw, FileText } from 'lucide-vue-next'
 import { toast } from 'vue-sonner'
 
 const route = useRoute()
@@ -85,6 +85,14 @@ const handleLogout = () => {
                 <NuxtLink to="/questions">
                   <BookOpen />
                   <span>题目管理</span>
+                </NuxtLink>
+              </SidebarMenuButton>
+            </SidebarMenuItem>
+            <SidebarMenuItem>
+              <SidebarMenuButton as-child :is-active="route.path.startsWith('/papers')">
+                <NuxtLink to="/papers">
+                  <FileText />
+                  <span>我的试卷</span>
                 </NuxtLink>
               </SidebarMenuButton>
             </SidebarMenuItem>

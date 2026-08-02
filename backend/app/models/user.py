@@ -43,3 +43,6 @@ class User(Base):
     # Tag
     tags_created = relationship("Tag", foreign_keys="Tag.created_by", back_populates="creator")
     tags_updated = relationship("Tag", foreign_keys="Tag.updated_by", back_populates="updater")
+
+    # Paper
+    papers = relationship("Paper", back_populates="owner", cascade="all, delete-orphan")

@@ -6,8 +6,8 @@ import { Checkbox } from '@/components/ui/checkbox'
 import { Card } from '@/components/ui/card'
 import { Pencil, Trash2, Copy, ChevronDown, Star, ShoppingBasket, CheckCircle, History, Workflow, CornerDownRight, GitFork, FileText, AlertTriangle } from 'lucide-vue-next'
 import MarkdownPreview from './MarkdownPreview.vue'
+import PaperQuickSelector from './PaperQuickSelector.vue'
 import type { Question as DbQuestion, KnowledgePoint, ImportItem } from '@/types'
-import { usePaperBasket } from '@/composables/usePaperBasket'
 import { toast } from 'vue-sonner'
 
 // Support both import items and database questions
@@ -159,9 +159,6 @@ const options = computed(() => {
   return props.item.options || []
 })
 
-const { has, toggle } = usePaperBasket()
-const isInBasket = computed(() => has(Number(props.item.id)))
-
 const knowledgePointIds = computed(() => {
   const item = props.item as ImportItem
   return item.knowledge_point_ids || []
@@ -303,17 +300,10 @@ const sourceFileUrl = computed(() => {
               <Workflow class="h-4 w-4" />
             </Button>
             
-            <Button
+            <PaperQuickSelector
               v-if="mode === 'library'"
-              variant="ghost"
-              size="icon"
-              class="h-8 w-8"
-              :class="isInBasket ? 'text-primary bg-primary/10' : 'text-muted-foreground'"
-              @click="toggle({ id: Number(item.id), content: item.content, q_type: item.q_type })"
-              title="加入试题篮"
-            >
-              <ShoppingBasket class="h-4 w-4" />
-            </Button>
+              :question-id="Number(item.id)"
+            />
 
             <Button
               v-if="mode === 'import'"

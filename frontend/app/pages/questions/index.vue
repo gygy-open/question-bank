@@ -7,7 +7,7 @@ import QuestionListItem from '~/components/QuestionListItem.vue'
 import QuestionEditDialog from '~/components/QuestionEditDialog.vue'
 import QuestionStructureSheet from '~/components/QuestionStructureSheet.vue'
 import PageHeader from '~/components/PageHeader.vue'
-import PaperBasket from '~/components/PaperBasket.vue'
+import PaperFullSelector from '~/components/PaperFullSelector.vue'
 import TagFilter from '~/components/TagFilter.vue'
 import { Loader2, Plus, X, Trash2, ShoppingBasket, ListTree, Edit } from 'lucide-vue-next'
 import { Label } from '@/components/ui/label'
@@ -48,7 +48,6 @@ import {
 import { Input } from '@/components/ui/input'
 import ClearableInput from '@/components/ClearableInput.vue'
 import ClearableSelect from '@/components/ClearableSelect.vue'
-import { usePaperBasket } from '~/composables/usePaperBasket'
 import { toast } from 'vue-sonner'
 
 
@@ -65,7 +64,10 @@ const dialogMode = ref<'create' | 'edit'>('create')
 
 // --- Selection & Batch Actions ---
 const selectedIds = ref<Set<number>>(new Set())
-const { add: addToBasket, remove: removeFromBasket } = usePaperBasket()
+
+// --- Add to paper ---
+const paperSelectorOpen = ref(false)
+const paperSelectorQuestionIds = ref<number[]>([])
 
 // --- Filters ---
 const filters = reactive({
@@ -176,18 +178,13 @@ const handleSelect = (id: number, selected: boolean) => {
 }
 
 const batchAddToBasket = () => {
-  let count = 0
-  questions.value.forEach(q => {
-    if (selectedIds.value.has(q.id)) {
-      addToBasket({
-        id: q.id,
-        content: q.content,
-        q_type: q.q_type
-      })
-      count++
-    }
-  })
-  toast.success(`已将 ${count} 道题目加入试题栏`)
+  const ids = Array.from(selectedIds.value)
+  if (ids.length === 0) return
+  paperSelectorQuestionIds.value = ids
+  paperSelectorOpen.value = true
+}
+
+const onPaperSelectorAdded = () => {
   selectedIds.value.clear()
 }
 
@@ -202,9 +199,6 @@ const batchDelete = async () => {
       method: 'POST',
       body: { ids }
     })
-    
-    // Remove from basket if present
-    ids.forEach(id => removeFromBasket(id))
     
     toast.success(`已删除 ${res.deleted_count} 道题目`)
     selectedIds.value.clear()
@@ -319,7 +313,6 @@ const deleteQuestion = async (id: number) => {
     await $api(`/questions/${id}`, {
       method: 'DELETE',
     })
-    removeFromBasket(id)
     refreshQuestions()
   } catch (error) {
     console.error(error)
@@ -606,7 +599,7 @@ const viewStructure = (question: Question) => {
                       <span class="text-sm text-muted-foreground">已选 {{ selectedIds.size }} 项</span>
                       <Button size="sm" variant="outline" class="h-7 px-2" @click="batchAddToBasket">
                         <ShoppingBasket class="mr-1 h-3 w-3" />
-                        加入试题栏
+                        加入试卷
                       </Button>
                       <Button size="sm" variant="outline" class="h-7 px-2" @click="openBatchUpdateSourceDialog">
                         <Edit class="mr-1 h-3 w-3" />
@@ -730,5 +723,9 @@ const viewStructure = (question: Question) => {
     </DialogContent>
   </Dialog>
 
-  <PaperBasket />
+  <PaperFullSelector
+    v-model:open="paperSelectorOpen"
+    :question-ids="paperSelectorQuestionIds"
+    @added="onPaperSelectorAdded"
+  />
 </template>
