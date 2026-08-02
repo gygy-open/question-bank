@@ -17,7 +17,7 @@ import {
 } from '@/components/ui/dialog'
 import { Checkbox } from '@/components/ui/checkbox'
 import {
-  ArrowLeft, Download, Loader2, CheckCircle, Plus, FileDown, Trash2, Heading2, Edit2,
+  ArrowLeft, Download, Loader2, CheckCircle, Plus, FileDown, Trash2, Heading2,
 } from 'lucide-vue-next'
 import { toast } from 'vue-sonner'
 import PaperQuestionCard from '@/components/PaperQuestionCard.vue'
@@ -93,27 +93,6 @@ const typeStatList = computed(() => {
     label: labels[k] || k, count: v,
   }))
 })
-
-interface Section {
-  title: string | null
-  items: PaperItem[]
-}
-
-const sections = computed<Section[]>(() => {
-  const result: Section[] = []
-  let current: Section = { title: null, items: [] }
-  for (const item of items.value) {
-    if (item.section_title) {
-      if (current.items.length > 0) result.push(current)
-      current = { title: item.section_title, items: [item] }
-    } else {
-      current.items.push(item)
-    }
-  }
-  if (current.items.length > 0) result.push(current)
-  return result
-})
-
 const displayNumbers = computed<Record<number, number>>(() => {
   const map: Record<number, number> = {}
   let counter = 0
@@ -158,30 +137,43 @@ const doInsertSection = async () => {
   }
 }
 
-const editingSectionIndex = ref<number | null>(null)
+const editingSectionId = ref<number | null>(null)
 const editSectionDraft = ref('')
 
-const startEditSection = (sectionIndex: number) => {
-  const section = sections.value[sectionIndex]
-  if (!section || !section.title) return
-  editSectionDraft.value = section.title
-  editingSectionIndex.value = sectionIndex
+const startEditSection = (ownerId: number, current: string) => {
+  editSectionDraft.value = current
+  editingSectionId.value = ownerId
 }
 
 const commitEditSection = async () => {
-  if (editingSectionIndex.value === null) return
-  const section = sections.value[editingSectionIndex.value]
-  if (!section || !section.items[0]) return
+  const ownerId = editingSectionId.value
+  editingSectionId.value = null
+  if (ownerId == null) return
+  const item = items.value.find((i) => i.id === ownerId)
+  if (!item) return
   const title = editSectionDraft.value.trim()
-  const firstItem = section.items[0]
+  if (title === (item.section_title || '')) return
   try {
-    await updateItem(paperId, firstItem.id, { section_title: title || null })
-    firstItem.section_title = title || null
+    await updateItem(paperId, ownerId, { section_title: title || null })
+    item.section_title = title || null
     rebuildBlocks()
-    editingSectionIndex.value = null
-    if (!title) toast.success('大题已移除')
+    if (!title) toast.success('大题已删除')
   } catch {
     toast.error('保存失败')
+  }
+}
+
+const removeSection = async (ownerId: number) => {
+  const item = items.value.find((i) => i.id === ownerId)
+  if (!item) return
+  try {
+    await updateItem(paperId, ownerId, { section_title: null })
+    item.section_title = null
+    rebuildBlocks()
+    editingSectionId.value = null
+    toast.success('大题已删除')
+  } catch {
+    toast.error('删除失败')
   }
 }
 
@@ -383,17 +375,44 @@ watch(
             >
               <template #item="{ element }">
                 <div>
-                  <!-- 大题标题块（可拖拽） -->
+                  <!-- 大题标题块（可拖拽、可内联编辑） -->
                   <div
                     v-if="element.kind === 'section'"
-                    class="group relative pl-8 pr-4 mt-6 mb-3 first:mt-0"
+                    class="group relative pl-8 pr-16 mt-6 mb-3 first:mt-0"
                   >
                     <div
                       class="drag-handle absolute left-0 top-1 cursor-move opacity-0 group-hover:opacity-60 hover:!opacity-100 transition-opacity"
                     >
                       <GripVertical class="h-5 w-5 text-muted-foreground" />
                     </div>
-                    <h2 class="text-lg font-bold text-foreground">{{ element.title }}</h2>
+
+                    <Input
+                      v-if="editingSectionId === element.ownerId"
+                      v-model="editSectionDraft"
+                      class="h-9 text-lg font-bold"
+                      autofocus
+                      @keydown.enter="commitEditSection"
+                      @keydown.esc="editingSectionId = null"
+                      @blur="commitEditSection"
+                    />
+                    <template v-else>
+                      <h2
+                        class="text-lg font-bold text-foreground cursor-text hover:text-primary transition-colors"
+                        title="点击编辑标题"
+                        @click="startEditSection(element.ownerId, element.title)"
+                      >
+                        {{ element.title }}
+                      </h2>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        class="absolute right-2 top-0 h-7 w-7 text-destructive hover:text-destructive opacity-0 group-hover:opacity-100 transition-opacity"
+                        title="删除大题标题"
+                        @click="removeSection(element.ownerId)"
+                      >
+                        <Trash2 class="h-4 w-4" />
+                      </Button>
+                    </template>
                   </div>
 
                   <!-- 题目块 -->
@@ -463,79 +482,6 @@ watch(
               <div class="space-y-2">
                 <Label>描述</Label>
                 <Textarea v-model="paper.description" rows="3" @blur="savePaperInfo" />
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader class="pb-3">
-              <CardTitle class="text-base">试卷结构</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div v-if="sections.length === 0" class="text-sm text-muted-foreground text-center py-4">
-                暂无题目
-              </div>
-
-              <div v-else class="space-y-3">
-                <div
-                  v-for="(section, sIdx) in sections"
-                  :key="sIdx"
-                  class="border rounded-lg overflow-hidden"
-                >
-                  <!-- Section header -->
-                  <div
-                    v-if="section.title"
-                    class="bg-muted/50 px-3 py-2 flex items-center justify-between group"
-                  >
-                    <div
-                      v-if="editingSectionIndex === sIdx"
-                      class="flex-1 flex items-center gap-2"
-                    >
-                      <Input
-                        v-model="editSectionDraft"
-                        class="h-7 text-sm"
-                        autofocus
-                        @keydown.enter="commitEditSection"
-                        @keydown.esc="editingSectionIndex = null"
-                      />
-                      <Button variant="ghost" size="icon" class="h-7 w-7" @click="commitEditSection">
-                        <CheckCircle class="h-3.5 w-3.5" />
-                      </Button>
-                    </div>
-                    <div v-else class="flex-1 flex items-center justify-between">
-                      <span class="text-sm font-semibold">{{ section.title }}</span>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        class="h-7 w-7 opacity-0 group-hover:opacity-100"
-                        @click="startEditSection(sIdx)"
-                      >
-                        <Edit2 class="h-3.5 w-3.5" />
-                      </Button>
-                    </div>
-                  </div>
-                  <div
-                    v-else
-                    class="bg-muted/30 px-3 py-1.5 text-xs text-muted-foreground"
-                  >
-                    未分组题目
-                  </div>
-
-                  <!-- Items summary -->
-                  <div class="px-3 py-2 flex items-center justify-between text-xs text-muted-foreground">
-                    <span>共 {{ section.items.length }} 题</span>
-                    <Button
-                      v-if="!section.title"
-                      variant="ghost"
-                      size="sm"
-                      class="h-6 text-xs"
-                      @click="openInsertSection(section.items[0])"
-                    >
-                      <Heading2 class="mr-1 h-3 w-3" />
-                      添加大题
-                    </Button>
-                  </div>
-                </div>
               </div>
             </CardContent>
           </Card>
