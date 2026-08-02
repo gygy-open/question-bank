@@ -1,5 +1,5 @@
 from pydantic import BaseModel, ConfigDict
-from typing import List, Optional
+from typing import List, Optional, Any
 from enum import Enum
 from datetime import datetime
 
@@ -65,6 +65,11 @@ class QuestionBrief(BaseModel):
     content: str
     q_type: str
     difficulty: int
+    options: Optional[Any] = None
+    answer: Optional[str] = None
+    thinking: Optional[str] = None
+    analysis: Optional[str] = None
+    summary: Optional[str] = None
 
 
 class PaperItemRead(BaseModel):

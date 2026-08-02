@@ -166,6 +166,11 @@ export interface QuestionBrief {
   content: string
   q_type: string
   difficulty: number
+  options?: { label: string; content: string }[] | null
+  answer?: string | null
+  thinking?: string | null
+  analysis?: string | null
+  summary?: string | null
 }
 
 export interface PaperItem {

@@ -17,7 +17,7 @@ import {
 } from '@/components/ui/dialog'
 import { Checkbox } from '@/components/ui/checkbox'
 import {
-  ArrowLeft, Download, Loader2, CheckCircle, Plus, FileDown, Trash2,
+  ArrowLeft, Download, Loader2, CheckCircle, Plus, FileDown, Trash2, Heading2, Edit2,
 } from 'lucide-vue-next'
 import { toast } from 'vue-sonner'
 import PaperQuestionCard from '@/components/PaperQuestionCard.vue'
@@ -35,6 +35,23 @@ const paper = ref<PaperDetail | null>(null)
 const items = ref<PaperItem[]>([])
 const loading = ref(true)
 
+type Block =
+  | { kind: 'section'; id: string; title: string; ownerId: number }
+  | { kind: 'question'; id: number; item: PaperItem }
+
+const blocks = ref<Block[]>([])
+
+const rebuildBlocks = () => {
+  const arr: Block[] = []
+  for (const it of items.value) {
+    if (it.section_title) {
+      arr.push({ kind: 'section', id: `sec-${it.id}`, title: it.section_title, ownerId: it.id })
+    }
+    arr.push({ kind: 'question', id: it.id, item: it })
+  }
+  blocks.value = arr
+}
+
 const saving = ref(false)
 const saved = ref(false)
 const savingStatus = ref('')
@@ -45,6 +62,7 @@ const load = async () => {
     const data = await get(paperId)
     paper.value = data
     items.value = [...data.items]
+    rebuildBlocks()
   } catch {
     toast.error('加载试卷失败')
     router.push('/papers')
@@ -76,6 +94,97 @@ const typeStatList = computed(() => {
   }))
 })
 
+interface Section {
+  title: string | null
+  items: PaperItem[]
+}
+
+const sections = computed<Section[]>(() => {
+  const result: Section[] = []
+  let current: Section = { title: null, items: [] }
+  for (const item of items.value) {
+    if (item.section_title) {
+      if (current.items.length > 0) result.push(current)
+      current = { title: item.section_title, items: [item] }
+    } else {
+      current.items.push(item)
+    }
+  }
+  if (current.items.length > 0) result.push(current)
+  return result
+})
+
+const displayNumbers = computed<Record<number, number>>(() => {
+  const map: Record<number, number> = {}
+  let counter = 0
+  for (const b of blocks.value) {
+    if (b.kind === 'section') {
+      counter = 0
+      continue
+    }
+    counter += 1
+    map[b.id] = counter
+  }
+  return map
+})
+
+const insertSectionOpen = ref(false)
+const insertTargetId = ref<number | null>(null)
+const newSectionTitle = ref('')
+
+const openInsertSection = (item: PaperItem | undefined | null) => {
+  if (!item) {
+    toast.error('请先添加题目')
+    return
+  }
+  insertTargetId.value = item.id
+  newSectionTitle.value = item.section_title || ''
+  insertSectionOpen.value = true
+}
+
+const doInsertSection = async () => {
+  const title = newSectionTitle.value.trim()
+  if (!title || insertTargetId.value == null) return
+  const targetItem = items.value.find((i) => i.id === insertTargetId.value)
+  if (!targetItem) return
+  try {
+    await updateItem(paperId, targetItem.id, { section_title: title })
+    targetItem.section_title = title
+    rebuildBlocks()
+    insertSectionOpen.value = false
+    toast.success('大题已添加')
+  } catch {
+    toast.error('添加大题失败')
+  }
+}
+
+const editingSectionIndex = ref<number | null>(null)
+const editSectionDraft = ref('')
+
+const startEditSection = (sectionIndex: number) => {
+  const section = sections.value[sectionIndex]
+  if (!section || !section.title) return
+  editSectionDraft.value = section.title
+  editingSectionIndex.value = sectionIndex
+}
+
+const commitEditSection = async () => {
+  if (editingSectionIndex.value === null) return
+  const section = sections.value[editingSectionIndex.value]
+  if (!section || !section.items[0]) return
+  const title = editSectionDraft.value.trim()
+  const firstItem = section.items[0]
+  try {
+    await updateItem(paperId, firstItem.id, { section_title: title || null })
+    firstItem.section_title = title || null
+    rebuildBlocks()
+    editingSectionIndex.value = null
+    if (!title) toast.success('大题已移除')
+  } catch {
+    toast.error('保存失败')
+  }
+}
+
 const savePaperInfo = useDebounceFn(async () => {
   if (!paper.value) return
   saving.value = true
@@ -98,41 +207,58 @@ const savePaperInfo = useDebounceFn(async () => {
 
 const onDragEnd = async () => {
   if (!paper.value) return
+  // 记录旧标题以计算差异
+  const oldTitles = new Map(items.value.map((i) => [i.id, i.section_title ?? null]))
+
+  // 从 blocks 顺序重建题目列表与分节归属：标题块归属其后的第一道题
+  const newItems: PaperItem[] = []
+  let pendingTitle: string | null = null
+  for (const b of blocks.value) {
+    if (b.kind === 'section') {
+      pendingTitle = b.title
+      continue
+    }
+    b.item.section_title = pendingTitle
+    pendingTitle = null
+    newItems.push(b.item)
+  }
+  items.value = newItems
+
   saving.value = true
   savingStatus.value = '保存中...'
   try {
-    await reorder(paperId, items.value.map((i) => i.id))
+    for (const it of newItems) {
+      const old = oldTitles.get(it.id) ?? null
+      const cur = it.section_title ?? null
+      if (old !== cur) {
+        await updateItem(paperId, it.id, { section_title: cur })
+      }
+    }
+    await reorder(paperId, newItems.map((i) => i.id))
     saved.value = true
     savingStatus.value = '已保存'
     setTimeout(() => { saved.value = false }, 3000)
   } catch {
     savingStatus.value = '排序保存失败'
     await load()
+    return
   } finally {
     saving.value = false
   }
+  rebuildBlocks()
 }
 
 const onRemoveItem = async (item: PaperItem) => {
   const prev = [...items.value]
   items.value = items.value.filter((i) => i.id !== item.id)
+  rebuildBlocks()
   try {
     await removeItem(paperId, item.id)
     if (paper.value) paper.value.question_count = items.value.length
   } catch {
     toast.error('移除失败')
     items.value = prev
-  }
-}
-
-const onUpdateSection = async (item: PaperItem, value: string | null) => {
-  const prev = item.section_title ?? null
-  item.section_title = value
-  try {
-    await updateItem(paperId, item.id, { section_title: value })
-  } catch {
-    toast.error('保存大题标题失败')
-    item.section_title = prev
+    rebuildBlocks()
   }
 }
 
@@ -225,37 +351,82 @@ watch(
 
     <!-- Main -->
     <div class="flex flex-1 overflow-hidden">
-      <!-- Left: question list -->
-      <div class="flex-1 overflow-y-auto">
-        <div class="p-4 space-y-3 max-w-3xl mx-auto">
-          <div class="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
+      <!-- Left: paper preview -->
+      <div class="flex-1 overflow-y-auto bg-muted/30">
+        <div class="p-6 max-w-3xl mx-auto">
+          <div class="flex items-center justify-between mb-4">
             <div class="text-sm text-muted-foreground">共 {{ items.length }} 道题目</div>
             <Button variant="outline" size="sm" @click="goToLibrary">
               <Plus class="mr-2 h-4 w-4" /> 去题库添加
             </Button>
           </div>
 
-          <draggable
+          <!-- 纸张 -->
+          <div
             v-if="items.length > 0"
-            v-model="items"
-            item-key="id"
-            handle=".drag-handle"
-            :animation="200"
-            class="space-y-3"
-            @end="onDragEnd"
+            class="bg-background rounded-lg shadow-sm border px-10 py-8"
           >
-            <template #item="{ element, index }">
-              <PaperQuestionCard
-                :item="element"
-                :index="index"
-                @remove="onRemoveItem(element)"
-                @view-detail="viewQuestion(element)"
-                @update-section="onUpdateSection(element, $event)"
-              />
-            </template>
-          </draggable>
+            <!-- 试卷抬头 -->
+            <div class="text-center mb-6 pb-4 border-b">
+              <h1 class="text-2xl font-bold">{{ paper.title }}</h1>
+              <p v-if="paper.description" class="text-sm text-muted-foreground mt-2">
+                {{ paper.description }}
+              </p>
+            </div>
 
-          <div v-else class="flex flex-col items-center justify-center py-16 text-center">
+            <draggable
+              v-model="blocks"
+              item-key="id"
+              handle=".drag-handle"
+              :animation="200"
+              @end="onDragEnd"
+            >
+              <template #item="{ element }">
+                <div>
+                  <!-- 大题标题块（可拖拽） -->
+                  <div
+                    v-if="element.kind === 'section'"
+                    class="group relative pl-8 pr-4 mt-6 mb-3 first:mt-0"
+                  >
+                    <div
+                      class="drag-handle absolute left-0 top-1 cursor-move opacity-0 group-hover:opacity-60 hover:!opacity-100 transition-opacity"
+                    >
+                      <GripVertical class="h-5 w-5 text-muted-foreground" />
+                    </div>
+                    <h2 class="text-lg font-bold text-foreground">{{ element.title }}</h2>
+                  </div>
+
+                  <!-- 题目块 -->
+                  <div v-else class="group/insert relative">
+                    <!-- 悬停：在此题前插入大题 -->
+                    <div
+                      class="absolute -top-3 left-0 right-0 z-10 flex justify-center opacity-0 group-hover/insert:opacity-100 transition-opacity"
+                    >
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        class="h-6 px-2 text-xs shadow-sm"
+                        @click="openInsertSection(element.item)"
+                      >
+                        <Heading2 class="mr-1 h-3 w-3" /> 在此处插入大题
+                      </Button>
+                    </div>
+                    <PaperQuestionCard
+                      :item="element.item"
+                      :number="displayNumbers[element.id]"
+                      @remove="onRemoveItem(element.item)"
+                      @view-detail="viewQuestion(element.item)"
+                    />
+                  </div>
+                </div>
+              </template>
+            </draggable>
+          </div>
+
+          <div
+            v-else
+            class="bg-background rounded-lg shadow-sm border flex flex-col items-center justify-center py-16 text-center"
+          >
             <p class="text-muted-foreground mb-4">还没有题目</p>
             <Button @click="goToLibrary">
               <Plus class="mr-2 h-4 w-4" /> 去题库添加题目
@@ -269,7 +440,7 @@ watch(
         <div class="p-4 space-y-6">
           <Card>
             <CardHeader class="pb-3">
-              <CardTitle class="text-base">试卷信息</CardTitle>
+              <CardTitle class="text-base">基本信息</CardTitle>
             </CardHeader>
             <CardContent class="space-y-4">
               <div class="space-y-2">
@@ -292,6 +463,79 @@ watch(
               <div class="space-y-2">
                 <Label>描述</Label>
                 <Textarea v-model="paper.description" rows="3" @blur="savePaperInfo" />
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader class="pb-3">
+              <CardTitle class="text-base">试卷结构</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div v-if="sections.length === 0" class="text-sm text-muted-foreground text-center py-4">
+                暂无题目
+              </div>
+
+              <div v-else class="space-y-3">
+                <div
+                  v-for="(section, sIdx) in sections"
+                  :key="sIdx"
+                  class="border rounded-lg overflow-hidden"
+                >
+                  <!-- Section header -->
+                  <div
+                    v-if="section.title"
+                    class="bg-muted/50 px-3 py-2 flex items-center justify-between group"
+                  >
+                    <div
+                      v-if="editingSectionIndex === sIdx"
+                      class="flex-1 flex items-center gap-2"
+                    >
+                      <Input
+                        v-model="editSectionDraft"
+                        class="h-7 text-sm"
+                        autofocus
+                        @keydown.enter="commitEditSection"
+                        @keydown.esc="editingSectionIndex = null"
+                      />
+                      <Button variant="ghost" size="icon" class="h-7 w-7" @click="commitEditSection">
+                        <CheckCircle class="h-3.5 w-3.5" />
+                      </Button>
+                    </div>
+                    <div v-else class="flex-1 flex items-center justify-between">
+                      <span class="text-sm font-semibold">{{ section.title }}</span>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        class="h-7 w-7 opacity-0 group-hover:opacity-100"
+                        @click="startEditSection(sIdx)"
+                      >
+                        <Edit2 class="h-3.5 w-3.5" />
+                      </Button>
+                    </div>
+                  </div>
+                  <div
+                    v-else
+                    class="bg-muted/30 px-3 py-1.5 text-xs text-muted-foreground"
+                  >
+                    未分组题目
+                  </div>
+
+                  <!-- Items summary -->
+                  <div class="px-3 py-2 flex items-center justify-between text-xs text-muted-foreground">
+                    <span>共 {{ section.items.length }} 题</span>
+                    <Button
+                      v-if="!section.title"
+                      variant="ghost"
+                      size="sm"
+                      class="h-6 text-xs"
+                      @click="openInsertSection(section.items[0])"
+                    >
+                      <Heading2 class="mr-1 h-3 w-3" />
+                      添加大题
+                    </Button>
+                  </div>
+                </div>
               </div>
             </CardContent>
           </Card>
@@ -370,6 +614,36 @@ watch(
           <Loader2 v-if="exporting" class="mr-2 h-4 w-4 animate-spin" />
           <FileDown v-else class="mr-2 h-4 w-4" />
           生成并下载
+        </Button>
+      </DialogFooter>
+    </DialogContent>
+  </Dialog>
+
+  <!-- Insert section dialog -->
+  <Dialog v-model:open="insertSectionOpen">
+    <DialogContent class="sm:max-w-[400px]">
+      <DialogHeader>
+        <DialogTitle>插入大题标题</DialogTitle>
+      </DialogHeader>
+      <div class="space-y-4 py-2">
+        <div class="space-y-2">
+          <Label>标题内容</Label>
+          <Input
+            v-model="newSectionTitle"
+            placeholder="例如：一、选择题"
+            autofocus
+            @keydown.enter="doInsertSection"
+          />
+          <p class="text-xs text-muted-foreground">
+            将作为该题所在大题的标题
+          </p>
+        </div>
+      </div>
+      <DialogFooter>
+        <Button variant="outline" @click="insertSectionOpen = false">取消</Button>
+        <Button :disabled="!newSectionTitle.trim()" @click="doInsertSection">
+          <Heading2 class="mr-2 h-4 w-4" />
+          插入
         </Button>
       </DialogFooter>
     </DialogContent>
