@@ -21,8 +21,9 @@ import {
 } from 'lucide-vue-next'
 import { toast } from 'vue-sonner'
 import PaperQuestionCard from '@/components/PaperQuestionCard.vue'
+import PaperQuestionDetailSheet from '@/components/PaperQuestionDetailSheet.vue'
 import { usePapers } from '~/composables/usePapers'
-import type { PaperDetail, PaperItem, Subject } from '~/types'
+import type { PaperDetail, PaperItem, Subject, KnowledgePoint } from '~/types'
 
 const route = useRoute()
 const router = useRouter()
@@ -30,6 +31,9 @@ const paperId = Number(route.params.id)
 
 const { get, update, removeItem, reorder, download, updateItem } = usePapers()
 const { data: subjects } = await useAPI<Subject[]>('/subjects')
+const { data: knowledgePoints } = await useAPI<KnowledgePoint[]>('/knowledge-points', {
+  query: { limit: -1 },
+})
 
 const paper = ref<PaperDetail | null>(null)
 const items = ref<PaperItem[]>([])
@@ -55,6 +59,9 @@ const rebuildBlocks = () => {
 const saving = ref(false)
 const saved = ref(false)
 const savingStatus = ref('')
+
+const detailSheetOpen = ref(false)
+const detailQuestionId = ref<number | null>(null)
 
 const load = async () => {
   loading.value = true
@@ -256,7 +263,8 @@ const onRemoveItem = async (item: PaperItem) => {
 
 const viewQuestion = (item: PaperItem) => {
   if (item.question) {
-    window.open(`/questions?id=${item.question.id}`, '_blank')
+    detailQuestionId.value = item.question.id
+    detailSheetOpen.value = true
   }
 }
 
@@ -594,4 +602,13 @@ watch(
       </DialogFooter>
     </DialogContent>
   </Dialog>
+
+  <!-- Question detail side panel -->
+  <PaperQuestionDetailSheet
+    v-model:open="detailSheetOpen"
+    :question-id="detailQuestionId"
+    :subjects="subjects || []"
+    :knowledge-points="knowledgePoints || []"
+    @updated="load"
+  />
 </template>

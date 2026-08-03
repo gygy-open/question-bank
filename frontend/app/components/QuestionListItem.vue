@@ -25,6 +25,9 @@ interface Props {
   allKnowledgePoints?: KnowledgePoint[]
   selected?: boolean
   selectable?: boolean
+  hideDelete?: boolean
+  hideDecompose?: boolean
+  defaultExpanded?: boolean
 }
 
 const props = withDefaults(defineProps<Props>(), {
@@ -32,7 +35,10 @@ const props = withDefaults(defineProps<Props>(), {
   index: 0,
   allKnowledgePoints: () => [],
   selected: false,
-  selectable: false
+  selectable: false,
+  hideDelete: false,
+  hideDecompose: false,
+  defaultExpanded: false
 })
 
 const emit = defineEmits<{
@@ -108,7 +114,7 @@ const difficultyLabel = computed(() => {
   return `难度 ${props.item.difficulty}`
 })
 
-const expanded = ref(false)
+const expanded = ref(props.defaultExpanded)
 
 const statusLabel = computed(() => {
   const item = props.item as DbQuestion
@@ -279,7 +285,7 @@ const sourceFileUrl = computed(() => {
             </Button>
 
             <Button
-              v-if="mode === 'library'"
+              v-if="mode === 'library' && !hideDecompose"
               variant="ghost"
               size="icon"
               class="h-8 w-8 text-indigo-600 hover:text-indigo-700 hover:bg-indigo-50"
@@ -317,6 +323,7 @@ const sourceFileUrl = computed(() => {
             </Button>
             
             <Button
+              v-if="!hideDelete"
               variant="ghost"
               size="icon"
               class="h-8 w-8 text-red-600 hover:text-red-700 hover:bg-red-50"
