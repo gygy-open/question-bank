@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted, computed, watch } from 'vue'
-import { Upload, FileText, CheckCircle, XCircle, Loader2, Ban, Trash2, RefreshCw, ExternalLink, AlertCircle, RotateCcw, Sparkles } from 'lucide-vue-next'
+import { Upload, FileText, CheckCircle, XCircle, Loader2, Ban, Trash2, RefreshCw, ExternalLink, AlertCircle, RotateCcw, Sparkles } from '@lucide/vue'
 import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'

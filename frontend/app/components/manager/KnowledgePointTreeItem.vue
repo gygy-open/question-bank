@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, nextTick, watch } from 'vue'
-import { ChevronRight, ChevronDown, Plus, Pencil, Trash2, Folder, FolderOpen, Save, X, GripVertical } from 'lucide-vue-next'
+import { ChevronRight, ChevronDown, Plus, Pencil, Trash2, Folder, FolderOpen, Save, X, GripVertical } from '@lucide/vue'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import type { KnowledgePoint } from '@/types'

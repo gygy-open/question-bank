@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Separator } from '@/components/ui/separator'
-import { BookOpen, Bold, Italic, List, ListOrdered, Quote, Code, Sigma, ImageIcon, Keyboard, Mouse } from 'lucide-vue-next'
+import { BookOpen, Bold, Italic, List, ListOrdered, Quote, Code, Sigma, ImageIcon, Keyboard, Mouse } from '@lucide/vue'
 
 definePageMeta({
   layout: 'default',

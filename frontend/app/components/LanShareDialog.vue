@@ -2,7 +2,7 @@
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { SidebarMenuItem, SidebarMenuButton } from '@/components/ui/sidebar'
 import { Button } from '@/components/ui/button'
-import { Wifi, Copy, Check } from 'lucide-vue-next'
+import { Wifi, Copy, Check } from '@lucide/vue'
 import { useClipboard } from '@vueuse/core'
 
 interface NetworkInfo {

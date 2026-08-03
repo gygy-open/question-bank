@@ -9,7 +9,7 @@ import {
 } from '@/components/ui/sheet'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { BookOpen } from 'lucide-vue-next'
+import { BookOpen } from '@lucide/vue'
 import type { Question } from '@/types'
 import MarkdownPreview from './MarkdownPreview.vue'
 

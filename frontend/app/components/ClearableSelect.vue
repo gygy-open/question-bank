@@ -6,7 +6,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { X } from 'lucide-vue-next'
+import { X } from '@lucide/vue'
 import { computed } from 'vue'
 
 interface Option {

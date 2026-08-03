@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue'
-import { ChevronRight, ChevronDown, Folder, FolderOpen } from 'lucide-vue-next'
+import { ChevronRight, ChevronDown, Folder, FolderOpen } from '@lucide/vue'
 import { cn } from '@/lib/utils'
 import type { KnowledgePoint } from '@/types'
 

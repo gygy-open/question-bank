@@ -13,6 +13,7 @@
     "postinstall": "nuxt prepare"
   },
   "dependencies": {
+    "@lucide/vue": "^1.28.0",
     "@tanstack/vue-table": "^8.21.3",
     "@tiptap/extension-image": "^3.13.0",
     "@tiptap/extension-link": "^3.13.0",
@@ -27,7 +28,6 @@
     "date-fns": "^4.1.0",
     "docx-preview": "^0.3.7",
     "katex": "^0.16.27",
-    "lucide-vue-next": "^0.556.0",
     "markdown-it": "^14.1.0",
     "markdown-it-texmath": "^1.0.0",
     "mathlive": "^0.108.2",

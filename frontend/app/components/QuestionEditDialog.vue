@@ -9,7 +9,7 @@ import {
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
 import { Input } from '@/components/ui/input'
-import { Plus, Trash2, Save, FileText, Loader2, Check, ChevronsUpDown, X } from 'lucide-vue-next'
+import { Plus, Trash2, Save, FileText, Loader2, Check, ChevronsUpDown, X } from '@lucide/vue'
 import {
   Select,
   SelectContent,

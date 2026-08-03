@@ -25,7 +25,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { Activity, X } from 'lucide-vue-next'
+import { Activity, X } from '@lucide/vue'
 import { format } from 'date-fns'
 
 const { user } = useAuth()

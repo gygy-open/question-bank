@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Loader2, Database, HardDrive, Server, Check } from 'lucide-vue-next'
+import { Loader2, Database, HardDrive, Server, Check } from '@lucide/vue'
 import { toast } from 'vue-sonner'
 
 definePageMeta({

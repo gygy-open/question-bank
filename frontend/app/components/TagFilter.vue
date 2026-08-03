@@ -8,7 +8,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from '@/components/ui/popover'
-import { Check, ChevronsUpDown, Tag as TagIcon, X } from 'lucide-vue-next'
+import { Check, ChevronsUpDown, Tag as TagIcon, X } from '@lucide/vue'
 import { cn } from '@/lib/utils'
 import {
   Command,

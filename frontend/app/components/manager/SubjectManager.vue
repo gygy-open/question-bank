@@ -4,7 +4,7 @@ import { toTypedSchema } from '@vee-validate/zod'
 import * as z from 'zod'
 import type { Subject } from '~/types'
 import { useAPI } from '~/composables/useAPI'
-import { Loader2, Edit, Trash2 } from 'lucide-vue-next'
+import { Loader2, Edit, Trash2 } from '@lucide/vue'
 
 const { $api } = useNuxtApp()
 

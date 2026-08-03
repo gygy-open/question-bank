@@ -2,7 +2,7 @@
 import { ref, watch } from 'vue'
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
-import { Plus, Trash2, X } from 'lucide-vue-next'
+import { Plus, Trash2, X } from '@lucide/vue'
 import TiptapEditor from './TiptapEditor.vue'
 
 interface Props {

@@ -3,7 +3,7 @@ import { ref, onMounted, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { renderAsync } from 'docx-preview'
 import MarkdownPreview from '@/components/MarkdownPreview.vue'
-import { Loader2, FileWarning } from 'lucide-vue-next'
+import { Loader2, FileWarning } from '@lucide/vue'
 import { Button } from '@/components/ui/button'
 
 definePageMeta({

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { Input } from '@/components/ui/input'
-import { X } from 'lucide-vue-next'
+import { X } from '@lucide/vue'
 import { computed } from 'vue'
 
 const props = defineProps<{

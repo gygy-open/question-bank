@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Copy, Check, ExternalLink, Image as ImageIcon, FileDown, Loader2, Pencil, Trash2, X, Save } from 'lucide-vue-next'
+import { Copy, Check, ExternalLink, Image as ImageIcon, FileDown, Loader2, Pencil, Trash2, X, Save } from '@lucide/vue'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
 import MarkdownPreview from '@/components/MarkdownPreview.vue'

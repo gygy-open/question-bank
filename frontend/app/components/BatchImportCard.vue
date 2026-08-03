@@ -3,7 +3,7 @@ import { ref } from 'vue'
 import { Button } from '@/components/ui/button'
 import { Card, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog'
-import { Loader2, CheckCircle2, XCircle, FileText } from 'lucide-vue-next'
+import { Loader2, CheckCircle2, XCircle, FileText } from '@lucide/vue'
 import { toast } from 'vue-sonner'
 import QuestionListItem from '@/components/QuestionListItem.vue'
 

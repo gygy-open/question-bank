@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue'
-import { Code, Eye, Download, Check, Copy } from 'lucide-vue-next'
+import { Code, Eye, Download, Check, Copy } from '@lucide/vue'
 import { Button } from '@/components/ui/button'
 import { useClipboard } from '@vueuse/core'
 

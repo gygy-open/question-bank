@@ -3,7 +3,7 @@ import { ref, watch, onMounted } from 'vue'
 import 'mathlive'
 import 'mathlive/static.css'
 import { Button } from '@/components/ui/button'
-import { Keyboard } from 'lucide-vue-next'
+import { Keyboard } from '@lucide/vue'
 
 const props = defineProps<{
   modelValue: string

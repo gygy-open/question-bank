@@ -6,7 +6,7 @@ import {
   SheetHeader,
   SheetTitle,
 } from '@/components/ui/sheet'
-import { Loader2 } from 'lucide-vue-next'
+import { Loader2 } from '@lucide/vue'
 import type { Question, KnowledgePoint, Subject } from '@/types'
 import QuestionListItem from './QuestionListItem.vue'
 import QuestionEditDialog from './QuestionEditDialog.vue'

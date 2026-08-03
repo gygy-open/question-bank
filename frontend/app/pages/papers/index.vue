@@ -19,7 +19,7 @@ import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import {
   Plus, MoreVertical, Pencil, Copy, Archive, ArchiveRestore, Trash2, FileText, Clock, Edit, Loader2,
-} from 'lucide-vue-next'
+} from '@lucide/vue'
 import { toast } from 'vue-sonner'
 import { usePapers } from '~/composables/usePapers'
 import { formatRelativeTime } from '@/lib/utils'

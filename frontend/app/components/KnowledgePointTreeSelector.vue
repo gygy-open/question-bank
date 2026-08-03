@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import type { KnowledgePoint } from '~/types'
-import { Folder } from 'lucide-vue-next'
+import { Folder } from '@lucide/vue'
 import { cn } from '@/lib/utils'
 import KnowledgePointTreeItemSelector from './KnowledgePointTreeItemSelector.vue'
 

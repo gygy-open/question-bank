@@ -5,7 +5,7 @@ import StarterKit from '@tiptap/starter-kit'
 import { Markdown } from 'tiptap-markdown'
 import Placeholder from '@tiptap/extension-placeholder'
 import Image from '@tiptap/extension-image'
-import { Bold, Italic, List, ListOrdered, Sigma, Quote, ImageIcon, FileCode, Square } from 'lucide-vue-next'
+import { Bold, Italic, List, ListOrdered, Sigma, Quote, ImageIcon, FileCode, Square } from '@lucide/vue'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import {

@@ -3,7 +3,7 @@ import { ref, computed, watch } from 'vue'
 import {
   Upload, Download, FileSpreadsheet, FileCheck, X, Info, AlertTriangle,
   Loader2, CheckCircle2, XCircle, Circle, ArrowRight, ArrowLeft, Copy, Lightbulb, BookOpen,
-} from 'lucide-vue-next'
+} from '@lucide/vue'
 import { Button } from '@/components/ui/button'
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter,

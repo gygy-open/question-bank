@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Send, Bot, User, Loader2, ExternalLink, Image as ImageIcon, X, Trash2, Plus, MessageSquare, Pencil, Book, CheckSquare, Copy } from 'lucide-vue-next'
+import { Send, Bot, User, Loader2, ExternalLink, Image as ImageIcon, X, Trash2, Plus, MessageSquare, Pencil, Book, CheckSquare, Copy } from '@lucide/vue'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
 import { Checkbox } from '@/components/ui/checkbox'

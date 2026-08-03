@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { Button } from '@/components/ui/button'
-import { GripVertical, Eye, X } from 'lucide-vue-next'
+import { GripVertical, Eye, X } from '@lucide/vue'
 import MarkdownPreview from '@/components/MarkdownPreview.vue'
 import type { PaperItem } from '~/types'
 

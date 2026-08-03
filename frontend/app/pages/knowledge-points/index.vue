@@ -2,7 +2,7 @@
 import PageHeader from '~/components/PageHeader.vue'
 import type { KnowledgePoint, Subject, VectorStatus, ReindexResult } from '~/types'
 import { useAPI } from '~/composables/useAPI'
-import { Loader2, Plus, Save, X, Folder, Upload, Download, RefreshCw, Database } from 'lucide-vue-next'
+import { Loader2, Plus, Save, X, Folder, Upload, Download, RefreshCw, Database } from '@lucide/vue'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'

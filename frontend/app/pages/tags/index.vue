@@ -31,7 +31,7 @@ import {
 } from '@/components/ui/select'
 import { Badge } from '@/components/ui/badge'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { Plus, Pencil, Trash2, Settings } from 'lucide-vue-next'
+import { Plus, Pencil, Trash2, Settings } from '@lucide/vue'
 import { toast } from 'vue-sonner'
 
 // State

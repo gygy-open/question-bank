@@ -13,7 +13,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
-import { Loader2, Upload } from 'lucide-vue-next'
+import { Loader2, Upload } from '@lucide/vue'
 
 const props = defineProps<{
   open: boolean

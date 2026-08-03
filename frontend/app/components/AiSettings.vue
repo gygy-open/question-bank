@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { toast } from 'vue-sonner'
-import { Plus, Trash2, Save, RefreshCw, Pencil } from 'lucide-vue-next'
+import { Plus, Trash2, Save, RefreshCw, Pencil } from '@lucide/vue'
 import type { AIProvider, AIModel, ActiveAIConfig, AIProviderCreate, AIProviderUpdate } from '~/types/ai-config'
 import {
   Card,
