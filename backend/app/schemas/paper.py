@@ -9,15 +9,11 @@ class OutputFormat(str, Enum):
     DOCX = "docx"
     LATEX = "latex"
 
-class PaperGenerateRequest(BaseModel):
-    title: str
-    question_ids: List[int]
-    format: OutputFormat = OutputFormat.DOCX
-    include_answer: bool = True
-    include_analysis: bool = True
-    include_explanation: bool = True
-    include_summary: bool = True
-    include_source: bool = False
+class ContentPosition(str, Enum):
+    """Where to place additional content (answers, explanations, etc.)"""
+    AFTER_QUESTION = "after_question"  # Immediately after each question
+    END_OF_PAPER = "end_of_paper"      # Unified appendix at the end
+    HIDDEN = "hidden"                   # Don't include at all
 
 
 # --- Multi-paper management ---
@@ -25,6 +21,7 @@ class PaperGenerateRequest(BaseModel):
 class PaperExportOptions(BaseModel):
     title: Optional[str] = None
     format: OutputFormat = OutputFormat.DOCX
+    content_position: ContentPosition = ContentPosition.AFTER_QUESTION
     include_answer: bool = True
     include_analysis: bool = True
     include_explanation: bool = True

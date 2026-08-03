@@ -16,6 +16,7 @@ export interface PaperUpdatePayload {
 export interface PaperExportOptions {
   title?: string
   format: 'docx' | 'latex'
+  content_position: 'after_question' | 'end_of_paper' | 'hidden'
   include_answer: boolean
   include_analysis: boolean
   include_explanation: boolean

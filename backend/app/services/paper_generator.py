@@ -9,7 +9,7 @@ from typing import List, Dict, Any, Callable, Optional
 from pathlib import Path
 from jinja2 import Environment, FileSystemLoader
 from app.models.question import Question, QuestionType
-from app.schemas.paper import OutputFormat
+from app.schemas.paper import OutputFormat, ContentPosition
 from app.core.config import settings
 
 logger = logging.getLogger(__name__)
@@ -121,23 +121,24 @@ class PaperGenerator:
         return sections
 
     def generate_latex_via_jinja(self, title: str, questions: List[Question],
+                                 content_position: ContentPosition = ContentPosition.AFTER_QUESTION,
                                  include_answer: bool = True, include_analysis: bool = True, 
                                  include_explanation: bool = True, include_summary: bool = True,
                                  include_source: bool = False,
                                  section_titles: Optional[List[Optional[str]]] = None,
                                  image_handler: Optional[Callable[[Path], str]] = None) -> str:
-        def build_q_data(q: Question) -> Dict[str, Any]:
+        def build_q_data(q: Question, include_details: bool = True) -> Dict[str, Any]:
             q_type = q.q_type
             if hasattr(q_type, "value"):
                 q_type = q_type.value
             q_data: Dict[str, Any] = {
                 "content_tex": self._md_to_latex(q.content, image_handler),
                 "options_tex": [],
-                "answer_tex": self._md_to_latex(self._format_answer(q), image_handler) if include_answer else "",
-                "thinking_tex": self._md_to_latex(q.thinking, image_handler) if include_analysis else "",
-                "analysis_tex": self._md_to_latex(q.analysis, image_handler) if include_explanation else "",
-                "summary_tex": self._md_to_latex(q.summary, image_handler) if include_summary else "",
-                "source_tex": self._md_to_latex(q.source, image_handler) if include_source else "",
+                "answer_tex": self._md_to_latex(self._format_answer(q), image_handler) if (include_details and include_answer) else "",
+                "thinking_tex": self._md_to_latex(q.thinking, image_handler) if (include_details and include_analysis) else "",
+                "analysis_tex": self._md_to_latex(q.analysis, image_handler) if (include_details and include_explanation) else "",
+                "summary_tex": self._md_to_latex(q.summary, image_handler) if (include_details and include_summary) else "",
+                "source_tex": self._md_to_latex(q.source, image_handler) if (include_details and include_source) else "",
                 "reserve_space": q_type == QuestionType.FREE_RESPONSE.value,
             }
             if q.options:
@@ -159,13 +160,35 @@ class PaperGenerator:
             return q_data
 
         raw_sections = self._build_sections(questions, section_titles)
+        
+        # Generate main sections (questions only or with details depending on content_position)
+        include_inline_details = content_position == ContentPosition.AFTER_QUESTION
         sections = [
-            {"title": s["title"], "questions": [build_q_data(q) for q in s["questions"]]}
+            {
+                "title": s["title"], 
+                "questions": [build_q_data(q, include_inline_details) for q in s["questions"]]
+            }
             for s in raw_sections
         ]
+        
+        # Generate appendix if content_position is END_OF_PAPER
+        appendix_sections = []
+        if content_position == ContentPosition.END_OF_PAPER:
+            appendix_sections = [
+                {
+                    "title": s["title"], 
+                    "questions": [build_q_data(q, True) for q in s["questions"]]
+                }
+                for s in raw_sections
+            ]
 
         template = self.jinja_env.get_template("exam_paper.tex.j2")
-        return template.render(title=title, sections=sections)
+        return template.render(
+            title=title, 
+            sections=sections, 
+            appendix_sections=appendix_sections,
+            has_appendix=content_position == ContentPosition.END_OF_PAPER
+        )
 
     def _append_question_details(self, md_lines: List[str], q: Question, 
                                  include_answer: bool, include_analysis: bool, 
@@ -189,20 +212,25 @@ class PaperGenerator:
             md_lines.append("")
 
     def generate_markdown(self, title: str, questions: List[Question],
+                          content_position: ContentPosition = ContentPosition.AFTER_QUESTION,
                           include_answer: bool = True, include_analysis: bool = True, 
                           include_explanation: bool = True, include_summary: bool = True,
                           include_source: bool = False,
                           section_titles: Optional[List[Optional[str]]] = None) -> str:
         md_lines = [f"# {title}", ""]
         sections = self._build_sections(questions, section_titles)
+        
+        # Generate questions section
+        question_number = 1
         for section in sections:
             if section["title"]:
                 md_lines.append(f"## {section['title']}")
                 md_lines.append("")
-            for i, q in enumerate(section["questions"], 1):
+            for q in section["questions"]:
                 # Use bold number instead of list to avoid indentation issues
-                md_lines.append(f"**{i}.** {self._process_images(q.content)}")
+                md_lines.append(f"**{question_number}.** {self._process_images(q.content)}")
                 md_lines.append("")
+                question_number += 1
 
                 if q.options:
                     opts = q.options
@@ -228,17 +256,49 @@ class PaperGenerator:
                                 md_lines.append(f"{label}\\. {self._process_images(str(text))}  ")
                         md_lines.append("")  # Blank line after options
 
-                self._append_question_details(md_lines, q, include_answer, include_analysis, include_explanation, include_summary, include_source)
+                # Add details after question if position is AFTER_QUESTION
+                if content_position == ContentPosition.AFTER_QUESTION:
+                    self._append_question_details(
+                        md_lines, q, include_answer, include_analysis, 
+                        include_explanation, include_summary, include_source
+                    )
                 md_lines.append("")
+
+        # Add appendix at the end if position is END_OF_PAPER
+        if content_position == ContentPosition.END_OF_PAPER:
+            md_lines.append("---")
+            md_lines.append("")
+            md_lines.append("# 参考答案与解析")
+            md_lines.append("")
+            
+            question_number = 1
+            for section in sections:
+                if section["title"]:
+                    md_lines.append(f"## {section['title']}")
+                    md_lines.append("")
+                for q in section["questions"]:
+                    md_lines.append(f"**{question_number}.** ")
+                    md_lines.append("")
+                    question_number += 1
+                    self._append_question_details(
+                        md_lines, q, include_answer, include_analysis, 
+                        include_explanation, include_summary, include_source
+                    )
+                    md_lines.append("")
 
         return "\n".join(md_lines)
 
     def generate_file(self, title: str, questions: List[Question], format: OutputFormat,
+                      content_position: ContentPosition = ContentPosition.AFTER_QUESTION,
                       include_answer: bool = True, include_analysis: bool = True, 
                       include_explanation: bool = True, include_summary: bool = True,
                       include_source: bool = False,
                       section_titles: Optional[List[Optional[str]]] = None) -> str:
-        logger.debug(f"Generating paper file in format: {format.value}")
+        logger.debug(f"Generating paper file in format: {format.value}, content_position: {content_position.value}")
+        
+        # When content is hidden, ignore all include flags
+        if content_position == ContentPosition.HIDDEN:
+            include_answer = include_analysis = include_explanation = include_summary = include_source = False
         
         if format == OutputFormat.LATEX:
             # Create a temporary directory for the build
@@ -258,7 +318,7 @@ class PaperGenerator:
                 try:
                     latex_content = self.generate_latex_via_jinja(
                         title, questions, 
-                        include_answer, include_analysis, include_explanation, include_summary, include_source,
+                        content_position, include_answer, include_analysis, include_explanation, include_summary, include_source,
                         section_titles=section_titles,
                         image_handler=latex_image_handler
                     )
@@ -294,7 +354,10 @@ class PaperGenerator:
         fd, path = tempfile.mkstemp(suffix=suffix)
         os.close(fd)
 
-        markdown_content = self.generate_markdown(title, questions, include_answer, include_analysis, include_explanation, include_summary, include_source, section_titles=section_titles)
+        markdown_content = self.generate_markdown(
+            title, questions, content_position, include_answer, include_analysis, 
+            include_explanation, include_summary, include_source, section_titles=section_titles
+        )
         extra_args = ['--standalone']
         if format == OutputFormat.DOCX:
             reference_doc = os.path.join(self.template_dir, "yuanxuan-standard-math.docx")

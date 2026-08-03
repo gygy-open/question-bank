@@ -16,9 +16,10 @@ import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
 } from '@/components/ui/dialog'
 import { Checkbox } from '@/components/ui/checkbox'
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
 import {
-  ArrowLeft, Download, Loader2, CheckCircle, Plus, FileDown, Trash2, Heading2,
-} from 'lucide-vue-next'
+  ArrowLeft, Download, Loader2, CheckCircle, Plus, FileDown, Trash2, Heading2, GripVertical,
+} from '@lucide/vue'
 import { toast } from 'vue-sonner'
 import PaperQuestionCard from '@/components/PaperQuestionCard.vue'
 import PaperQuestionDetailSheet from '@/components/PaperQuestionDetailSheet.vue'
@@ -277,11 +278,16 @@ const exportOpen = ref(false)
 const exporting = ref(false)
 const exportForm = ref({
   format: 'docx' as 'docx' | 'latex',
+  content_position: 'after_question' as 'after_question' | 'end_of_paper' | 'hidden',
   include_answer: false,
   include_analysis: false,
   include_explanation: false,
   include_summary: false,
   include_source: false,
+})
+
+const contentPositionEnabled = computed(() => {
+  return exportForm.value.content_position !== 'hidden'
 })
 
 const doExport = async () => {
@@ -536,28 +542,64 @@ watch(
             </SelectContent>
           </Select>
         </div>
-        <div class="space-y-2">
-          <Label>包含内容</Label>
+
+        <Separator />
+
+        <div class="space-y-3">
+          <Label>附加内容显示位置</Label>
+          <RadioGroup v-model="exportForm.content_position">
+            <div class="flex items-center space-x-2">
+              <RadioGroupItem id="pos_after" value="after_question" />
+              <Label for="pos_after" class="font-normal cursor-pointer">
+                <div class="flex flex-col">
+                  <span>题目后</span>
+                  <span class="text-xs text-muted-foreground">每题后紧跟答案和解析</span>
+                </div>
+              </Label>
+            </div>
+            <div class="flex items-center space-x-2">
+              <RadioGroupItem id="pos_end" value="end_of_paper" />
+              <Label for="pos_end" class="font-normal cursor-pointer">
+                <div class="flex flex-col">
+                  <span>卷尾附录</span>
+                  <span class="text-xs text-muted-foreground">统一放在试卷末尾</span>
+                </div>
+              </Label>
+            </div>
+            <div class="flex items-center space-x-2">
+              <RadioGroupItem id="pos_hidden" value="hidden" />
+              <Label for="pos_hidden" class="font-normal cursor-pointer">
+                <div class="flex flex-col">
+                  <span>不显示</span>
+                  <span class="text-xs text-muted-foreground">仅导出题目内容</span>
+                </div>
+              </Label>
+            </div>
+          </RadioGroup>
+        </div>
+
+        <div v-if="contentPositionEnabled" class="space-y-2">
+          <Label>包含项目</Label>
           <div class="flex flex-wrap gap-4">
             <div class="flex items-center space-x-2">
               <Checkbox id="ex_answer" v-model="exportForm.include_answer" />
-              <Label for="ex_answer" class="font-normal">标准答案</Label>
+              <Label for="ex_answer" class="font-normal cursor-pointer">标准答案</Label>
             </div>
             <div class="flex items-center space-x-2">
               <Checkbox id="ex_analysis" v-model="exportForm.include_analysis" />
-              <Label for="ex_analysis" class="font-normal">分析</Label>
+              <Label for="ex_analysis" class="font-normal cursor-pointer">分析</Label>
             </div>
             <div class="flex items-center space-x-2">
               <Checkbox id="ex_explanation" v-model="exportForm.include_explanation" />
-              <Label for="ex_explanation" class="font-normal">解析</Label>
+              <Label for="ex_explanation" class="font-normal cursor-pointer">解析</Label>
             </div>
             <div class="flex items-center space-x-2">
               <Checkbox id="ex_summary" v-model="exportForm.include_summary" />
-              <Label for="ex_summary" class="font-normal">总结</Label>
+              <Label for="ex_summary" class="font-normal cursor-pointer">总结</Label>
             </div>
             <div class="flex items-center space-x-2">
               <Checkbox id="ex_source" v-model="exportForm.include_source" />
-              <Label for="ex_source" class="font-normal">来源</Label>
+              <Label for="ex_source" class="font-normal cursor-pointer">来源</Label>
             </div>
           </div>
         </div>

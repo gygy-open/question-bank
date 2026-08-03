@@ -7,9 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from starlette.background import BackgroundTask
 from app.api import deps
 from app import crud, models
-from app.crud.crud_question import question as question_crud
 from app.schemas.paper import (
-    PaperGenerateRequest,
     PaperCreate,
     PaperUpdate,
     PaperItemsAdd,
@@ -266,6 +264,7 @@ async def download_managed_paper(
             title,
             questions,
             options.format,
+            content_position=options.content_position,
             include_answer=options.include_answer,
             include_analysis=options.include_analysis,
             include_explanation=options.include_explanation,
@@ -287,51 +286,6 @@ async def download_managed_paper(
             path=file_path,
             filename=filename,
             background=BackgroundTask(cleanup),
-        )
-    except Exception as e:
-        logger.error(f"Error generating paper: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=str(e))
-
-
-@router.post("/download")
-async def download_paper(
-    request: PaperGenerateRequest,
-    db: AsyncSession = Depends(deps.get_db),
-) -> Any:
-    """
-    [Legacy] Generate and download a paper from an ad-hoc question id list.
-    Order is not guaranteed; prefer POST /papers/{id}/download.
-    """
-    questions = await question_crud.get_multi_by_ids(db, ids=request.question_ids)
-    if not questions:
-        raise HTTPException(status_code=404, detail="No questions found")
-
-    try:
-        file_path = paper_generator.generate_file(
-            request.title,
-            questions,
-            request.format,
-            include_answer=request.include_answer,
-            include_analysis=request.include_analysis,
-            include_explanation=request.include_explanation,
-            include_summary=request.include_summary,
-            include_source=request.include_source
-        )
-
-        extension = request.format.value
-        if extension == "latex":
-            extension = "zip"
-
-        filename = f"{request.title}.{extension}"
-
-        def cleanup():
-            if os.path.exists(file_path):
-                os.remove(file_path)
-
-        return FileResponse(
-            path=file_path,
-            filename=filename,
-            background=BackgroundTask(cleanup)
         )
     except Exception as e:
         logger.error(f"Error generating paper: {e}", exc_info=True)

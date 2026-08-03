@@ -66,4 +66,24 @@
 \end{questions}
 \BLOCK{ endfor }
 
+\BLOCK{ if has_appendix }
+\newpage
+\section*{参考答案与解析}
+\BLOCK{ for section in appendix_sections }
+\BLOCK{ if section.title }
+\subsection*{\VAR{ section.title }}
+\BLOCK{ endif }
+\begin{questions}
+    \BLOCK{ for q in section.questions }
+    \question
+    \BLOCK{ if q.answer_tex } \par \textbf{【答案】} \VAR{ q.answer_tex } \BLOCK{ endif }
+    \BLOCK{ if q.thinking_tex } \par \textbf{【分析】} \VAR{ q.thinking_tex } \BLOCK{ endif }
+    \BLOCK{ if q.analysis_tex } \par \textbf{【解析】} \VAR{ q.analysis_tex } \BLOCK{ endif }
+    \BLOCK{ if q.summary_tex } \par \textbf{【总结】} \VAR{ q.summary_tex } \BLOCK{ endif }
+    \BLOCK{ if q.source_tex } \par \textbf{【来源】} \VAR{ q.source_tex } \BLOCK{ endif }
+    \BLOCK{ endfor }
+\end{questions}
+\BLOCK{ endfor }
+\BLOCK{ endif }
+
 \end{document}
