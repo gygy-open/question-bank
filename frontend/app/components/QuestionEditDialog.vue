@@ -339,14 +339,6 @@ watch(() => editingQuestion.value?.q_type, (newType, oldType) => {
             <!-- Editor (Left) -->
             <section class="border-b border-border/50 bg-background px-6 py-6 lg:border-b-0 lg:border-r lg:h-full lg:overflow-y-auto">
               <div class="mx-auto max-w-3xl space-y-6">
-              
-              <!-- Subject Display (read-only in edit mode, auto-filled in create mode) -->
-              <div class="space-y-2" v-if="editingQuestion?.subject_id">
-                <Label>所属学科</Label>
-                <div class="flex h-9 w-full rounded-md border border-input bg-muted px-3 py-2 text-sm">
-                  {{ subjects?.find(s => s.id === editingQuestion.subject_id)?.name || '未知学科' }}
-                </div>
-              </div>
 
               <!-- Question Type & Difficulty -->
               <div class="grid grid-cols-2 gap-4">
