@@ -66,6 +66,7 @@ export interface Tag {
   name: string
   category: string
   color: string
+  subject_id: number
 }
 
 export interface TagCategory {
@@ -206,6 +207,8 @@ export interface User {
   avatar_url?: string
   is_active: boolean
   is_superuser: boolean
+  subject_id?: number
+  last_active_subject_id?: number
 }
 
 export interface LoginRequest {
