@@ -65,6 +65,9 @@ const handleLogout = () => {
             </a>
           </SidebarMenuButton>
         </SidebarMenuItem>
+        <SidebarMenuItem class="px-1 pt-1">
+          <SubjectSelector />
+        </SidebarMenuItem>
       </SidebarMenu>
     </SidebarHeader>
     <SidebarContent>

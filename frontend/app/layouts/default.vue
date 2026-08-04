@@ -5,10 +5,12 @@ import { toast } from 'vue-sonner'
 
 const { fetchUser, token, user } = useAuth()
 const { state: updateState, check: checkUpdate } = useUpdateCheck()
+const { init: initSubjectContext } = useSubjectContext()
 
 onMounted(async () => {
   if (token.value) {
     await fetchUser()
+    await initSubjectContext()
   }
   // Updating is a server-side action (an admin runs the new installer on the
   // server), so only prompt administrators — not every LAN client.
