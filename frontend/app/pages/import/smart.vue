@@ -613,21 +613,7 @@ const reset = () => {
                     </CardTitle>
                 </CardHeader>
                 <CardContent>
-                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-                        <div class="space-y-2">
-                            <Label>所属学科 <span class="text-destructive">*</span></Label>
-                            <Select v-model="globalSettings.subject_id">
-                                <SelectTrigger>
-                                    <SelectValue placeholder="选择学科" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem v-for="s in subjects" :key="s.id" :value="s.id">
-                                        {{ s.name }}
-                                    </SelectItem>
-                                </SelectContent>
-                            </Select>
-                            <p class="text-xs text-muted-foreground">用于过滤可用的分类，每个题目可单独分配分类</p>
-                        </div>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div class="space-y-2">
                             <Label>初始状态</Label>
                             <Select v-model="globalSettings.status">
