@@ -8,6 +8,7 @@ class UserBase(BaseModel):
     is_active: bool = True
     is_superuser: bool = False
     subject_id: int | None = None
+    last_active_subject_id: int | None = None
 
 class UserCreate(UserBase):
     password: str
@@ -20,6 +21,10 @@ class UserUpdate(BaseModel):
     is_active: bool | None = None
     is_superuser: bool | None = None
     subject_id: int | None = None
+    last_active_subject_id: int | None = None
+
+class UserUpdateLastSubject(BaseModel):
+    subject_id: int
 
 class UserUpdatePassword(BaseModel):
     current_password: str

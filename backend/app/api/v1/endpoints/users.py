@@ -5,7 +5,7 @@ from fastapi.encoders import jsonable_encoder
 
 from app.api import deps
 from app.crud import crud_user
-from app.schemas.user import User, UserCreate, UserUpdate, UserUpdatePassword
+from app.schemas.user import User, UserCreate, UserUpdate, UserUpdatePassword, UserUpdateLastSubject
 from app.core import security
 
 router = APIRouter()
@@ -71,6 +71,20 @@ async def update_user_me(
         # Given the schema, it's allowed.
         pass
         
+    user = await crud_user.user.update(session, db_obj=current_user, obj_in=user_in)
+    return user
+
+@router.put("/me/last-subject", response_model=User)
+async def update_last_subject_me(
+    *,
+    session: deps.SessionDep,
+    body: UserUpdateLastSubject,
+    current_user: User = Depends(deps.get_current_active_user),
+) -> Any:
+    """
+    Persist the current user's last active (working) subject.
+    """
+    user_in = UserUpdate(last_active_subject_id=body.subject_id)
     user = await crud_user.user.update(session, db_obj=current_user, obj_in=user_in)
     return user
 
