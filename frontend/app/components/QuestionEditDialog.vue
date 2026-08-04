@@ -340,19 +340,12 @@ watch(() => editingQuestion.value?.q_type, (newType, oldType) => {
             <section class="border-b border-border/50 bg-background px-6 py-6 lg:border-b-0 lg:border-r lg:h-full lg:overflow-y-auto">
               <div class="mx-auto max-w-3xl space-y-6">
               
-              <!-- Subject Selection -->
-              <div class="space-y-2" v-if="subjects && subjects.length > 0">
+              <!-- Subject Display (read-only in edit mode, auto-filled in create mode) -->
+              <div class="space-y-2" v-if="editingQuestion?.subject_id">
                 <Label>所属学科</Label>
-                <Select :model-value="editingQuestion?.subject_id?.toString()" @update:model-value="(v) => { if(editingQuestion) editingQuestion.subject_id = Number(v) }">
-                  <SelectTrigger>
-                    <SelectValue placeholder="选择学科" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem v-for="sub in subjects" :key="sub.id" :value="sub.id.toString()">
-                      {{ sub.name }}
-                    </SelectItem>
-                  </SelectContent>
-                </Select>
+                <div class="flex h-9 w-full rounded-md border border-input bg-muted px-3 py-2 text-sm">
+                  {{ subjects?.find(s => s.id === editingQuestion.subject_id)?.name || '未知学科' }}
+                </div>
               </div>
 
               <!-- Question Type & Difficulty -->

@@ -689,6 +689,7 @@ const viewStructure = (question: Question) => {
     :knowledge-points="knowledgePoints"
     :subjects="subjects"
     :mode="dialogMode"
+    :auto-fill-subject-id="currentSubjectId ?? undefined"
     @update:open="(v) => isDialogOpen = v"
     @success="handleEditSuccess"
   />
