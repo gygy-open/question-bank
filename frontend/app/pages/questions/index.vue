@@ -99,16 +99,24 @@ if (route.query.id) {
 // --- Data Fetching ---
 const { data: subjects, refresh: refreshSubjects } = await useAPI<Subject[]>('/subjects')
 
-const selectedSubjectId = ref<string>('0')
-if (subjects.value?.[0]) {
-  selectedSubjectId.value = String(subjects.value[0].id)
-  filters.subject_id = selectedSubjectId.value
-}
-
-watch(selectedSubjectId, (newVal) => {
-  filters.subject_id = newVal
-  page.value = 1 // Reset page on subject change
+// Subject is now driven by the global subject context (sidebar selector).
+const { currentSubjectId, setSubject } = useSubjectContext()
+const selectedSubjectId = computed<string>({
+  get: () => (currentSubjectId.value != null ? String(currentSubjectId.value) : '0'),
+  set: (val) => {
+    if (val && val !== '0') setSubject(Number(val)).catch(() => {})
+  },
 })
+
+// Keep the query filter and pagination in sync with the global subject.
+watch(
+  selectedSubjectId,
+  (newVal) => {
+    filters.subject_id = newVal
+    page.value = 1
+  },
+  { immediate: true }
+)
 
 const queryParams = computed(() => {
   const params: Record<string, any> = {
@@ -453,12 +461,6 @@ const viewStructure = (question: Question) => {
       </div>
 
       <Tabs v-model="selectedSubjectId" class="w-full">
-        <TabsList class="w-full justify-start overflow-x-auto">
-          <TabsTrigger v-for="subject in subjects" :key="subject.id" :value="String(subject.id)">
-            {{ subject.name }}
-          </TabsTrigger>
-        </TabsList>
-
         <TabsContent v-for="subject in subjects" :key="subject.id" :value="String(subject.id)" class="mt-4 space-y-6">
           <div class="flex flex-col md:flex-row gap-6">
             <!-- Mobile Sidebar Toggle -->

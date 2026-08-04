@@ -61,11 +61,11 @@ const { $api } = useNuxtApp()
 const { data: subjects } = useAPI<Subject[]>('/subjects')
 const { data: knowledgePoints } = useAPI<KnowledgePoint[]>('/knowledge-points', { query: { limit: -1 } })
 
-// Fetch current user and auto-fill subject_id
+// Default the import subject to the global subject context (still overridable below).
+const { currentSubjectId } = useSubjectContext()
 const { data: currentUser } = await useAPI('/users/me')
-if ((currentUser.value as any)?.subject_id) {
-    globalSettings.value.subject_id = (currentUser.value as any).subject_id
-}
+globalSettings.value.subject_id =
+    currentSubjectId.value ?? (currentUser.value as any)?.subject_id ?? undefined
 
 // Filter knowledge points based on selected subject
 const filteredKnowledgePoints = computed(() => {

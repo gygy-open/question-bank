@@ -36,8 +36,18 @@ import { toast } from 'vue-sonner'
 
 // State
 const { $api } = useNuxtApp()
-const { data: tags, refresh } = await useAPI<Tag[]>('/tags')
+const { currentSubjectId, currentSubject, hasSubjects } = useSubjectContext()
+
+const { data: tags, refresh } = await useAPI<Tag[]>(
+    () => `/tags?subject_id=${currentSubjectId.value ?? ''}`,
+    { immediate: !!currentSubjectId.value }
+)
 const { data: tagCategories, refresh: refreshCategories } = await useAPI<TagCategory[]>('/tag-categories')
+
+// Reload tags whenever the global subject changes.
+watch(currentSubjectId, () => {
+    if (currentSubjectId.value) refresh()
+})
 
 const selectedCategory = ref('all')
 const selectedTags = ref<number[]>([])
@@ -99,7 +109,7 @@ const saveTag = async () => {
         } else {
             await $api('/tags', {
                 method: 'POST',
-                body: currentTag.value
+                body: { ...currentTag.value, subject_id: currentSubjectId.value }
             })
             toast.success('标签创建成功')
         }
@@ -209,11 +219,14 @@ const deleteCategory = async (id: number) => {
 <template>
     <PageHeader title="标签管理">
         <template #actions>
+            <span v-if="currentSubject" class="mr-2 text-sm text-muted-foreground">
+                当前学科：{{ currentSubject.name }}
+            </span>
             <Button variant="outline" class="mr-2" @click="isCategoryDialogOpen = true">
                 <Settings class="w-4 h-4 mr-2" />
                 管理分类
             </Button>
-            <Button @click="openCreateDialog">
+            <Button :disabled="!hasSubjects" @click="openCreateDialog">
                 <Plus class="w-4 h-4 mr-2" />
                 新建标签
             </Button>

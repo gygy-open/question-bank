@@ -27,12 +27,14 @@ const { data: subjects } = await useAPI<Subject[]>('/subjects')
 const { data: currentUser } = await useAPI<{ is_superuser?: boolean }>('/users/me')
 const isSuperuser = computed(() => !!currentUser.value?.is_superuser)
 
-const selectedSubjectId = ref<string>('')
-
-// Initialize selectedSubjectId
-if (subjects.value && subjects.value.length > 0) {
-  selectedSubjectId.value = String(subjects.value[0].id)
-}
+// Subject is driven by the global subject context (sidebar selector).
+const { currentSubjectId, setSubject } = useSubjectContext()
+const selectedSubjectId = computed<string>({
+  get: () => (currentSubjectId.value != null ? String(currentSubjectId.value) : ''),
+  set: (val) => {
+    if (val) setSubject(Number(val)).catch(() => {})
+  },
+})
 
 const selectedSubjectName = computed(() =>
   subjects.value?.find(s => String(s.id) === selectedSubjectId.value)?.name || ''
@@ -271,12 +273,6 @@ onMounted(fetchVectorStatus)
       </div>
 
       <Tabs v-else v-model="selectedSubjectId" class="w-full">
-        <TabsList class="w-full justify-start overflow-x-auto">
-          <TabsTrigger v-for="subject in subjects" :key="subject.id" :value="String(subject.id)">
-            {{ subject.name }}
-          </TabsTrigger>
-        </TabsList>
-
         <div class="mt-4 border rounded-lg p-4 min-h-[500px] bg-card">
           <div class="flex justify-between items-center mb-4 gap-2 flex-wrap">
             <h3 class="text-lg font-medium">知识点树</h3>
