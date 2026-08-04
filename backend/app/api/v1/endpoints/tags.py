@@ -1,6 +1,5 @@
 from typing import Any, List
 from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy import select
 from app import crud, schemas, models
 from app.api import deps
 
@@ -9,10 +8,13 @@ router = APIRouter()
 @router.get("", response_model=List[schemas.Tag])
 async def read_tags(
     db: deps.SessionDep,
+    subject_id: int,
     skip: int = 0,
     limit: int = 100,
 ) -> Any:
-    tags = await crud.tag.get_multi(db, skip=skip, limit=limit)
+    tags = await crud.tag.get_multi_by_subject(
+        db, subject_id=subject_id, skip=skip, limit=limit
+    )
     return tags
 
 @router.post("", response_model=schemas.Tag)
@@ -22,10 +24,11 @@ async def create_tag(
     tag_in: schemas.TagCreate,
     current_user: models.User = Depends(deps.get_current_active_user),
 ) -> Any:
-    # Check if tag exists
-    stmt = select(models.Tag).where(models.Tag.name == tag_in.name)
-    result = await db.execute(stmt)
-    if result.scalar_one_or_none():
+    # Check if tag exists within the same subject
+    existing = await crud.tag.get_by_name_in_subject(
+        db, name=tag_in.name, subject_id=tag_in.subject_id
+    )
+    if existing:
         raise HTTPException(status_code=400, detail="Tag with this name already exists")
 
     tag = await crud.tag.create(db=db, obj_in=tag_in, user_id=current_user.id)

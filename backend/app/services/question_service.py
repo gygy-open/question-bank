@@ -10,7 +10,8 @@ class QuestionService:
         self, 
         db: AsyncSession, 
         ai_suggested_tags: Dict[str, List[str]], 
-        user_id: Optional[int]
+        user_id: Optional[int],
+        subject_id: Optional[int] = None,
     ) -> List[int]:
         """
         Process AI suggested tags: find existing or create new tags.
@@ -38,10 +39,12 @@ class QuestionService:
                 
                 tag_name = str(tag_name).strip()
                 
-                # Find tag (do not create if missing)
+                # Find tag (do not create if missing), scoped to the subject
                 stmt = select(models.Tag).where(models.Tag.name == tag_name)
+                if subject_id is not None:
+                    stmt = stmt.where(models.Tag.subject_id == subject_id)
                 result = await db.execute(stmt)
-                tag = result.scalar_one_or_none()
+                tag = result.scalars().first()
                 
                 if tag:
                     tag_ids.append(tag.id)
@@ -60,7 +63,9 @@ class QuestionService:
         """
         # 1. Process AI Suggested Tags
         if question_in.ai_suggested_tags:
-            new_tag_ids = await self.process_ai_tags(db, question_in.ai_suggested_tags, user_id)
+            new_tag_ids = await self.process_ai_tags(
+                db, question_in.ai_suggested_tags, user_id, subject_id=question_in.subject_id
+            )
             
             if question_in.tag_ids is None:
                 question_in.tag_ids = []

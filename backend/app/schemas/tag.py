@@ -7,7 +7,7 @@ class TagBase(BaseModel):
     color: Optional[str] = "#grey"
 
 class TagCreate(TagBase):
-    pass
+    subject_id: int
 
 class TagUpdate(TagBase):
     name: Optional[str] = None
@@ -15,6 +15,7 @@ class TagUpdate(TagBase):
 
 class Tag(TagBase):
     id: int
+    subject_id: int
 
     class Config:
         from_attributes = True
