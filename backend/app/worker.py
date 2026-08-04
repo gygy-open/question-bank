@@ -68,7 +68,7 @@ async def process_task(db: AsyncSession, task: ImportTask):
                 user_result = await db.execute(user_stmt)
                 user = user_result.scalar_one_or_none()
                 if user:
-                    subject_id = user.subject_id
+                    subject_id = user.last_active_subject_id or user.subject_id
             
             for q_data in questions_data:
                 # Determine type enum

@@ -92,8 +92,8 @@ async def create_question(
     question_in: schemas.QuestionCreate,
     current_user: models.User = Depends(deps.get_current_active_user),
 ) -> Any:
-    if not question_in.subject_id and current_user.subject_id:
-        question_in.subject_id = current_user.subject_id
+    if not question_in.subject_id:
+        question_in.subject_id = current_user.last_active_subject_id or current_user.subject_id
     question = await crud.question.create_with_tags(db=db, obj_in=question_in, user_id=current_user.id)
     return question
 
@@ -140,8 +140,8 @@ async def create_questions_batch(
         if parent_id is not None:
             question_in.parent_id = parent_id
             
-        if not question_in.subject_id and current_user.subject_id:
-            question_in.subject_id = current_user.subject_id
+        if not question_in.subject_id:
+            question_in.subject_id = current_user.last_active_subject_id or current_user.subject_id
             
         if not question_in.source and batch_in.filename:
             question_in.source = batch_in.filename

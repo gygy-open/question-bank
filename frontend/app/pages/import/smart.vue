@@ -63,9 +63,7 @@ const { data: knowledgePoints } = useAPI<KnowledgePoint[]>('/knowledge-points', 
 
 // Default the import subject to the global subject context (still overridable below).
 const { currentSubjectId } = useSubjectContext()
-const { data: currentUser } = await useAPI('/users/me')
-globalSettings.value.subject_id =
-    currentSubjectId.value ?? (currentUser.value as any)?.subject_id ?? undefined
+globalSettings.value.subject_id = currentSubjectId.value ?? undefined
 
 // Filter knowledge points based on selected subject
 const filteredKnowledgePoints = computed(() => {
