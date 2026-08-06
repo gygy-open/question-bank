@@ -4,6 +4,7 @@ from typing import Optional
 class TagCategoryBase(BaseModel):
     name: str
     slug: str
+    subject_id: int
     sort_order: int = 0
     is_active: bool = True
 

@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Boolean
+from sqlalchemy import Column, Integer, String, Boolean, ForeignKey, UniqueConstraint
 from .base import Base
 
 class TagCategory(Base):
@@ -7,6 +7,12 @@ class TagCategory(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String(50), nullable=False) # 显示名称，如：年份
-    slug = Column(String(50), unique=True, index=True, nullable=False) # 代码，如：year
+    slug = Column(String(50), index=True, nullable=False) # 代码，如：year
+    subject_id = Column(Integer, ForeignKey('subjects.id'), nullable=True, index=True) # 暂时允许为空以供迁移
     sort_order = Column(Integer, default=0) # 排序
     is_active = Column(Boolean, default=True) # 是否启用
+
+    __table_args__ = (
+        UniqueConstraint('subject_id', 'slug', name='uq_tag_category_subject_slug'),
+        UniqueConstraint('subject_id', 'name', name='uq_tag_category_subject_name'),
+    )

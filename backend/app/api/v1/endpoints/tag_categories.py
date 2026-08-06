@@ -11,13 +11,17 @@ router = APIRouter()
 @router.get("", response_model=List[schemas.TagCategory])
 async def read_tag_categories(
     db: deps.SessionDep,
+    subject_id: int | None = None,
     skip: int = 0,
     limit: int = 100,
 ) -> Any:
     """
     Retrieve tag categories.
     """
-    tag_categories = await crud.tag_category.get_multi(db, skip=skip, limit=limit)
+    if subject_id is not None:
+        tag_categories = await crud.tag_category.get_multi_by_subject(db, subject_id=subject_id, skip=skip, limit=limit)
+    else:
+        tag_categories = await crud.tag_category.get_multi(db, skip=skip, limit=limit)
     return tag_categories
 
 @router.post("", response_model=schemas.TagCategory)
@@ -30,6 +34,13 @@ async def create_tag_category(
     """
     Create new tag category.
     """
+    if not tag_category_in.subject_id:
+        raise HTTPException(status_code=400, detail="subject_id is required")
+        
+    existing = await crud.tag_category.get_by_slug_in_subject(db, slug=tag_category_in.slug, subject_id=tag_category_in.subject_id)
+    if existing:
+        raise HTTPException(status_code=400, detail="Tag category with this slug already exists in this subject")
+        
     tag_category = await crud.tag_category.create(db=db, obj_in=tag_category_in)
     return tag_category
 

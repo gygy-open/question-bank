@@ -65,7 +65,11 @@ const { data: tags } = useAPI<Tag[]>('/tags', {
     subject_id: editingQuestion.value?.subject_id || props.autoFillSubjectId || undefined
   }))
 })
-const { data: tagCategories } = useAPI<TagCategory[]>('/tag-categories')
+const { data: tagCategories } = useAPI<TagCategory[]>('/tag-categories', {
+  query: computed(() => ({
+    subject_id: editingQuestion.value?.subject_id || props.autoFillSubjectId || undefined
+  }))
+})
 
 const isSubmitting = ref(false)
 const openTagSelect = ref(false)

@@ -280,7 +280,17 @@ const { data: tags, refresh: refreshTags } = await useAPI<Tag[]>('/tags', {
     return res
   }
 })
-const { data: tagCategories } = await useAPI<TagCategory[]>('/tag-categories')
+const { data: tagCategories } = await useAPI<TagCategory[]>('/tag-categories', {
+  query: computed(() => ({
+    subject_id: selectedSubjectId.value && selectedSubjectId.value !== '0' ? selectedSubjectId.value : undefined
+  })),
+  transform: (res) => {
+    if (res && res.detail && Array.isArray(res.detail) && res.detail[0]?.type === 'missing') {
+      return []
+    }
+    return res
+  }
+})
 const { data: users } = await useAPI<User[]>('/users', {
   query: computed(() => ({
     subject_id: selectedSubjectId.value && selectedSubjectId.value !== '0' ? selectedSubjectId.value : undefined

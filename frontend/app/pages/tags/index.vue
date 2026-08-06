@@ -42,7 +42,11 @@ const { data: tags, refresh } = await useAPI<Tag[]>(
     () => `/tags?subject_id=${currentSubjectId.value ?? ''}`,
     { immediate: !!currentSubjectId.value }
 )
-const { data: tagCategories, refresh: refreshCategories } = await useAPI<TagCategory[]>('/tag-categories')
+const { data: tagCategories, refresh: refreshCategories } = await useAPI<TagCategory[]>('/tag-categories', {
+  query: computed(() => ({
+    subject_id: currentSubjectId.value || undefined
+  }))
+})
 
 // Reload tags whenever the global subject changes.
 watch(currentSubjectId, () => {
@@ -191,10 +195,18 @@ const saveCategory = async () => {
 }
 
 const createCategory = async () => {
+    if (!currentSubjectId.value) {
+        toast.error('请先选择学科')
+        return
+    }
+    
     try {
         await $api('/tag-categories', {
             method: 'POST',
-            body: newCategory.value
+            body: { 
+                ...newCategory.value, 
+                subject_id: parseInt(currentSubjectId.value) 
+            }
         })
         await refreshCategories()
         newCategory.value = { name: '', slug: '', sort_order: 0, is_active: true }
