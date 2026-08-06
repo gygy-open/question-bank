@@ -203,7 +203,7 @@ const handleLogout = () => {
               <SidebarMenuButton size="lg"
                 class="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground">
                 <Avatar class="h-8 w-8 rounded-lg">
-                  <AvatarImage :src="user?.avatar_url" :alt="user?.username" />
+                  <AvatarImage :src="user?.avatar_url || ''" :alt="user?.username" />
                   <AvatarFallback class="rounded-lg">{{ user?.username?.slice(0, 2).toUpperCase() }}</AvatarFallback>
                 </Avatar>
                 <div class="grid flex-1 text-left text-sm leading-tight">

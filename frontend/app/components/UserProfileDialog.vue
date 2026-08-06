@@ -112,7 +112,7 @@ const handleSubmit = async () => {
       <div class="grid gap-4 py-4">
         <div class="flex flex-col items-center gap-4">
           <Avatar class="h-24 w-24">
-            <AvatarImage :src="formData.avatar_url" />
+            <AvatarImage :src="formData.avatar_url || ''" />
             <AvatarFallback>{{ user?.username?.slice(0, 2).toUpperCase() }}</AvatarFallback>
           </Avatar>
           <div class="flex items-center gap-2">
