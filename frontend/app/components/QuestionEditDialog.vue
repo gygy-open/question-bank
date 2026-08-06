@@ -60,16 +60,26 @@ const emit = defineEmits<{
 const { $api } = useNuxtApp()
 
 const editingQuestion = ref<any>(null)
-const { data: tags } = useAPI<Tag[]>('/tags', {
+const { data: tags, refresh: refreshTags } = useAPI<Tag[]>('/tags', {
   query: computed(() => ({
     subject_id: editingQuestion.value?.subject_id || props.autoFillSubjectId || undefined
-  }))
+  })),
+  immediate: false,
 })
-const { data: tagCategories } = useAPI<TagCategory[]>('/tag-categories', {
+const { data: tagCategories, refresh: refreshTagCategories } = useAPI<TagCategory[]>('/tag-categories', {
   query: computed(() => ({
     subject_id: editingQuestion.value?.subject_id || props.autoFillSubjectId || undefined
-  }))
+  })),
+  immediate: false,
 })
+
+// Trigger fetch when subject is available
+watch(() => editingQuestion.value?.subject_id || props.autoFillSubjectId, (newId) => {
+  if (newId) {
+    refreshTags()
+    refreshTagCategories()
+  }
+}, { immediate: true })
 
 const isSubmitting = ref(false)
 const openTagSelect = ref(false)

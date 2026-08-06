@@ -38,20 +38,26 @@ import { toast } from 'vue-sonner'
 const { $api } = useNuxtApp()
 const { currentSubjectId, currentSubject, hasSubjects } = useSubjectContext()
 
-const { data: tags, refresh } = await useAPI<Tag[]>(
-    () => `/tags?subject_id=${currentSubjectId.value ?? ''}`,
-    { immediate: !!currentSubjectId.value }
-)
+const { data: tags, refresh } = await useAPI<Tag[]>('/tags', {
+  query: computed(() => ({
+    subject_id: currentSubjectId.value || undefined
+  })),
+  immediate: false,
+})
 const { data: tagCategories, refresh: refreshCategories } = await useAPI<TagCategory[]>('/tag-categories', {
   query: computed(() => ({
     subject_id: currentSubjectId.value || undefined
-  }))
+  })),
+  immediate: false,
 })
 
-// Reload tags whenever the global subject changes.
+// Reload tags and categories whenever the global subject changes.
 watch(currentSubjectId, () => {
-    if (currentSubjectId.value) refresh()
-})
+    if (currentSubjectId.value) {
+      refresh()
+      refreshCategories()
+    }
+}, { immediate: true })
 
 const selectedCategory = ref('all')
 const selectedTags = ref<number[]>([])
