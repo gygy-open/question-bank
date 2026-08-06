@@ -65,15 +65,17 @@ const { data: tags, refresh: refreshTags } = useAPI<Tag[]>('/tags', {
     subject_id: editingQuestion.value?.subject_id || props.autoFillSubjectId || undefined
   })),
   immediate: false,
+  watch: false,
 })
 const { data: tagCategories, refresh: refreshTagCategories } = useAPI<TagCategory[]>('/tag-categories', {
   query: computed(() => ({
     subject_id: editingQuestion.value?.subject_id || props.autoFillSubjectId || undefined
   })),
   immediate: false,
+  watch: false,
 })
 
-// Trigger fetch when subject is available
+// Only fetch once a real subject is available (never send an empty subject_id).
 watch(() => editingQuestion.value?.subject_id || props.autoFillSubjectId, (newId) => {
   if (newId) {
     refreshTags()

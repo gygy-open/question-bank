@@ -273,31 +273,21 @@ const { data: tags, refresh: refreshTags } = await useAPI<Tag[]>('/tags', {
     subject_id: selectedSubjectId.value && selectedSubjectId.value !== '0' ? selectedSubjectId.value : undefined
   })),
   immediate: false,
-  transform: (res) => {
-    if (res && res.detail && Array.isArray(res.detail) && res.detail[0]?.type === 'missing') {
-      return []
-    }
-    return res
-  }
+  watch: false,
 })
-const { data: tagCategories } = await useAPI<TagCategory[]>('/tag-categories', {
+const { data: tagCategories, refresh: refreshTagCategories } = await useAPI<TagCategory[]>('/tag-categories', {
   query: computed(() => ({
     subject_id: selectedSubjectId.value && selectedSubjectId.value !== '0' ? selectedSubjectId.value : undefined
   })),
   immediate: false,
-  transform: (res) => {
-    if (res && res.detail && Array.isArray(res.detail) && res.detail[0]?.type === 'missing') {
-      return []
-    }
-    return res
-  }
+  watch: false,
 })
 
-// watch selectedSubjectId to trigger tag and category fetch when it becomes truthy
+// Only fetch tags/categories once a real subject is selected (never send an empty subject_id).
 watch(selectedSubjectId, (newId) => {
   if (newId && newId !== '0') {
     refreshTags()
-    // Since tagCategories returns a ref but doesn't expose refresh out of the box in the destructure, we can either destructure refresh or just let nuxt handle it when query changes
+    refreshTagCategories()
   }
 }, { immediate: true })
 

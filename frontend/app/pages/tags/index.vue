@@ -43,15 +43,17 @@ const { data: tags, refresh } = await useAPI<Tag[]>('/tags', {
     subject_id: currentSubjectId.value || undefined
   })),
   immediate: false,
+  watch: false,
 })
 const { data: tagCategories, refresh: refreshCategories } = await useAPI<TagCategory[]>('/tag-categories', {
   query: computed(() => ({
     subject_id: currentSubjectId.value || undefined
   })),
   immediate: false,
+  watch: false,
 })
 
-// Reload tags and categories whenever the global subject changes.
+// Only fetch once a real subject is selected (never send an empty subject_id).
 watch(currentSubjectId, () => {
     if (currentSubjectId.value) {
       refresh()
