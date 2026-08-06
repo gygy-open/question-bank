@@ -46,7 +46,7 @@ onMounted(async () => {
       '--header-height': 'calc(var(--spacing) * 12)',
     }"
   >
-    <AppSidebar variant="inset" />
+    <AppSidebar />
     <SidebarInset>
       <slot />
     </SidebarInset>

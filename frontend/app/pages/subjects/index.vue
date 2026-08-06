@@ -89,9 +89,10 @@ const deleteSubject = async (id: number) => {
     </template>
   </PageHeader>
 
-  <div class="flex flex-1 flex-col">
-    <div class="@container/main flex flex-1 flex-col px-4 space-y-6 py-6">
-      <div class="border rounded-md">
+  <div class="flex-1 overflow-auto">
+    <div class="max-w-7xl mx-auto p-6">
+      <!-- 表格卡片 -->
+      <div class="bg-white rounded-lg shadow-sm border">
         <Table>
           <TableHeader>
             <TableRow>
@@ -122,7 +123,7 @@ const deleteSubject = async (id: number) => {
               </TableCell>
             </TableRow>
             <TableRow v-if="!subjects || subjects.length === 0">
-              <TableCell colspan="5" class="text-center py-8 text-muted-foreground">
+              <TableCell colspan="6" class="text-center py-8 text-muted-foreground">
                 暂无科目
               </TableCell>
             </TableRow>
@@ -130,8 +131,10 @@ const deleteSubject = async (id: number) => {
         </Table>
       </div>
     </div>
+  </div>
 
-    <Dialog v-model:open="isDialogOpen">
+  <!-- 对话框 -->
+  <Dialog v-model:open="isDialogOpen">
       <DialogContent>
         <DialogHeader>
           <DialogTitle>{{ isEditing ? '编辑科目' : '新建科目' }}</DialogTitle>
@@ -170,5 +173,4 @@ const deleteSubject = async (id: number) => {
         </DialogFooter>
       </DialogContent>
     </Dialog>
-  </div>
 </template>
