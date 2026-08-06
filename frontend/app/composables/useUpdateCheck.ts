@@ -1,3 +1,5 @@
+import { useLocalStorage } from '@vueuse/core'
+
 /**
  * Desktop update check.
  *
@@ -45,7 +47,7 @@ function isNewer(latest: string, current: string): boolean {
 }
 
 export function useUpdateCheck() {
-  const state = useState<UpdateState>('update-check', () => ({
+  const state = useLocalStorage<UpdateState>('update-check', {
     current: '',
     latest: '',
     hasUpdate: false,
@@ -53,7 +55,7 @@ export function useUpdateCheck() {
     checkedAt: 0,
     checking: false,
     error: null,
-  }))
+  })
 
   const { $api } = useNuxtApp()
 
