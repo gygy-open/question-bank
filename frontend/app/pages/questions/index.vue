@@ -268,7 +268,18 @@ watch(questions, (newQuestions) => {
 const { data: knowledgePoints, refresh: refreshKnowledgePoints } = await useAPI<KnowledgePoint[]>('/knowledge-points', {
   query: { limit: -1 }
 })
-const { data: tags, refresh: refreshTags } = await useAPI<Tag[]>('/tags')
+const { data: tags, refresh: refreshTags } = await useAPI<Tag[]>('/tags', {
+  query: computed(() => ({
+    subject_id: selectedSubjectId.value && selectedSubjectId.value !== '0' ? selectedSubjectId.value : undefined
+  })),
+  transform: (res) => {
+    // If we receive the error object indicating subject_id is missing, return empty array instead of throwing
+    if (res && res.detail && Array.isArray(res.detail) && res.detail[0]?.type === 'missing') {
+      return []
+    }
+    return res
+  }
+})
 const { data: tagCategories } = await useAPI<TagCategory[]>('/tag-categories')
 const { data: users } = await useAPI<User[]>('/users', {
   query: computed(() => ({

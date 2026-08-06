@@ -58,10 +58,15 @@ const emit = defineEmits<{
 }>()
 
 const { $api } = useNuxtApp()
-const { data: tags } = useAPI<Tag[]>('/tags')
-const { data: tagCategories } = useAPI<TagCategory[]>('/tag-categories')
 
 const editingQuestion = ref<any>(null)
+const { data: tags } = useAPI<Tag[]>('/tags', {
+  query: computed(() => ({
+    subject_id: editingQuestion.value?.subject_id || props.autoFillSubjectId || undefined
+  }))
+})
+const { data: tagCategories } = useAPI<TagCategory[]>('/tag-categories')
+
 const isSubmitting = ref(false)
 const openTagSelect = ref(false)
 
