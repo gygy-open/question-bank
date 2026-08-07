@@ -25,7 +25,8 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import UserProfileDialog from '~/components/UserProfileDialog.vue'
 import ChangePasswordDialog from '~/components/ChangePasswordDialog.vue'
 import AboutDialog from '~/components/AboutDialog.vue'
-import { BookOpen, ChevronsUpDown, CirclePlus, ListTree, LogOut, Settings, Sparkles, User, Users, Tags, Library, HelpCircle, MessageSquare, KeyRound, Activity, Layers, ClipboardList, Info } from '@lucide/vue'
+import { useColorMode } from '@vueuse/core'
+import { BookOpen, ChevronsUpDown, CirclePlus, ListTree, LogOut, Settings, Sparkles, User, Users, Tags, Library, HelpCircle, MessageSquare, KeyRound, Activity, Layers, ClipboardList, Info, Moon, Sun } from '@lucide/vue'
 
 const props = withDefaults(defineProps<SidebarProps>(), {
   collapsible: "icon",
@@ -37,6 +38,10 @@ const router = useRouter()
 const isProfileOpen = ref(false)
 const isChangePasswordOpen = ref(false)
 const isAboutOpen = ref(false)
+const colorMode = useColorMode()
+const toggleColorMode = () => {
+  colorMode.value = colorMode.value === 'dark' ? 'light' : 'dark'
+}
 
 const handleLogout = () => {
   logout()
@@ -168,6 +173,12 @@ const navActiveClass = 'border-l-2 border-transparent data-[active=true]:border-
     </SidebarContent>
     <SidebarFooter>
       <SidebarMenu>
+        <SidebarMenuItem>
+          <SidebarMenuButton :tooltip="colorMode === 'dark' ? '切换到浅色模式' : '切换到深色模式'" @click="toggleColorMode">
+            <component :is="colorMode === 'dark' ? Sun : Moon" />
+            <span>{{ colorMode === 'dark' ? '浅色模式' : '深色模式' }}</span>
+          </SidebarMenuButton>
+        </SidebarMenuItem>
         <SidebarMenuItem>
           <SidebarMenuButton as-child :is-active="route.path === '/manual'" :class="navActiveClass">
             <NuxtLink to="/manual">

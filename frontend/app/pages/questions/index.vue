@@ -9,17 +9,16 @@ import QuestionStructureSheet from '~/components/QuestionStructureSheet.vue'
 import PageHeader from '~/components/PageHeader.vue'
 import PaperFullSelector from '~/components/PaperFullSelector.vue'
 import TagFilter from '~/components/TagFilter.vue'
-import { Loader2, Plus, X, Trash2, ShoppingBasket, ListTree, Edit } from '@lucide/vue'
+import { Loader2, Plus, X, Trash2, ShoppingBasket, ListTree, Edit, SlidersHorizontal } from '@lucide/vue'
 import { Label } from '@/components/ui/label'
+import { Badge } from '@/components/ui/badge'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Checkbox } from '@/components/ui/checkbox'
 import {
-  Sheet,
-  SheetContent,
-  SheetHeader,
-  SheetTitle,
-  SheetTrigger,
-} from '@/components/ui/sheet'
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from '@/components/ui/popover'
 import {
   Pagination,
   PaginationEllipsis,
@@ -144,6 +143,17 @@ const queryParams = computed(() => {
   if (filters.root_only) params.root_only = true
   
   return params
+})
+
+// Count of active filters tucked away in the "more filters" popover, so it can carry a badge.
+const secondaryFilterCount = computed(() => {
+  let count = 0
+  if (filters.source) count++
+  if (filters.import_task_name) count++
+  if (filters.review_count) count++
+  if (filters.creator_id && filters.creator_id !== '0') count++
+  if (filters.reviewer_id && filters.reviewer_id !== '0') count++
+  return count
 })
 
 const { data: questionPage, refresh: refreshQuestions, status: questionsStatus } = await useAPI<QuestionPage>('/questions', {
@@ -388,6 +398,13 @@ const filteredKnowledgePoints = computed(() => {
   return knowledgePoints.value?.filter(c => String(c.subject_id) === filters.subject_id)
 })
 
+// Knowledge point filter now lives in a popover trigger instead of a dedicated sidebar column.
+const kpPopoverOpen = ref(false)
+const selectKnowledgePoint = (id?: string) => {
+  filters.knowledge_point_id = id
+  kpPopoverOpen.value = false
+}
+
 const resetFilters = () => {
   filters.id = undefined
   
@@ -483,123 +500,132 @@ const viewStructure = (question: Question) => {
 
       <Tabs v-model="selectedSubjectId" class="w-full">
         <TabsContent v-for="subject in subjects" :key="subject.id" :value="String(subject.id)" class="mt-4 space-y-6">
-          <div class="flex flex-col md:flex-row gap-6">
-            <!-- Mobile Sidebar Toggle -->
-            <div class="md:hidden">
-              <Sheet>
-                <SheetTrigger as-child>
-                  <Button variant="outline" class="w-full justify-start">
-                    <ListTree class="mr-2 h-4 w-4" />
-                    {{ filters.knowledge_point_id ? (getKnowledgePointName(filters.knowledge_point_id as number) || '已选择知识点') : '选择知识点' }}
-                  </Button>
-                </SheetTrigger>
-                <SheetContent side="left" class="w-[300px] sm:w-[400px] p-0">
-                  <SheetHeader class="p-4 border-b">
-                    <SheetTitle>选择知识点</SheetTitle>
-                  </SheetHeader>
-                  <div class="h-[calc(100vh-5rem)] overflow-y-auto p-4">
-                    <KnowledgePointTreeSelector 
-                      :knowledge-points="filteredKnowledgePoints || []" 
-                      :selected-id="filters.knowledge_point_id"
-                      @select="(id) => filters.knowledge_point_id = id" 
+          <div class="space-y-6">
+              <!-- Filters: only the high-frequency fields stay always visible to reduce visual clutter -->
+              <div class="space-y-4 p-4 rounded-lg bg-muted/40">
+                <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
+                  <!-- Keyword Filter -->
+                  <div class="space-y-2 sm:col-span-2 xl:col-span-1">
+                    <Label class="text-xs font-medium">关键词</Label>
+                    <ClearableInput v-model="filters.keyword" placeholder="搜索题目内容..." />
+                  </div>
+
+                  <!-- ID Filter -->
+                  <div class="space-y-2">
+                    <Label class="text-xs font-medium">ID</Label>
+                    <ClearableInput v-model="filters.id" placeholder="搜索ID..." />
+                  </div>
+
+                  <!-- Status Filter -->
+                  <div class="space-y-2">
+                    <Label class="text-xs font-medium">状态</Label>
+                    <ClearableSelect v-model="filters.status" :options="statusOptions" placeholder="全部状态" />
+                  </div>
+
+                  <!-- Type Filter -->
+                  <div class="space-y-2">
+                    <Label class="text-xs font-medium">题型</Label>
+                    <ClearableSelect v-model="filters.q_type" :options="qTypeOptions" placeholder="全部题型" />
+                  </div>
+
+                  <!-- Difficulty Filter -->
+                  <div class="space-y-2">
+                    <Label class="text-xs font-medium">难度</Label>
+                    <ClearableSelect v-model="filters.difficulty" :options="difficultyOptions" placeholder="全部难度" />
+                  </div>
+                </div>
+
+                <div class="flex flex-wrap items-end gap-4">
+                  <!-- Knowledge Point Filter: popover replaces the old dedicated sidebar column -->
+                  <div class="space-y-2">
+                    <Label class="text-xs font-medium">知识点</Label>
+                    <Popover v-model:open="kpPopoverOpen">
+                      <PopoverTrigger as-child>
+                        <Button variant="secondary" class="min-w-[180px] justify-start">
+                          <ListTree class="mr-2 h-4 w-4 shrink-0" />
+                          <span class="truncate">
+                            {{ filters.knowledge_point_id ? (getKnowledgePointName(filters.knowledge_point_id as number) || '已选择知识点') : '全部知识点' }}
+                          </span>
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent class="w-72 p-2" align="start">
+                        <div class="max-h-80 overflow-y-auto">
+                          <KnowledgePointTreeSelector
+                            :knowledge-points="filteredKnowledgePoints || []"
+                            :selected-id="filters.knowledge_point_id"
+                            @select="selectKnowledgePoint"
+                          />
+                        </div>
+                      </PopoverContent>
+                    </Popover>
+                  </div>
+
+                  <!-- Tag Filter -->
+                  <div class="space-y-2 flex-1 min-w-[240px]">
+                    <Label class="text-xs font-medium">标签</Label>
+                    <TagFilter 
+                      v-model="filters.tag_ids" 
+                      :tags="tags || []" 
+                      :categories="tagCategories || []" 
                     />
                   </div>
-                </SheetContent>
-              </Sheet>
-            </div>
 
-            <!-- Desktop Left Sidebar: Knowledge Point Tree -->
-            <div class="hidden md:block w-64 flex-shrink-0 border rounded-lg bg-card p-2 h-[calc(100vh-250px)] overflow-y-auto sticky top-4">
-              <KnowledgePointTreeSelector :knowledge-points="filteredKnowledgePoints || []" :selected-id="filters.knowledge_point_id"
-                @select="(id) => filters.knowledge_point_id = id" />
-            </div>
+                  <!-- More Filters Popover: source / import task / review count / creator / reviewer -->
+                  <Popover>
+                    <PopoverTrigger as-child>
+                      <Button variant="secondary">
+                        <SlidersHorizontal class="mr-2 h-4 w-4" />
+                        更多筛选
+                        <Badge v-if="secondaryFilterCount > 0" variant="secondary" class="ml-1 px-1.5">
+                          {{ secondaryFilterCount }}
+                        </Badge>
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent class="w-80" align="start">
+                      <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <!-- Source Filter -->
+                        <div class="space-y-2">
+                          <Label class="text-xs font-medium">来源</Label>
+                          <ClearableInput v-model="filters.source" placeholder="搜索来源..." />
+                        </div>
 
-            <!-- Right Content: Filters & Table -->
-            <div class="flex-1 space-y-6 min-w-0">
-              <!-- Filters -->
-              <div class="grid grid-cols-1 gap-4 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 p-4 border rounded-lg bg-card">
-              
-                <!-- Keyword Filter -->
-                <div class="space-y-2 md:col-span-2 lg:col-span-1">
-                  <Label class="text-xs font-medium">关键词</Label>
-                  <ClearableInput v-model="filters.keyword" placeholder="搜索题目内容..." />
-                </div>
+                        <!-- Import Task Name Filter -->
+                        <div class="space-y-2">
+                          <Label class="text-xs font-medium">导入任务</Label>
+                          <ClearableInput v-model="filters.import_task_name" placeholder="搜索任务名称..." />
+                        </div>
 
-                <!-- ID Filter -->
-                <div class="space-y-2">
-                  <Label class="text-xs font-medium">ID</Label>
-                  <ClearableInput v-model="filters.id" placeholder="搜索ID..." />
-                </div>
+                        <!-- Review Count Filter -->
+                        <div class="space-y-2">
+                          <Label class="text-xs font-medium">审核次数</Label>
+                          <ClearableInput v-model="filters.review_count" type="number" placeholder="次数" />
+                        </div>
 
-                <!-- Status Filter -->
-                <div class="space-y-2">
-                  <Label class="text-xs font-medium">状态</Label>
-                  <ClearableSelect v-model="filters.status" :options="statusOptions" placeholder="全部状态" />
-                </div>
+                        <!-- Creator Filter -->
+                        <div class="space-y-2">
+                          <Label class="text-xs font-medium">创建人</Label>
+                          <ClearableSelect v-model="filters.creator_id" :options="userOptions" placeholder="全部创建人" />
+                        </div>
 
-                <!-- Type Filter -->
-                <div class="space-y-2">
-                  <Label class="text-xs font-medium">题型</Label>
-                  <ClearableSelect v-model="filters.q_type" :options="qTypeOptions" placeholder="全部题型" />
-                </div>
+                        <!-- Reviewer Filter -->
+                        <div class="space-y-2 sm:col-span-2">
+                          <Label class="text-xs font-medium">审核人</Label>
+                          <ClearableSelect v-model="filters.reviewer_id" :options="userOptions" placeholder="全部审核人" />
+                        </div>
+                      </div>
+                    </PopoverContent>
+                  </Popover>
 
-                <!-- Difficulty Filter -->
-                <div class="space-y-2">
-                  <Label class="text-xs font-medium">难度</Label>
-                  <ClearableSelect v-model="filters.difficulty" :options="difficultyOptions" placeholder="全部难度" />
-                </div>
+                  <!-- Hierarchy Filter -->
+                  <!-- <div class="flex items-center space-x-2">
+                    <Checkbox id="root-only" :checked="filters.root_only" @update:checked="(v) => filters.root_only = v" />
+                    <Label for="root-only" class="text-sm font-medium leading-none cursor-pointer">
+                      仅显示原题
+                    </Label>
+                  </div> -->
 
-                <!-- Source Filter -->
-                <div class="space-y-2">
-                  <Label class="text-xs font-medium">来源</Label>
-                  <ClearableInput v-model="filters.source" placeholder="搜索来源..." />
-                </div>
-
-                <!-- Import Task Name Filter -->
-                <div class="space-y-2">
-                  <Label class="text-xs font-medium">导入任务</Label>
-                  <ClearableInput v-model="filters.import_task_name" placeholder="搜索任务名称..." />
-                </div>
-
-                <!-- Review Count Filter -->
-                <div class="space-y-2">
-                  <Label class="text-xs font-medium">审核次数</Label>
-                  <ClearableInput v-model="filters.review_count" type="number" placeholder="次数" />
-                </div>
-
-                <!-- Creator Filter -->
-                <div class="space-y-2">
-                  <Label class="text-xs font-medium">创建人</Label>
-                  <ClearableSelect v-model="filters.creator_id" :options="userOptions" placeholder="全部创建人" />
-                </div>
-
-                <!-- Reviewer Filter -->
-                <div class="space-y-2">
-                  <Label class="text-xs font-medium">审核人</Label>
-                  <ClearableSelect v-model="filters.reviewer_id" :options="userOptions" placeholder="全部审核人" />
-                </div>
-
-                <!-- Tag Filter -->
-                <div class="space-y-2 md:col-span-2">
-                  <Label class="text-xs font-medium">标签</Label>
-                  <TagFilter 
-                    v-model="filters.tag_ids" 
-                    :tags="tags || []" 
-                    :categories="tagCategories || []" 
-                  />
-                </div>
-
-                <!-- Hierarchy Filter -->
-                <!-- <div class="flex items-center space-x-2 pt-6">
-                  <Checkbox id="root-only" :checked="filters.root_only" @update:checked="(v) => filters.root_only = v" />
-                  <Label for="root-only" class="text-sm font-medium leading-none cursor-pointer">
-                    仅显示原题
-                  </Label>
-                </div> -->
-
-                <!-- Reset Button -->
-                <div class="flex items-end">
-                  <Button variant="secondary" class="w-full" @click="resetFilters">
+                  <!-- Reset Button -->
+                  <Button variant="secondary" @click="resetFilters">
                     <X class="mr-2 h-4 w-4" />
                     重置
                   </Button>
@@ -696,7 +722,6 @@ const viewStructure = (question: Question) => {
                   </Pagination>
                 </div>
               </div>
-            </div>
           </div>
         </TabsContent>
       </Tabs>

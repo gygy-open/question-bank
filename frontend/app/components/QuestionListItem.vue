@@ -4,7 +4,13 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Card } from '@/components/ui/card'
-import { Pencil, Trash2, Copy, ChevronDown, Star, ShoppingBasket, CheckCircle, History, Workflow, CornerDownRight, GitFork, FileText, AlertTriangle } from '@lucide/vue'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
+import { Pencil, Trash2, Copy, ChevronDown, Star, ShoppingBasket, CheckCircle, History, Workflow, CornerDownRight, GitFork, FileText, AlertTriangle, MoreHorizontal } from '@lucide/vue'
 import MarkdownPreview from './MarkdownPreview.vue'
 import PaperQuickSelector from './PaperQuickSelector.vue'
 import type { Question as DbQuestion, KnowledgePoint, ImportItem } from '@/types'
@@ -82,15 +88,16 @@ const typeLabel = computed(() => {
   return types[props.item.q_type] || props.item.q_type
 })
 
+// Kept intentionally low-saturation so type colors don't compete with the primary theme color.
 const typeColor = computed(() => {
   const colors: Record<string, string> = {
-    'single_choice': 'bg-blue-100 text-blue-800',
-    'multiple_choice': 'bg-purple-100 text-purple-800',
-    'true_false': 'bg-green-100 text-green-800',
-    'fill_in_the_blank': 'bg-orange-100 text-orange-800',
-    'free_response': 'bg-yellow-100 text-yellow-800'
+    'single_choice': 'bg-blue-50 text-blue-700 dark:bg-blue-500/10 dark:text-blue-400',
+    'multiple_choice': 'bg-violet-50 text-violet-700 dark:bg-violet-500/10 dark:text-violet-400',
+    'true_false': 'bg-teal-50 text-teal-700 dark:bg-teal-500/10 dark:text-teal-400',
+    'fill_in_the_blank': 'bg-orange-50 text-orange-700 dark:bg-orange-500/10 dark:text-orange-400',
+    'free_response': 'bg-amber-50 text-amber-700 dark:bg-amber-500/10 dark:text-amber-400'
   }
-  return colors[props.item.q_type] || 'bg-gray-100 text-gray-800'
+  return colors[props.item.q_type] || 'bg-muted text-muted-foreground'
 })
 
 const warnings = computed<string[]>(() => {
@@ -134,11 +141,11 @@ const statusBadgeProps = computed(() => {
   const item = props.item as DbQuestion
   switch (item.status) {
     case 'published':
-      return { variant: 'default' as const, class: 'bg-green-600 hover:bg-green-700' }
+      return { variant: 'default' as const, class: 'bg-green-600 hover:bg-green-700 dark:bg-green-700 dark:hover:bg-green-600' }
     case 'pending':
-      return { variant: 'secondary' as const, class: 'bg-yellow-100 text-yellow-800 hover:bg-yellow-200' }
+      return { variant: 'secondary' as const, class: 'bg-amber-100 text-amber-800 hover:bg-amber-200 dark:bg-amber-500/15 dark:text-amber-400 dark:hover:bg-amber-500/25' }
     case 'draft':
-      return { variant: 'secondary' as const, class: 'bg-gray-100 text-gray-800 hover:bg-gray-200' }
+      return { variant: 'secondary' as const, class: '' }
     case 'archived':
       return { variant: 'outline' as const, class: 'text-muted-foreground' }
     default:
@@ -231,16 +238,18 @@ const sourceFileUrl = computed(() => {
               <Badge variant="outline">{{ typeLabel }}</Badge>
               
               <!-- Structure Badges -->
-              <Badge v-if="(item as DbQuestion).parent_id" variant="secondary" class="flex items-center gap-1 px-1.5 bg-indigo-100 text-indigo-800 hover:bg-indigo-200">
+              <Badge v-if="(item as DbQuestion).parent_id" variant="secondary" class="flex items-center gap-1 px-1.5 bg-indigo-50 text-indigo-700 hover:bg-indigo-100 dark:bg-indigo-500/10 dark:text-indigo-400">
                  子题
               </Badge>
-              <Badge v-if="(item as DbQuestion).children?.length" variant="secondary" class="flex items-center gap-1 px-1.5 bg-blue-100 text-blue-800 hover:bg-blue-200">
+              <Badge v-if="(item as DbQuestion).children?.length" variant="secondary" class="flex items-center gap-1 px-1.5 bg-blue-50 text-blue-700 hover:bg-blue-100 dark:bg-blue-500/10 dark:text-blue-400">
                  母题
               </Badge>
 
-              <div class="flex">
-                <Star v-for="i in item.difficulty" :key="i"
-                  class="h-3 w-3 fill-yellow-400 text-yellow-400" />
+              <!-- Fixed 5-star scale so difficulty is comparable at a glance across items -->
+              <div class="flex" :title="difficultyLabel">
+                <Star v-for="i in 5" :key="i"
+                  class="h-3 w-3"
+                  :class="i <= item.difficulty ? 'fill-primary text-primary' : 'fill-none text-muted-foreground/30'" />
               </div>
               <Badge v-if="(item as DbQuestion).status" :variant="statusBadgeProps.variant" :class="['text-xs', statusBadgeProps.class]">
                 {{ statusLabel }}
@@ -276,7 +285,7 @@ const sourceFileUrl = computed(() => {
               v-if="mode === 'library' && (item as DbQuestion).status === 'pending'"
               variant="ghost"
               size="icon"
-              class="h-8 w-8 text-green-600 hover:text-green-700 hover:bg-green-50"
+              class="h-8 w-8 text-green-600 hover:text-green-700 hover:bg-green-50 dark:hover:bg-green-500/10"
               title="通过审核"
               @click.stop="handleReview"
               :disabled="isReviewing"
@@ -284,32 +293,43 @@ const sourceFileUrl = computed(() => {
               <CheckCircle class="h-4 w-4" />
             </Button>
 
-            <Button
-              v-if="mode === 'library' && !hideDecompose"
-              variant="ghost"
-              size="icon"
-              class="h-8 w-8 text-indigo-600 hover:text-indigo-700 hover:bg-indigo-50"
-              title="添加子题"
-              @click="emit('decompose', item as DbQuestion)"
-            >
-              <GitFork class="h-4 w-4" />
-            </Button>
-
-            <Button
-              v-if="mode === 'library' && ((item as DbQuestion).children?.length || (item as DbQuestion).parent_id)"
-              variant="ghost"
-              size="icon"
-              class="h-8 w-8 text-blue-600 hover:text-blue-700 hover:bg-blue-50"
-              title="查看结构图谱"
-              @click="emit('view-structure', item as DbQuestion)"
-            >
-              <Workflow class="h-4 w-4" />
-            </Button>
-            
             <PaperQuickSelector
               v-if="mode === 'library'"
               :question-id="Number(item.id)"
             />
+
+            <!-- Lower-frequency/destructive actions grouped to reduce icon clutter -->
+            <DropdownMenu v-if="mode === 'library'">
+              <DropdownMenuTrigger as-child>
+                <Button variant="ghost" size="icon" class="h-8 w-8" title="更多操作">
+                  <MoreHorizontal class="h-4 w-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem
+                  v-if="!hideDecompose"
+                  @click="emit('decompose', item as DbQuestion)"
+                >
+                  <GitFork class="h-4 w-4" />
+                  添加子题
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  v-if="(item as DbQuestion).children?.length || (item as DbQuestion).parent_id"
+                  @click="emit('view-structure', item as DbQuestion)"
+                >
+                  <Workflow class="h-4 w-4" />
+                  查看结构图谱
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  v-if="!hideDelete"
+                  variant="destructive"
+                  @click="emit('delete')"
+                >
+                  <Trash2 class="h-4 w-4" />
+                  删除
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
 
             <Button
               v-if="mode === 'import'"
@@ -323,10 +343,10 @@ const sourceFileUrl = computed(() => {
             </Button>
             
             <Button
-              v-if="!hideDelete"
+              v-if="!hideDelete && mode !== 'library'"
               variant="ghost"
               size="icon"
-              class="h-8 w-8 text-red-600 hover:text-red-700 hover:bg-red-50"
+              class="h-8 w-8 text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-500/10"
               title="删除"
               @click="emit('delete')"
             >
@@ -345,15 +365,15 @@ const sourceFileUrl = computed(() => {
               <span>{{ w }}</span>
             </div>
           </div>
-          <div :class="mode === 'library' ? 'prose prose-sm max-w-none dark:prose-invert' : 'text-sm text-gray-600 mb-2'">
+          <div :class="mode === 'library' ? 'prose prose-sm max-w-none dark:prose-invert' : 'text-sm text-muted-foreground mb-2'">
             <MarkdownPreview :content="contentPreview" />
           </div>
           
           <!-- Options for choice questions -->
           <div v-if="options.length > 0 && (item.q_type === 'single_choice' || item.q_type === 'multiple_choice')" class="mt-2 mb-3 space-y-1">
             <div v-for="opt in options" :key="opt.label" class="flex gap-2 text-xs">
-              <span class="font-bold text-gray-600 shrink-0">{{ opt.label }}.</span>
-              <div class="flex-1 text-gray-700 [&_.prose]:my-0 [&_.prose>p]:my-0 [&_.prose]:text-xs">
+              <span class="font-bold text-muted-foreground shrink-0">{{ opt.label }}.</span>
+              <div class="flex-1 text-foreground/80 [&_.prose]:my-0 [&_.prose>p]:my-0 [&_.prose]:text-xs">
                 <MarkdownPreview :content="opt.content" />
               </div>
             </div>
@@ -375,32 +395,6 @@ const sourceFileUrl = computed(() => {
             </Badge>
           </div>
 
-          <!-- Metadata Footer (library mode) -->
-          <div v-if="mode === 'library'" class="mt-4 pt-4 border-t text-xs text-muted-foreground grid grid-cols-1 sm:grid-cols-2 gap-2">
-            <div>
-              <span class="font-medium">创建:</span> {{ (item as DbQuestion).creator?.full_name || (item as DbQuestion).creator?.username || 'Unknown' }} 
-              <span class="ml-1">{{ new Date((item as DbQuestion).created_at + 'Z').toLocaleString() }}</span>
-            </div>
-            <div>
-              <span class="font-medium">更新:</span> {{ (item as DbQuestion).updater?.full_name || (item as DbQuestion).updater?.username || 'Unknown' }}
-              <span class="ml-1">{{ new Date((item as DbQuestion).updated_at + 'Z').toLocaleString() }}</span>
-            </div>
-            <div class="col-span-1 sm:col-span-2 flex flex-col gap-1">
-              <div class="flex items-center gap-2">
-                <span class="font-medium">审核次数:</span> {{ (item as DbQuestion).review_count }}
-              </div>
-              <div v-if="(item as DbQuestion).review_logs?.length" class="flex gap-1 flex-wrap mt-1">
-                 <span v-for="log in (item as DbQuestion).review_logs" :key="log.id" class="bg-gray-100 px-2 py-0.5 rounded text-[10px] flex items-center gap-1">
-                    <History class="w-3 h-3" />
-                    {{ log.user?.full_name || log.user?.username }} ({{ new Date(log.created_at + 'Z').toLocaleDateString() }})
-                 </span>
-              </div>
-            </div>
-            <div v-if="(item as DbQuestion).source" class="col-span-1 sm:col-span-2">
-              <span class="font-medium">来源:</span> {{ (item as DbQuestion).source }}
-            </div>
-          </div>
-
           <!-- Info badges (import mode) -->
           <div v-if="mode === 'import'" class="flex gap-2 flex-wrap">
             <Badge variant="secondary" class="text-xs">{{ difficultyLabel }}</Badge>
@@ -418,14 +412,15 @@ const sourceFileUrl = computed(() => {
           </div>
         </div>
 
-        <!-- Expand Button -->
-        <div v-if="mode === 'import' || (mode === 'library' && ((item as DbQuestion).answer || (item as DbQuestion).thinking || (item as DbQuestion).analysis || (item as DbQuestion).summary))" class="flex justify-center">
+        <!-- Expand Button: also gates the metadata footer below, so the card stays compact by default -->
+        <div v-if="mode === 'import' || mode === 'library'" class="flex justify-center">
           <Button
             variant="ghost"
             size="sm"
-            class="h-6 w-full text-muted-foreground hover:bg-muted/50"
+            class="h-6 w-full gap-1 text-muted-foreground hover:bg-muted/50"
             @click="expanded = !expanded"
           >
+            <span class="text-xs">{{ expanded ? '收起详情' : '展开详情' }}</span>
             <ChevronDown class="h-4 w-4 transition-transform duration-200" :class="{ 'rotate-180': expanded }" />
           </Button>
         </div>
@@ -434,11 +429,11 @@ const sourceFileUrl = computed(() => {
       <!-- Expandable Details (import mode) -->
       <div v-if="mode === 'import' && expanded" class="mt-4 pt-4 border-t border-border/50 space-y-4">
         <div class="space-y-2">
-          <div class="text-sm font-semibold text-gray-700">答案</div>
+          <div class="text-sm font-semibold text-foreground">答案</div>
           <div class="text-sm bg-muted/30 p-2 rounded">
             <div v-if="item.q_type === 'fill_in_the_blank' && parsedAnswer && parsedAnswer.length > 0" class="flex flex-col gap-2">
               <div v-for="(blank, index) in parsedAnswer" :key="index" class="flex items-start gap-2">
-                <span v-if="parsedAnswer.length > 1" class="font-mono text-gray-500 shrink-0 mt-1.5">{{ Number(index) + 1 }}.</span>
+                <span v-if="parsedAnswer.length > 1" class="font-mono text-muted-foreground shrink-0 mt-1.5">{{ Number(index) + 1 }}.</span>
                 <div class="flex flex-wrap gap-2 items-center">
                   <template v-if="Array.isArray(blank)">
                     <template v-for="(ans, ansIdx) in blank" :key="ansIdx">
@@ -459,14 +454,14 @@ const sourceFileUrl = computed(() => {
         </div>
 
         <div v-if="(item as ImportItem).thinking" class="space-y-2">
-          <div class="text-sm font-semibold text-gray-700">分析</div>
+          <div class="text-sm font-semibold text-foreground">分析</div>
           <div class="text-sm bg-muted/20 p-3 rounded [&_.prose]:my-0 [&_.prose>p]:my-0">
             <MarkdownPreview :content="(item as ImportItem).thinking || ''" />
           </div>
         </div>
 
         <div v-if="(item as ImportItem).analysis" class="space-y-2">
-          <div class="text-sm font-semibold text-gray-700">解析</div>
+          <div class="text-sm font-semibold text-foreground">解析</div>
           <div class="text-sm bg-muted/20 p-3 rounded [&_.prose]:my-0 [&_.prose>p]:my-0">
             <MarkdownPreview :content="(item as ImportItem).analysis || ''" />
           </div>
@@ -475,12 +470,36 @@ const sourceFileUrl = computed(() => {
 
       <!-- Expandable Details (library mode) -->
       <div v-if="mode === 'library' && expanded" class="mt-4 pt-4 border-t border-border/50 space-y-4">
+        <div class="text-xs text-muted-foreground grid grid-cols-1 sm:grid-cols-2 gap-2">
+          <div>
+            <span class="font-medium">创建:</span> {{ (item as DbQuestion).creator?.full_name || (item as DbQuestion).creator?.username || 'Unknown' }}
+            <span class="ml-1">{{ new Date((item as DbQuestion).created_at + 'Z').toLocaleString() }}</span>
+          </div>
+          <div>
+            <span class="font-medium">更新:</span> {{ (item as DbQuestion).updater?.full_name || (item as DbQuestion).updater?.username || 'Unknown' }}
+            <span class="ml-1">{{ new Date((item as DbQuestion).updated_at + 'Z').toLocaleString() }}</span>
+          </div>
+          <div class="col-span-1 sm:col-span-2 flex flex-col gap-1">
+            <div class="flex items-center gap-2">
+              <span class="font-medium">审核次数:</span> {{ (item as DbQuestion).review_count }}
+            </div>
+            <div v-if="(item as DbQuestion).review_logs?.length" class="flex gap-1 flex-wrap mt-1">
+               <span v-for="log in (item as DbQuestion).review_logs" :key="log.id" class="bg-muted px-2 py-0.5 rounded text-[10px] flex items-center gap-1">
+                  <History class="w-3 h-3" />
+                  {{ log.user?.full_name || log.user?.username }} ({{ new Date(log.created_at + 'Z').toLocaleDateString() }})
+               </span>
+            </div>
+          </div>
+          <div v-if="(item as DbQuestion).source" class="col-span-1 sm:col-span-2">
+            <span class="font-medium">来源:</span> {{ (item as DbQuestion).source }}
+          </div>
+        </div>
         <div class="space-y-2">
-          <div class="text-sm font-semibold text-gray-700">答案</div>
+          <div class="text-sm font-semibold text-foreground">答案</div>
           <div class="text-sm bg-muted/30 p-2 rounded">
             <div v-if="item.q_type === 'fill_in_the_blank' && parsedAnswer && parsedAnswer.length > 0" class="flex flex-col gap-2">
               <div v-for="(blank, index) in parsedAnswer" :key="index" class="flex items-start gap-2">
-                <span v-if="parsedAnswer.length > 1" class="font-mono text-gray-500 shrink-0 mt-1.5">{{ Number(index) + 1 }}.</span>
+                <span v-if="parsedAnswer.length > 1" class="font-mono text-muted-foreground shrink-0 mt-1.5">{{ Number(index) + 1 }}.</span>
                 <div class="flex flex-wrap gap-2 items-center">
                   <template v-if="Array.isArray(blank)">
                     <template v-for="(ans, ansIdx) in blank" :key="ansIdx">
@@ -501,21 +520,21 @@ const sourceFileUrl = computed(() => {
         </div>
 
         <div v-if="(item as DbQuestion).thinking" class="space-y-2">
-          <div class="text-sm font-semibold text-gray-700">分析</div>
+          <div class="text-sm font-semibold text-foreground">分析</div>
           <div class="text-sm bg-muted/20 p-3 rounded [&_.prose]:my-0 [&_.prose>p]:my-0">
             <MarkdownPreview :content="(item as DbQuestion).thinking || ''" />
           </div>
         </div>
 
         <div v-if="(item as DbQuestion).analysis" class="space-y-2">
-          <div class="text-sm font-semibold text-gray-700">解析</div>
+          <div class="text-sm font-semibold text-foreground">解析</div>
           <div class="text-sm bg-muted/20 p-3 rounded [&_.prose]:my-0 [&_.prose>p]:my-0">
             <MarkdownPreview :content="(item as DbQuestion).analysis || ''" />
           </div>
         </div>
 
         <div v-if="(item as DbQuestion).summary" class="space-y-2">
-          <div class="text-sm font-semibold text-gray-700">总结</div>
+          <div class="text-sm font-semibold text-foreground">总结</div>
           <div class="text-sm bg-muted/20 p-3 rounded [&_.prose]:my-0 [&_.prose>p]:my-0">
             <MarkdownPreview :content="(item as DbQuestion).summary || ''" />
           </div>
