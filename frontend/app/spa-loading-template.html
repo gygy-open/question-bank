@@ -104,14 +104,14 @@
     left: 0;
     width: 100vw;
     height: 100vh;
-    background: #0f172a; /* Slate 900 */
+    background: #fcfcfc;
     display: flex;
     flex-direction: column;
     justify-content: center;
     align-items: center;
     z-index: 9999;
     font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
-    color: #94a3b8; /* Slate 400 */
+    color: #78716c; /* 与主题 muted-foreground 接近的暖灰 */
   }
 
   .math-loader {
@@ -127,14 +127,14 @@
     left: 50%;
     width: 4px;
     height: 4px;
-    background: #38bdf8; /* Sky 400 */
+    background: #2F7A6B; /* 主题色松烟青绿 */
     border-radius: 50%;
     /* Scale up the coordinates by 2.5 */
     transform: translate(calc(var(--x) * 2.5), calc(var(--y) * 2.5));
     opacity: 0;
     animation: pulse 3s ease-in-out infinite;
     animation-delay: var(--d);
-    box-shadow: 0 0 5px rgba(56, 189, 248, 0.5);
+    box-shadow: 0 0 5px rgba(47, 122, 107, 0.5);
   }
 
   @keyframes pulse {
@@ -156,13 +156,14 @@
   .loading-text {
     margin-top: 2rem;
     font-size: 0.875rem;
-    letter-spacing: 0.2em;
+    font-weight: 500;
+    letter-spacing: 0.05em;
+    color: #44403c; /* 比容器基础色更深，浅底下对比度更够 */
     animation: blink 2s infinite;
-    text-transform: uppercase;
   }
 
   @keyframes blink {
-    0%, 100% { opacity: 0.5; }
+    0%, 100% { opacity: 0.6; }
     50% { opacity: 1; }
   }
 </style>
