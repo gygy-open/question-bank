@@ -5,11 +5,13 @@ import {
   SidebarFooter,
   SidebarGroup,
   SidebarGroupContent,
+  SidebarGroupLabel,
   SidebarHeader,
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
-  SidebarRail
+  SidebarRail,
+  SidebarSeparator
 } from '@/components/ui/sidebar'
 import type { SidebarProps } from "@/components/ui/sidebar"
 import {
@@ -22,8 +24,8 @@ import CustomSidebarTrigger from '~/components/CustomSidebarTrigger.vue'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import UserProfileDialog from '~/components/UserProfileDialog.vue'
 import ChangePasswordDialog from '~/components/ChangePasswordDialog.vue'
-import { BookOpen, ChevronsUpDown, CirclePlus, ListTree, LogOut, Settings, Sparkles, User, Users, Tags, Library, HelpCircle, MessageSquare, KeyRound, Activity, ListTodo, Download, RefreshCw, FileText } from '@lucide/vue'
-import { toast } from 'vue-sonner'
+import AboutDialog from '~/components/AboutDialog.vue'
+import { BookOpen, ChevronsUpDown, CirclePlus, ListTree, LogOut, Settings, Sparkles, User, Users, Tags, Library, HelpCircle, MessageSquare, KeyRound, Activity, Layers, ClipboardList, Info } from '@lucide/vue'
 
 const props = withDefaults(defineProps<SidebarProps>(), {
   collapsible: "icon",
@@ -34,24 +36,15 @@ const { user, logout } = useAuth()
 const router = useRouter()
 const isProfileOpen = ref(false)
 const isChangePasswordOpen = ref(false)
-
-const { state: updateState, check: checkUpdate } = useUpdateCheck()
-
-const handleCheckUpdate = async () => {
-  await checkUpdate(true)
-  if (updateState.value.error) {
-    toast.error('检查更新失败', { description: updateState.value.error })
-  } else if (updateState.value.hasUpdate) {
-    window.open(updateState.value.releaseUrl, '_blank')
-  } else {
-    toast.success('已是最新版本', { description: `当前版本 v${updateState.value.current}` })
-  }
-}
+const isAboutOpen = ref(false)
 
 const handleLogout = () => {
   logout()
   router.push('/login')
 }
+
+// 左侧彩色条 + 主题色高亮当前导航项，不修改 ui/sidebar 原始组件
+const navActiveClass = 'border-l-2 border-transparent data-[active=true]:border-l-primary data-[active=true]:bg-primary/10 data-[active=true]:text-primary data-[active=true]:font-medium group-data-[collapsible=icon]:border-l-0'
 </script>
 
 <template>
@@ -83,119 +76,147 @@ const handleLogout = () => {
                 </NuxtLink>
               </SidebarMenuButton>
             </SidebarMenuItem>
-            <SidebarMenuItem>
-              <SidebarMenuButton as-child :is-active="route.path === '/questions'">
-                <NuxtLink to="/questions">
-                  <BookOpen />
-                  <span>题目管理</span>
-                </NuxtLink>
-              </SidebarMenuButton>
-            </SidebarMenuItem>
-            <SidebarMenuItem>
-              <SidebarMenuButton as-child :is-active="route.path.startsWith('/papers')">
-                <NuxtLink to="/papers">
-                  <FileText />
-                  <span>我的试卷</span>
-                </NuxtLink>
-              </SidebarMenuButton>
-            </SidebarMenuItem>
-            <SidebarMenuItem>
-              <SidebarMenuButton as-child :is-active="route.path === '/import/smart'">
-                <NuxtLink to="/import/smart">
-                  <Sparkles />
-                  <span>智能导入</span>
-                </NuxtLink>
-              </SidebarMenuButton>
-            </SidebarMenuItem>
-            <SidebarMenuItem>
-              <SidebarMenuButton as-child :is-active="route.path === '/imports'">
-                <NuxtLink to="/imports">
-                  <ListTodo />
-                  <span>批量智能导入</span>
-                </NuxtLink>
-              </SidebarMenuButton>
-            </SidebarMenuItem>
-            <SidebarMenuItem>
-              <SidebarMenuButton as-child :is-active="route.path === '/chat'">
-                <NuxtLink to="/chat">
-                  <MessageSquare />
-                  <span>AI 助手</span>
-                </NuxtLink>
-              </SidebarMenuButton>
-            </SidebarMenuItem>
-            <SidebarMenuItem>
-              <SidebarMenuButton as-child :is-active="route.path === '/knowledge-points'">
-                <NuxtLink to="/knowledge-points">
-                  <ListTree />
-                  <span>知识点管理</span>
-                </NuxtLink>
-              </SidebarMenuButton>
-            </SidebarMenuItem>
-            <SidebarMenuItem>
-              <SidebarMenuButton as-child :is-active="route.path === '/tags'">
-                <NuxtLink to="/tags">
-                  <Tags />
-                  <span>标签管理</span>
-                </NuxtLink>
-              </SidebarMenuButton>
-            </SidebarMenuItem>
-            <SidebarMenuItem>
-              <SidebarMenuButton as-child :is-active="route.path === '/subjects'">
-                <NuxtLink to="/subjects">
-                  <Library />
-                  <span>科目管理</span>
-                </NuxtLink>
-              </SidebarMenuButton>
-            </SidebarMenuItem>
           </SidebarMenu>
+        </SidebarGroupContent>
+      </SidebarGroup>
+
+      <SidebarGroup>
+        <SidebarGroupContent class="flex flex-col gap-3">
+          <div>
+            <SidebarGroupLabel>内容</SidebarGroupLabel>
+            <SidebarMenu>
+              <SidebarMenuItem>
+                <SidebarMenuButton as-child :is-active="route.path === '/questions'" :class="navActiveClass">
+                  <NuxtLink to="/questions">
+                    <BookOpen />
+                    <span>题目管理</span>
+                  </NuxtLink>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+              <SidebarMenuItem>
+                <SidebarMenuButton as-child :is-active="route.path.startsWith('/papers')" :class="navActiveClass">
+                  <NuxtLink to="/papers">
+                    <ClipboardList />
+                    <span>我的试卷</span>
+                  </NuxtLink>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+              <SidebarMenuItem>
+                <SidebarMenuButton as-child :is-active="route.path === '/chat'" :class="navActiveClass">
+                  <NuxtLink to="/chat">
+                    <MessageSquare />
+                    <span>AI 助手</span>
+                  </NuxtLink>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+            </SidebarMenu>
+          </div>
+
+          <div>
+            <SidebarGroupLabel>导入</SidebarGroupLabel>
+            <SidebarMenu>
+              <SidebarMenuItem>
+                <SidebarMenuButton as-child :is-active="route.path === '/import/smart'" :class="navActiveClass">
+                  <NuxtLink to="/import/smart">
+                    <Sparkles />
+                    <span>智能导入</span>
+                  </NuxtLink>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+              <SidebarMenuItem>
+                <SidebarMenuButton as-child :is-active="route.path === '/imports'" :class="navActiveClass">
+                  <NuxtLink to="/imports">
+                    <Layers />
+                    <span>批量智能导入</span>
+                  </NuxtLink>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+            </SidebarMenu>
+          </div>
+
+          <div>
+            <SidebarGroupLabel>知识库</SidebarGroupLabel>
+            <SidebarMenu>
+              <SidebarMenuItem>
+                <SidebarMenuButton as-child :is-active="route.path === '/knowledge-points'" :class="navActiveClass">
+                  <NuxtLink to="/knowledge-points">
+                    <ListTree />
+                    <span>知识点管理</span>
+                  </NuxtLink>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+              <SidebarMenuItem>
+                <SidebarMenuButton as-child :is-active="route.path === '/tags'" :class="navActiveClass">
+                  <NuxtLink to="/tags">
+                    <Tags />
+                    <span>标签管理</span>
+                  </NuxtLink>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+              <SidebarMenuItem>
+                <SidebarMenuButton as-child :is-active="route.path === '/subjects'" :class="navActiveClass">
+                  <NuxtLink to="/subjects">
+                    <Library />
+                    <span>科目管理</span>
+                  </NuxtLink>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+            </SidebarMenu>
+          </div>
         </SidebarGroupContent>
       </SidebarGroup>
     </SidebarContent>
     <SidebarFooter>
       <SidebarMenu>
-        <SidebarMenuItem v-if="user?.is_superuser">
-          <SidebarMenuButton
-            :class="updateState.hasUpdate ? 'text-primary' : ''"
-            :tooltip="updateState.hasUpdate ? `发现新版本 v${updateState.latest}，点击下载安装程序` : '检查更新'"
-            @click="handleCheckUpdate"
-          >
-            <Download v-if="updateState.hasUpdate" />
-            <RefreshCw v-else :class="updateState.checking ? 'animate-spin' : ''" />
-            <span>{{ updateState.hasUpdate ? `有新版 v${updateState.latest}` : '检查更新' }}</span>
-          </SidebarMenuButton>
-        </SidebarMenuItem>
         <SidebarMenuItem>
-          <SidebarMenuButton as-child :is-active="route.path === '/manual'">
+          <SidebarMenuButton as-child :is-active="route.path === '/manual'" :class="navActiveClass">
             <NuxtLink to="/manual">
               <HelpCircle />
               <span>使用手册</span>
             </NuxtLink>
           </SidebarMenuButton>
         </SidebarMenuItem>
-        <SidebarMenuItem v-if="user?.is_superuser">
-          <SidebarMenuButton as-child :is-active="route.path === '/users'">
-            <NuxtLink to="/users">
-              <Users />
-              <span>用户管理</span>
-            </NuxtLink>
+        <SidebarMenuItem>
+          <SidebarMenuButton tooltip="版本信息与检查更新" @click="isAboutOpen = true">
+            <Info />
+            <span>关于</span>
           </SidebarMenuButton>
         </SidebarMenuItem>
-        <SidebarMenuItem v-if="user?.id === 1">
-          <SidebarMenuButton as-child :is-active="route.path === '/activity-logs'">
-            <NuxtLink to="/activity-logs">
-              <Activity />
-              <span>行为日志</span>
-            </NuxtLink>
-          </SidebarMenuButton>
-        </SidebarMenuItem>
-        <SidebarMenuItem v-if="user?.is_superuser">
-          <SidebarMenuButton as-child :is-active="route.path === '/settings'">
-            <NuxtLink to="/settings">
-              <Settings />
-              <span>系统设置</span>
-            </NuxtLink>
-          </SidebarMenuButton>
-        </SidebarMenuItem>
+      </SidebarMenu>
+
+      <div v-if="user?.is_superuser">
+        <SidebarGroupLabel>系统管理</SidebarGroupLabel>
+        <SidebarMenu>
+          <SidebarMenuItem>
+            <SidebarMenuButton as-child :is-active="route.path === '/users'" :class="navActiveClass">
+              <NuxtLink to="/users">
+                <Users />
+                <span>用户管理</span>
+              </NuxtLink>
+            </SidebarMenuButton>
+          </SidebarMenuItem>
+          <SidebarMenuItem v-if="user?.id === 1">
+            <SidebarMenuButton as-child :is-active="route.path === '/activity-logs'" :class="navActiveClass">
+              <NuxtLink to="/activity-logs">
+                <Activity />
+                <span>行为日志</span>
+              </NuxtLink>
+            </SidebarMenuButton>
+          </SidebarMenuItem>
+          <SidebarMenuItem>
+            <SidebarMenuButton as-child :is-active="route.path === '/settings'" :class="navActiveClass">
+              <NuxtLink to="/settings">
+                <Settings />
+                <span>系统设置</span>
+              </NuxtLink>
+            </SidebarMenuButton>
+          </SidebarMenuItem>
+        </SidebarMenu>
+      </div>
+
+      <SidebarSeparator class="mx-0" />
+
+      <SidebarMenu>
         <LanShareDialog />
         <SidebarMenuItem>
           <DropdownMenu>
@@ -235,5 +256,6 @@ const handleLogout = () => {
     <SidebarRail />
     <UserProfileDialog v-model:open="isProfileOpen" />
     <ChangePasswordDialog v-model:open="isChangePasswordOpen" />
+    <AboutDialog v-model:open="isAboutOpen" :is-superuser="user?.is_superuser" />
   </Sidebar>
 </template>
