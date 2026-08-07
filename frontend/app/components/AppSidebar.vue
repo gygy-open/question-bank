@@ -182,6 +182,8 @@ const navActiveClass = 'border-l-2 border-transparent data-[active=true]:border-
             <span>关于</span>
           </SidebarMenuButton>
         </SidebarMenuItem>
+        <!-- 与"关于"归为一组：都是系统状态信息，而非高频操作 -->
+        <LanShareDialog />
       </SidebarMenu>
 
       <div v-if="user?.is_superuser">
@@ -217,7 +219,6 @@ const navActiveClass = 'border-l-2 border-transparent data-[active=true]:border-
       <SidebarSeparator class="mx-0" />
 
       <SidebarMenu>
-        <LanShareDialog />
         <SidebarMenuItem>
           <DropdownMenu>
             <DropdownMenuTrigger as-child>
@@ -231,7 +232,7 @@ const navActiveClass = 'border-l-2 border-transparent data-[active=true]:border-
                   <span class="truncate font-semibold">{{ user?.full_name || user?.username }}</span>
                   <span class="truncate text-xs">{{ user?.username }}</span>
                 </div>
-                <ChevronsUpDown class="ml-auto size-4" />
+                <ChevronsUpDown class="text-sidebar-foreground/50 ml-auto size-4" />
               </SidebarMenuButton>
             </DropdownMenuTrigger>
             <DropdownMenuContent class="w-[--radix-dropdown-menu-trigger-width] min-w-56 rounded-lg" side="bottom"
