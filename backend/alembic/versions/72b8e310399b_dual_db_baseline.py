@@ -96,8 +96,10 @@ def upgrade() -> None:
         batch_op.create_index(batch_op.f('ix_user_username'), ['username'], unique=True)
 
     # Now that 'user' exists, add the deferred FKs on 'subjects'.
-    op.create_foreign_key('fk_subjects_created_by_user', 'subjects', 'user', ['created_by'], ['id'])
-    op.create_foreign_key('fk_subjects_updated_by_user', 'subjects', 'user', ['updated_by'], ['id'])
+    # Batch mode: SQLite rebuilds the table; MySQL degrades to plain ALTER.
+    with op.batch_alter_table('subjects', schema=None) as batch_op:
+        batch_op.create_foreign_key('fk_subjects_created_by_user', 'user', ['created_by'], ['id'])
+        batch_op.create_foreign_key('fk_subjects_updated_by_user', 'user', ['updated_by'], ['id'])
 
     op.create_table('activity_logs',
     sa.Column('id', sa.Integer(), nullable=False),
@@ -317,8 +319,9 @@ def downgrade() -> None:
 
     op.drop_table('activity_logs')
     # Drop the deferred circular FKs before dropping 'user'/'subjects'.
-    op.drop_constraint('fk_subjects_updated_by_user', 'subjects', type_='foreignkey')
-    op.drop_constraint('fk_subjects_created_by_user', 'subjects', type_='foreignkey')
+    with op.batch_alter_table('subjects', schema=None) as batch_op:
+        batch_op.drop_constraint('fk_subjects_updated_by_user', type_='foreignkey')
+        batch_op.drop_constraint('fk_subjects_created_by_user', type_='foreignkey')
     with op.batch_alter_table('user', schema=None) as batch_op:
         batch_op.drop_index(batch_op.f('ix_user_username'))
         batch_op.drop_index(batch_op.f('ix_user_subject_id'))
