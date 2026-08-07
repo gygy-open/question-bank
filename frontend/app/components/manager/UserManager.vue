@@ -33,12 +33,26 @@ import {
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Loader2, Pencil, Trash2, Plus, TriangleAlert } from '@lucide/vue'
-import type { User, Subject } from '~/types'
+import { Badge } from '@/components/ui/badge'
+import ClearableInput from '~/components/ClearableInput.vue'
+import { Loader2, Pencil, Trash2, Plus, TriangleAlert, KeyRound } from '@lucide/vue'
+import type { User } from '~/types'
 
 const { $api } = useNuxtApp()
 const { data: users, refresh, status } = await useAPI<User[]>('/users')
-const { data: subjects } = useAPI<Subject[]>('/subjects')
+
+const searchQuery = ref('')
+const roleFilter = ref('all')
+
+const filteredUsers = computed(() => {
+  const keyword = searchQuery.value.trim().toLowerCase()
+  return (users.value || []).filter((user) => {
+    if (roleFilter.value === 'admin' && !user.is_superuser) return false
+    if (roleFilter.value === 'normal' && user.is_superuser) return false
+    if (!keyword) return true
+    return user.username.toLowerCase().includes(keyword) || (user.full_name || '').toLowerCase().includes(keyword)
+  })
+})
 
 const isDialogOpen = ref(false)
 const isDeleteConfirmOpen = ref(false)
@@ -46,6 +60,11 @@ const userToDelete = ref<User | null>(null)
 const deleteConfirmationUsername = ref('')
 const isEditing = ref(false)
 const isLoading = ref(false)
+
+const isResetPasswordOpen = ref(false)
+const userToReset = ref<User | null>(null)
+const newPassword = ref('')
+const confirmPassword = ref('')
 
 const formData = reactive({
   id: 0,
@@ -55,7 +74,6 @@ const formData = reactive({
   password: '',
   is_active: true,
   is_superuser: false,
-  subject_id: null as number | null,
 })
 
 const resetForm = () => {
@@ -66,7 +84,6 @@ const resetForm = () => {
   formData.password = ''
   formData.is_active = true
   formData.is_superuser = false
-  formData.subject_id = null
   isEditing.value = false
 }
 
@@ -83,7 +100,6 @@ const openEditDialog = (user: User) => {
   formData.password = '' // Password is not returned, and we only send if changing
   formData.is_active = user.is_active
   formData.is_superuser = user.is_superuser
-  formData.subject_id = (user as any).subject_id || null
   isEditing.value = true
   isDialogOpen.value = true
 }
@@ -102,24 +118,16 @@ const handleSubmit = async () => {
     toast.error('姓名不能为空')
     return
   }
-  if (!formData.subject_id) {
-    toast.error('请选择负责科目')
-    return
-  }
 
   isLoading.value = true
   try {
     if (isEditing.value) {
-      const payload: any = {
+      const payload = {
         username: formData.username,
         full_name: formData.full_name,
         avatar_url: formData.avatar_url,
         is_active: formData.is_active,
         is_superuser: formData.is_superuser,
-        subject_id: formData.subject_id,
-      }
-      if (formData.password) {
-        payload.password = formData.password
       }
       await $api(`/users/${formData.id}`, {
         method: 'PUT',
@@ -136,7 +144,6 @@ const handleSubmit = async () => {
           password: formData.password,
           is_active: formData.is_active,
           is_superuser: formData.is_superuser,
-          subject_id: formData.subject_id,
         },
       })
       toast.success('用户创建成功')
@@ -181,12 +188,59 @@ const confirmDelete = async () => {
     userToDelete.value = null
   }
 }
+
+const openResetPasswordDialog = (user: User) => {
+  userToReset.value = user
+  newPassword.value = ''
+  confirmPassword.value = ''
+  isResetPasswordOpen.value = true
+}
+
+const confirmResetPassword = async () => {
+  if (!userToReset.value) return
+  if (!newPassword.value) {
+    toast.error('请输入新密码')
+    return
+  }
+  if (newPassword.value !== confirmPassword.value) {
+    toast.error('两次输入的密码不一致')
+    return
+  }
+
+  isLoading.value = true
+  try {
+    await $api(`/users/${userToReset.value.id}`, {
+      method: 'PUT',
+      body: { password: newPassword.value },
+    })
+    toast.success('密码重置成功')
+    isResetPasswordOpen.value = false
+  } catch (error: any) {
+    const detail = error.data?.detail || '重置失败'
+    toast.error(detail)
+  } finally {
+    isLoading.value = false
+    userToReset.value = null
+  }
+}
 </script>
 
 <template>
   <div class="space-y-4">
-    <div class="flex justify-between items-center">
-      <h2 class="text-lg font-medium">用户列表</h2>
+    <div class="flex flex-wrap items-center justify-between gap-3">
+      <div class="flex flex-1 items-center gap-2">
+        <ClearableInput v-model="searchQuery" placeholder="搜索用户名或姓名..." class="max-w-xs" />
+        <Select v-model="roleFilter">
+          <SelectTrigger class="w-32">
+            <SelectValue placeholder="全部角色" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">全部角色</SelectItem>
+            <SelectItem value="admin">管理员</SelectItem>
+            <SelectItem value="normal">普通用户</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
       <Button @click="openCreateDialog">
         <Plus class="mr-2 h-4 w-4" />
         新增用户
@@ -201,7 +255,6 @@ const confirmDelete = async () => {
             <TableHead>头像</TableHead>
             <TableHead>用户名</TableHead>
             <TableHead>姓名</TableHead>
-            <TableHead>负责科目</TableHead>
             <TableHead>状态</TableHead>
             <TableHead>角色</TableHead>
             <TableHead class="text-right">操作</TableHead>
@@ -209,16 +262,21 @@ const confirmDelete = async () => {
         </TableHeader>
         <TableBody>
           <TableRow v-if="status === 'pending'">
-            <TableCell colspan="8" class="h-24 text-center">
+            <TableCell colspan="7" class="h-24 text-center">
               <Loader2 class="h-6 w-6 animate-spin mx-auto" />
             </TableCell>
           </TableRow>
           <TableRow v-else-if="users?.length === 0">
-            <TableCell colspan="8" class="h-24 text-center">
+            <TableCell colspan="7" class="h-24 text-center">
               暂无用户
             </TableCell>
           </TableRow>
-          <TableRow v-for="user in users" :key="user.id">
+          <TableRow v-else-if="filteredUsers.length === 0">
+            <TableCell colspan="7" class="h-24 text-center text-muted-foreground">
+              没有匹配的用户
+            </TableCell>
+          </TableRow>
+          <TableRow v-for="user in filteredUsers" :key="user.id">
             <TableCell>{{ user.id }}</TableCell>
             <TableCell>
               <Avatar>
@@ -229,26 +287,22 @@ const confirmDelete = async () => {
             <TableCell>{{ user.username }}</TableCell>
             <TableCell>{{ user.full_name }}</TableCell>
             <TableCell>
-              <span v-if="(user as any).subject_id" class="text-blue-600">
-                {{ subjects?.find(s => s.id === (user as any).subject_id)?.name || '未知' }}
-              </span>
-              <span v-else class="text-gray-400">未分配</span>
+              <Badge v-if="user.is_active" variant="outline" class="border-primary/30 bg-primary/5 text-primary">启用</Badge>
+              <Badge v-else variant="outline" class="text-muted-foreground">禁用</Badge>
             </TableCell>
             <TableCell>
-              <span :class="user.is_active ? 'text-green-600' : 'text-red-600'">
-                {{ user.is_active ? '启用' : '禁用' }}
-              </span>
-            </TableCell>
-            <TableCell>
-              <span :class="user.is_superuser ? 'text-purple-600 font-medium' : 'text-gray-600'">
+              <Badge :variant="user.is_superuser ? 'default' : 'secondary'">
                 {{ user.is_superuser ? '管理员' : '普通用户' }}
-              </span>
+              </Badge>
             </TableCell>
             <TableCell class="text-right space-x-2">
-              <Button variant="ghost" size="icon" @click="openEditDialog(user)">
+              <Button variant="ghost" size="icon" title="编辑" aria-label="编辑用户" @click="openEditDialog(user)">
                 <Pencil class="h-4 w-4" />
               </Button>
-              <Button variant="ghost" size="icon" class="text-red-600 hover:text-red-700 hover:bg-red-50" @click="openDeleteConfirm(user)">
+              <Button variant="ghost" size="icon" title="重置密码" aria-label="重置密码" @click="openResetPasswordDialog(user)">
+                <KeyRound class="h-4 w-4" />
+              </Button>
+              <Button variant="ghost" size="icon" title="删除" aria-label="删除用户" class="text-destructive hover:text-destructive hover:bg-destructive/10" @click="openDeleteConfirm(user)">
                 <Trash2 class="h-4 w-4" />
               </Button>
             </TableCell>
@@ -256,6 +310,7 @@ const confirmDelete = async () => {
         </TableBody>
       </Table>
     </div>
+    <p v-if="filteredUsers.length" class="text-sm text-muted-foreground">共 {{ filteredUsers.length }} 个用户</p>
 
     <Dialog :open="isDialogOpen" @update:open="isDialogOpen = $event">
       <DialogContent class="sm:max-w-[425px]">
@@ -290,29 +345,6 @@ const confirmDelete = async () => {
             />
           </div>
           <div class="grid grid-cols-4 items-center gap-4">
-            <Label for="subject_id" class="text-right">
-              负责科目 <span class="text-red-500">*</span>
-            </Label>
-            <Select
-              :model-value="formData.subject_id?.toString() || '0'"
-              @update:model-value="(v) => formData.subject_id = v === '0' ? null : parseInt(v)"
-            >
-              <SelectTrigger class="col-span-3">
-                <SelectValue placeholder="选择科目" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="0">无</SelectItem>
-                <SelectItem
-                  v-for="subject in subjects"
-                  :key="subject.id"
-                  :value="subject.id.toString()"
-                >
-                  {{ subject.name }}
-                </SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-          <div class="grid grid-cols-4 items-center gap-4">
             <Label for="avatar_url" class="text-right">
               头像URL
             </Label>
@@ -323,16 +355,16 @@ const confirmDelete = async () => {
               autocomplete="off"
             />
           </div>
-          <div class="grid grid-cols-4 items-center gap-4">
+          <div v-if="!isEditing" class="grid grid-cols-4 items-center gap-4">
             <Label for="password" class="text-right">
-              密码 <span v-if="!isEditing" class="text-red-500">*</span>
+              密码 <span class="text-red-500">*</span>
             </Label>
             <Input
               id="password"
               type="password"
               v-model="formData.password"
               class="col-span-3"
-              :placeholder="isEditing ? '留空保持不变' : '必填'"
+              placeholder="必填"
               autocomplete="new-password"
             />
           </div>
@@ -376,7 +408,7 @@ const confirmDelete = async () => {
         <DialogHeader>
           <DialogTitle>确认删除用户？</DialogTitle>
           <DialogDescription class="py-4">
-            <div class="flex items-start gap-4 p-4 bg-red-50 text-red-800 rounded-md mb-4">
+            <div class="flex items-start gap-4 p-4 bg-destructive/10 text-destructive rounded-md mb-4">
               <TriangleAlert class="h-5 w-5 shrink-0 mt-0.5" />
               <div class="space-y-2">
                 <p class="font-medium">警告：此操作不可逆！</p>
@@ -386,7 +418,7 @@ const confirmDelete = async () => {
               </div>
             </div>
             <div class="space-y-2">
-              <Label>请输入用户名 <span class="font-bold text-black">{{ userToDelete?.username }}</span> 以确认删除</Label>
+              <Label>请输入用户名 <span class="font-bold text-foreground">{{ userToDelete?.username }}</span> 以确认删除</Label>
               <Input v-model="deleteConfirmationUsername" placeholder="请输入用户名" />
             </div>
           </DialogDescription>
@@ -400,6 +432,53 @@ const confirmDelete = async () => {
           >
             <Loader2 v-if="isLoading" class="mr-2 h-4 w-4 animate-spin" />
             确认删除
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+
+    <!-- Reset Password Dialog -->
+    <Dialog v-model:open="isResetPasswordOpen">
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>重置密码</DialogTitle>
+          <DialogDescription>
+            为用户 <span class="font-bold text-foreground">{{ userToReset?.username }}</span> 设置新密码。
+          </DialogDescription>
+        </DialogHeader>
+        <div class="grid gap-4 py-2">
+          <div class="grid grid-cols-4 items-center gap-4">
+            <Label for="new_password" class="text-right">
+              新密码 <span class="text-red-500">*</span>
+            </Label>
+            <Input
+              id="new_password"
+              type="password"
+              v-model="newPassword"
+              class="col-span-3"
+              placeholder="必填"
+              autocomplete="new-password"
+            />
+          </div>
+          <div class="grid grid-cols-4 items-center gap-4">
+            <Label for="confirm_password" class="text-right">
+              确认密码 <span class="text-red-500">*</span>
+            </Label>
+            <Input
+              id="confirm_password"
+              type="password"
+              v-model="confirmPassword"
+              class="col-span-3"
+              placeholder="必填"
+              autocomplete="new-password"
+            />
+          </div>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" @click="isResetPasswordOpen = false">取消</Button>
+          <Button :disabled="isLoading" @click="confirmResetPassword">
+            <Loader2 v-if="isLoading" class="mr-2 h-4 w-4 animate-spin" />
+            确认重置
           </Button>
         </DialogFooter>
       </DialogContent>
