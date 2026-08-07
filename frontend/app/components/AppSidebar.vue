@@ -9,25 +9,31 @@ import {
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
+  SidebarRail
 } from '@/components/ui/sidebar'
+import type { SidebarProps } from "@/components/ui/sidebar"
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
+import CustomSidebarTrigger from '~/components/CustomSidebarTrigger.vue'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import UserProfileDialog from '~/components/UserProfileDialog.vue'
 import ChangePasswordDialog from '~/components/ChangePasswordDialog.vue'
 import { BookOpen, ChevronsUpDown, CirclePlus, ListTree, LogOut, Settings, Sparkles, User, Users, Tags, Library, HelpCircle, MessageSquare, KeyRound, Activity, ListTodo, Download, RefreshCw, FileText } from '@lucide/vue'
 import { toast } from 'vue-sonner'
 
+const props = withDefaults(defineProps<SidebarProps>(), {
+  collapsible: "icon",
+})
+
 const route = useRoute()
 const { user, logout } = useAuth()
 const router = useRouter()
 const isProfileOpen = ref(false)
 const isChangePasswordOpen = ref(false)
-const config = useRuntimeConfig()
 
 const { state: updateState, check: checkUpdate } = useUpdateCheck()
 
@@ -49,24 +55,18 @@ const handleLogout = () => {
 </script>
 
 <template>
-  <Sidebar collapsible="offcanvas">
+  <Sidebar v-bind="props">
     <SidebarHeader>
       <SidebarMenu>
-        <SidebarMenuItem>
-          <SidebarMenuButton size="lg" as-child>
-            <a href="#">
-              <div
-                class="flex aspect-square size-8 items-center justify-center rounded-lg text-primary-foreground">
-                <img src="/logo.svg" alt="题库系统" class="size-8" />
-              </div>
-              <div class="flex flex-col gap-0.5 leading-none">
-                <span class="font-semibold">{{ config.public.appName }}</span>
-              </div>
-            </a>
-          </SidebarMenuButton>
-        </SidebarMenuItem>
-        <SidebarMenuItem class="px-1 pt-1">
-          <SubjectSelector />
+        <SidebarMenuItem
+          class="flex flex-row items-center gap-1 group-data-[collapsible=icon]:flex-col group-data-[collapsible=icon]:gap-2"
+        >
+          <div class="min-w-0 flex-1 group-data-[collapsible=icon]:w-full">
+            <SubjectSelector />
+          </div>
+          <CustomSidebarTrigger
+            class="ml-2 h-8 w-8 shrink-0 rounded-md hover:bg-sidebar-accent group-data-[collapsible=icon]:ml-0"
+          />
         </SidebarMenuItem>
       </SidebarMenu>
     </SidebarHeader>
@@ -232,6 +232,7 @@ const handleLogout = () => {
         </SidebarMenuItem>
       </SidebarMenu>
     </SidebarFooter>
+    <SidebarRail />
     <UserProfileDialog v-model:open="isProfileOpen" />
     <ChangePasswordDialog v-model:open="isChangePasswordOpen" />
   </Sidebar>

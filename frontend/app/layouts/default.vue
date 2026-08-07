@@ -41,11 +41,7 @@ onMounted(async () => {
 </script>
 
 <template>
-  <SidebarProvider
-    :style=" {
-      '--header-height': 'calc(var(--spacing) * 12)',
-    }"
-  >
+  <SidebarProvider>
     <AppSidebar />
     <SidebarInset>
       <slot />

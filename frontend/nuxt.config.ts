@@ -1,6 +1,7 @@
 import tailwindcss from '@tailwindcss/vite'
 
-const appNmae = 'Question Bank 题库系统'
+const appName = 'Question Bank'
+const appSlogan = 'AI原生的题库系统'
 
 // https://nuxt.com/docs/api/configuration/nuxt-config
 export default defineNuxtConfig({
@@ -12,13 +13,13 @@ export default defineNuxtConfig({
 
   runtimeConfig: {
     public: {
-      appName: appNmae,
+      appName,
     }
   },
 
   app: {
     head: {
-      title: appNmae, // default fallback title
+      title: `${appName} - ${appSlogan}`, // default fallback title
       htmlAttrs: {
         lang: 'zh-CN',
       },

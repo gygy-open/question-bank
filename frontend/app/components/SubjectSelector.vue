@@ -1,60 +1,89 @@
 <script setup lang="ts">
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select'
-import { Library, AlertTriangle } from '@lucide/vue'
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
+import { SidebarMenuButton, useSidebar } from '@/components/ui/sidebar'
+import { ChevronsUpDown, AlertTriangle } from '@lucide/vue'
 import { toast } from 'vue-sonner'
 
-const { currentSubjectId, currentSubject, subjects, hasSubjects, setSubject } = useSubjectContext()
-const router = useRouter()
+// Cycle a fixed palette by subject id so each subject keeps a stable color.
+const SUBJECT_COLORS = [
+  'bg-red-500', 'bg-orange-500', 'bg-amber-500', 'bg-lime-500',
+  'bg-emerald-500', 'bg-teal-500', 'bg-cyan-500', 'bg-blue-500',
+  'bg-indigo-500', 'bg-violet-500', 'bg-fuchsia-500', 'bg-pink-500',
+]
+const getSubjectColor = (id: number) => SUBJECT_COLORS[id % SUBJECT_COLORS.length]
+const getSubjectInitial = (name: string) => name.trim().charAt(0) || '?'
 
-// Bridge number <-> string for the Select (shadcn Select works with strings).
-const selectedValue = computed({
-  get: () => (currentSubjectId.value != null ? String(currentSubjectId.value) : undefined),
-  set: async (val: string | undefined) => {
-    if (!val) return
-    try {
-      await setSubject(Number(val))
-    } catch {
-      toast.error('切换学科失败')
-    }
-  },
-})
+const { currentSubject, subjects, hasSubjects, setSubject } = useSubjectContext()
+const router = useRouter()
+const config = useRuntimeConfig()
+const { state } = useSidebar()
+
+const selectSubject = async (id: number) => {
+  try {
+    await setSubject(id)
+  } catch {
+    toast.error('切换学科失败')
+  }
+}
 
 const goCreateSubject = () => router.push('/subjects?create=true')
 </script>
 
 <template>
-  <Select v-if="hasSubjects" v-model="selectedValue">
-    <SelectTrigger
-      class="w-full bg-primary/5 border-primary/20"
-      aria-label="选择当前工作学科"
+  <DropdownMenu v-if="hasSubjects">
+    <DropdownMenuTrigger as-child>
+      <SidebarMenuButton
+        size="lg"
+        aria-label="切换学科"
+        class="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground"
+      >
+        <div class="flex aspect-square size-8 items-center justify-center rounded-lg text-primary-foreground">
+          <img src="/logo.svg" alt="题库系统" class="size-8" />
+        </div>
+        <div class="flex min-w-0 flex-col gap-0.5 leading-none">
+          <span class="flex min-w-0 items-center gap-1">
+            <span class="truncate font-semibold">{{ currentSubject?.name || '选择学科' }}</span>
+            <ChevronsUpDown class="size-3.5 shrink-0 text-muted-foreground" />
+          </span>
+          <span class="truncate text-xs text-muted-foreground">{{ config.public.appName }}</span>
+        </div>
+      </SidebarMenuButton>
+    </DropdownMenuTrigger>
+    <DropdownMenuContent
+      class="w-(--radix-dropdown-menu-trigger-width) min-w-56 rounded-lg"
+      :side="state === 'collapsed' ? 'right' : 'bottom'"
+      align="start"
+      :side-offset="4"
     >
-      <div class="flex items-center gap-2 truncate">
-        <Library class="size-4 shrink-0 text-primary" />
-        <SelectValue placeholder="选择学科">
-          {{ currentSubject?.name }}
-        </SelectValue>
-      </div>
-    </SelectTrigger>
-    <SelectContent>
-      <SelectItem v-for="s in subjects" :key="s.id" :value="String(s.id)">
+      <DropdownMenuItem v-for="s in subjects" :key="s.id" @click="selectSubject(s.id)">
+        <div
+          class="mr-2 flex size-5 shrink-0 items-center justify-center rounded-md text-[10px] font-semibold text-white"
+          :class="getSubjectColor(s.id)"
+        >
+          {{ getSubjectInitial(s.name) }}
+        </div>
         {{ s.name }}
-      </SelectItem>
-    </SelectContent>
-  </Select>
+      </DropdownMenuItem>
+    </DropdownMenuContent>
+  </DropdownMenu>
 
-  <button
+  <SidebarMenuButton
     v-else
-    type="button"
-    class="flex w-full items-center gap-2 rounded-md border border-destructive/50 bg-destructive/10 px-3 py-2 text-sm text-destructive hover:bg-destructive/15"
+    size="lg"
+    aria-label="请先创建学科"
+    class="text-destructive hover:bg-destructive/10 hover:text-destructive"
     @click="goCreateSubject"
   >
-    <AlertTriangle class="size-4 shrink-0" />
-    <span class="truncate">请先创建学科</span>
-  </button>
+    <div class="flex aspect-square size-8 items-center justify-center rounded-lg border border-destructive/50 bg-destructive/10">
+      <AlertTriangle class="size-4" />
+    </div>
+    <div class="flex flex-col gap-0.5 leading-none">
+      <span class="truncate font-semibold">请先创建学科</span>
+    </div>
+  </SidebarMenuButton>
 </template>
