@@ -60,7 +60,7 @@ class CRUDQuestion(CRUDBase[Question, QuestionCreate, QuestionUpdate]):
         db: AsyncSession,
         *,
         subject_id: Optional[int] = None,
-        knowledge_point_id: Optional[int] = None,
+        knowledge_point_ids: Optional[List[int]] = None,
         tag_ids: Optional[List[int]] = None,
         q_type: Optional[str] = None,
         difficulty: Optional[int] = None,
@@ -123,8 +123,11 @@ class CRUDQuestion(CRUDBase[Question, QuestionCreate, QuestionUpdate]):
         if subject_id:
             query = query.filter(self.model.subject_id == subject_id)
             
-        if knowledge_point_id:
-            kp_ids = await knowledge_point_crud.get_descendant_ids(db, knowledge_point_id)
+        if knowledge_point_ids:
+            # Any selected knowledge point (plus its descendants) is a match.
+            kp_ids: set = set()
+            for kp_id in knowledge_point_ids:
+                kp_ids.update(await knowledge_point_crud.get_descendant_ids(db, kp_id))
             if kp_ids:
                 query = query.filter(self.model.knowledge_points.any(KnowledgePoint.id.in_(kp_ids)))
             else:
@@ -180,7 +183,7 @@ class CRUDQuestion(CRUDBase[Question, QuestionCreate, QuestionUpdate]):
         skip: int = 0,
         limit: int = 100,
         subject_id: Optional[int] = None,
-        knowledge_point_id: Optional[int] = None,
+        knowledge_point_ids: Optional[List[int]] = None,
         tag_ids: Optional[List[int]] = None,
         q_type: Optional[str] = None,
         difficulty: Optional[int] = None,
@@ -199,7 +202,7 @@ class CRUDQuestion(CRUDBase[Question, QuestionCreate, QuestionUpdate]):
         query = await self._get_filter_query(
             db,
             subject_id=subject_id,
-            knowledge_point_id=knowledge_point_id,
+            knowledge_point_ids=knowledge_point_ids,
             tag_ids=tag_ids,
             q_type=q_type,
             difficulty=difficulty,
@@ -232,7 +235,7 @@ class CRUDQuestion(CRUDBase[Question, QuestionCreate, QuestionUpdate]):
         db: AsyncSession,
         *,
         subject_id: Optional[int] = None,
-        knowledge_point_id: Optional[int] = None,
+        knowledge_point_ids: Optional[List[int]] = None,
         tag_ids: Optional[List[int]] = None,
         q_type: Optional[str] = None,
         difficulty: Optional[int] = None,
@@ -251,7 +254,7 @@ class CRUDQuestion(CRUDBase[Question, QuestionCreate, QuestionUpdate]):
         query = await self._get_filter_query(
             db,
             subject_id=subject_id,
-            knowledge_point_id=knowledge_point_id,
+            knowledge_point_ids=knowledge_point_ids,
             tag_ids=tag_ids,
             q_type=q_type,
             difficulty=difficulty,

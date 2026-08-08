@@ -156,7 +156,7 @@ watch(newName, (val) => {
       </button>
 
       <!-- Folder Icon -->
-      <div class="mr-2 text-blue-500/80">
+      <div class="mr-2 text-primary/80">
         <FolderOpen v-if="isOpen" class="w-4 h-4" />
         <Folder v-else class="w-4 h-4" />
       </div>

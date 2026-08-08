@@ -9,7 +9,7 @@ import QuestionStructureSheet from '~/components/QuestionStructureSheet.vue'
 import PageHeader from '~/components/PageHeader.vue'
 import PaperFullSelector from '~/components/PaperFullSelector.vue'
 import TagFilter from '~/components/TagFilter.vue'
-import { Loader2, Plus, X, Trash2, ShoppingBasket, ListTree, Edit, SlidersHorizontal } from '@lucide/vue'
+import { Loader2, Plus, X, Trash2, ShoppingBasket, ListTree, Edit, SlidersHorizontal, ChevronsUpDown } from '@lucide/vue'
 import { Label } from '@/components/ui/label'
 import { Badge } from '@/components/ui/badge'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
@@ -71,7 +71,7 @@ const paperSelectorQuestionIds = ref<number[]>([])
 // --- Filters ---
 const filters = reactive({
   subject_id: undefined as string | undefined,
-  knowledge_point_id: undefined as string | undefined,
+  knowledge_point_ids: [] as string[],
   tag_ids: [] as string[],
   q_type: undefined as string | undefined,
   difficulty: undefined as string | undefined,
@@ -128,7 +128,7 @@ const queryParams = computed(() => {
     if (filters.subject_id && filters.subject_id !== '0') params.subject_id = filters.subject_id
   }
   
-  if (filters.knowledge_point_id && filters.knowledge_point_id !== '0') params.knowledge_point_id = filters.knowledge_point_id
+  if (filters.knowledge_point_ids && filters.knowledge_point_ids.length > 0) params.knowledge_point_ids = filters.knowledge_point_ids
   if (filters.tag_ids && filters.tag_ids.length > 0) params.tag_ids = filters.tag_ids
   if (filters.q_type && filters.q_type !== '0') params.q_type = filters.q_type
   if (filters.difficulty && filters.difficulty !== '0') params.difficulty = filters.difficulty
@@ -388,10 +388,6 @@ const handleEditSuccess = () => {
   refreshQuestions()
 }
 
-const getKnowledgePointName = (id: number) => {
-  return knowledgePoints.value?.find(c => c.id === id)?.name || id
-}
-
 // Filter helpers
 const filteredKnowledgePoints = computed(() => {
   if (!filters.subject_id || filters.subject_id === '0') return knowledgePoints.value
@@ -400,9 +396,27 @@ const filteredKnowledgePoints = computed(() => {
 
 // Knowledge point filter now lives in a popover trigger instead of a dedicated sidebar column.
 const kpPopoverOpen = ref(false)
-const selectKnowledgePoint = (id?: string) => {
-  filters.knowledge_point_id = id
-  kpPopoverOpen.value = false
+const selectedKnowledgePointNames = computed(() => {
+  return filters.knowledge_point_ids
+    .map(id => knowledgePoints.value?.find(kp => String(kp.id) === id)?.name)
+    .filter((name): name is string => Boolean(name))
+})
+const knowledgePointFilterLabel = computed(() => {
+  const names = selectedKnowledgePointNames.value
+  if (names.length === 0) return '全部知识点'
+  if (names.length === 1) return names[0]
+  return `已选 ${names.length} 个知识点`
+})
+const toggleKnowledgePoint = (id: string) => {
+  const index = filters.knowledge_point_ids.indexOf(id)
+  if (index >= 0) {
+    filters.knowledge_point_ids.splice(index, 1)
+  } else {
+    filters.knowledge_point_ids.push(id)
+  }
+}
+const clearKnowledgePoints = () => {
+  filters.knowledge_point_ids = []
 }
 
 const resetFilters = () => {
@@ -414,7 +428,7 @@ const resetFilters = () => {
   }
 
   filters.subject_id = selectedSubjectId.value
-  filters.knowledge_point_id = undefined
+  filters.knowledge_point_ids = []
   filters.tag_ids = []
   filters.q_type = undefined
   filters.difficulty = undefined
@@ -537,24 +551,35 @@ const viewStructure = (question: Question) => {
 
                 <div class="flex flex-wrap items-end gap-4">
                   <!-- Knowledge Point Filter: popover replaces the old dedicated sidebar column -->
-                  <div class="space-y-2">
+                  <div class="space-y-2 flex-1 min-w-[200px]">
                     <Label class="text-xs font-medium">知识点</Label>
                     <Popover v-model:open="kpPopoverOpen">
                       <PopoverTrigger as-child>
-                        <Button variant="secondary" class="min-w-[180px] justify-start">
-                          <ListTree class="mr-2 h-4 w-4 shrink-0" />
-                          <span class="truncate">
-                            {{ filters.knowledge_point_id ? (getKnowledgePointName(filters.knowledge_point_id as number) || '已选择知识点') : '全部知识点' }}
-                          </span>
+                        <Button variant="outline" role="combobox" :aria-expanded="kpPopoverOpen" class="h-9 w-full justify-between font-normal">
+                          <div class="flex items-center truncate">
+                            <ListTree class="mr-2 h-4 w-4 shrink-0 opacity-50" />
+                            <span class="truncate">{{ knowledgePointFilterLabel }}</span>
+                          </div>
+                          <div class="flex items-center gap-1 shrink-0">
+                            <Badge v-if="selectedKnowledgePointNames.length > 0" variant="secondary" class="px-1.5">
+                              {{ selectedKnowledgePointNames.length }}
+                            </Badge>
+                            <ChevronsUpDown class="h-4 w-4 opacity-50" />
+                          </div>
                         </Button>
                       </PopoverTrigger>
-                      <PopoverContent class="w-72 p-2" align="start">
-                        <div class="max-h-80 overflow-y-auto">
+                      <PopoverContent class="w-80 p-2" align="start">
+                        <div class="max-h-96 overflow-y-auto">
                           <KnowledgePointTreeSelector
                             :knowledge-points="filteredKnowledgePoints || []"
-                            :selected-id="filters.knowledge_point_id"
-                            @select="selectKnowledgePoint"
+                            :selected-ids="filters.knowledge_point_ids"
+                            @toggle="toggleKnowledgePoint"
+                            @clear="clearKnowledgePoints"
                           />
+                        </div>
+                        <div v-if="selectedKnowledgePointNames.length > 0" class="flex items-center justify-between pt-2 mt-1 border-t px-1">
+                          <span class="text-xs text-muted-foreground">已选 {{ selectedKnowledgePointNames.length }} 个</span>
+                          <Button variant="ghost" size="sm" class="h-auto px-2 py-1 text-xs" @click="clearKnowledgePoints">清除</Button>
                         </div>
                       </PopoverContent>
                     </Popover>

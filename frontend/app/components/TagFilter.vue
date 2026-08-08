@@ -82,7 +82,7 @@ const getCategoryName = (slug: string) => {
           variant="outline"
           role="combobox"
           :aria-expanded="open"
-          class="h-10 w-full justify-between"
+          class="h-9 w-full justify-between font-normal"
         >
           <div class="flex items-center truncate">
             <TagIcon class="mr-2 h-4 w-4 shrink-0 opacity-50" />

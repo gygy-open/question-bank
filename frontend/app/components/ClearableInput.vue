@@ -7,6 +7,7 @@ const props = defineProps<{
   modelValue?: string | number
   placeholder?: string
   type?: string
+  autofocus?: boolean
 }>()
 
 const emit = defineEmits(['update:modelValue'])
@@ -26,6 +27,7 @@ const clear = () => {
       :model-value="modelValue" 
       :type="type" 
       :placeholder="placeholder"
+      :autofocus="autofocus"
       @update:model-value="emit('update:modelValue', $event)"
       class="pr-8"
     />
