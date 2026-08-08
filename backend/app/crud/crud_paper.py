@@ -47,6 +47,7 @@ class CRUDPaper(CRUDBase[Paper, PaperCreate, PaperUpdate]):
         db: AsyncSession,
         *,
         owner_id: int,
+        subject_id: Optional[int] = None,
         status: Optional[str] = None,
         keyword: Optional[str] = None,
         sort: str = "updated_desc",
@@ -58,6 +59,8 @@ class CRUDPaper(CRUDBase[Paper, PaperCreate, PaperUpdate]):
             .options(selectinload(Paper.items))
             .where(Paper.owner_id == owner_id)
         )
+        if subject_id:
+            query = query.where(Paper.subject_id == subject_id)
         if status:
             query = query.where(Paper.status == status)
         if keyword:

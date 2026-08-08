@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import PageHeader from '~/components/PageHeader.vue'
 import { Button } from '@/components/ui/button'
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '@/components/ui/card'
@@ -27,6 +27,7 @@ import type { Paper, Subject } from '~/types'
 
 const { list, create, update, remove, duplicate } = usePapers()
 const { data: subjects } = await useAPI<Subject[]>('/subjects')
+const { currentSubjectId } = useSubjectContext()
 
 const papers = ref<Paper[]>([])
 const loading = ref(false)
@@ -44,7 +45,11 @@ const filteredPapers = computed(() => papers.value)
 const loadPapers = async () => {
   loading.value = true
   try {
-    papers.value = await list({ status: activeTab.value, sort: sortBy.value })
+    papers.value = await list({
+      subject_id: currentSubjectId.value,
+      status: activeTab.value,
+      sort: sortBy.value,
+    })
   } catch {
     toast.error('加载试卷失败')
   } finally {
@@ -54,6 +59,9 @@ const loadPapers = async () => {
 
 onMounted(loadPapers)
 
+// Reload when the global subject switches (e.g. via the sidebar selector).
+watch(currentSubjectId, loadPapers)
+
 const onTabChange = (v: string | number) => {
   activeTab.value = v as 'draft' | 'archived'
   loadPapers()
@@ -62,7 +70,7 @@ const onTabChange = (v: string | number) => {
 const onSortChange = () => loadPapers()
 
 const openCreate = () => {
-  form.value = { title: '', subject_id: undefined, description: '' }
+  form.value = { title: '', subject_id: currentSubjectId.value ?? undefined, description: '' }
   createOpen.value = true
 }
 

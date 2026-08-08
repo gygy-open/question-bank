@@ -35,7 +35,7 @@ const LEGACY_KEY = 'paper-basket'
 export function usePapers() {
   const { $api } = useNuxtApp()
 
-  const list = (params?: { status?: string; keyword?: string; sort?: string }) =>
+  const list = (params?: { subject_id?: number | null; status?: string; keyword?: string; sort?: string }) =>
     $api<Paper[]>('/papers', { query: params })
 
   const get = (id: number) => $api<PaperDetail>(`/papers/${id}`)

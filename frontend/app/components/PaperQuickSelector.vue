@@ -13,6 +13,7 @@ const props = defineProps<{
 }>()
 
 const { list, create, addItems } = usePapers()
+const { currentSubjectId } = useSubjectContext()
 
 const open = ref(false)
 const loading = ref(false)
@@ -24,7 +25,7 @@ const showFull = ref(false)
 const loadPapers = async () => {
   loading.value = true
   try {
-    const data = await list({ status: 'draft', sort: 'updated_desc' })
+    const data = await list({ subject_id: currentSubjectId.value, status: 'draft', sort: 'updated_desc' })
     papers.value = data
     total.value = data.length
   } catch {

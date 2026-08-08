@@ -24,6 +24,7 @@ const emit = defineEmits<{
 }>()
 
 const { list, create, addItems } = usePapers()
+const { currentSubjectId } = useSubjectContext()
 
 const loading = ref(false)
 const submitting = ref(false)
@@ -40,7 +41,7 @@ const filteredPapers = computed(() => {
 const loadPapers = async () => {
   loading.value = true
   try {
-    papers.value = await list({ sort: 'updated_desc' })
+    papers.value = await list({ subject_id: currentSubjectId.value, sort: 'updated_desc' })
   } catch {
     toast.error('加载试卷失败')
   } finally {
