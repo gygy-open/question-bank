@@ -104,21 +104,24 @@
     left: 0;
     width: 100vw;
     height: 100vh;
-    background: #fcfcfc;
+    /* 极简深邃黑，仅保留中央极微弱的青色晕染，避免死黑 */
+    background: #09090b;
+    background-image: radial-gradient(circle at 50% 50%, rgba(47, 122, 107, 0.08) 0%, transparent 45%);
     display: flex;
     flex-direction: column;
     justify-content: center;
     align-items: center;
     z-index: 9999;
-    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
-    color: #78716c; /* 与主题 muted-foreground 接近的暖灰 */
+    /* 切回克制的无衬线体 */
+    font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
   }
 
   .math-loader {
     position: relative;
     width: 200px;
     height: 200px;
-    animation: rotate 60s linear infinite;
+    /* 极其缓慢的自转，减少眩晕，保持静谧 */
+    animation: rotate 90s linear infinite;
   }
 
   .dot {
@@ -127,24 +130,27 @@
     left: 50%;
     width: 4px;
     height: 4px;
-    background: #2F7A6B; /* 主题色松烟青绿 */
+    /* 摒弃五颜六色，回归纯粹的磨砂白点 */
+    background: rgba(255, 255, 255, 0.85);
     border-radius: 50%;
     /* Scale up the coordinates by 2.5 */
     transform: translate(calc(var(--x) * 2.5), calc(var(--y) * 2.5));
     opacity: 0;
-    animation: pulse 3s ease-in-out infinite;
+    /* 拉长呼吸周期，让波纹有如同水母般的优雅舒展 */
+    animation: ethereal-pulse 4s ease-in-out infinite;
     animation-delay: var(--d);
-    box-shadow: 0 0 5px rgba(47, 122, 107, 0.5);
   }
 
-  @keyframes pulse {
+  /* 丝滑的呼吸光晕与缩放 */
+  @keyframes ethereal-pulse {
     0%, 100% { 
-      opacity: 0.1; 
-      transform: translate(calc(var(--x) * 2.5), calc(var(--y) * 2.5)) scale(0.5); 
+      opacity: 0.05; 
+      transform: translate(calc(var(--x) * 2.5), calc(var(--y) * 2.5)) scale(0.6); 
     }
     50% { 
       opacity: 1; 
-      transform: translate(calc(var(--x) * 2.5), calc(var(--y) * 2.5)) scale(1.5); 
+      transform: translate(calc(var(--x) * 2.5), calc(var(--y) * 2.5)) scale(1.15); 
+      box-shadow: 0 0 12px rgba(255, 255, 255, 0.3);
     }
   }
 
@@ -154,16 +160,18 @@
   }
 
   .loading-text {
-    margin-top: 2rem;
-    font-size: 0.875rem;
+    margin-top: 3.5rem;
+    font-size: 0.75rem;
     font-weight: 500;
-    letter-spacing: 0.05em;
-    color: #44403c; /* 比容器基础色更深，浅底下对比度更够 */
-    animation: blink 2s infinite;
+    /* 字距拉开，字体缩放适中，营造空旷的排版高级感 */
+    letter-spacing: 0.35em;
+    text-transform: uppercase;
+    color: rgba(255, 255, 255, 0.85); /* 提高亮度和不透明度，确保清晰 */
+    animation: gentle-fade 3s ease-in-out infinite;
   }
 
-  @keyframes blink {
-    0%, 100% { opacity: 0.6; }
+  @keyframes gentle-fade {
+    0%, 100% { opacity: 0.5; }
     50% { opacity: 1; }
   }
 </style>

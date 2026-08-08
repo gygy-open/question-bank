@@ -123,4 +123,18 @@
   button:not([disabled]), [role="button"]:not([disabled]) {
     cursor: pointer;
   }
+
+  /* SPA 挂载后从暗色加载页平滑淡入，缓解明暗跳变 */
+  #__nuxt {
+    animation: app-fade-in 0.25s ease-out;
+  }
+
+  @keyframes app-fade-in {
+    from {
+      opacity: 0;
+    }
+    to {
+      opacity: 1;
+    }
+  }
 }
