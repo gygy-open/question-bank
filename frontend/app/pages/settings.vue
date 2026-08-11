@@ -117,7 +117,7 @@ onMounted(() => {
           @click="updateActiveTab('prompts')"
         >
           <MessageSquareText class="w-4 h-4" />
-          系统提示词
+          提示词配置
         </Button>
       </nav>
     </aside>
@@ -184,7 +184,7 @@ onMounted(() => {
       <!-- AI Prompts -->
       <div v-show="activeTab === 'prompts'">
         <div class="mb-6">
-          <h2 class="text-2xl font-bold tracking-tight">系统提示词 (Prompts)</h2>
+          <h2 class="text-2xl font-bold tracking-tight">提示词配置</h2>
           <p class="text-sm text-muted-foreground">如果您了解大语言工作原理，可在此微调它处理指令的方式。</p>
         </div>
         <AiPromptsConfig />
