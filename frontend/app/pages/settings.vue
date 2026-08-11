@@ -86,13 +86,13 @@ onMounted(() => {
 <template>
   <PageHeader title="系统设置" />
   
-  <div class="flex flex-col md:flex-row p-4 max-w-7xl mx-auto w-full items-stretch min-h-[calc(100vh-8rem)]">
+  <div class="flex flex-col md:flex-row max-w-7xl mx-auto w-full items-stretch min-h-[calc(100vh-4rem)]">
     <!-- Left Sidebar Navigation -->
-    <aside class="w-full md:w-56 shrink-0 md:pr-6 md:border-r border-border">
-      <nav class="flex flex-row md:flex-col gap-1 overflow-x-auto md:overflow-visible pb-2 md:pb-0 md:sticky md:top-6">
+    <aside class="w-full md:w-56 shrink-0 md:border-r border-border p-4 md:pr-6 md:pt-8 bg-muted/20 md:bg-transparent">
+      <nav class="flex flex-row md:flex-col gap-1 overflow-x-auto md:overflow-visible pb-2 md:pb-0 md:sticky md:top-8">
         <Button 
           :variant="activeTab === 'general' ? 'secondary' : 'ghost'" 
-          class="justify-start gap-2 whitespace-nowrap"
+          class="justify-start gap-2 whitespace-nowrap lg:w-full"
           @click="updateActiveTab('general')"
         >
           <Settings class="w-4 h-4" />
@@ -100,7 +100,7 @@ onMounted(() => {
         </Button>
         <Button 
           :variant="activeTab === 'ai' ? 'secondary' : 'ghost'" 
-          class="justify-start gap-2 whitespace-nowrap"
+          class="justify-start gap-2 whitespace-nowrap lg:w-full"
           @click="updateActiveTab('ai')"
         >
           <Cpu class="w-4 h-4" />
@@ -110,7 +110,7 @@ onMounted(() => {
     </aside>
 
     <!-- Right Content Area -->
-    <main class="flex-1 min-w-0 md:pl-8 mt-6 md:mt-0">
+    <main class="flex-1 min-w-0 p-4 md:pl-8 md:pt-8 mt-4 md:mt-0">
       <!-- General Settings -->
       <div v-show="activeTab === 'general'" class="space-y-6">
         <div class="mb-4">
