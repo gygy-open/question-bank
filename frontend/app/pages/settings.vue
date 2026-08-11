@@ -50,7 +50,7 @@ const fetchSettings = async () => {
     // Filter out settings managed by AI Config UI or AI Prompts config
     settings.value = data.filter(s => {
       const isConfigModelId = ['AI_TEXT_MODEL_ID', 'AI_VISION_MODEL_ID', 'AI_EMBEDDING_MODEL_ID'].includes(s.key)
-      const isPrompt = s.key.startsWith('AI_') && s.key.endsWith('_PROMPT')
+      const isPrompt = s.key.endsWith('_PROMPT')
       return !isConfigModelId && !isPrompt
     })
   } catch (error) {

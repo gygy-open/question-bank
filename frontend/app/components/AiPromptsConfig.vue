@@ -28,7 +28,7 @@ const fetchPrompts = async () => {
   try {
     const data = await $api<SystemSetting[]>('/settings')
     // Filter only AI settings that are prompts, ignore model IDs
-    promptSettings.value = data.filter(s => s.key.endsWith('_PROMPT') && s.key.startsWith('AI_'))
+    promptSettings.value = data.filter(s => s.key.endsWith('_PROMPT'))
   } catch (error) {
     toast.error('获取提示词失败', {
       description: (error as any).message,
