@@ -47,8 +47,12 @@ const fetchSettings = async () => {
   loading.value = true
   try {
     const data = await $api<SystemSetting[]>('/settings')
-    // Filter out settings managed by AI Config UI
-    settings.value = data.filter(s => !['AI_TEXT_MODEL_ID', 'AI_VISION_MODEL_ID'].includes(s.key))
+    // Filter out settings managed by AI Config UI or AI Prompts config
+    settings.value = data.filter(s => {
+      const isConfigModelId = ['AI_TEXT_MODEL_ID', 'AI_VISION_MODEL_ID', 'AI_EMBEDDING_MODEL_ID'].includes(s.key)
+      const isPrompt = s.key.startsWith('AI_') && s.key.endsWith('_PROMPT')
+      return !isConfigModelId && !isPrompt
+    })
   } catch (error) {
     toast.error('获取设置失败', {
       description: (error as any).message,
