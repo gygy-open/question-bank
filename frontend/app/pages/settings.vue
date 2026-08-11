@@ -1,5 +1,8 @@
 <script setup lang="ts">
+import { ref, onMounted, watchEffect } from 'vue'
+import { useRouter } from 'vue-router'
 import { toast } from 'vue-sonner'
+import { Settings, Cpu } from 'lucide-vue-next'
 import PageHeader from '~/components/PageHeader.vue'
 import AiSettings from '~/components/AiSettings.vue'
 import {
@@ -12,11 +15,16 @@ import {
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { Button } from '@/components/ui/button'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 
 const { $api } = useNuxtApp()
 const { user } = useAuth()
 const router = useRouter()
+
+// Navigation State
+const activeTab = ref('general')
+const updateActiveTab = (tab: string) => {
+  activeTab.value = tab
+}
 
 // Redirect if not superuser
 watchEffect(() => {
@@ -77,19 +85,44 @@ onMounted(() => {
 
 <template>
   <PageHeader title="系统设置" />
-  <div class="flex flex-1 flex-col p-4 space-y-6">
-    <Tabs default-value="general" class="w-full">
-      <TabsList class="grid w-full grid-cols-2 max-w-[400px]">
-        <TabsTrigger value="general">常规设置</TabsTrigger>
-        <TabsTrigger value="ai">AI 模型配置</TabsTrigger>
-      </TabsList>
+  
+  <div class="flex flex-col md:flex-row gap-8 p-4 max-w-7xl mx-auto w-full items-start">
+    <!-- Left Sidebar Navigation -->
+    <aside class="w-full md:w-56 shrink-0 md:sticky md:top-6">
+      <nav class="flex flex-row md:flex-col gap-1 overflow-x-auto md:overflow-visible pb-2 md:pb-0">
+        <Button 
+          :variant="activeTab === 'general' ? 'secondary' : 'ghost'" 
+          class="justify-start gap-2 whitespace-nowrap"
+          @click="updateActiveTab('general')"
+        >
+          <Settings class="w-4 h-4" />
+          常规设置
+        </Button>
+        <Button 
+          :variant="activeTab === 'ai' ? 'secondary' : 'ghost'" 
+          class="justify-start gap-2 whitespace-nowrap"
+          @click="updateActiveTab('ai')"
+        >
+          <Cpu class="w-4 h-4" />
+          AI 大脑核心
+        </Button>
+      </nav>
+    </aside>
 
-      <TabsContent value="general" class="space-y-6">
+    <!-- Right Content Area -->
+    <main class="flex-1 min-w-0">
+      <!-- General Settings -->
+      <div v-show="activeTab === 'general'" class="space-y-6">
+        <div class="mb-4">
+          <h2 class="text-2xl font-bold tracking-tight">常规设置</h2>
+          <p class="text-sm text-muted-foreground">管理系统的全局环境变量与基础配置。</p>
+        </div>
+
         <div v-if="loading" class="flex justify-center py-8">
           <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
         </div>
 
-        <div v-else class="grid gap-6 max-w-3xl">
+        <div v-else class="grid gap-6">
           <Card v-for="setting in settings" :key="setting.key">
             <CardHeader>
               <CardTitle class="text-base">{{ setting.key }}</CardTitle>
@@ -102,7 +135,7 @@ onMounted(() => {
                     v-if="setting.key === 'AI_EXTRACT_PROMPT' || setting.value.length > 100"
                     v-model="setting.value"
                     placeholder="Value"
-                    class="min-h-[200px]"
+                    class="min-h-[200px] font-mono text-sm"
                   />
                   <Input 
                     v-else
@@ -112,21 +145,28 @@ onMounted(() => {
                   />
                 </div>
                 <div class="flex justify-end">
-                  <Button @click="updateSetting(setting)">保存</Button>
+                  <Button @click="updateSetting(setting)">保存设置</Button>
                 </div>
               </div>
             </CardContent>
           </Card>
           
-          <div v-if="settings.length === 0" class="text-center text-muted-foreground py-8">
-            暂无设置项
+          <div v-if="settings.length === 0" class="flex flex-col items-center justify-center p-12 text-center border rounded-xl bg-card border-dashed">
+            <Settings class="w-8 h-8 text-muted-foreground/50 mb-4" />
+            <h3 class="text-lg font-medium">暂无设置项</h3>
+            <p class="text-sm text-muted-foreground mt-1">系统尚未注册任何开放配置项</p>
           </div>
         </div>
-      </TabsContent>
+      </div>
 
-      <TabsContent value="ai">
+      <!-- AI Settings -->
+      <div v-show="activeTab === 'ai'">
+        <div class="mb-6">
+          <h2 class="text-2xl font-bold tracking-tight">AI 大脑核心</h2>
+          <p class="text-sm text-muted-foreground">分配提供商、录入模型，并配置系统各场景下的主力计算引擎。</p>
+        </div>
         <AiSettings />
-      </TabsContent>
-    </Tabs>
+      </div>
+    </main>
   </div>
 </template>
