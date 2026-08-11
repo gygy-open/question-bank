@@ -1,6 +1,11 @@
 # Question Bank —— AI 原生的题库系统
 
+## 预览
+
 ![](./docs/public/example-imports.png)
+
+
+## 文档与反馈
 
 📖 在线文档：<https://gygy-open.github.io/question-bank/>
 
@@ -12,7 +17,7 @@
     </td>
     <td align="center">
       <img src="./docs/public/qr_tip.png" alt="赞赏二维码" width="180" /><br />
-      觉得有帮助，激赏作者 ☕
+      激励作者☕，让项目变得更好
     </td>
   </tr>
 </table>
