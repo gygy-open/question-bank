@@ -2,9 +2,10 @@
 import { ref, onMounted, watchEffect } from 'vue'
 import { useRouter } from 'vue-router'
 import { toast } from 'vue-sonner'
-import { Settings, Cpu } from '@lucide/vue'
+import { Settings, Cpu, MessageSquareText } from '@lucide/vue'
 import PageHeader from '~/components/PageHeader.vue'
 import AiSettings from '~/components/AiSettings.vue'
+import AiPromptsConfig from '~/components/AiPromptsConfig.vue'
 import {
   Card,
   CardContent,
@@ -106,6 +107,14 @@ onMounted(() => {
           <Cpu class="w-4 h-4" />
           AI 大脑核心
         </Button>
+        <Button 
+          :variant="activeTab === 'prompts' ? 'secondary' : 'ghost'" 
+          class="justify-start gap-2 whitespace-nowrap lg:w-full"
+          @click="updateActiveTab('prompts')"
+        >
+          <MessageSquareText class="w-4 h-4" />
+          系统提示词
+        </Button>
       </nav>
     </aside>
 
@@ -166,6 +175,15 @@ onMounted(() => {
           <p class="text-sm text-muted-foreground">分配提供商、录入模型，并配置系统各场景下的主力计算引擎。</p>
         </div>
         <AiSettings />
+      </div>
+
+      <!-- AI Prompts -->
+      <div v-show="activeTab === 'prompts'">
+        <div class="mb-6">
+          <h2 class="text-2xl font-bold tracking-tight">系统提示词 (Prompts)</h2>
+          <p class="text-sm text-muted-foreground">如果您了解大语言工作原理，可在此微调它处理指令的方式。</p>
+        </div>
+        <AiPromptsConfig />
       </div>
     </main>
   </div>
