@@ -86,9 +86,9 @@ onMounted(() => {
 <template>
   <PageHeader title="系统设置" />
   
-  <div class="flex flex-col md:flex-row gap-8 p-4 max-w-7xl mx-auto w-full items-start">
+  <div class="flex flex-col md:flex-row p-4 max-w-7xl mx-auto w-full items-start">
     <!-- Left Sidebar Navigation -->
-    <aside class="w-full md:w-56 shrink-0 md:sticky md:top-6">
+    <aside class="w-full md:w-56 shrink-0 md:sticky md:top-6 md:pr-6 md:border-r border-border">
       <nav class="flex flex-row md:flex-col gap-1 overflow-x-auto md:overflow-visible pb-2 md:pb-0">
         <Button 
           :variant="activeTab === 'general' ? 'secondary' : 'ghost'" 
@@ -110,7 +110,7 @@ onMounted(() => {
     </aside>
 
     <!-- Right Content Area -->
-    <main class="flex-1 min-w-0">
+    <main class="flex-1 min-w-0 md:pl-8 mt-6 md:mt-0">
       <!-- General Settings -->
       <div v-show="activeTab === 'general'" class="space-y-6">
         <div class="mb-4">
