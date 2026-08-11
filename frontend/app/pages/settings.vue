@@ -86,10 +86,10 @@ onMounted(() => {
 <template>
   <PageHeader title="系统设置" />
   
-  <div class="flex flex-col md:flex-row p-4 max-w-7xl mx-auto w-full items-start">
+  <div class="flex flex-col md:flex-row p-4 max-w-7xl mx-auto w-full items-stretch min-h-[calc(100vh-8rem)]">
     <!-- Left Sidebar Navigation -->
-    <aside class="w-full md:w-56 shrink-0 md:sticky md:top-6 md:pr-6 md:border-r border-border">
-      <nav class="flex flex-row md:flex-col gap-1 overflow-x-auto md:overflow-visible pb-2 md:pb-0">
+    <aside class="w-full md:w-56 shrink-0 md:pr-6 md:border-r border-border">
+      <nav class="flex flex-row md:flex-col gap-1 overflow-x-auto md:overflow-visible pb-2 md:pb-0 md:sticky md:top-6">
         <Button 
           :variant="activeTab === 'general' ? 'secondary' : 'ghost'" 
           class="justify-start gap-2 whitespace-nowrap"
