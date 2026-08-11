@@ -2,7 +2,7 @@
 import { ref, onMounted, watchEffect } from 'vue'
 import { useRouter } from 'vue-router'
 import { toast } from 'vue-sonner'
-import { Settings, Cpu } from 'lucide-vue-next'
+import { Settings, Cpu } from '@lucide/vue'
 import PageHeader from '~/components/PageHeader.vue'
 import AiSettings from '~/components/AiSettings.vue'
 import {
