@@ -15,6 +15,7 @@ wheels/
 
 config.json
 
+data/
 static/
 uploads/
 

@@ -149,5 +149,8 @@ async def update_active_config(
             await system_setting.update(db, db_obj=existing, obj_in=SystemSettingUpdate(value=val))
         else:
             await system_setting.create(db, obj_in=SystemSettingCreate(key=key, value=val, description="Active AI Embedding Model ID"))
+        # Reload the in-memory embedding function so the change applies without a restart.
+        from app.services.embedding import reload_embedding_function
+        await reload_embedding_function()
     
     return {"status": "success"}

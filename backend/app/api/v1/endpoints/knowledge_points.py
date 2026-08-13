@@ -36,6 +36,35 @@ async def read_knowledge_points(
 
 # --- Vector sync (deferred indexing) ---
 
+@router.get("/embedding-status")
+async def get_embedding_status(
+    db: deps.SessionDep,
+    subject_id: Optional[int] = None,
+    current_user: models.User = Depends(deps.get_current_active_user),
+) -> Any:
+    """Import-page readiness: whether embedding is configured and the subject's KPs are vectorized."""
+    embedding_configured = VectorStore.is_available()
+
+    if subject_id is not None:
+        kps = await crud.knowledge_point.get_by_subject(db, subject_id=subject_id, limit=None)
+        kp_total = len(kps)
+    else:
+        all_kps = await crud.knowledge_point.get_multi(db, limit=None)
+        kp_total = len(all_kps)
+
+    # Empty subject has nothing to vectorize; treat as "vectorized".
+    kp_vectorized = True
+    if embedding_configured and kp_total > 0:
+        vec_count = VectorStore.count_by_subject(subject_id) if subject_id is not None else VectorStore.count()
+        kp_vectorized = vec_count >= kp_total
+
+    return {
+        "embedding_configured": embedding_configured,
+        "kp_total": kp_total,
+        "kp_vectorized": kp_vectorized,
+    }
+
+
 @router.get("/vector-status", response_model=schemas.VectorStatus)
 async def get_vector_status(
     db: deps.SessionDep,
@@ -98,6 +127,8 @@ async def reindex_vectors(
         count = await crud.knowledge_point.reindex_vectors(db, subject_id=subject_id)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=f"向量重建失败：{e}")
     return schemas.ReindexResult(
         status="success",
         reindexed=count,

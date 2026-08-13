@@ -177,11 +177,21 @@ def chroma_mode() -> str:
     mode = settings.CHROMADB_MODE or load_runtime_config().get("chroma_mode", "")
     if mode:
         return mode
-    return "embedded" if getattr(sys, "frozen", False) else "http"
+    if getattr(sys, "frozen", False):
+        return "embedded"
+    # Single-machine SQLite deployments have no standalone ChromaDB service.
+    if "sqlite" in get_db_url():
+        return "embedded"
+    return "http"
 
 
 def chroma_path() -> Path:
     """Filesystem location for the embedded (PersistentClient) ChromaDB store."""
+    return settings.DATA_DIR / "data" / "chroma"
+
+
+def legacy_chroma_path() -> Path:
+    """Pre-consolidation ChromaDB location (directly under DATA_DIR)."""
     return settings.DATA_DIR / "chroma"
 
 

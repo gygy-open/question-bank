@@ -42,17 +42,26 @@ async def process_task(db: AsyncSession, task: ImportTask):
         file_path = Path(task.file_path)
         if not file_path.exists():
             raise FileNotFoundError(f"File not found: {file_path}")
-            
+
+        # Resolve subject up-front so knowledge-point retrieval can be subject-scoped.
+        subject_id = None
+        if task.user_id:
+            user_stmt = select(User).where(User.id == task.user_id)
+            user_result = await db.execute(user_stmt)
+            user = user_result.scalar_one_or_none()
+            if user:
+                subject_id = user.last_active_subject_id or user.subject_id
+
         result = None
         if task.file_type == 'docx':
             import uuid
             proc_task_id = str(uuid.uuid4())
-            result = await doc_processor.process_docx(file_path, db=db, task_id=proc_task_id, mode=task.mode or "extract")
+            result = await doc_processor.process_docx(file_path, db=db, task_id=proc_task_id, mode=task.mode or "extract", subject_id=subject_id)
         elif task.file_type == 'markdown':
             content = file_path.read_text(encoding='utf-8')
             import uuid
             proc_task_id = str(uuid.uuid4())
-            result = await doc_processor.process_markdown(content, db=db, filename=task.original_filename, task_id=proc_task_id, mode=task.mode or "extract")
+            result = await doc_processor.process_markdown(content, db=db, filename=task.original_filename, task_id=proc_task_id, mode=task.mode or "extract", subject_id=subject_id)
             
         if result:
             # Save questions
@@ -60,15 +69,6 @@ async def process_task(db: AsyncSession, task: ImportTask):
             saved_count = 0
             
             creator_id = task.user_id
-            
-            # Fetch user to get subject_id
-            subject_id = None
-            if creator_id:
-                user_stmt = select(User).where(User.id == creator_id)
-                user_result = await db.execute(user_stmt)
-                user = user_result.scalar_one_or_none()
-                if user:
-                    subject_id = user.last_active_subject_id or user.subject_id
             
             for q_data in questions_data:
                 # Determine type enum

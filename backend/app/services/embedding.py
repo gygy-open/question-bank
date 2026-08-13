@@ -14,6 +14,9 @@ from app.core.vector_store import VectorStore
 logger = logging.getLogger(__name__)
 
 class AIProviderEmbeddingFunction(EmbeddingFunction):
+    # Some OpenAI-compatible providers (e.g. DashScope) cap batch size at 20.
+    OPENAI_BATCH_SIZE = 10
+
     def __init__(self, provider_type: str, api_key: str, base_url: str = None, model_name: str = None):
         self.provider_type = provider_type
         self.api_key = api_key
@@ -34,8 +37,9 @@ class AIProviderEmbeddingFunction(EmbeddingFunction):
                 logger.error(f"Unknown provider type: {self.provider_type}")
                 return [[] for _ in input]
         except Exception as e:
+            # Propagate so callers don't silently store empty vectors; write paths guard this.
             logger.error(f"Error generating embeddings: {e}")
-            return [[] for _ in input]
+            raise
 
     def _get_openai_embeddings(self, texts: List[str]) -> Embeddings:
         client = openai.Client(api_key=self.api_key, base_url=self.base_url)
@@ -44,11 +48,15 @@ class AIProviderEmbeddingFunction(EmbeddingFunction):
         # Replace newlines
         clean_texts = [text.replace("\n", " ") for text in texts]
         
-        response = client.embeddings.create(
-            input=clean_texts,
-            model=model
-        )
-        return [data.embedding for data in response.data]
+        embeddings: Embeddings = []
+        for i in range(0, len(clean_texts), self.OPENAI_BATCH_SIZE):
+            chunk = clean_texts[i:i + self.OPENAI_BATCH_SIZE]
+            response = client.embeddings.create(
+                input=chunk,
+                model=model
+            )
+            embeddings.extend(data.embedding for data in response.data)
+        return embeddings
 
     def _get_gemini_embeddings(self, texts: List[str]) -> Embeddings:
         client_kwargs = {"api_key": self.api_key}

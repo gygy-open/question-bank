@@ -1,6 +1,7 @@
 from typing import Any, Dict, List
+import shutil
 import chromadb
-from app.core.config import settings, chroma_mode, chroma_path
+from app.core.config import settings, chroma_mode, chroma_path, legacy_chroma_path
 
 class VectorStore:
     _client = None
@@ -16,6 +17,11 @@ class VectorStore:
             if chroma_mode() == "embedded":
                 # Desktop / single-file: no separate ChromaDB server needed.
                 path = chroma_path()
+                # One-time move of the pre-consolidation store into data/.
+                legacy = legacy_chroma_path()
+                if legacy.exists() and not path.exists():
+                    path.parent.mkdir(parents=True, exist_ok=True)
+                    shutil.move(str(legacy), str(path))
                 path.mkdir(parents=True, exist_ok=True)
                 cls._client = chromadb.PersistentClient(path=str(path))
             else:
@@ -55,6 +61,18 @@ class VectorStore:
             return 0
 
     @classmethod
+    def count_by_subject(cls, subject_id: int, name: str = "knowledge_points") -> int:
+        """Number of vectors for a single subject (subject-scoped sync check)."""
+        if not cls.is_available():
+            return 0
+        try:
+            res = cls.get_collection(name).get(where={"subject_id": subject_id}, include=[])
+            return len(res.get("ids", []))
+        except Exception as e:
+            print(f"Error counting vectors for subject {subject_id}: {e}")
+            return 0
+
+    @classmethod
     def reset_collection(cls, name: str = "knowledge_points"):
         """Delete the collection so it can be rebuilt from scratch (full reindex)."""
         try:
@@ -65,7 +83,7 @@ class VectorStore:
             print(f"Note: could not delete collection {name} (may not exist): {e}")
 
     @classmethod
-    def upsert_knowledge_points_batch(cls, items: List[Dict[str, Any]]):
+    def upsert_knowledge_points_batch(cls, items: List[Dict[str, Any]], raise_on_error: bool = False):
         """
         Batch upsert knowledge points in a single call.
         items: [{"id": int, "text": str, "metadata": dict}, ...]
@@ -81,6 +99,8 @@ class VectorStore:
             )
         except Exception as e:
             print(f"Error batch upserting {len(items)} knowledge points to vector store: {e}")
+            if raise_on_error:
+                raise
 
     @classmethod
     def delete_knowledge_points_batch(cls, ids: List[int]):

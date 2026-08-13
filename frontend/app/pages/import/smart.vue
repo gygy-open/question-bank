@@ -1,7 +1,8 @@
 <script setup lang="ts">
-import { ref, computed, watch } from 'vue'
+import { ref, computed, watch, onMounted } from 'vue'
 import { Upload, Loader2, FileText, CheckCircle2, AlertCircle, Sparkles, Trash2, Plus, Save, FileCode, Image as ImageIcon } from '@lucide/vue'
 import { Button } from '@/components/ui/button'
+import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -65,6 +66,28 @@ const { data: knowledgePoints } = useAPI<KnowledgePoint[]>('/knowledge-points', 
 const { currentSubjectId } = useSubjectContext()
 globalSettings.value.subject_id = currentSubjectId.value ?? undefined
 
+// Non-blocking import-readiness checks: (1) embedding configured, (2) this subject's KPs vectorized.
+const { user } = useAuth()
+const isSuperuser = computed(() => !!user.value?.is_superuser)
+const embeddingConfigured = ref(true)
+const kpVectorized = ref(true)
+
+const fetchImportStatus = async () => {
+    try {
+        const res = await $api<{ embedding_configured: boolean; kp_total: number; kp_vectorized: boolean }>(
+            '/knowledge-points/embedding-status',
+            { query: { subject_id: globalSettings.value.subject_id } }
+        )
+        embeddingConfigured.value = res.embedding_configured
+        kpVectorized.value = res.kp_vectorized
+    } catch {
+        embeddingConfigured.value = true
+        kpVectorized.value = true
+    }
+}
+onMounted(fetchImportStatus)
+watch(() => globalSettings.value.subject_id, fetchImportStatus)
+
 // Filter knowledge points based on selected subject
 const filteredKnowledgePoints = computed(() => {
     if (!knowledgePoints.value) return []
@@ -106,6 +129,10 @@ const handlePaste = async (e: ClipboardEvent) => {
 
 const handleAutoUpload = () => {
     if (!file.value && !pastedImage.value) return;
+    if (!globalSettings.value.subject_id) {
+        toast.error('请先选择所属学科')
+        return
+    }
     
     // Auto-detect based on file type or pasted image
     if (pastedImage.value || (file.value && file.value.type.startsWith('image/'))) {
@@ -197,7 +224,7 @@ const handleUploadDocx = async () => {
     formData.append('file', file.value)
 
     try {
-        const data = await $api<any>(`/upload/docx?mode=${importMode.value}&method=${parseMethod.value}`, {
+        const data = await $api<any>(`/upload/docx?mode=${importMode.value}&method=${parseMethod.value}&subject_id=${globalSettings.value.subject_id}`, {
             method: 'POST',
             body: formData,
         })
@@ -229,14 +256,14 @@ const handleUploadMarkdown = async (isFile: boolean = false) => {
         if (isFile) {
             const formData = new FormData()
             formData.append('file', file.value!)
-            data = await $api<any>(`/upload/markdown?mode=${importMode.value}&method=${parseMethod.value}`, {
+            data = await $api<any>(`/upload/markdown?mode=${importMode.value}&method=${parseMethod.value}&subject_id=${globalSettings.value.subject_id}`, {
                 method: 'POST',
                 body: formData,
             })
         } else {
             data = await $api<any>('/upload/markdown-text', {
                 method: 'POST',
-                body: { content: markdownContent.value, mode: importMode.value, method: parseMethod.value },
+                body: { content: markdownContent.value, mode: importMode.value, method: parseMethod.value, subject_id: globalSettings.value.subject_id },
             })
         if (data.file_path) {
             uploadedFilePath.value = data.file_path
@@ -261,7 +288,7 @@ const handleUploadImage = async () => {
     formData.append('file', file.value)
 
     try {
-        const data = await $api<any>(`/upload/image-recognition?mode=${importMode.value}`, {
+        const data = await $api<any>(`/upload/image-recognition?mode=${importMode.value}&subject_id=${globalSettings.value.subject_id}`, {
             method: 'POST',
             body: formData,
         })
@@ -386,6 +413,27 @@ const reset = () => {
         <!-- Step 1: Upload -->
         <div v-if="step === 'upload'" class="w-full">
             <div class="space-y-6">
+                <Alert v-if="!embeddingConfigured" class="max-w-4xl mx-auto">
+                    <AlertCircle class="h-4 w-4" />
+                    <AlertDescription>
+                        未配置 Embedding 模型，导入时不会自动匹配知识点。可前往
+                        <NuxtLink to="/settings" class="underline font-medium">系统设置</NuxtLink>
+                        配置后再导入。
+                    </AlertDescription>
+                </Alert>
+                <Alert v-else-if="!kpVectorized" class="max-w-4xl mx-auto">
+                    <AlertCircle class="h-4 w-4" />
+                    <AlertDescription>
+                        <template v-if="isSuperuser">
+                            当前学科的知识点尚未建立向量索引，导入时不会自动匹配。可前往
+                            <NuxtLink to="/knowledge-points" class="underline font-medium">知识点管理</NuxtLink>
+                            重建索引。
+                        </template>
+                        <template v-else>
+                            当前学科的知识点尚未建立向量索引，导入时不会自动匹配，请联系管理员重建索引。
+                        </template>
+                    </AlertDescription>
+                </Alert>
                 <!-- Input Source Tabs -->
                 <Tabs defaultValue="file" class="w-full max-w-4xl mx-auto">
                     <TabsList class="grid w-full grid-cols-2">

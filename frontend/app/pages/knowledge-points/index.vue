@@ -290,7 +290,16 @@ onMounted(fetchVectorStatus)
           </div>
 
           <!-- Vector index status (superuser only, only when reindex needed) -->
-          <Alert v-if="isSuperuser && vectorStatus?.needs_reindex" class="mb-4">
+          <Alert v-if="isSuperuser && vectorStatus && !vectorStatus.embedding_configured" class="mb-4 items-center [&>svg]:translate-y-0">
+            <Database class="h-4 w-4" />
+            <AlertDescription class="flex items-center justify-between gap-2">
+              <span class="text-sm">{{ vectorStatus.reason }}，如果您需要在智能导入题目时自动匹配知识点，请先配置 Embedding 模型，否则可以忽略此提示。</span>
+              <Button size="sm" variant="outline" as-child>
+                <NuxtLink to="/settings">前往配置</NuxtLink>
+              </Button>
+            </AlertDescription>
+          </Alert>
+          <Alert v-else-if="isSuperuser && vectorStatus?.needs_reindex" class="mb-4 items-center [&>svg]:translate-y-0">
             <Database class="h-4 w-4" />
             <AlertDescription class="flex items-center justify-between gap-2">
               <span class="text-sm">{{ vectorStatus.reason }}，建议重建向量索引以启用语义检索。</span>

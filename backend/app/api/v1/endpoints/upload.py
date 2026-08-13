@@ -17,6 +17,7 @@ class MarkdownContentRequest(BaseModel):
     filename: str = None
     mode: str = "extract"
     method: str = "ai"
+    subject_id: int = None
 
 @router.post("/docx")
 async def upload_docx(
@@ -24,6 +25,7 @@ async def upload_docx(
     file: UploadFile = File(...),
     mode: str = "extract",
     method: str = "ai",
+    subject_id: int = None,
 ):
     """Upload and process a DOCX file."""
     if not file.filename.endswith('.docx'):
@@ -41,7 +43,7 @@ async def upload_docx(
     await asyncio.to_thread(file_path.write_bytes, content)
     
     try:
-        result = await doc_processor.process_docx(file_path, db=db, mode=mode, method=method)
+        result = await doc_processor.process_docx(file_path, db=db, mode=mode, method=method, subject_id=subject_id)
         result["file_path"] = str(file_path)
         return result
     except Exception as e:
@@ -53,6 +55,7 @@ async def upload_markdown(
     file: UploadFile = File(None),
     mode: str = "extract",
     method: str = "ai",
+    subject_id: int = None,
 ):
     """Process markdown content from file upload."""
     if not file:
@@ -75,7 +78,7 @@ async def upload_markdown(
     markdown_content = markdown_content_bytes.decode('utf-8')
     
     try:
-        result = await doc_processor.process_markdown(markdown_content, db=db, filename=file.filename, mode=mode, method=method)
+        result = await doc_processor.process_markdown(markdown_content, db=db, filename=file.filename, mode=mode, method=method, subject_id=subject_id)
         result["file_path"] = str(file_path)
         return result
     except Exception as e:
@@ -88,7 +91,7 @@ async def upload_markdown_text(
 ):
     """Process markdown content from text input."""
     try:
-        result = await doc_processor.process_markdown(request.content, db=db, filename=request.filename, mode=request.mode, method=request.method)
+        result = await doc_processor.process_markdown(request.content, db=db, filename=request.filename, mode=request.mode, method=request.method, subject_id=request.subject_id)
         return result
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -98,13 +101,14 @@ async def upload_image_recognition(
     db: deps.SessionDep,
     file: UploadFile = File(...),
     mode: str = "extract",
+    subject_id: int = None,
 ):
     """Upload and process an image file to extract questions using AI vision."""
     if not file.content_type.startswith('image/'):
         raise HTTPException(status_code=400, detail="Only image files are supported")
     
     try:
-        result = await doc_processor.process_image(file.file, db=db, mode=mode)
+        result = await doc_processor.process_image(file.file, db=db, mode=mode, subject_id=subject_id)
         return result
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

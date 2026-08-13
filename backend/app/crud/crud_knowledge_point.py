@@ -279,7 +279,7 @@ class CRUDKnowledgePoint(CRUDBase[KnowledgePoint, KnowledgePointCreate, Knowledg
                 },
             })
 
-        VectorStore.upsert_knowledge_points_batch(items)
+        VectorStore.upsert_knowledge_points_batch(items, raise_on_error=True)
         return len(items)
 
 knowledge_point = CRUDKnowledgePoint(KnowledgePoint)

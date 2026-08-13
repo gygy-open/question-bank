@@ -6,7 +6,7 @@ from app.crud.crud_question import question as crud_question
 from app.crud.crud_user import user as crud_user
 from app.schemas.question import Question, QuestionCreate
 from app.models.question import QuestionStatus
-from app.core.vector_store import VectorStore
+from app.services.kp_retriever import KnowledgePointRetriever
 from app.services.ai_provider import get_ai_provider
 from app.crud.crud_system_setting import system_setting
 from app.models.ai_config import AIModel, AIProvider
@@ -257,7 +257,7 @@ async def _resolve_tags(db: AsyncSession, tag_names: List[str]) -> List[int]:
     # For now, just return what we found.
     return tag_ids
 
-async def _enrich_question_with_knowledge_points(db: AsyncSession, question_data: Dict[str, Any]) -> Dict[str, Any]:
+async def _enrich_question_with_knowledge_points(db: AsyncSession, question_data: Dict[str, Any], subject_id: Optional[int] = None) -> Dict[str, Any]:
     """
     Helper to enrich question data with knowledge points from Vector Store using AI reranking.
     Similar logic to DocProcessor._call_ai_for_questions.
@@ -274,9 +274,9 @@ async def _enrich_question_with_knowledge_points(db: AsyncSession, question_data
             # Or better, just search by text in DB if we had a CRUD for KnowledgePoint by name
             # Here we use VectorStore search as a proxy
             try:
-                results = await asyncio.to_thread(
-                    VectorStore.search_similar,
+                results = await KnowledgePointRetriever.retrieve(
                     query=kp_text,
+                    subject_id=subject_id,
                     limit=1
                 )
                 if results and results.get('documents') and results['documents'][0]:
@@ -308,9 +308,9 @@ async def _enrich_question_with_knowledge_points(db: AsyncSession, question_data
         if question_data.get("thinking"):
             query_text += " " + question_data["thinking"]
         
-        results = await asyncio.to_thread(
-            VectorStore.search_similar,
+        results = await KnowledgePointRetriever.retrieve(
             query=query_text,
+            subject_id=subject_id,
             limit=5
         )
         
@@ -427,7 +427,7 @@ async def propose_question_draft(db: AsyncSession, args: Dict[str, Any]) -> str:
 
     try:
         # Enrich with knowledge points
-        args = await _enrich_question_with_knowledge_points(db, args)
+        args = await _enrich_question_with_knowledge_points(db, args, subject_id=subject_id)
         
         # Resolve tags
         tag_ids = []
@@ -485,7 +485,7 @@ async def propose_questions_batch(db: AsyncSession, args: Dict[str, Any]) -> str
     # Helper function for recursive creation
     async def create_recursive(q_data: Dict[str, Any], parent_id: Optional[int] = None) -> List[int]:
         # Enrich with knowledge points
-        q_data = await _enrich_question_with_knowledge_points(db, q_data)
+        q_data = await _enrich_question_with_knowledge_points(db, q_data, subject_id=subject_id)
         
         # Resolve tags
         tag_ids = []
@@ -551,8 +551,7 @@ async def search_knowledge_points(db: AsyncSession, args: Dict[str, Any]) -> str
         return "Please provide a query."
 
     try:
-        results = await asyncio.to_thread(
-            VectorStore.search_similar,
+        results = await KnowledgePointRetriever.retrieve(
             query=query,
             limit=limit
         )

@@ -3,7 +3,7 @@ import uuid
 import logging
 import asyncio
 from pathlib import Path
-from typing import BinaryIO
+from typing import BinaryIO, Optional
 import pypandoc
 from app.core.config import settings
 from app.crud.crud_system_setting import system_setting
@@ -13,7 +13,7 @@ from app.services.structured_parser import parse_structured
 from app.models.ai_config import AIModel, AIProvider
 from app.models.tag import Tag
 from app.models.tag_category import TagCategory
-from app.core.vector_store import VectorStore
+from app.services.kp_retriever import KnowledgePointRetriever
 from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 
@@ -45,7 +45,7 @@ class DocProcessor:
             
         return model.provider, model
 
-    async def _call_ai_for_questions(self, content: str, db: AsyncSession, image_data: bytes = None, filename: str = None, mode: str = "extract") -> list[dict]:
+    async def _call_ai_for_questions(self, content: str, db: AsyncSession, image_data: bytes = None, filename: str = None, mode: str = "extract", subject_id: Optional[int] = None) -> list[dict]:
         """
         Call AI Provider to extract questions from content or image.
         
@@ -145,10 +145,10 @@ class DocProcessor:
                         query_text = " ".join(q.knowledge_points)
                         logger.debug(f"Using AI-extracted knowledge points for vector search: {query_text}")
 
-                    # Use asyncio.to_thread to avoid blocking the event loop
-                    results = await asyncio.to_thread(
-                        VectorStore.search_similar,
+                    # Subject-scoped; returns None when no embedding model is configured.
+                    results = await KnowledgePointRetriever.retrieve(
                         query=query_text,
+                        subject_id=subject_id,
                         limit=5  # Increase limit to get more candidates for reranking
                     )
                     
@@ -284,7 +284,7 @@ class DocProcessor:
         
         return extracted_questions
 
-    async def process_markdown(self, content: str, db: AsyncSession, filename: str = None, task_id: str = None, mode: str = "extract", method: str = "ai") -> dict:
+    async def process_markdown(self, content: str, db: AsyncSession, filename: str = None, task_id: str = None, mode: str = "extract", method: str = "ai", subject_id: Optional[int] = None) -> dict:
         """
         Process markdown content directly and extract questions.
         
@@ -313,7 +313,7 @@ class DocProcessor:
         if method == "structured":
             extracted_questions = parse_structured(content)
         else:
-            extracted_questions = await self._call_ai_for_questions(content, db, filename=filename, mode=mode)
+            extracted_questions = await self._call_ai_for_questions(content, db, filename=filename, mode=mode, subject_id=subject_id)
         
         return {
             "task_id": task_id,
@@ -321,7 +321,7 @@ class DocProcessor:
             "questions": extracted_questions
         }
 
-    async def process_image(self, image_file: BinaryIO, db: AsyncSession, task_id: str = None, mode: str = "extract") -> dict:
+    async def process_image(self, image_file: BinaryIO, db: AsyncSession, task_id: str = None, mode: str = "extract", subject_id: Optional[int] = None) -> dict:
         """
         Process image file and extract questions using Gemini Vision.
         
@@ -354,7 +354,7 @@ class DocProcessor:
         await asyncio.to_thread(save_image)
         
         # Extract questions using AI Vision
-        extracted_questions = await self._call_ai_for_questions("", db, image_data=image_data, mode=mode)
+        extracted_questions = await self._call_ai_for_questions("", db, image_data=image_data, mode=mode, subject_id=subject_id)
         
         return {
             "task_id": task_id,
@@ -362,7 +362,7 @@ class DocProcessor:
             "questions": extracted_questions
         }
 
-    async def process_docx(self, file_path: Path, db: AsyncSession = None, task_id: str = None, mode: str = "extract", method: str = "ai") -> dict:
+    async def process_docx(self, file_path: Path, db: AsyncSession = None, task_id: str = None, mode: str = "extract", method: str = "ai", subject_id: Optional[int] = None) -> dict:
         """
         Convert docx to markdown, extract media, and parse questions using Gemini.
         """
@@ -423,7 +423,7 @@ class DocProcessor:
         if method == "structured":
             extracted_questions = parse_structured(content)
         else:
-            extracted_questions = await self._call_ai_for_questions(content, db, filename=file_path.name, mode=mode)
+            extracted_questions = await self._call_ai_for_questions(content, db, filename=file_path.name, mode=mode, subject_id=subject_id)
         
         return {
             "task_id": task_id,
