@@ -104,6 +104,19 @@ const handlePaste = async (e: ClipboardEvent) => {
     }
 }
 
+const handleAutoUpload = () => {
+    if (!file.value && !pastedImage.value) return;
+    
+    // Auto-detect based on file type or pasted image
+    if (pastedImage.value || (file.value && file.value.type.startsWith('image/'))) {
+        handleUploadImage();
+    } else if (file.value && file.value.name.endsWith('.md')) {
+        handleUploadMarkdown(true);
+    } else {
+        handleUploadDocx(); // Default to docx
+    }
+}
+
 const parseOptions = (rawOptions: string[] | null): { label: string, content: string }[] => {
     if (!rawOptions || rawOptions.length === 0) {
         return [
@@ -371,231 +384,212 @@ const reset = () => {
     <div class="flex flex-1 flex-col p-4 space-y-6">
         
         <!-- Step 1: Upload -->
-        <div v-if="step === 'upload'" class="max-w-4xl mx-auto w-full">
-            <Card>
-                <CardHeader>
-                    <CardTitle class="flex items-center gap-2">
-                        <Sparkles class="h-5 w-5" />
-                        选择识别方式
-                    </CardTitle>
-                    <CardDescription>
-                        支持多种方式导入题目，AI 将自动提取题目、选项、答案和解析。
-                    </CardDescription>
-                </CardHeader>
-                <CardContent>
-                    <div class="mb-6">
-                        <Label class="text-base font-medium mb-2 block">解析方法</Label>
-                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <div
-                                class="flex items-start space-x-3 border rounded-lg p-4 cursor-pointer transition-all hover:border-primary/50"
-                                :class="{ 'bg-accent/50 border-primary ring-1 ring-primary': parseMethod === 'ai' }"
-                                @click="parseMethod = 'ai'"
-                            >
-                                <div class="mt-1 h-4 w-4 rounded-full border border-primary flex items-center justify-center shrink-0">
-                                    <div v-if="parseMethod === 'ai'" class="h-2 w-2 rounded-full bg-primary" />
+        <div v-if="step === 'upload'" class="w-full">
+            <div class="space-y-6">
+                <!-- Input Source Tabs -->
+                <Tabs defaultValue="file" class="w-full max-w-4xl mx-auto">
+                    <TabsList class="grid w-full grid-cols-2">
+                        <TabsTrigger value="file" class="gap-2">
+                            <Upload class="h-4 w-4" />
+                            文件或图片
+                        </TabsTrigger>
+                        <TabsTrigger value="text" class="gap-2">
+                            <FileCode class="h-4 w-4" />
+                            纯文本粘贴
+                        </TabsTrigger>
+                    </TabsList>
+                    
+                    <!-- File Dropzone -->
+                    <TabsContent value="file" class="mt-4">
+                        <div
+                            @dragover.prevent
+                            @drop.prevent="handleFileChange"
+                            @paste="handlePaste"
+                            tabindex="0"
+                            class="relative group border-2 border-dashed rounded-xl p-12 text-center transition-all hover:border-primary focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 flex flex-col items-center justify-center min-h-[320px] bg-muted/20"
+                            :class="[pastedImage ? 'border-primary bg-primary/5' : 'border-muted-foreground/30 hover:bg-muted/50']"
+                        >
+                            <input
+                                type="file"
+                                id="mega-file-upload"
+                                class="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
+                                accept=".docx,.md,image/*"
+                                @change="handleFileChange"
+                                :disabled="isUploading"
+                                title="点击上传文件"
+                            />
+                            
+                            <!-- Initial State -->
+                            <div v-if="!file && !pastedImage" class="space-y-6 pointer-events-none relative z-0">
+                                <div class="bg-background w-20 h-20 rounded-full flex items-center justify-center mx-auto shadow-sm border">
+                                    <Upload class="h-10 w-10 text-muted-foreground group-hover:text-primary transition-colors" />
                                 </div>
-                                <div>
-                                    <div class="font-medium flex items-center gap-2">
-                                        AI 智能抽取
-                                        <Sparkles class="h-3 w-3 text-amber-500" />
-                                    </div>
-                                    <div class="text-sm text-muted-foreground mt-1">由 AI 自动识别题目结构，适用于格式不固定的文档与图片。</div>
-                                </div>
-                            </div>
-                            <div
-                                class="flex items-start space-x-3 border rounded-lg p-4 cursor-pointer transition-all hover:border-primary/50"
-                                :class="{ 'bg-accent/50 border-primary ring-1 ring-primary': parseMethod === 'structured' }"
-                                @click="parseMethod = 'structured'"
-                            >
-                                <div class="mt-1 h-4 w-4 rounded-full border border-primary flex items-center justify-center shrink-0">
-                                    <div v-if="parseMethod === 'structured'" class="h-2 w-2 rounded-full bg-primary" />
-                                </div>
-                                <div>
-                                    <div class="font-medium">标签精准解析</div>
-                                    <div class="text-sm text-muted-foreground mt-1">按【题目】【选项】【答案】等标签精准解析，无需 AI、即时且可控。</div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div v-if="parseMethod === 'ai'" class="mb-6">
-                        <Label class="text-base font-medium mb-2 block">处理模式</Label>
-                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <div 
-                                class="flex items-start space-x-3 border rounded-lg p-4 cursor-pointer transition-all hover:border-primary/50"
-                                :class="{ 'bg-accent/50 border-primary ring-1 ring-primary': importMode === 'extract' }"
-                                @click="importMode = 'extract'"
-                            >
-                                <div class="mt-1 h-4 w-4 rounded-full border border-primary flex items-center justify-center shrink-0">
-                                    <div v-if="importMode === 'extract'" class="h-2 w-2 rounded-full bg-primary" />
-                                </div>
-                                <div>
-                                    <div class="font-medium">录入原题</div>
-                                    <div class="text-sm text-muted-foreground mt-1">提取文档中的题目、答案和解析，保持原样。适用于已有标准答案的题。</div>
-                                </div>
-                            </div>
-                            <div 
-                                class="flex items-start space-x-3 border rounded-lg p-4 cursor-pointer transition-all hover:border-primary/50"
-                                :class="{ 'bg-accent/50 border-primary ring-1 ring-primary': importMode === 'solve' }"
-                                @click="importMode = 'solve'"
-                            >
-                                <div class="mt-1 h-4 w-4 rounded-full border border-primary flex items-center justify-center shrink-0">
-                                    <div v-if="importMode === 'solve'" class="h-2 w-2 rounded-full bg-primary" />
-                                </div>
-                                <div>
-                                    <div class="font-medium flex items-center gap-2">
-                                        AI 自动做题
-                                        <Sparkles class="h-3 w-3 text-amber-500" />
-                                    </div>
-                                    <div class="text-sm text-muted-foreground mt-1">AI 提取题目并做题并生成标准答案和解析，适用于无答案的教材题。</div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div v-if="parseMethod === 'structured'" class="mb-6 rounded-md bg-muted/50 border p-4 text-sm text-muted-foreground">
-                        使用 <code class="text-foreground">【题目】</code> 分隔每道题，可选 <code class="text-foreground">【选项】【答案】【解析】【题型】【难度】</code> 等标签；除 <code class="text-foreground">【题目】</code> 外均可省略，题型可自动推断。
-                    </div>
-
-                    <Tabs v-model="activeTab" class="w-full">
-                        <TabsList class="grid w-full" :class="parseMethod === 'ai' ? 'grid-cols-3' : 'grid-cols-2'">
-                            <TabsTrigger value="docx" class="gap-2">
-                                <FileText class="h-4 w-4" />
-                                Word 文档
-                            </TabsTrigger>
-                            <TabsTrigger value="markdown" class="gap-2">
-                                <FileCode class="h-4 w-4" />
-                                Markdown
-                            </TabsTrigger>
-                            <TabsTrigger v-if="parseMethod === 'ai'" value="image" class="gap-2">
-                                <ImageIcon class="h-4 w-4" />
-                                图片识别
-                            </TabsTrigger>
-                        </TabsList>
-                        
-                        <!-- DOCX Tab -->
-                        <TabsContent value="docx" class="space-y-4 mt-4">
-                            <div class="space-y-2">
-                                <Label for="docx-file">选择 Word 文档</Label>
-                                <div class="flex gap-2">
-                                    <Input id="docx-file" type="file" accept=".docx" @change="handleFileChange" />
-                                    <Button @click="handleUploadDocx" :disabled="!file || isUploading">
-                                        <Loader2 v-if="isUploading" class="mr-2 h-4 w-4 animate-spin" />
-                                        <Upload v-else class="mr-2 h-4 w-4" />
-                                        开始识别
-                                    </Button>
-                                </div>
-                                <p class="text-sm text-muted-foreground">
-                                    支持 .docx 格式，会自动提取文档中的图片和数学公式。
-                                </p>
-                            </div>
-                        </TabsContent>
-
-                        <!-- Markdown Tab -->
-                        <TabsContent value="markdown" class="space-y-4 mt-4">
-                            <div class="space-y-4">
-                                <!-- File Upload -->
                                 <div class="space-y-2">
-                                    <Label for="md-file">方式一：上传 Markdown 文件</Label>
-                                    <div class="flex gap-2">
-                                        <Input id="md-file" type="file" accept=".md" @change="handleFileChange" />
-                                        <Button @click="() => handleUploadMarkdown(true)" :disabled="!file || isUploading">
-                                            <Loader2 v-if="isUploading" class="mr-2 h-4 w-4 animate-spin" />
-                                            <Upload v-else class="mr-2 h-4 w-4" />
-                                            识别
+                                    <h3 class="text-xl font-medium">点击此处 或 拖拽文件到这里上传</h3>
+                                    <p class="text-sm text-muted-foreground">同时支持 Ctrl/Cmd + V 直接粘贴屏幕截图</p>
+                                </div>
+                                <div class="flex items-center justify-center gap-4 text-xs text-muted-foreground mt-4">
+                                    <span class="flex items-center gap-1"><FileText class="h-3 w-3"/> Word (.docx)</span>
+                                    <span class="flex items-center gap-1"><FileCode class="h-3 w-3"/> Markdown (.md)</span>
+                                    <span class="flex items-center gap-1"><ImageIcon class="h-3 w-3"/> 图片提取</span>
+                                </div>
+                            </div>
+                            
+                            <!-- File Selected State -->
+                            <div v-else class="space-y-6 relative z-20 w-full max-w-md">
+                                <div class="p-6 bg-background rounded-lg shadow-sm border flex flex-col items-center gap-4">
+                                    <template v-if="pastedImage">
+                                        <img :src="pastedImage" alt="Pasted image" class="max-h-48 rounded border shadow-sm object-contain" />
+                                        <div class="text-sm font-medium text-center truncate w-full">已粘贴图片</div>
+                                    </template>
+                                    <template v-else-if="file">
+                                         <div class="h-16 w-16 bg-primary/10 rounded-full flex items-center justify-center">
+                                            <ImageIcon v-if="file.type.startsWith('image/')" class="h-8 w-8 text-primary" />
+                                            <FileText v-else-if="file.name.endsWith('.docx')" class="h-8 w-8 text-primary" />
+                                            <FileCode v-else class="h-8 w-8 text-primary" />
+                                         </div>
+                                         <div class="text-sm font-medium text-center truncate w-full px-4" :title="file.name">
+                                             {{ file.name }}
+                                         </div>
+                                         <div class="text-xs text-muted-foreground">
+                                             {{ (file.size / 1024 / 1024).toFixed(2) }} MB
+                                         </div>
+                                    </template>
+                                    
+                                    <div class="mt-2 w-full">
+                                        <Button variant="outline" class="w-full" @click.stop="reset" :disabled="isUploading">
+                                            <Trash2 class="h-4 w-4 mr-2" />
+                                            删除并重新选择
                                         </Button>
                                     </div>
                                 </div>
+                            </div>
+                        </div>
+                    </TabsContent>
+                    
+                    <!-- Text Textarea -->
+                    <TabsContent value="text" class="mt-4">
+                        <div class="border rounded-xl bg-background p-4 min-h-[320px] flex flex-col shadow-sm">
+                            <TiptapEditor 
+                                v-model="markdownContent" 
+                                placeholder="将含有题目的文档内容或纯文本直接粘贴到此处..."
+                                min-height="min-h-[250px]"
+                            />
+                        </div>
+                    </TabsContent>
+                </Tabs>
 
-                                <div class="relative">
-                                    <div class="absolute inset-0 flex items-center">
-                                        <span class="w-full border-t" />
+                <!-- Parsing Settings & Submit -->
+                <div class="space-y-6 bg-accent/20 rounded-xl p-6 border max-w-4xl mx-auto w-full">
+                    <div>
+                        <h3 class="text-lg font-medium mb-4">个性化解析设置</h3>
+                        
+                        <!-- Primary Parsing Methods -->
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div
+                                class="flex items-start space-x-3 border-2 rounded-lg p-4 cursor-pointer transition-all hover:bg-accent/50 bg-background"
+                                :class="parseMethod === 'ai' ? 'border-primary ring-1 ring-primary shadow-sm' : 'border-muted'"
+                                @click="parseMethod = 'ai'"
+                            >
+                                <div class="mt-0.5"><CheckCircle2 v-if="parseMethod === 'ai'" class="h-5 w-5 text-primary" /><div v-else class="h-5 w-5 rounded-full border opacity-50"/></div>
+                                <div>
+                                    <div class="text-base font-medium flex items-center gap-2">
+                                        ✨ 强力 AI 识别
                                     </div>
-                                    <div class="relative flex justify-center text-xs uppercase">
-                                        <span class="bg-background px-2 text-muted-foreground">或</span>
-                                    </div>
-                                </div>
-
-                                <!-- Direct Input -->
-                                <div class="space-y-2">
-                                    <Label for="md-content">方式二：直接输入 Markdown 内容</Label>
-                                    <TiptapEditor 
-                                        v-model="markdownContent" 
-                                        placeholder="粘贴或输入 Markdown 格式的题目内容..."
-                                        min-height="min-h-[300px]"
-                                    />
-                                    <Button @click="() => handleUploadMarkdown(false)" :disabled="!markdownContent.trim() || isUploading" class="w-full">
-                                        <Loader2 v-if="isUploading" class="mr-2 h-4 w-4 animate-spin" />
-                                        <Sparkles v-else class="mr-2 h-4 w-4" />
-                                        开始识别
-                                    </Button>
+                                    <div class="text-sm text-muted-foreground mt-1">自动识别各种排版或截图题目，无需格式。</div>
                                 </div>
                             </div>
-                        </TabsContent>
-
-                        <!-- Image Tab -->
-                        <TabsContent value="image" class="space-y-4 mt-4">
-                            <div class="space-y-4">
-                                <!-- File Upload -->
-                                <div class="space-y-2">
-                                    <Label for="image-file">方式一：选择图片文件</Label>
-                                    <div class="flex gap-2">
-                                        <Input id="image-file" type="file" accept="image/*" @change="handleFileChange" />
-                                    </div>
+                            
+                            <div
+                                class="flex items-start space-x-3 border-2 rounded-lg p-4 cursor-pointer transition-all hover:bg-accent/50 bg-background"
+                                :class="parseMethod === 'structured' ? 'border-primary ring-1 ring-primary shadow-sm' : 'border-muted'"
+                                @click="parseMethod = 'structured'"
+                            >
+                                <div class="mt-0.5"><CheckCircle2 v-if="parseMethod === 'structured'" class="h-5 w-5 text-primary" /><div v-else class="h-5 w-5 rounded-full border opacity-50"/></div>
+                                <div>
+                                    <div class="text-base font-medium">📝 严格模板解析</div>
+                                    <div class="text-sm text-muted-foreground mt-1">适用于已按【题目】【答案】等标签排版好的题库。</div>
                                 </div>
-
-                                <div class="relative">
-                                    <div class="absolute inset-0 flex items-center">
-                                        <span class="w-full border-t" />
-                                    </div>
-                                    <div class="relative flex justify-center text-xs uppercase">
-                                        <span class="bg-background px-2 text-muted-foreground">或</span>
-                                    </div>
-                                </div>
-
-                                <!-- Paste Area -->
-                                <div class="space-y-2">
-                                    <Label>方式二：粘贴图片 (Ctrl/Cmd + V)</Label>
-                                    <div
-                                        @paste="handlePaste"
-                                        tabindex="0"
-                                        class="border-2 border-dashed rounded-lg p-8 text-center cursor-pointer hover:border-primary transition-colors focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2"
-                                        :class="pastedImage ? 'border-primary bg-primary/5' : 'border-muted-foreground/25'"
-                                    >
-                                        <div v-if="!pastedImage" class="space-y-2">
-                                            <ImageIcon class="h-12 w-12 mx-auto text-muted-foreground" />
-                                            <p class="text-sm text-muted-foreground">点击此处并按 Ctrl/Cmd + V 粘贴图片</p>
-                                        </div>
-                                        <div v-else class="space-y-2">
-                                            <img :src="pastedImage" alt="Pasted image" class="max-h-64 mx-auto rounded" />
-                                            <p class="text-sm text-muted-foreground">已粘贴图片</p>
-                                        </div>
-                                    </div>
-                                </div>
-
-                                <Button @click="handleUploadImage" :disabled="!file || isUploading" class="w-full">
-                                    <Loader2 v-if="isUploading" class="mr-2 h-4 w-4 animate-spin" />
-                                    <Upload v-else class="mr-2 h-4 w-4" />
-                                    开始识别
-                                </Button>
-
-                                <p class="text-sm text-muted-foreground">
-                                    支持 JPG、PNG 等图片格式，使用 AI 视觉模型识别图片中的题目。
-                                </p>
                             </div>
-                        </TabsContent>
-                    </Tabs>
-
-                    <div v-if="error"
-                        class="mt-4 p-4 rounded-md bg-destructive/15 text-destructive flex items-center gap-2">
-                        <AlertCircle class="h-4 w-4" />
-                        <span>{{ error }}</span>
+                        </div>
                     </div>
-                </CardContent>
-            </Card>
+
+                    <!-- Dynamic Sub-settings based on parse method -->
+                    <div class="pl-4 border-l-2 border-primary/20 space-y-4 pt-2">
+                        <!-- AI Sub-settings -->
+                        <template v-if="parseMethod === 'ai'">
+                            <Label class="text-sm font-medium text-foreground">选择 AI 处理模式</Label>
+                            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                <div 
+                                    class="flex items-center space-x-3 border rounded-lg p-3 cursor-pointer hover:bg-accent/50 bg-background transition-all"
+                                    :class="importMode === 'extract' ? 'border-primary bg-primary/5' : ''"
+                                    @click="importMode = 'extract'"
+                                >
+                                    <div class="h-4 w-4 rounded-full border flex items-center justify-center" :class="importMode === 'extract' ? 'border-primary' : 'border-muted-foreground'">
+                                        <div v-if="importMode === 'extract'" class="h-2 w-2 rounded-full bg-primary" />
+                                    </div>
+                                    <div>
+                                        <div class="text-sm font-medium">📥 仅提取/原样录入</div>
+                                        <div class="text-xs text-muted-foreground">提取原文件内的题目和答案。</div>
+                                    </div>
+                                </div>
+                                <div 
+                                    class="flex items-center space-x-3 border rounded-lg p-3 cursor-pointer hover:bg-accent/50 bg-background transition-all"
+                                    :class="importMode === 'solve' ? 'border-primary bg-primary/5' : ''"
+                                    @click="importMode = 'solve'"
+                                >
+                                    <div class="h-4 w-4 rounded-full border flex items-center justify-center" :class="importMode === 'solve' ? 'border-primary' : 'border-muted-foreground'">
+                                        <div v-if="importMode === 'solve'" class="h-2 w-2 rounded-full bg-primary" />
+                                    </div>
+                                    <div>
+                                        <div class="text-sm font-medium">🤖 让 AI 帮我解答</div>
+                                        <div class="text-xs text-muted-foreground">AI 会自动为您补全标准答案和解析。</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </template>
+                        
+                        <!-- Structured Sub-settings -->
+                        <template v-if="parseMethod === 'structured'">
+                            <div class="rounded-md bg-background border p-4 text-sm text-muted-foreground flex items-start gap-2">
+                                <AlertCircle class="h-4 w-4 text-amber-500 shrink-0 mt-0.5" />
+                                <div>
+                                    <p class="font-medium text-foreground mb-1">模板说明</p>
+                                    <p>必须使用 <code class="text-foreground bg-muted px-1.5 py-0.5 rounded text-xs border">【题目】</code> 作为每道题的开头。</p>
+                                    <p class="mt-1">非必填标签： <code class="text-foreground bg-muted px-1.5 py-0.5 rounded text-xs border">【选项】</code> <code class="text-foreground bg-muted px-1.5 py-0.5 rounded text-xs border">【答案】</code> <code class="text-foreground bg-muted px-1.5 py-0.5 rounded text-xs border">【解析】</code></p>
+                                </div>
+                            </div>
+                        </template>
+                    </div>
+
+                    <!-- Final Action -->
+                    <div class="pt-4 mt-4 border-t">
+                        <Button 
+                            class="w-full text-lg h-14 shadow-lg transition-all" 
+                            :class="parseMethod === 'ai' ? 'bg-primary' : 'bg-slate-800 hover:bg-slate-900 dark:bg-slate-700'" 
+                            @click="handleAutoUpload" 
+                            :disabled="(!file && !pastedImage && !markdownContent.trim()) || isUploading"
+                        >
+                            <Loader2 v-if="isUploading" class="mr-2 h-6 w-6 animate-spin" />
+                            <Sparkles v-else-if="parseMethod === 'ai'" class="mr-2 h-6 w-6" />
+                            <FileCode v-else class="mr-2 h-6 w-6" />
+                            {{ isUploading ? '正在拼命识别中...' : (parseMethod === 'ai' ? '开始智能识别' : '开始模板解析') }}
+                        </Button>
+                        <p v-if="(!file && !pastedImage && !markdownContent.trim())" class="text-center text-sm text-destructive mt-3">
+                            请在上方提供文件或纯文本内容
+                        </p>
+                    </div>
+                    
+                    <!-- Error Box -->
+                    <div v-if="error" class="mt-4 p-4 rounded-md bg-destructive/15 text-destructive border border-destructive/20 flex items-center gap-2 text-sm shadow-sm transition-all animate-in fade-in slide-in-from-bottom-2">
+                        <AlertCircle class="h-4 w-4 shrink-0" />
+                        <span class="break-all">{{ error }}</span>
+                    </div>
+                </div>
+            </div>
         </div>
 
-        <!-- Step 2: Review -->
+        <!-- Step 2: Review (unchanged) -->
         <div v-if="step === 'review'" class="space-y-6">
             <!-- Global Settings -->
             <Card class="sticky top-4 z-10 shadow-md border-primary/20">
