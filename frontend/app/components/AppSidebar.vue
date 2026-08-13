@@ -26,7 +26,7 @@ import UserProfileDialog from '~/components/UserProfileDialog.vue'
 import ChangePasswordDialog from '~/components/ChangePasswordDialog.vue'
 import AboutDialog from '~/components/AboutDialog.vue'
 import { useColorMode } from '@vueuse/core'
-import { BookOpen, ChevronsUpDown, CirclePlus, ListTree, LogOut, Settings, Sparkles, User, Users, Tags, Library, HelpCircle, MessageSquare, KeyRound, Activity, Layers, ClipboardList, Info, Moon, Sun } from '@lucide/vue'
+import { BookOpen, ChevronsUpDown, ListTree, LogOut, Settings, Sparkles, User, Users, Tags, Library, HelpCircle, KeyRound, Activity, Layers, ClipboardList, Info, Moon, Sun, Bot } from '@lucide/vue'
 
 const props = withDefaults(defineProps<SidebarProps>(), {
   collapsible: "icon",
@@ -35,6 +35,7 @@ const props = withDefaults(defineProps<SidebarProps>(), {
 const route = useRoute()
 const { user, logout } = useAuth()
 const router = useRouter()
+const chat = useGlobalChat()
 const isProfileOpen = ref(false)
 const isChangePasswordOpen = ref(false)
 const isAboutOpen = ref(false)
@@ -73,12 +74,20 @@ const navActiveClass = 'border-l-2 border-transparent data-[active=true]:border-
         <SidebarGroupContent class="flex flex-col gap-2">
           <SidebarMenu>
             <SidebarMenuItem>
-              <SidebarMenuButton :is-active="route.query.create === 'true'" as-child tooltip="新增题目"
-                class="border border-primary text-primary hover:bg-primary hover:text-primary-foreground active:bg-primary/90 active:text-primary-foreground min-w-8 duration-200 ease-linear">
-                <NuxtLink to="/questions?create=true">
-                  <CirclePlus />
-                  <span>新增题目</span>
-                </NuxtLink>
+              <SidebarMenuButton
+                :is-active="chat.isOpen.value && !chat.isMinimized.value"
+                :aria-pressed="chat.isOpen.value"
+                tooltip="AI 助手"
+                class="relative min-w-8 border border-primary text-primary duration-200 ease-linear hover:bg-primary hover:text-primary-foreground data-[active=true]:bg-primary data-[active=true]:text-primary-foreground"
+                @click="chat.toggle()"
+              >
+                <Bot />
+                <span>AI 助手</span>
+                <span
+                  v-if="chat.hasUnread.value && !(chat.isOpen.value && !chat.isMinimized.value)"
+                  class="absolute right-2 top-1.5 h-2 w-2 rounded-full bg-destructive"
+                  :class="chat.loading.value ? 'animate-pulse' : ''"
+                />
               </SidebarMenuButton>
             </SidebarMenuItem>
           </SidebarMenu>
@@ -103,14 +112,6 @@ const navActiveClass = 'border-l-2 border-transparent data-[active=true]:border-
                   <NuxtLink to="/papers">
                     <ClipboardList />
                     <span>我的试卷</span>
-                  </NuxtLink>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-              <SidebarMenuItem>
-                <SidebarMenuButton as-child :is-active="route.path === '/chat'" :class="navActiveClass">
-                  <NuxtLink to="/chat">
-                    <MessageSquare />
-                    <span>AI 助手</span>
                   </NuxtLink>
                 </SidebarMenuButton>
               </SidebarMenuItem>
