@@ -2,7 +2,10 @@
 
 ## 预览
 
-![](./docs/public/example-imports.png)
+<p align="center">
+  <img src="./docs/public/examples/questions.png" alt="题库管理" width="49%" />
+  <img src="./docs/public/examples/smart-import_dark.png" alt="智能导入" width="49%" />
+</p>
 
 
 ## 文档与反馈

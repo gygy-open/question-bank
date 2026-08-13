@@ -13,7 +13,7 @@
 
 ## 界面总览
 
-![](../public/example-imports.png)
+![](../public/examples/questions.png)
 
 ## 版本形态
 

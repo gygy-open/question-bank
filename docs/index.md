@@ -6,7 +6,7 @@ hero:
   text: AI 原生的题库系统
   tagline: 智能导入、多题型、多供应商 AI、知识点 RAG 与审核工作流
   image:
-    src: /example-imports.png
+    src: /examples/questions.png
     alt: Question Bank
   actions:
     - theme: brand
