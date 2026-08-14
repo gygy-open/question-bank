@@ -82,7 +82,7 @@ async def seed_knowledge_points(db: AsyncSession):
     result = await db.execute(select(Subject).filter(Subject.slug == "math"))
     subject = result.scalars().first()
     if not subject:
-        logger.error("Subject 'math' not found. Please run initial_data.py first.")
+        logger.error("Subject 'math' not found. Please create it first (via onboarding or the subjects page).")
         return
 
     logger.info(f"Seeding knowledge points into subject: {subject.name}")

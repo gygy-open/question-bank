@@ -7,15 +7,17 @@ from app.schemas.chat import ChatRequest, ChatSession, ChatSessionCreate, ChatSe
 from app.models.chat import ChatSession as ChatSessionModel, ChatMessage as ChatMessageModel
 from app.models.ai_config import AIModel
 from app.crud.crud_chat import chat_session, chat_message
-from app.crud.crud_system_setting import system_setting
 from app.services.ai_provider import get_ai_provider, ToolCall
 from app.services.tools import TOOLS_SCHEMA, TOOL_MAP
+from app.services.prompt_utils import render_subject_prompt
+from app.services.prompts import CHAT_SYSTEM_PROMPT
+from app.models.subject import Subject
 from fastapi.responses import StreamingResponse
 import json
 import logging
 import base64
 import aiofiles
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
 
 from app.models.user import User
 
@@ -92,7 +94,7 @@ async def generate_session_title(session_id: str, messages: List[Dict], db: Asyn
     except Exception as e:
         logger.error(f"Error generating title for session {session_id}: {e}")
 
-async def chat_generator(session_id: str, new_user_message: ChatMessageCreate, model_id: int, db: AsyncSession, current_user: User, background_tasks: BackgroundTasks):
+async def chat_generator(session_id: str, new_user_message: ChatMessageCreate, model_id: int, db: AsyncSession, current_user: User, background_tasks: BackgroundTasks, subject_id: Optional[int] = None):
     # 1. Save user message
     user_msg_data = new_user_message.model_dump()
     user_msg_data["session_id"] = session_id
@@ -109,16 +111,17 @@ async def chat_generator(session_id: str, new_user_message: ChatMessageCreate, m
     # 3. Prepare messages for AI
     ai_messages = []
     
-    # Inject System Prompt to control tool usage
-    sys_prompt_setting = await system_setting.get_by_key(db, "CHAT_SYSTEM_PROMPT")
-    default_sys_prompt = """You are a helpful assistant for a Question Bank system.
-Tools Usage Policy:
-- You have access to tools like `search_questions`, `create_question_draft`, and `create_questions_batch`.
-- ONLY use these tools when the user EXPLICITLY requests an action (e.g., "search for...", "save to database", "import these").
-- Do NOT use tools if the user is just asking for information, explanations, or generating content for review without asking to save it.
-- If the user asks to "generate a question", just generate the text. Only call `create_question_draft` if they add "and save it" or "add to bank".
-"""
-    system_prompt = sys_prompt_setting.value if sys_prompt_setting and sys_prompt_setting.value else default_sys_prompt
+    # Inject System Prompt to control tool usage.
+    # 工具调用策略与已注册工具强耦合，硬编码随代码演进，不做成用户可编辑配置。
+    system_prompt = CHAT_SYSTEM_PROMPT
+
+    # Resolve subject placeholders so one generic template fits any subject
+    subject = None
+    if subject_id:
+        subj_res = await db.execute(select(Subject).where(Subject.id == subject_id))
+        subject = subj_res.scalar_one_or_none()
+    system_prompt = render_subject_prompt(system_prompt, subject)
+
     ai_messages.append({"role": "system", "content": system_prompt})
 
     for msg in history:
@@ -416,7 +419,7 @@ async def create_message(
         raise HTTPException(status_code=403, detail="Not authorized")
 
     return StreamingResponse(
-        chat_generator(session_id, request.message, request.model_id, db, current_user, background_tasks),
+        chat_generator(session_id, request.message, request.model_id, db, current_user, background_tasks, request.subject_id),
         media_type="text/event-stream"
     )
 

@@ -1,143 +1,222 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, reactive, watch, onMounted } from 'vue'
 import { toast } from 'vue-sonner'
-import { Save, MessageSquareText, FileText, BrainCircuit, MessageCircle, Wrench } from '@lucide/vue'
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from '@/components/ui/card'
+import { Save, MessageSquareText, FileText, BrainCircuit, Wrench, RotateCcw, ClipboardCopy } from '@lucide/vue'
 import { Textarea } from '@/components/ui/textarea'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
+import type { Subject } from '~/types'
 
 const { $api } = useNuxtApp()
 
-interface SystemSetting {
+interface SubjectPrompt {
   key: string
-  value: string
+  title: string
   description: string
+  default: string
+  value: string | null
+  is_custom: boolean
 }
 
-// Map technical prompt keys to user-friendly titles and icons
-const promptMetaMap: Record<string, { title: string, icon: any, desc: string }> = {
-  'AI_EXTRACT_PROMPT': {
-    title: '文档题目提取助手',
-    icon: FileText,
-    desc: '控制 AI 从上传的 Word 或图片中识别并拆分题干与选项的行为准则。'
-  },
-  'AI_SOLVE_PROMPT': {
-    title: '解题推理分析助手',
-    icon: BrainCircuit,
-    desc: '定义 AI 在生成题目解析和答案时，应该遵循的数学逻辑和排版格式。'
-  },
-  'CHAT_SYSTEM_PROMPT': {
-    title: '全局聊天设定',
-    icon: MessageCircle,
-    desc: '系统 AI 助手的默认角色设定和基础性格，控制日常对话风格。'
+// 图标按 key 映射；标题/描述由后端返回
+const iconMap: Record<string, any> = {
+  AI_EXTRACT_PROMPT: FileText,
+  AI_SOLVE_PROMPT: BrainCircuit,
+}
+
+const subjects = ref<Subject[]>([])
+const selectedSubjectId = ref<string>('')
+const prompts = ref<SubjectPrompt[]>([])
+const drafts = reactive<Record<string, string>>({})
+const loading = ref(false)
+const saving = reactive<Record<string, boolean>>({})
+
+const fetchSubjects = async () => {
+  try {
+    subjects.value = await $api<Subject[]>('/subjects')
+    if (subjects.value.length && !selectedSubjectId.value) {
+      selectedSubjectId.value = String(subjects.value[0].id)
+    }
+  } catch (error) {
+    toast.error('获取科目失败', { description: (error as any).message })
   }
 }
 
-const promptSettings = ref<SystemSetting[]>([])
-const loading = ref(false)
-
 const fetchPrompts = async () => {
+  if (!selectedSubjectId.value) {
+    prompts.value = []
+    return
+  }
   loading.value = true
   try {
-    const data = await $api<SystemSetting[]>('/settings')
-    // Filter only AI settings that are prompts, ignore model IDs
-    promptSettings.value = data.filter(s => s.key.endsWith('_PROMPT'))
+    const data = await $api<SubjectPrompt[]>(`/subjects/${selectedSubjectId.value}/prompts`)
+    prompts.value = data
+    for (const p of data) drafts[p.key] = p.value ?? ''
   } catch (error) {
-    toast.error('获取提示词失败', {
-      description: (error as any).message,
-    })
+    toast.error('获取提示词失败', { description: (error as any).message })
   } finally {
     loading.value = false
   }
 }
 
-const updateSetting = async (setting: SystemSetting) => {
+const fillWithDefault = (p: SubjectPrompt) => {
+  drafts[p.key] = p.default
+}
+
+const save = async (p: SubjectPrompt) => {
+  const value = (drafts[p.key] ?? '').trim()
+  if (!value) {
+    toast.error('内容为空', { description: '如需恢复默认，请使用"重置为默认"。' })
+    return
+  }
+  saving[p.key] = true
   try {
-    await $api(`/settings/${setting.key}`, {
+    await $api(`/subjects/${selectedSubjectId.value}/prompts/${p.key}`, {
       method: 'PUT',
-      body: {
-        value: setting.value,
-        description: setting.description,
-      }
+      body: { value: drafts[p.key] },
     })
-    toast.success('保存成功', {
-      description: `提示词 ${setting.key} 已更新`,
-    })
+    toast.success('已保存', { description: `${p.title} 已应用于当前科目` })
+    await fetchPrompts()
   } catch (error) {
-    toast.error('保存失败', {
-      description: (error as any).message,
-    })
+    toast.error('保存失败', { description: (error as any).message })
+  } finally {
+    saving[p.key] = false
   }
 }
 
-onMounted(() => {
-  fetchPrompts()
+const reset = async (p: SubjectPrompt) => {
+  saving[p.key] = true
+  try {
+    await $api(`/subjects/${selectedSubjectId.value}/prompts/${p.key}`, { method: 'DELETE' })
+    toast.success('已重置为默认', { description: `${p.title} 恢复使用系统默认` })
+    await fetchPrompts()
+  } catch (error) {
+    toast.error('重置失败', { description: (error as any).message })
+  } finally {
+    saving[p.key] = false
+  }
+}
+
+watch(selectedSubjectId, fetchPrompts)
+
+onMounted(async () => {
+  await fetchSubjects()
+  await fetchPrompts()
 })
 </script>
 
+
 <template>
   <div class="space-y-6">
+    <!-- 科目选择 -->
+    <div class="flex items-center gap-3 max-w-4xl">
+      <span class="text-sm font-medium shrink-0">配置科目</span>
+      <Select v-model="selectedSubjectId">
+        <SelectTrigger class="w-64">
+          <SelectValue placeholder="选择科目" />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem v-for="s in subjects" :key="s.id" :value="String(s.id)">
+            {{ s.name }}
+          </SelectItem>
+        </SelectContent>
+      </Select>
+      <p class="text-xs text-muted-foreground">
+        提示词按科目独立配置；未定制的科目自动使用系统默认。
+      </p>
+    </div>
+
     <div v-if="loading" class="flex justify-center py-8">
       <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
     </div>
 
     <div v-else class="max-w-4xl">
       <Accordion type="single" collapsible class="w-full space-y-4">
-        <AccordionItem 
-          v-for="setting in promptSettings" 
-          :key="setting.key" 
-          :value="setting.key"
+        <AccordionItem
+          v-for="p in prompts"
+          :key="p.key"
+          :value="p.key"
           class="border rounded-xl bg-card px-4"
         >
           <AccordionTrigger class="hover:no-underline py-4">
             <div class="flex items-center gap-4 text-left">
               <div class="p-2.5 bg-primary/10 rounded-lg text-primary shrink-0">
-                <component :is="promptMetaMap[setting.key]?.icon || Wrench" class="w-5 h-5" />
+                <component :is="iconMap[p.key] || Wrench" class="w-5 h-5" />
               </div>
               <div>
                 <div class="flex items-center gap-2">
-                  <h3 class="font-semibold text-base">{{ promptMetaMap[setting.key]?.title || '未知功能提示词' }}</h3>
-                  <Badge variant="outline" class="text-[10px] font-mono py-0 h-4">{{ setting.key }}</Badge>
+                  <h3 class="font-semibold text-base">{{ p.title }}</h3>
+                  <Badge variant="outline" class="text-[10px] font-mono py-0 h-4">{{ p.key }}</Badge>
+                  <Badge
+                    :variant="p.is_custom ? 'default' : 'secondary'"
+                    class="text-[10px] py-0 h-4"
+                  >
+                    {{ p.is_custom ? '已自定义' : '使用默认' }}
+                  </Badge>
                 </div>
                 <p class="text-xs text-muted-foreground mt-0.5 line-clamp-1 font-normal">
-                  {{ promptMetaMap[setting.key]?.desc || setting.description || '用于精细化调整大语言模型响应行为的指令集。' }}
+                  {{ p.description }}
                 </p>
               </div>
             </div>
           </AccordionTrigger>
           <AccordionContent class="pt-2 pb-6">
-            <div class="flex flex-col gap-4 pl-[3.25rem]">
+            <div class="flex flex-col gap-3 pl-[3.25rem]">
               <Textarea
-                v-model="setting.value"
-                placeholder="请输入系统提示词..."
+                v-model="drafts[p.key]"
+                placeholder="留空并保存无效；如需恢复系统默认请点『重置为默认』。可点『填入默认模板』基于默认修改。"
                 class="min-h-[300px] font-mono text-[13px] leading-relaxed resize-y bg-muted/30 focus:bg-background"
               />
-              <div class="flex justify-between items-center mt-2">
+
+              <details class="text-xs">
+                <summary class="cursor-pointer text-muted-foreground hover:text-foreground select-none">
+                  查看系统默认模板
+                </summary>
+                <pre class="mt-2 p-3 rounded-lg bg-muted/50 whitespace-pre-wrap font-mono text-[12px] leading-relaxed max-h-64 overflow-auto">{{ p.default }}</pre>
+              </details>
+
+              <div class="flex items-center justify-between gap-2 mt-1">
                 <p class="text-xs text-muted-foreground flex-1">
-                  注意：修改提示词会直接影响 AI 生成的内容质量。请确保您熟悉 Markdown 与系统预留的 {变量} 占位符。
+                  支持 <code>{subject_name}</code>、<code>{subject_description}</code> 等占位符，运行时自动替换。
                 </p>
-                <Button @click="updateSetting(setting)" size="sm">
-                  <Save class="w-4 h-4 mr-2" />
-                  保存并生效
-                </Button>
+                <div class="flex items-center gap-2 shrink-0">
+                  <Button variant="ghost" size="sm" @click="fillWithDefault(p)">
+                    <ClipboardCopy class="w-4 h-4 mr-1.5" />
+                    填入默认模板
+                  </Button>
+                  <Button
+                    v-if="p.is_custom"
+                    variant="outline"
+                    size="sm"
+                    :disabled="saving[p.key]"
+                    @click="reset(p)"
+                  >
+                    <RotateCcw class="w-4 h-4 mr-1.5" />
+                    重置为默认
+                  </Button>
+                  <Button size="sm" :disabled="saving[p.key]" @click="save(p)">
+                    <Save class="w-4 h-4 mr-1.5" />
+                    保存覆盖
+                  </Button>
+                </div>
               </div>
             </div>
           </AccordionContent>
         </AccordionItem>
       </Accordion>
 
-      <div v-if="promptSettings.length === 0" class="flex flex-col items-center justify-center p-12 text-center border rounded-xl bg-card border-dashed">
+      <div v-if="!loading && prompts.length === 0" class="flex flex-col items-center justify-center p-12 text-center border rounded-xl bg-card border-dashed">
         <MessageSquareText class="w-8 h-8 text-muted-foreground/50 mb-4" />
-        <h3 class="text-lg font-medium">暂无提示词模板</h3>
-        <p class="text-sm text-muted-foreground mt-1">系统没有暴露需要配置的 AI 提示词</p>
+        <h3 class="text-lg font-medium">暂无可配置的提示词</h3>
+        <p class="text-sm text-muted-foreground mt-1">请先选择一个科目</p>
       </div>
     </div>
   </div>

@@ -102,7 +102,7 @@ async def complete_setup(payload: SetupComplete) -> dict:
     # 4. Rebuild the engine against the freshly configured database.
     await reset_engine(url)
 
-    # 5. Create the initial superuser and seed default data.
+    # 5. Create the initial superuser.
     session_maker = get_sessionmaker()
     async with session_maker() as db:
         existing = await crud_user.get_by_username(db, username=payload.admin_username)
@@ -117,13 +117,6 @@ async def complete_setup(payload: SetupComplete) -> dict:
                 ),
             )
 
-        # 6. Seed default subjects and system settings.
-        try:
-            from scripts.initial_data import init_db
-
-            await init_db(db)
-        except Exception as exc:  # noqa: BLE001
-            logger.exception("Initial data seeding failed: %s", exc)
-
+    # 科目不再预置：首次登录后由前端引导页 (/onboarding) 让用户创建第一个科目。
     logger.info("First-run setup completed (db_type=%s)", payload.db_type)
     return {"ok": True}

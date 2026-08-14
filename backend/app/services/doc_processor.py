@@ -10,7 +10,11 @@ from app.crud.crud_system_setting import system_setting
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.services.ai_provider import get_ai_provider
 from app.services.structured_parser import parse_structured
+from app.services.prompt_utils import render_subject_prompt
+from app.services.prompts import get_default_prompt
+from app.crud.crud_subject_prompt import subject_prompt as crud_subject_prompt
 from app.models.ai_config import AIModel, AIProvider
+from app.models.subject import Subject
 from app.models.tag import Tag
 from app.models.tag_category import TagCategory
 from app.services.kp_retriever import KnowledgePointRetriever
@@ -74,12 +78,16 @@ class DocProcessor:
                 "BASE_URL": provider_db.base_url,
                 "MODEL_NAME": model_db.name,
             }
-            # Fetch prompts
+            # Prompt 分层：科目覆盖(subject_prompts) -> 代码默认(prompts.py)，再渲染科目占位符
             prompt_key = "AI_SOLVE_PROMPT" if mode == "solve" else "AI_EXTRACT_PROMPT"
-            prompts = await system_setting.get_map_by_keys(db, [prompt_key])
-            
-            if prompt_key in prompts:
-                config["AI_EXTRACT_PROMPT"] = prompts[prompt_key]
+            subject = None
+            override = None
+            if subject_id:
+                res_subj = await db.execute(select(Subject).where(Subject.id == subject_id))
+                subject = res_subj.scalar_one_or_none()
+                override = await crud_subject_prompt.get_value(db, subject_id, prompt_key)
+            template = override if override is not None else get_default_prompt(prompt_key)
+            config["AI_EXTRACT_PROMPT"] = render_subject_prompt(template, subject)
 
             # Fetch Tags and Categories for Prompt Context
             try:

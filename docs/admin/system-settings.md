@@ -9,11 +9,10 @@
 | `AI_TEXT_MODEL_ID` | 激活的对话 / 文本模型 |
 | `AI_VISION_MODEL_ID` | 激活的视觉模型 |
 | `AI_EMBEDDING_MODEL_ID` | 激活的向量嵌入模型 |
-| `CHAT_SYSTEM_PROMPT` | 对话系统提示词（控制工具调用策略等） |
-| `AI_EXTRACT_PROMPT` | 题目抽取提示词 |
-| `AI_SOLVE_PROMPT` | 解答模式提示词 |
 
 每个参数含键、值与描述。模型类参数通常在 [AI 供应商与模型](/admin/ai-config) 页面间接设置。
+
+> 题目抽取 / 解答提示词已改为**按科目配置**（默认值内置于代码，未定制时自动回退），不再是全局系统参数，见 [Prompt 配置](/admin/prompts)。
 
 ## 静态配置 vs 动态配置
 

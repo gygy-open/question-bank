@@ -20,15 +20,14 @@ uv sync
 # 应用数据库迁移
 uv run alembic upgrade head
 
-# 初始化基础数据 / 创建超管(按需)
-uv run python scripts/initial_data.py
+# 创建超管(按需)
 uv run python scripts/create_superuser.py
 
 # 启动开发服务器(热重载)
 uv run fastapi dev app/main.py
 ```
 
-后端默认监听 `http://localhost:8000`，API 文档在 `/docs`。
+后端默认监听 `http://localhost:8000`，API 文档在 `/docs`。首次登录后会自动进入引导页创建第一个科目。
 
 ## 前端
 

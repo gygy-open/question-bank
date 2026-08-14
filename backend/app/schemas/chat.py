@@ -57,3 +57,4 @@ class ChatRequest(BaseModel):
     message: ChatMessageCreate # The new message to add
     stream: bool = True
     temperature: Optional[float] = 0.7
+    subject_id: Optional[int] = None # Current working subject, used to render subject-specific prompts

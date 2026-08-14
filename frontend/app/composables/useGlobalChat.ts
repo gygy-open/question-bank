@@ -366,6 +366,7 @@ const sendMessage = async () => {
                     content: userMessageContent,
                     images: uploadedImagePaths.length > 0 ? uploadedImagePaths : undefined,
                 },
+                subject_id: useSubjectContext().currentSubjectId.value ?? undefined,
                 stream: true,
             }),
         })
