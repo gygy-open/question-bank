@@ -34,10 +34,11 @@ OBSOLETE_KEYS = [
 def upgrade() -> None:
     """Delete obsolete rows from system_settings."""
     bind = op.get_bind()
+    # sa.table/column so the reserved word ``key`` is quoted per-dialect
+    # (backticks on MySQL); a raw SQL string breaks on MySQL.
+    system_settings = sa.table("system_settings", sa.column("key", sa.String))
     bind.execute(
-        sa.text("DELETE FROM system_settings WHERE key IN :keys").bindparams(
-            sa.bindparam("keys", tuple(OBSOLETE_KEYS), expanding=True)
-        )
+        system_settings.delete().where(system_settings.c.key.in_(OBSOLETE_KEYS))
     )
 
 
