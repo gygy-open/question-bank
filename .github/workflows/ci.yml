@@ -1,0 +1,58 @@
+name: CI
+
+# Fast feedback gate: run backend tests on every PR and on pushes to main so
+# broken code is caught before merge (not at release time).
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  backend-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          python-version: '3.13'
+
+      - name: Run backend tests
+        working-directory: backend
+        run: |
+          uv sync --group dev
+          uv run pytest
+
+  migrations-mysql:
+    runs-on: ubuntu-latest
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ROOT_PASSWORD: root
+          MYSQL_DATABASE: question_bank_test
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h localhost -uroot -proot"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=10
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          python-version: '3.13'
+
+      # Runs the Alembic chain against real MySQL so dialect-specific migration
+      # failures (types, ALTER, charset) surface — SQLite cannot emulate these.
+      - name: Run migration tests on MySQL
+        working-directory: backend
+        env:
+          MYSQL_TEST_URL: mysql+aiomysql://root:root@127.0.0.1:3306/question_bank_test
+        run: |
+          uv sync --group dev
+          uv run pytest tests/test_migrations.py

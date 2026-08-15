@@ -4,6 +4,9 @@ migrate:
 make_migration msg: 
     uv run alembic revision --autogenerate -m "{{msg}}"
 
+test:
+    uv run pytest
+
 # --- Desktop packaging ---------------------------------------------------
 
 # Build the frontend SPA so it can be bundled into the desktop executable.
