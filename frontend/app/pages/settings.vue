@@ -2,7 +2,7 @@
 import { ref, onMounted, watchEffect } from 'vue'
 import { useRouter } from 'vue-router'
 import { toast } from 'vue-sonner'
-import { Settings, Cpu, MessageSquareText } from '@lucide/vue'
+import { Settings, Cpu, MessageSquareText, UserPlus } from '@lucide/vue'
 import PageHeader from '~/components/PageHeader.vue'
 import AiSettings from '~/components/AiSettings.vue'
 import AiPromptsConfig from '~/components/AiPromptsConfig.vue'
@@ -16,6 +16,8 @@ import {
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { Button } from '@/components/ui/button'
+import { Switch } from '@/components/ui/switch'
+import { Label } from '@/components/ui/label'
 
 const { $api } = useNuxtApp()
 const { user } = useAuth()
@@ -43,6 +45,13 @@ interface SystemSetting {
 const settings = ref<SystemSetting[]>([])
 const loading = ref(false)
 
+const REGISTRATION_ENABLED_KEY = 'USER_REGISTRATION_ENABLED'
+const REGISTRATION_APPROVAL_KEY = 'USER_REGISTRATION_REQUIRES_APPROVAL'
+
+const registrationEnabled = ref(false)
+const registrationRequiresApproval = ref(false)
+const registrationSaving = ref(false)
+
 const fetchSettings = async () => {
   loading.value = true
   try {
@@ -51,8 +60,11 @@ const fetchSettings = async () => {
     settings.value = data.filter(s => {
       const isConfigModelId = ['AI_TEXT_MODEL_ID', 'AI_VISION_MODEL_ID', 'AI_EMBEDDING_MODEL_ID'].includes(s.key)
       const isPrompt = s.key.endsWith('_PROMPT')
-      return !isConfigModelId && !isPrompt
+      const isRegistration = [REGISTRATION_ENABLED_KEY, REGISTRATION_APPROVAL_KEY].includes(s.key)
+      return !isConfigModelId && !isPrompt && !isRegistration
     })
+    registrationEnabled.value = data.find(s => s.key === REGISTRATION_ENABLED_KEY)?.value === 'true'
+    registrationRequiresApproval.value = data.find(s => s.key === REGISTRATION_APPROVAL_KEY)?.value === 'true'
   } catch (error) {
     toast.error('获取设置失败', {
       description: (error as any).message,
@@ -60,6 +72,32 @@ const fetchSettings = async () => {
   } finally {
     loading.value = false
   }
+}
+
+const saveRegistrationSetting = async (key: string, value: boolean, description: string) => {
+  registrationSaving.value = true
+  try {
+    await $api(`/settings/${key}`, {
+      method: 'PUT',
+      body: { value: value ? 'true' : 'false', description },
+    })
+    toast.success('保存成功')
+  } catch (error) {
+    toast.error('保存失败', { description: (error as any).message })
+    await fetchSettings()
+  } finally {
+    registrationSaving.value = false
+  }
+}
+
+const onToggleRegistration = (value: boolean) => {
+  registrationEnabled.value = value
+  saveRegistrationSetting(REGISTRATION_ENABLED_KEY, value, '是否开放用户自助注册')
+}
+
+const onToggleApproval = (value: boolean) => {
+  registrationRequiresApproval.value = value
+  saveRegistrationSetting(REGISTRATION_APPROVAL_KEY, value, '注册用户是否需要管理员审核')
 }
 
 const updateSetting = async (setting: SystemSetting) => {
@@ -118,6 +156,14 @@ onMounted(() => {
         >
           <MessageSquareText class="w-4 h-4" />
           提示词配置
+        </Button>
+        <Button 
+          :variant="activeTab === 'registration' ? 'secondary' : 'ghost'" 
+          class="justify-start gap-2 whitespace-nowrap lg:w-full"
+          @click="updateActiveTab('registration')"
+        >
+          <UserPlus class="w-4 h-4" />
+          注册设置
         </Button>
       </nav>
     </aside>
@@ -188,6 +234,42 @@ onMounted(() => {
           <p class="text-sm text-muted-foreground">如果您了解大语言工作原理，可在此微调它处理指令的方式。</p>
         </div>
         <AiPromptsConfig />
+      </div>
+
+      <!-- Registration Settings -->
+      <div v-show="activeTab === 'registration'" class="space-y-6">
+        <div class="mb-4">
+          <h2 class="text-2xl font-bold tracking-tight">注册设置</h2>
+          <p class="text-sm text-muted-foreground">控制是否允许访客自助注册账户。</p>
+        </div>
+
+        <Card>
+          <CardContent class="pt-6 space-y-6">
+            <div class="flex items-center justify-between gap-4">
+              <div class="space-y-0.5">
+                <Label class="text-base">开放自助注册</Label>
+                <p class="text-sm text-muted-foreground">开启后，登录页将显示注册入口，访客可自行创建账户。</p>
+              </div>
+              <Switch
+                :model-value="registrationEnabled"
+                :disabled="registrationSaving"
+                @update:model-value="onToggleRegistration"
+              />
+            </div>
+
+            <div class="flex items-center justify-between gap-4">
+              <div class="space-y-0.5">
+                <Label class="text-base">注册需管理员审核</Label>
+                <p class="text-sm text-muted-foreground">开启后，新注册用户默认停用，需管理员在用户管理中启用后方可登录。</p>
+              </div>
+              <Switch
+                :model-value="registrationRequiresApproval"
+                :disabled="registrationSaving || !registrationEnabled"
+                @update:model-value="onToggleApproval"
+              />
+            </div>
+          </CardContent>
+        </Card>
       </div>
     </main>
   </div>

@@ -1,14 +1,25 @@
 from typing import Any, List
 
-from fastapi import APIRouter, Body, Depends, HTTPException
+from fastapi import APIRouter, Body, Depends, HTTPException, UploadFile, File
 from fastapi.encoders import jsonable_encoder
+from fastapi.responses import StreamingResponse
 
 from app.api import deps
 from app.crud import crud_user
-from app.schemas.user import User, UserCreate, UserUpdate, UserUpdatePassword, UserUpdateLastSubject
+from app.schemas.user import (
+    User,
+    UserCreate,
+    UserUpdate,
+    UserUpdatePassword,
+    UserUpdateLastSubject,
+    UserImportResult,
+)
 from app.core import security
+from app.services import user_import_service
 
 router = APIRouter()
+
+MAX_IMPORT_SIZE = 5 * 1024 * 1024  # 5 MB
 
 @router.get("", response_model=List[User])
 async def read_users(
@@ -42,6 +53,37 @@ async def create_user(
         )
     user = await crud_user.user.create(session, obj_in=user_in)
     return user
+
+@router.get("/import-template")
+async def download_import_template(
+    current_user: User = Depends(deps.get_current_active_superuser),
+) -> Any:
+    """Download the .xlsx user import template."""
+    content = user_import_service.generate_template()
+    return StreamingResponse(
+        iter([content]),
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={
+            "Content-Disposition": 'attachment; filename="users_template.xlsx"'
+        },
+    )
+
+@router.post("/import", response_model=UserImportResult)
+async def import_users(
+    *,
+    session: deps.SessionDep,
+    file: UploadFile = File(...),
+    current_user: User = Depends(deps.get_current_active_superuser),
+) -> Any:
+    """Batch import users from an .xlsx file."""
+    if not file.filename or not file.filename.lower().endswith(".xlsx"):
+        raise HTTPException(status_code=400, detail="仅支持 .xlsx 格式的文件")
+
+    content = await file.read()
+    if len(content) > MAX_IMPORT_SIZE:
+        raise HTTPException(status_code=400, detail="文件过大，请确保文件小于 5MB")
+
+    return await user_import_service.import_excel(session, file_bytes=content)
 
 @router.get("/me", response_model=User)
 async def read_user_me(

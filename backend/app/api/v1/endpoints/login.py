@@ -8,11 +8,20 @@ from app.api import deps
 from app.core import security
 from app.core.config import settings
 from app.crud import crud_user
+from app.crud.crud_system_setting import system_setting
 from app.schemas.token import Token
-from app.schemas.user import User
+from app.schemas.user import User, UserCreate, RegisterRequest, RegisterResult, RegistrationConfig
 from app.models.activity_log import ActivityLog
 
 router = APIRouter()
+
+REGISTRATION_ENABLED_KEY = "USER_REGISTRATION_ENABLED"
+REGISTRATION_APPROVAL_KEY = "USER_REGISTRATION_REQUIRES_APPROVAL"
+
+
+async def _setting_is_true(session: deps.SessionDep, key: str) -> bool:
+    setting = await system_setting.get_by_key(session, key)
+    return bool(setting and (setting.value or "").strip().lower() == "true")
 
 @router.post("/login/access-token", response_model=Token)
 async def login_access_token(
@@ -30,7 +39,7 @@ async def login_access_token(
     if not user:
         raise HTTPException(status_code=400, detail="Incorrect username or password")
     elif not user.is_active:
-        raise HTTPException(status_code=400, detail="Inactive user")
+        raise HTTPException(status_code=403, detail="Inactive user pending approval")
 
     # Update user login stats
     user.last_login = datetime.utcnow()
@@ -75,6 +84,37 @@ async def test_token(current_user: Annotated[User, Depends(deps.get_current_user
     Test access token
     """
     return current_user
+
+@router.get("/register/config", response_model=RegistrationConfig)
+async def registration_config(session: deps.SessionDep) -> RegistrationConfig:
+    """Public registration availability, used by the login/register pages."""
+    return RegistrationConfig(
+        enabled=await _setting_is_true(session, REGISTRATION_ENABLED_KEY),
+        requires_approval=await _setting_is_true(session, REGISTRATION_APPROVAL_KEY),
+    )
+
+@router.post("/register", response_model=RegisterResult)
+async def register(session: deps.SessionDep, payload: RegisterRequest) -> RegisterResult:
+    """Self-service registration, gated by the USER_REGISTRATION_ENABLED setting."""
+    if not await _setting_is_true(session, REGISTRATION_ENABLED_KEY):
+        raise HTTPException(status_code=403, detail="注册功能未开放")
+
+    existing = await crud_user.user.get_by_username(session, username=payload.username)
+    if existing:
+        raise HTTPException(status_code=400, detail="该用户名已被注册")
+
+    requires_approval = await _setting_is_true(session, REGISTRATION_APPROVAL_KEY)
+    await crud_user.user.create(
+        session,
+        obj_in=UserCreate(
+            username=payload.username,
+            full_name=payload.full_name,
+            password=payload.password,
+            is_active=not requires_approval,
+            is_superuser=False,
+        ),
+    )
+    return RegisterResult(ok=True, requires_approval=requires_approval)
 
 @router.post("/logout")
 async def logout(

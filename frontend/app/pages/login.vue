@@ -14,6 +14,7 @@ const router = useRouter()
 const { $api } = useNuxtApp()
 
 const isLoading = ref(false)
+const registrationEnabled = ref(false)
 
 // 若系统尚未完成首次初始化，引导至安装向导
 onMounted(async () => {
@@ -24,6 +25,12 @@ onMounted(async () => {
     }
   } catch {
     // 忽略状态探测失败
+  }
+  try {
+    const cfg = await $api<{ enabled: boolean }>('/register/config')
+    registrationEnabled.value = cfg.enabled
+  } catch {
+    // 忽略注册配置探测失败
   }
 })
 
@@ -43,7 +50,14 @@ const onSubmit = form.handleSubmit(async (values) => {
     toast.success('登录成功')
     router.push('/')
   } catch (error: any) {
-    toast.error(error.message || '登录失败')
+    const status = error.statusCode ?? error.status ?? error.response?.status
+    if (status === 403) {
+      toast.error('账号未激活，正在等待管理员审核，请联系管理员')
+    } else if (status === 400) {
+      toast.error('用户名或密码错误')
+    } else {
+      toast.error(error.message || '登录失败')
+    }
   } finally {
     isLoading.value = false
   }
@@ -89,6 +103,11 @@ const onSubmit = form.handleSubmit(async (values) => {
               <Loader2 v-if="isLoading" class="mr-2 h-4 w-4 animate-spin" />
               登录
             </Button>
+
+            <div v-if="registrationEnabled" class="text-center text-sm text-muted-foreground">
+              还没有账户？
+              <NuxtLink to="/register" class="text-primary hover:underline">立即注册</NuxtLink>
+            </div>
           </div>
         </form>
       </CardContent>

@@ -35,7 +35,8 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Badge } from '@/components/ui/badge'
 import ClearableInput from '~/components/ClearableInput.vue'
-import { Loader2, Pencil, Trash2, Plus, TriangleAlert, KeyRound } from '@lucide/vue'
+import { Loader2, Pencil, Trash2, Plus, TriangleAlert, KeyRound, Upload } from '@lucide/vue'
+import UserImportDialog from '~/components/manager/UserImportDialog.vue'
 import type { User } from '~/types'
 
 const { $api } = useNuxtApp()
@@ -43,6 +44,7 @@ const { data: users, refresh, status } = await useAPI<User[]>('/users')
 
 const searchQuery = ref('')
 const roleFilter = ref('all')
+const isImportOpen = ref(false)
 
 const filteredUsers = computed(() => {
   const keyword = searchQuery.value.trim().toLowerCase()
@@ -241,12 +243,19 @@ const confirmResetPassword = async () => {
           </SelectContent>
         </Select>
       </div>
-      <Button @click="openCreateDialog">
-        <Plus class="mr-2 h-4 w-4" />
-        新增用户
-      </Button>
+      <div class="flex items-center gap-2">
+        <Button variant="outline" @click="isImportOpen = true">
+          <Upload class="mr-2 h-4 w-4" />
+          批量导入
+        </Button>
+        <Button @click="openCreateDialog">
+          <Plus class="mr-2 h-4 w-4" />
+          新增用户
+        </Button>
+      </div>
     </div>
 
+    <UserImportDialog v-model:open="isImportOpen" @imported="refresh" />
     <div class="rounded-md border">
       <Table>
         <TableHeader>

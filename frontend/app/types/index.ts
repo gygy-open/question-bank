@@ -61,6 +61,19 @@ export interface KPImportPreflight {
   affected_questions: number
 }
 
+export interface UserImportRowError {
+  row: number
+  message: string
+}
+
+export interface UserImportResult {
+  status: 'success' | 'partial' | 'failed'
+  created: number
+  failed: number
+  total: number
+  errors: UserImportRowError[]
+}
+
 export interface Tag {
   id: number
   name: string

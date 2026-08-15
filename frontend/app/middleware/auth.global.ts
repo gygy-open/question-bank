@@ -6,8 +6,11 @@ export default defineNuxtRouteMiddleware(async (to) => {
     return
   }
 
-  // 如果用户未登录且访问非登录页，重定向到登录页
-  if (!token.value && to.path !== '/login') {
+  // 免登录页面：登录与自助注册
+  const publicPaths = ['/login', '/register']
+
+  // 如果用户未登录且访问非公开页，重定向到登录页
+  if (!token.value && !publicPaths.includes(to.path)) {
     return navigateTo('/login')
   }
 
@@ -16,8 +19,8 @@ export default defineNuxtRouteMiddleware(async (to) => {
     const { init, hasSubjects } = useSubjectContext()
     await init()
 
-    // 已登录访问登录页 -> 回首页（下面的科目校验会接管无科目场景）
-    if (to.path === '/login') {
+    // 已登录访问登录/注册页 -> 回首页（下面的科目校验会接管无科目场景）
+    if (publicPaths.includes(to.path)) {
       return navigateTo(hasSubjects.value ? '/' : '/onboarding')
     }
 

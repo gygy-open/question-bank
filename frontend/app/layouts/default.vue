@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { SidebarProvider, SidebarInset } from '~/components/ui/sidebar'
 import AppSidebar from '~/components/AppSidebar.vue'
+import FloatingChatWidget from '~/components/chat/FloatingChatWidget.vue'
 import { toast } from 'vue-sonner'
 import { useLocalStorage, useSessionStorage } from '@vueuse/core'
 
@@ -46,5 +47,6 @@ onMounted(async () => {
     <SidebarInset>
       <slot />
     </SidebarInset>
+    <FloatingChatWidget />
   </SidebarProvider>
 </template>
