@@ -25,8 +25,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { Activity, X } from '@lucide/vue'
+import { X } from '@lucide/vue'
 import { format } from 'date-fns'
+import PageHeader from '~/components/PageHeader.vue'
 
 const { user } = useAuth()
 const router = useRouter()
@@ -78,35 +79,31 @@ const formatDetails = (details: any) => {
 </script>
 
 <template>
-  <div class="p-6">
-    <div class="flex items-center justify-between mb-6">
-      <h1 class="text-2xl font-bold flex items-center gap-2">
-        <Activity class="w-6 h-6" />
-        行为日志
-      </h1>
-      <div class="flex items-center gap-4">
-        <div class="flex items-center gap-2">
-          <Select v-model="selectedUserId">
-            <SelectTrigger class="w-[180px]">
-              <SelectValue placeholder="选择用户" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">所有用户</SelectItem>
-              <SelectItem v-for="u in usersData" :key="u.id" :value="String(u.id)">
-                {{ u.full_name || u.username }}
-              </SelectItem>
-            </SelectContent>
-          </Select>
-          <Button v-if="selectedUserId !== 'all'" variant="ghost" size="icon" @click="resetFilter">
-            <X class="w-4 h-4" />
-          </Button>
-        </div>
-        <div class="text-sm text-muted-foreground">
-          共 {{ total }} 条记录
-        </div>
+  <PageHeader title="行为日志">
+    <template #actions>
+      <div class="flex items-center gap-2">
+        <Select v-model="selectedUserId">
+          <SelectTrigger class="w-[180px]">
+            <SelectValue placeholder="选择用户" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">所有用户</SelectItem>
+            <SelectItem v-for="u in usersData" :key="u.id" :value="String(u.id)">
+              {{ u.full_name || u.username }}
+            </SelectItem>
+          </SelectContent>
+        </Select>
+        <Button v-if="selectedUserId !== 'all'" variant="ghost" size="icon" @click="resetFilter">
+          <X class="w-4 h-4" />
+        </Button>
       </div>
-    </div>
+      <div class="text-sm text-muted-foreground">
+        共 {{ total }} 条记录
+      </div>
+    </template>
+  </PageHeader>
 
+  <div class="p-6">
     <div class="rounded-md border bg-card mb-4">
       <Table>
         <TableHeader>
