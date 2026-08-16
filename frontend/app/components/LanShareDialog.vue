@@ -10,6 +10,8 @@ interface NetworkInfo {
   port: number
   host_ip: string | null
   lan_url: string | null
+  lan_hostname: string | null
+  lan_hostname_url: string | null
 }
 
 const { $api } = useNuxtApp()
@@ -60,11 +62,22 @@ const { copy, copied, isSupported } = useClipboard({ source: () => info.value?.l
             </Button>
           </div>
 
+          <div v-if="info.lan_hostname_url" class="flex items-center gap-2">
+            <code class="flex-1 truncate rounded-md bg-muted px-3 py-2 text-center text-sm text-muted-foreground">
+              {{ info.lan_hostname_url }}
+            </code>
+            <Button v-if="isSupported" size="icon" variant="outline" title="复制地址"
+              @click="copy(info.lan_hostname_url!)">
+              <Copy class="size-4" />
+            </Button>
+          </div>
+
           <ul class="list-disc space-y-1 pl-5 text-sm text-muted-foreground">
             <li>手机需连接与本机<strong>相同的 WiFi</strong>。</li>
             <li>每位同事用<strong>各自的账号</strong>登录。</li>
             <li>本机<strong>关机或退出应用</strong>后，他人将无法访问。</li>
             <li>若本机 IP 变化（重启后），此地址会随之更新。</li>
+            <li v-if="info.lan_hostname_url">更好记的地址可能在安卓手机上无法打开，此时请改用上方 IP 地址。</li>
           </ul>
         </div>
       </DialogContent>

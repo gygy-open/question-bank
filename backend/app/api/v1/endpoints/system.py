@@ -52,13 +52,17 @@ async def get_network_info(
     import os
 
     from app.core.config import get_lan_share
+    from app.services import mdns
 
     lan_share = get_lan_share()
     port = int(os.getenv("PORT", "8000"))
     ip = _lan_ip() if lan_share else None
+    hostname = mdns.current_hostname() if lan_share else None
     return {
         "lan_share": lan_share,
         "port": port,
         "host_ip": ip,
         "lan_url": f"http://{ip}:{port}/" if ip else None,
+        "lan_hostname": hostname,
+        "lan_hostname_url": f"http://{hostname}:{port}/" if hostname else None,
     }

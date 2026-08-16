@@ -155,6 +155,7 @@ class _Server:
 
         from app.core.config import settings
         from app.main import app
+        from app.services import mdns
 
         settings.DATA_DIR.mkdir(parents=True, exist_ok=True)
         self._run_migrations_once()
@@ -164,6 +165,10 @@ class _Server:
             self._worker.start()
 
         host = "0.0.0.0" if lan else "127.0.0.1"
+        if lan:
+            mdns.start(_lan_ip(), PORT)
+        else:
+            mdns.stop()
         config = uvicorn.Config(
             app, host=host, port=PORT, log_level=settings.LOG_LEVEL.lower()
         )
@@ -172,6 +177,9 @@ class _Server:
         self._thread.start()
 
     def stop(self) -> None:
+        from app.services import mdns
+
+        mdns.stop()
         if self._server is not None:
             self._server.should_exit = True
         if self._thread is not None:
@@ -222,13 +230,17 @@ def run_tray() -> None:
         webbrowser.open(URL_LOCAL)
 
     def on_toggle_lan(_icon, _item) -> None:
+        from app.services import mdns
+
         enabled = not get_lan_share()
         set_lan_share(enabled)
         _set_firewall_rule(enabled)
         server.restart(enabled)
         icon.update_menu()
         if enabled:
-            _notify(f"局域网共享已开启\nhttp://{_lan_ip()}:{PORT}/")
+            hostname = mdns.current_hostname()
+            extra = f" 或 http://{hostname}:{PORT}/" if hostname else ""
+            _notify(f"局域网共享已开启\nhttp://{_lan_ip()}:{PORT}/{extra}")
         else:
             _notify("局域网共享已关闭")
 

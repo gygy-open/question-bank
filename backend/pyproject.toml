@@ -27,6 +27,7 @@ dependencies = [
     "aiosqlite>=0.22.1",
     "pystray>=0.19.5",
     "pillow>=11.0.0",
+    "zeroconf>=0.150.0",
 ]
 
 [dependency-groups]
