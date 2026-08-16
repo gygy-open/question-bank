@@ -18,13 +18,13 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import CustomSidebarTrigger from '~/components/CustomSidebarTrigger.vue'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import UserProfileDialog from '~/components/UserProfileDialog.vue'
 import ChangePasswordDialog from '~/components/ChangePasswordDialog.vue'
-import AboutDialog from '~/components/AboutDialog.vue'
 import { useColorMode } from '@vueuse/core'
 import { BookOpen, ChevronsUpDown, ListTree, LogOut, Settings, Sparkles, User, Users, Tags, Library, HelpCircle, KeyRound, Activity, Layers, ClipboardList, Info, Moon, Sun, Bot } from '@lucide/vue'
 
@@ -38,7 +38,6 @@ const router = useRouter()
 const chat = useGlobalChat()
 const isProfileOpen = ref(false)
 const isChangePasswordOpen = ref(false)
-const isAboutOpen = ref(false)
 const colorMode = useColorMode()
 const toggleColorMode = () => {
   colorMode.value = colorMode.value === 'dark' ? 'light' : 'dark'
@@ -175,12 +174,6 @@ const navActiveClass = 'border-l-2 border-transparent data-[active=true]:border-
     <SidebarFooter>
       <SidebarMenu>
         <SidebarMenuItem>
-          <SidebarMenuButton :tooltip="colorMode === 'dark' ? '切换到浅色模式' : '切换到深色模式'" @click="toggleColorMode">
-            <component :is="colorMode === 'dark' ? Sun : Moon" />
-            <span>{{ colorMode === 'dark' ? '浅色模式' : '深色模式' }}</span>
-          </SidebarMenuButton>
-        </SidebarMenuItem>
-        <SidebarMenuItem>
           <SidebarMenuButton as-child :is-active="route.path === '/manual'" :class="navActiveClass">
             <NuxtLink to="/manual">
               <HelpCircle />
@@ -188,43 +181,39 @@ const navActiveClass = 'border-l-2 border-transparent data-[active=true]:border-
             </NuxtLink>
           </SidebarMenuButton>
         </SidebarMenuItem>
-        <SidebarMenuItem>
-          <SidebarMenuButton tooltip="版本信息与检查更新" @click="isAboutOpen = true">
-            <Info />
-            <span>关于</span>
-          </SidebarMenuButton>
-        </SidebarMenuItem>
-        <!-- 与"关于"归为一组：都是系统状态信息，而非高频操作 -->
-        <LanShareDialog />
       </SidebarMenu>
 
-      <div v-if="user?.is_superuser">
-        <SidebarGroupLabel>系统管理</SidebarGroupLabel>
+      <!-- 系统：LAN 共享与超管入口归为同一簇 -->
+      <div>
+        <SidebarGroupLabel>系统</SidebarGroupLabel>
         <SidebarMenu>
-          <SidebarMenuItem>
-            <SidebarMenuButton as-child :is-active="route.path === '/users'" :class="navActiveClass">
-              <NuxtLink to="/users">
-                <Users />
-                <span>用户管理</span>
-              </NuxtLink>
-            </SidebarMenuButton>
-          </SidebarMenuItem>
-          <SidebarMenuItem v-if="user?.id === 1">
-            <SidebarMenuButton as-child :is-active="route.path === '/activity-logs'" :class="navActiveClass">
-              <NuxtLink to="/activity-logs">
-                <Activity />
-                <span>行为日志</span>
-              </NuxtLink>
-            </SidebarMenuButton>
-          </SidebarMenuItem>
-          <SidebarMenuItem>
-            <SidebarMenuButton as-child :is-active="route.path === '/settings'" :class="navActiveClass">
-              <NuxtLink to="/settings">
-                <Settings />
-                <span>系统设置</span>
-              </NuxtLink>
-            </SidebarMenuButton>
-          </SidebarMenuItem>
+          <LanShareDialog />
+          <template v-if="user?.is_superuser">
+            <SidebarMenuItem>
+              <SidebarMenuButton as-child :is-active="route.path === '/users'" :class="navActiveClass">
+                <NuxtLink to="/users">
+                  <Users />
+                  <span>用户管理</span>
+                </NuxtLink>
+              </SidebarMenuButton>
+            </SidebarMenuItem>
+            <SidebarMenuItem v-if="user?.id === 1">
+              <SidebarMenuButton as-child :is-active="route.path === '/activity-logs'" :class="navActiveClass">
+                <NuxtLink to="/activity-logs">
+                  <Activity />
+                  <span>行为日志</span>
+                </NuxtLink>
+              </SidebarMenuButton>
+            </SidebarMenuItem>
+            <SidebarMenuItem>
+              <SidebarMenuButton as-child :is-active="route.path === '/settings'" :class="navActiveClass">
+                <NuxtLink to="/settings">
+                  <Settings />
+                  <span>系统设置</span>
+                </NuxtLink>
+              </SidebarMenuButton>
+            </SidebarMenuItem>
+          </template>
         </SidebarMenu>
       </div>
 
@@ -257,6 +246,16 @@ const navActiveClass = 'border-l-2 border-transparent data-[active=true]:border-
                 <KeyRound class="mr-2 size-4" />
                 修改密码
               </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem @click="toggleColorMode">
+                <component :is="colorMode === 'dark' ? Sun : Moon" class="mr-2 size-4" />
+                {{ colorMode === 'dark' ? '浅色模式' : '深色模式' }}
+              </DropdownMenuItem>
+              <DropdownMenuItem @click="router.push('/about')">
+                <Info class="mr-2 size-4" />
+                关于系统
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
               <DropdownMenuItem @click="handleLogout">
                 <LogOut class="mr-2 size-4" />
                 退出登录
@@ -269,6 +268,5 @@ const navActiveClass = 'border-l-2 border-transparent data-[active=true]:border-
     <SidebarRail />
     <UserProfileDialog v-model:open="isProfileOpen" />
     <ChangePasswordDialog v-model:open="isChangePasswordOpen" />
-    <AboutDialog v-model:open="isAboutOpen" :is-superuser="user?.is_superuser" />
   </Sidebar>
 </template>
