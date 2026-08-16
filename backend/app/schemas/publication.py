@@ -3,7 +3,8 @@ from typing import List, Optional, Any
 from enum import Enum
 from datetime import datetime
 
-from app.models.paper import PaperStatus
+from app.models.publication import PublicationStatus, PublicationType, BlockType
+
 
 class OutputFormat(str, Enum):
     DOCX = "docx"
@@ -16,9 +17,9 @@ class ContentPosition(str, Enum):
     HIDDEN = "hidden"                   # Don't include at all
 
 
-# --- Multi-paper management ---
+# --- Export ---
 
-class PaperExportOptions(BaseModel):
+class PublicationExportOptions(BaseModel):
     title: Optional[str] = None
     format: OutputFormat = OutputFormat.DOCX
     content_position: ContentPosition = ContentPosition.AFTER_QUESTION
@@ -29,31 +30,27 @@ class PaperExportOptions(BaseModel):
     include_source: bool = False
 
 
-class PaperCreate(BaseModel):
+# --- Publication CRUD ---
+
+class PublicationCreate(BaseModel):
     title: str
+    pub_type: PublicationType = PublicationType.EXAM_PAPER
     subject_id: Optional[int] = None
     description: Optional[str] = None
+    difficulty: Optional[int] = None
+    knowledge_point_ids: Optional[List[int]] = None
 
 
-class PaperUpdate(BaseModel):
+class PublicationUpdate(BaseModel):
     title: Optional[str] = None
     subject_id: Optional[int] = None
     description: Optional[str] = None
-    status: Optional[PaperStatus] = None
+    status: Optional[PublicationStatus] = None
+    difficulty: Optional[int] = None
+    knowledge_point_ids: Optional[List[int]] = None
 
 
-class PaperItemsAdd(BaseModel):
-    question_ids: List[int]
-
-
-class PaperReorder(BaseModel):
-    ordered_item_ids: List[int]
-
-
-class PaperItemUpdate(BaseModel):
-    section_title: Optional[str] = None
-    score: Optional[float] = None
-
+# --- Blocks ---
 
 class QuestionBrief(BaseModel):
     model_config = ConfigDict(from_attributes=True)
@@ -69,30 +66,44 @@ class QuestionBrief(BaseModel):
     summary: Optional[str] = None
 
 
-class PaperItemRead(BaseModel):
+class BlockWrite(BaseModel):
+    block_type: BlockType
+    content: Optional[Any] = None
+    ref_question_id: Optional[int] = None
+
+
+class BlocksReplace(BaseModel):
+    """整表覆写: 前端提交完整有序块列表。"""
+    blocks: List[BlockWrite]
+
+
+class BlockRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: int
-    question_id: int
+    block_type: str
     sequence: int
-    section_title: Optional[str] = None
-    score: Optional[float] = None
+    content: Optional[Any] = None
+    ref_question_id: Optional[int] = None
     question: Optional[QuestionBrief] = None
 
 
-class PaperRead(BaseModel):
+class PublicationRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: int
+    pub_type: str
     title: str
     description: Optional[str] = None
     status: str
+    difficulty: Optional[int] = None
     subject_id: Optional[int] = None
     owner_id: int
     created_at: datetime
     updated_at: datetime
-    question_count: int = 0
+    block_count: int = 0
 
 
-class PaperDetail(PaperRead):
-    items: List[PaperItemRead] = []
+class PublicationDetail(PublicationRead):
+    blocks: List[BlockRead] = []
+    knowledge_point_ids: List[int] = []

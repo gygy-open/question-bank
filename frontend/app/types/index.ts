@@ -212,6 +212,48 @@ export interface PaperDetail extends Paper {
   items: PaperItem[]
 }
 
+// --- Publication (Block Canvas) ---
+
+export type BlockType = 'heading' | 'text' | 'question' | 'page_break'
+
+export type PublicationType = 'exam_paper' | 'study_guide' | 'question_group'
+
+export interface PublicationBlock {
+  id: number
+  block_type: BlockType
+  sequence: number
+  content?: Record<string, any> | null
+  ref_question_id?: number | null
+  question?: QuestionBrief | null
+}
+
+export interface Publication {
+  id: number
+  pub_type: PublicationType
+  title: string
+  description?: string | null
+  status: 'draft' | 'archived'
+  difficulty?: number | null
+  subject_id?: number | null
+  owner_id: number
+  created_at: string
+  updated_at: string
+  block_count: number
+}
+
+export interface PublicationDetail extends Publication {
+  blocks: PublicationBlock[]
+  knowledge_point_ids: number[]
+}
+
+/** Block payload for saving (PUT /publications/:id/blocks). */
+export interface BlockWrite {
+  block_type: BlockType
+  content?: Record<string, any> | null
+  ref_question_id?: number | null
+}
+
+
 
 export interface User {
   id: number

@@ -12,4 +12,11 @@ from .subject_prompt import SubjectPrompt
 from .ai_config import AIProvider, AIModel
 from .chat import ChatSession, ChatMessage
 from .prompt import PromptTemplate
-from .paper import Paper, PaperQuestion
+from .publication import (
+    Publication,
+    PublicationBlock,
+    PublicationStatus,
+    PublicationType,
+    BlockType,
+    publication_knowledge_points,
+)

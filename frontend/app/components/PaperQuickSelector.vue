@@ -5,19 +5,19 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { ShoppingBasket, Clock, Plus, List, Loader2, CheckCircle } from '@lucide/vue'
 import { toast } from 'vue-sonner'
-import { usePapers } from '@/composables/usePapers'
-import type { Paper } from '~/types'
+import { usePublications } from '@/composables/usePublications'
+import type { Publication } from '~/types'
 
 const props = defineProps<{
   questionId: number
 }>()
 
-const { list, create, addItems } = usePapers()
+const { list, create, appendQuestions } = usePublications()
 const { currentSubjectId } = useSubjectContext()
 
 const open = ref(false)
 const loading = ref(false)
-const papers = ref<Paper[]>([])
+const papers = ref<Publication[]>([])
 const total = ref(0)
 
 const showFull = ref(false)
@@ -25,7 +25,7 @@ const showFull = ref(false)
 const loadPapers = async () => {
   loading.value = true
   try {
-    const data = await list({ subject_id: currentSubjectId.value, status: 'draft', sort: 'updated_desc' })
+    const data = await list({ pub_type: 'exam_paper', subject_id: currentSubjectId.value, status: 'draft', sort: 'updated_desc' })
     papers.value = data
     total.value = data.length
   } catch {
@@ -40,9 +40,9 @@ const onOpenChange = (value: boolean) => {
   if (value) loadPapers()
 }
 
-const addToPaper = async (paper: Paper) => {
+const addToPaper = async (paper: Publication) => {
   try {
-    await addItems(paper.id, [props.questionId])
+    await appendQuestions(paper.id, [props.questionId])
     toast.success(`已加入《${paper.title}》`)
     open.value = false
   } catch {
@@ -52,8 +52,8 @@ const addToPaper = async (paper: Paper) => {
 
 const createAndAdd = async () => {
   try {
-    const paper = await create({ title: `新试卷 ${new Date().toLocaleDateString()}` })
-    await addItems(paper.id, [props.questionId])
+    const paper = await create({ title: `新试卷 ${new Date().toLocaleDateString()}`, pub_type: 'exam_paper' })
+    await appendQuestions(paper.id, [props.questionId])
     toast.success(`已创建并加入《${paper.title}》`)
     open.value = false
   } catch {
@@ -112,7 +112,7 @@ const onKey = (e: KeyboardEvent) => {
           >
             <div class="flex-1 min-w-0">
               <div class="text-sm font-medium truncate">{{ paper.title }}</div>
-              <div class="text-xs text-muted-foreground">{{ paper.question_count }} 题</div>
+              <div class="text-xs text-muted-foreground">{{ paper.block_count }} 项</div>
             </div>
             <kbd class="hidden group-hover:inline-flex h-5 px-1.5 items-center rounded border bg-muted text-xs font-mono">
               {{ idx + 1 }}

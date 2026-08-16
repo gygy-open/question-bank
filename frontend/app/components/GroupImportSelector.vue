@@ -15,15 +15,16 @@ import type { Publication } from '~/types'
 
 const props = defineProps<{
   open: boolean
-  questionIds: number[]
+  /** 要解包导入的题组 id。 */
+  groupId: number | null
 }>()
 
 const emit = defineEmits<{
   'update:open': [value: boolean]
-  added: []
+  imported: []
 }>()
 
-const { list, create, appendQuestions } = usePublications()
+const { list, create, importGroup } = usePublications()
 const { currentSubjectId } = useSubjectContext()
 
 const loading = ref(false)
@@ -57,17 +58,17 @@ watch(
       searchQuery.value = ''
       loadPapers()
     }
-  }
+  },
 )
 
-const confirmAdd = async () => {
-  if (!selectedPaperId.value) return
+const confirmImport = async () => {
+  if (!selectedPaperId.value || props.groupId == null) return
   submitting.value = true
   try {
     const paper = papers.value.find((p) => p.id === selectedPaperId.value)
-    await appendQuestions(selectedPaperId.value, props.questionIds)
-    toast.success(`已将 ${props.questionIds.length} 道题加入《${paper?.title}》`)
-    emit('added')
+    await importGroup(selectedPaperId.value, props.groupId)
+    toast.success(`已解包加入《${paper?.title}》`)
+    emit('imported')
     emit('update:open', false)
   } catch {
     toast.error('加入失败')
@@ -76,13 +77,18 @@ const confirmAdd = async () => {
   }
 }
 
-const createNewPaper = async () => {
+const createAndImport = async () => {
+  if (props.groupId == null) return
   submitting.value = true
   try {
-    const paper = await create({ title: `新试卷 ${new Date().toLocaleDateString()}`, pub_type: 'exam_paper' })
-    await appendQuestions(paper.id, props.questionIds)
-    toast.success(`已创建并加入 ${props.questionIds.length} 道题`)
-    emit('added')
+    const paper = await create({
+      title: `新试卷 ${new Date().toLocaleDateString()}`,
+      pub_type: 'exam_paper',
+      subject_id: currentSubjectId.value ?? null,
+    })
+    await importGroup(paper.id, props.groupId)
+    toast.success('已创建并解包加入')
+    emit('imported')
     emit('update:open', false)
   } catch {
     toast.error('创建失败')
@@ -96,9 +102,9 @@ const createNewPaper = async () => {
   <Dialog :open="open" @update:open="emit('update:open', $event)">
     <DialogContent class="max-w-2xl">
       <DialogHeader>
-        <DialogTitle>选择试卷</DialogTitle>
+        <DialogTitle>加入试题篮</DialogTitle>
         <DialogDescription>
-          将 {{ questionIds.length }} 道题加入试卷
+          将题组内容解包，追加到所选试卷末尾
         </DialogDescription>
       </DialogHeader>
 
@@ -118,54 +124,32 @@ const createNewPaper = async () => {
             :key="paper.id"
             :class="[
               'w-full flex items-start gap-3 p-3 rounded-lg border-2 transition-all text-left',
-              selectedPaperId === paper.id
-                ? 'border-primary bg-primary/5'
-                : 'border-transparent hover:border-muted hover:bg-muted/50',
+              selectedPaperId === paper.id ? 'border-primary bg-primary/5' : 'border-transparent bg-muted/40 hover:bg-muted',
             ]"
             @click="selectedPaperId = paper.id"
           >
-            <div class="flex-shrink-0 mt-1">
-              <div
-                :class="[
-                  'w-5 h-5 rounded-full border-2 flex items-center justify-center transition-colors',
-                  selectedPaperId === paper.id ? 'border-primary bg-primary' : 'border-muted-foreground',
-                ]"
-              >
-                <Check v-if="selectedPaperId === paper.id" class="h-3 w-3 text-primary-foreground" />
-              </div>
-            </div>
             <div class="flex-1 min-w-0">
-              <div class="flex items-center justify-between gap-2">
-                <div class="font-medium truncate">{{ paper.title }}</div>
-                <Badge v-if="paper.status === 'archived'" variant="secondary">已归档</Badge>
-              </div>
-              <div class="text-sm text-muted-foreground mt-1">
-                {{ paper.block_count }} 项 · {{ formatRelativeTime(paper.updated_at) }}
+              <div class="font-medium truncate">{{ paper.title }}</div>
+              <div class="text-xs text-muted-foreground mt-1 flex items-center gap-2">
+                <Badge variant="secondary">{{ paper.block_count }} 项</Badge>
+                <span>{{ formatRelativeTime(paper.updated_at) }}</span>
               </div>
             </div>
+            <Check v-if="selectedPaperId === paper.id" class="h-5 w-5 text-primary shrink-0" />
           </button>
-
-          <div v-if="filteredPapers.length === 0" class="py-8 text-center text-sm text-muted-foreground">
-            没有匹配的试卷
+          <div v-if="filteredPapers.length === 0" class="text-center text-sm text-muted-foreground py-8">
+            暂无试卷
           </div>
-
-          <button
-            class="w-full flex items-center gap-3 p-3 rounded-lg border-2 border-dashed border-muted-foreground/30 hover:border-primary hover:bg-primary/5 transition-all"
-            @click="createNewPaper"
-          >
-            <div class="w-5 h-5 rounded-full bg-primary/10 flex items-center justify-center">
-              <Plus class="h-3 w-3 text-primary" />
-            </div>
-            <div class="text-sm font-medium text-primary">新建试卷</div>
-          </button>
         </div>
       </ScrollArea>
 
-      <DialogFooter>
-        <Button variant="outline" @click="emit('update:open', false)">取消</Button>
-        <Button :disabled="!selectedPaperId || submitting" @click="confirmAdd">
+      <DialogFooter class="gap-2 sm:justify-between">
+        <Button variant="outline" :disabled="submitting" @click="createAndImport">
+          <Plus class="mr-2 h-4 w-4" /> 新建试卷并加入
+        </Button>
+        <Button :disabled="!selectedPaperId || submitting" @click="confirmImport">
           <Loader2 v-if="submitting" class="mr-2 h-4 w-4 animate-spin" />
-          确定
+          加入所选试卷
         </Button>
       </DialogFooter>
     </DialogContent>

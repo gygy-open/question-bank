@@ -8,8 +8,9 @@ import QuestionEditDialog from '~/components/QuestionEditDialog.vue'
 import QuestionStructureSheet from '~/components/QuestionStructureSheet.vue'
 import PageHeader from '~/components/PageHeader.vue'
 import PaperFullSelector from '~/components/PaperFullSelector.vue'
+import GroupSelector from '~/components/GroupSelector.vue'
 import TagFilter from '~/components/TagFilter.vue'
-import { Loader2, Plus, X, Trash2, ShoppingBasket, ListTree, Edit, SlidersHorizontal, ChevronsUpDown, ChevronLeft, ChevronRight } from '@lucide/vue'
+import { Loader2, Plus, X, Trash2, ShoppingBasket, Package, ListTree, Edit, SlidersHorizontal, ChevronsUpDown, ChevronLeft, ChevronRight } from '@lucide/vue'
 import { Label } from '@/components/ui/label'
 import { Badge } from '@/components/ui/badge'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
@@ -65,6 +66,8 @@ const selectedIds = ref<Set<number>>(new Set())
 // --- Add to paper ---
 const paperSelectorOpen = ref(false)
 const paperSelectorQuestionIds = ref<number[]>([])
+const groupSelectorOpen = ref(false)
+const groupSelectorQuestionIds = ref<number[]>([])
 
 // --- Filters ---
 const filters = reactive({
@@ -201,6 +204,17 @@ const batchAddToBasket = () => {
 }
 
 const onPaperSelectorAdded = () => {
+  selectedIds.value.clear()
+}
+
+const batchAddToGroup = () => {
+  const ids = Array.from(selectedIds.value)
+  if (ids.length === 0) return
+  groupSelectorQuestionIds.value = ids
+  groupSelectorOpen.value = true
+}
+
+const onGroupSelectorAdded = () => {
   selectedIds.value.clear()
 }
 
@@ -673,6 +687,10 @@ const viewStructure = (question: Question) => {
                         <ShoppingBasket class="mr-1 h-3 w-3" />
                         加入试卷
                       </Button>
+                      <Button size="sm" variant="outline" class="h-7 px-2" @click="batchAddToGroup">
+                        <Package class="mr-1 h-3 w-3" />
+                        加入题组
+                      </Button>
                       <Button size="sm" variant="outline" class="h-7 px-2" @click="openBatchUpdateSourceDialog">
                         <Edit class="mr-1 h-3 w-3" />
                         修改来源
@@ -807,5 +825,11 @@ const viewStructure = (question: Question) => {
     v-model:open="paperSelectorOpen"
     :question-ids="paperSelectorQuestionIds"
     @added="onPaperSelectorAdded"
+  />
+
+  <GroupSelector
+    v-model:open="groupSelectorOpen"
+    :question-ids="groupSelectorQuestionIds"
+    @added="onGroupSelectorAdded"
   />
 </template>
