@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Separator } from '@/components/ui/separator'
-import { BookOpen, Bold, Italic, List, ListOrdered, Quote, Code, Sigma, ImageIcon, Keyboard, Mouse } from '@lucide/vue'
+import { Bold, Italic, List, ListOrdered, Quote, Code, Sigma, ImageIcon, Keyboard, Mouse } from '@lucide/vue'
+import PageHeader from '~/components/PageHeader.vue'
 
 definePageMeta({
   layout: 'default',
@@ -9,16 +10,10 @@ definePageMeta({
 </script>
 
 <template>
-  <div class="flex flex-1 flex-col gap-4 p-4 pt-0">
-    <!-- Header -->
-    <header class="sticky top-0 z-10 flex h-14 items-center gap-4 border-b bg-background px-4 sm:static sm:h-auto sm:border-0 sm:bg-transparent sm:px-6 lg:h-[60px] lg:px-8">
-      <div class="flex items-center gap-2">
-        <BookOpen class="h-6 w-6" />
-        <h1 class="text-xl font-semibold">系统使用手册</h1>
-      </div>
-    </header>
+  <PageHeader title="系统使用手册" />
 
-    <div class="mx-auto w-full max-w-5xl space-y-6 px-4 sm:px-6 lg:px-8">
+  <div class="flex-1 overflow-auto">
+    <div class="mx-auto w-full max-w-5xl space-y-6 p-4 sm:p-6 lg:p-8">
       <!-- 编辑器使用说明 -->
       <Card>
         <CardHeader>
@@ -304,7 +299,7 @@ definePageMeta({
       <!-- 底部提示 -->
       <div class="p-4 rounded-lg bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 text-sm">
         <p class="text-blue-900 dark:text-blue-100">
-          📚 更多功能正在开发中，敬请期待！如有问题或建议，请联系系统管理员。
+          📚 更多功能正在开发中，敬请期待！
         </p>
       </div>
     </div>
