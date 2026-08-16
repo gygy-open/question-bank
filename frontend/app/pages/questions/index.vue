@@ -9,7 +9,7 @@ import QuestionStructureSheet from '~/components/QuestionStructureSheet.vue'
 import PageHeader from '~/components/PageHeader.vue'
 import PaperFullSelector from '~/components/PaperFullSelector.vue'
 import TagFilter from '~/components/TagFilter.vue'
-import { Loader2, Plus, X, Trash2, ShoppingBasket, ListTree, Edit, SlidersHorizontal, ChevronsUpDown } from '@lucide/vue'
+import { Loader2, Plus, X, Trash2, ShoppingBasket, ListTree, Edit, SlidersHorizontal, ChevronsUpDown, ChevronLeft, ChevronRight } from '@lucide/vue'
 import { Label } from '@/components/ui/label'
 import { Badge } from '@/components/ui/badge'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
@@ -22,8 +22,6 @@ import {
 import {
   Pagination,
   PaginationEllipsis,
-  PaginationFirst,
-  PaginationLast,
   PaginationContent,
   PaginationItem,
   PaginationNext,
@@ -726,23 +724,31 @@ const viewStructure = (question: Question) => {
                   />
                 </div>
 
-                <!-- Pagination -->
-                <div v-if="total > 0" class="flex justify-center mt-4 pb-8">
+                <!-- Pagination: icon-only prev/next + subdued active page, kept light to match the card list -->
+                <div v-if="total > 0" class="flex justify-center mt-10 pb-8">
                   <Pagination v-model:page="page" :total="total" :sibling-count="1" show-edges :default-page="1"
                     :items-per-page="pageSize">
                     <PaginationContent v-slot="{ items }" class="flex items-center gap-1">
-                      <PaginationFirst />
-                      <PaginationPrevious />
+                      <PaginationPrevious class="h-8 w-8 p-0" aria-label="上一页">
+                        <ChevronLeft class="h-4 w-4" />
+                      </PaginationPrevious>
                       <template v-for="(item, index) in items">
                         <PaginationItem v-if="item.type === 'page'" :key="index" :value="item.value" as-child>
-                          <Button class="w-10 h-10 p-0" :variant="item.value === page ? 'default' : 'outline'">
+                          <Button
+                            :variant="item.value === page ? 'outline' : 'ghost'"
+                            :class="[
+                              'w-8 h-8 p-0 text-sm',
+                              item.value === page ? 'border-primary text-primary font-medium' : 'text-muted-foreground'
+                            ]"
+                          >
                             {{ item.value }}
                           </Button>
                         </PaginationItem>
-                        <PaginationEllipsis v-else :key="item.type" :index="index" />
+                        <PaginationEllipsis v-else :key="item.type" :index="index" class="size-8" />
                       </template>
-                      <PaginationNext />
-                      <PaginationLast />
+                      <PaginationNext class="h-8 w-8 p-0" aria-label="下一页">
+                        <ChevronRight class="h-4 w-4" />
+                      </PaginationNext>
                     </PaginationContent>
                   </Pagination>
                 </div>
