@@ -10,14 +10,14 @@ from pathlib import Path
 import pypandoc
 
 from app.models.question import Question, QuestionType
-from app.models.publication import PublicationBlock, BlockType
-from app.schemas.publication import OutputFormat, ContentPosition
+from app.models.composition import CompositionBlock, BlockType
+from app.schemas.composition import OutputFormat, ContentPosition
 from app.core.config import settings
 
 logger = logging.getLogger(__name__)
 
 
-class PublicationRenderer:
+class CompositionRenderer:
     """基于内容块 (Block) 的按需导出渲染引擎。
 
     渲染管线: Blocks -> 中间态 Markdown -> Pandoc -> DOCX / LaTeX(zip)。
@@ -140,7 +140,7 @@ class PublicationRenderer:
                         md_lines.append(f"{label}\\. {self._process_images(str(text), image_handler)}  ")
                 md_lines.append("")
 
-    def _block_content_text(self, block: PublicationBlock) -> str:
+    def _block_content_text(self, block: CompositionBlock) -> str:
         content = block.content or {}
         if isinstance(content, str):
             return content
@@ -149,7 +149,7 @@ class PublicationRenderer:
     def generate_markdown(
         self,
         title: str,
-        blocks: List[PublicationBlock],
+        blocks: List[CompositionBlock],
         content_position: ContentPosition = ContentPosition.AFTER_QUESTION,
         include_answer: bool = True,
         include_analysis: bool = True,
@@ -219,7 +219,7 @@ class PublicationRenderer:
     def generate_file(
         self,
         title: str,
-        blocks: List[PublicationBlock],
+        blocks: List[CompositionBlock],
         format: OutputFormat,
         content_position: ContentPosition = ContentPosition.AFTER_QUESTION,
         include_answer: bool = True,
@@ -269,7 +269,7 @@ class PublicationRenderer:
     def _generate_latex_zip(
         self,
         title: str,
-        blocks: List[PublicationBlock],
+        blocks: List[CompositionBlock],
         content_position: ContentPosition,
         include_answer: bool,
         include_analysis: bool,
@@ -328,4 +328,5 @@ class PublicationRenderer:
         )
 
 
-publication_renderer = PublicationRenderer()
+publication_renderer = CompositionRenderer()
+composition_renderer = publication_renderer

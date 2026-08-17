@@ -15,20 +15,20 @@ import { toast } from 'vue-sonner'
 import BlockCanvas from '@/components/canvas/BlockCanvas.vue'
 import { toEditorBlock, toBlockWrite, type EditorBlock } from '@/components/canvas/blockRegistry'
 import PaperQuestionDetailSheet from '@/components/PaperQuestionDetailSheet.vue'
-import { usePublications } from '~/composables/usePublications'
-import type { PublicationDetail, Subject, KnowledgePoint } from '~/types'
+import { useCompositions } from '~/composables/useCompositions'
+import type { CompositionDetail, Subject, KnowledgePoint } from '~/types'
 
 const route = useRoute()
 const router = useRouter()
 const pubId = Number(route.params.id)
 
-const { get, update, saveBlocks } = usePublications()
+const { get, update, saveBlocks } = useCompositions()
 const { data: subjects } = await useAPI<Subject[]>('/subjects')
 const { data: knowledgePoints } = await useAPI<KnowledgePoint[]>('/knowledge-points', {
   query: { limit: -1 },
 })
 
-const publication = ref<PublicationDetail | null>(null)
+const publication = ref<CompositionDetail | null>(null)
 const blocks = ref<EditorBlock[]>([])
 const loading = ref(true)
 
@@ -57,7 +57,7 @@ const load = async () => {
     blocks.value = data.blocks.map(toEditorBlock)
   } catch {
     toast.error('加载题组失败')
-    router.push('/groups')
+    router.push('/library?type=group')
   } finally {
     loading.value = false
   }
@@ -94,7 +94,6 @@ const saveInfo = useDebounceFn(async () => {
   try {
     await update(pubId, {
       title: publication.value.title,
-      subject_id: publication.value.subject_id ?? null,
       description: publication.value.description ?? null,
       difficulty: publication.value.difficulty ?? null,
     })
@@ -136,7 +135,7 @@ watch(
     <div class="border-b bg-background sticky top-0 z-10">
       <div class="flex items-center justify-between px-4 py-3 gap-3">
         <div class="flex items-center gap-3 min-w-0">
-          <Button variant="ghost" size="icon" @click="router.push('/groups')">
+          <Button variant="ghost" size="icon" @click="router.push('/library?type=group')">
             <ArrowLeft class="h-4 w-4" />
           </Button>
           <div class="min-w-0">
@@ -199,7 +198,7 @@ watch(
               </div>
               <div class="space-y-2">
                 <Label>科目</Label>
-                <Select v-model="publication.subject_id" @update:model-value="saveInfo">
+                <Select v-model="publication.subject_id" disabled>
                   <SelectTrigger>
                     <SelectValue placeholder="选择科目" />
                   </SelectTrigger>

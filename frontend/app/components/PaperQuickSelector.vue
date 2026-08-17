@@ -5,19 +5,19 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { ShoppingBasket, Clock, Plus, List, Loader2, CheckCircle } from '@lucide/vue'
 import { toast } from 'vue-sonner'
-import { usePublications } from '@/composables/usePublications'
-import type { Publication } from '~/types'
+import { useCompositions } from '@/composables/useCompositions'
+import type { Composition } from '~/types'
 
 const props = defineProps<{
   questionId: number
 }>()
 
-const { list, create, appendQuestions } = usePublications()
+const { list, create, appendQuestions } = useCompositions()
 const { currentSubjectId } = useSubjectContext()
 
 const open = ref(false)
 const loading = ref(false)
-const papers = ref<Publication[]>([])
+const papers = ref<Composition[]>([])
 const total = ref(0)
 
 const showFull = ref(false)
@@ -25,7 +25,7 @@ const showFull = ref(false)
 const loadPapers = async () => {
   loading.value = true
   try {
-    const data = await list({ pub_type: 'exam_paper', subject_id: currentSubjectId.value, status: 'draft', sort: 'updated_desc' })
+    const data = await list({ comp_type: 'exam_paper', subject_id: currentSubjectId.value, status: 'draft', sort: 'updated_desc' })
     papers.value = data
     total.value = data.length
   } catch {
@@ -40,7 +40,7 @@ const onOpenChange = (value: boolean) => {
   if (value) loadPapers()
 }
 
-const addToPaper = async (paper: Publication) => {
+const addToPaper = async (paper: Composition) => {
   try {
     await appendQuestions(paper.id, [props.questionId])
     toast.success(`已加入《${paper.title}》`)
@@ -52,7 +52,7 @@ const addToPaper = async (paper: Publication) => {
 
 const createAndAdd = async () => {
   try {
-    const paper = await create({ title: `新试卷 ${new Date().toLocaleDateString()}`, pub_type: 'exam_paper' })
+    const paper = await create({ title: `新试卷 ${new Date().toLocaleDateString()}`, comp_type: 'exam_paper' })
     await appendQuestions(paper.id, [props.questionId])
     toast.success(`已创建并加入《${paper.title}》`)
     open.value = false
@@ -63,7 +63,7 @@ const createAndAdd = async () => {
 
 const goToAllPapers = () => {
   open.value = false
-  navigateTo('/papers')
+  navigateTo('/library?scope=personal')
 }
 
 const onKey = (e: KeyboardEvent) => {

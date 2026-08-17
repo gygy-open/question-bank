@@ -9,9 +9,9 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Search, Check, Plus, Loader2 } from '@lucide/vue'
 import { toast } from 'vue-sonner'
-import { usePublications } from '@/composables/usePublications'
+import { useCompositions } from '@/composables/useCompositions'
 import { formatRelativeTime } from '@/lib/utils'
-import type { Publication } from '~/types'
+import type { Composition } from '~/types'
 
 const props = defineProps<{
   open: boolean
@@ -23,12 +23,12 @@ const emit = defineEmits<{
   added: []
 }>()
 
-const { list, create, appendQuestions } = usePublications()
+const { list, create, appendQuestions } = useCompositions()
 const { currentSubjectId } = useSubjectContext()
 
 const loading = ref(false)
 const submitting = ref(false)
-const groups = ref<Publication[]>([])
+const groups = ref<Composition[]>([])
 const searchQuery = ref('')
 const selectedGroupId = ref<number | null>(null)
 
@@ -41,7 +41,7 @@ const filteredGroups = computed(() => {
 const loadGroups = async () => {
   loading.value = true
   try {
-    groups.value = await list({ pub_type: 'question_group', subject_id: currentSubjectId.value, sort: 'updated_desc' })
+    groups.value = await list({ comp_type: 'question_group', subject_id: currentSubjectId.value, sort: 'updated_desc' })
   } catch {
     toast.error('加载题组失败')
   } finally {
@@ -81,7 +81,7 @@ const createNewGroup = async () => {
   try {
     const group = await create({
       title: `新题组 ${new Date().toLocaleDateString()}`,
-      pub_type: 'question_group',
+      comp_type: 'question_group',
       subject_id: currentSubjectId.value ?? null,
     })
     await appendQuestions(group.id, props.questionIds)

@@ -47,5 +47,5 @@ class User(Base):
     tags_created = relationship("Tag", foreign_keys="Tag.created_by", back_populates="creator")
     tags_updated = relationship("Tag", foreign_keys="Tag.updated_by", back_populates="updater")
 
-    # Publication (试卷/学案/题组)
-    publications = relationship("Publication", back_populates="owner", cascade="all, delete-orphan")
+    # Composition (题组/试卷/学案/讲义) — owner 为创建人
+    compositions = relationship("Composition", back_populates="owner", cascade="all, delete-orphan")

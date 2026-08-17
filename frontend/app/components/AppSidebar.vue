@@ -96,29 +96,43 @@ const navActiveClass = 'border-l-2 border-transparent data-[active=true]:border-
       <SidebarGroup>
         <SidebarGroupContent class="flex flex-col gap-3">
           <div>
-            <SidebarGroupLabel>内容</SidebarGroupLabel>
+            <SidebarGroupLabel>资源库</SidebarGroupLabel>
             <SidebarMenu>
               <SidebarMenuItem>
                 <SidebarMenuButton as-child :is-active="route.path === '/questions'" :class="navActiveClass">
                   <NuxtLink to="/questions">
                     <BookOpen />
-                    <span>题目管理</span>
+                    <span>题库</span>
                   </NuxtLink>
                 </SidebarMenuButton>
               </SidebarMenuItem>
               <SidebarMenuItem>
-                <SidebarMenuButton as-child :is-active="route.path.startsWith('/papers')" :class="navActiveClass">
-                  <NuxtLink to="/papers">
-                    <ClipboardList />
-                    <span>我的试卷</span>
-                  </NuxtLink>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-              <SidebarMenuItem>
-                <SidebarMenuButton as-child :is-active="route.path.startsWith('/groups')" :class="navActiveClass">
-                  <NuxtLink to="/groups">
+                <SidebarMenuButton as-child :is-active="route.path.startsWith('/library') && route.query.type === 'group'" :class="navActiveClass">
+                  <NuxtLink to="/library?type=group">
                     <Package />
                     <span>题组</span>
+                  </NuxtLink>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+            </SidebarMenu>
+          </div>
+
+          <div>
+            <SidebarGroupLabel>作品库</SidebarGroupLabel>
+            <SidebarMenu>
+              <SidebarMenuItem>
+                <SidebarMenuButton as-child :is-active="route.path.startsWith('/library') && route.query.type !== 'group' && route.query.scope === 'team'" :class="navActiveClass">
+                  <NuxtLink to="/library?scope=team">
+                    <Users />
+                    <span>团队空间</span>
+                  </NuxtLink>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+              <SidebarMenuItem>
+                <SidebarMenuButton as-child :is-active="route.path.startsWith('/library') && route.query.type !== 'group' && route.query.scope !== 'team'" :class="navActiveClass">
+                  <NuxtLink to="/library?scope=personal">
+                    <User />
+                    <span>我的空间</span>
                   </NuxtLink>
                 </SidebarMenuButton>
               </SidebarMenuItem>

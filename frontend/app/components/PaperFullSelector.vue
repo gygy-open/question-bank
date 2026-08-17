@@ -9,9 +9,9 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Search, Check, Plus, Loader2 } from '@lucide/vue'
 import { toast } from 'vue-sonner'
-import { usePublications } from '@/composables/usePublications'
+import { useCompositions } from '@/composables/useCompositions'
 import { formatRelativeTime } from '@/lib/utils'
-import type { Publication } from '~/types'
+import type { Composition } from '~/types'
 
 const props = defineProps<{
   open: boolean
@@ -23,12 +23,12 @@ const emit = defineEmits<{
   added: []
 }>()
 
-const { list, create, appendQuestions } = usePublications()
+const { list, create, appendQuestions } = useCompositions()
 const { currentSubjectId } = useSubjectContext()
 
 const loading = ref(false)
 const submitting = ref(false)
-const papers = ref<Publication[]>([])
+const papers = ref<Composition[]>([])
 const searchQuery = ref('')
 const selectedPaperId = ref<number | null>(null)
 
@@ -41,7 +41,7 @@ const filteredPapers = computed(() => {
 const loadPapers = async () => {
   loading.value = true
   try {
-    papers.value = await list({ pub_type: 'exam_paper', subject_id: currentSubjectId.value, sort: 'updated_desc' })
+    papers.value = await list({ comp_type: 'exam_paper', subject_id: currentSubjectId.value, sort: 'updated_desc' })
   } catch {
     toast.error('加载试卷失败')
   } finally {
@@ -79,7 +79,7 @@ const confirmAdd = async () => {
 const createNewPaper = async () => {
   submitting.value = true
   try {
-    const paper = await create({ title: `新试卷 ${new Date().toLocaleDateString()}`, pub_type: 'exam_paper' })
+    const paper = await create({ title: `新试卷 ${new Date().toLocaleDateString()}`, comp_type: 'exam_paper' })
     await appendQuestions(paper.id, props.questionIds)
     toast.success(`已创建并加入 ${props.questionIds.length} 道题`)
     emit('added')

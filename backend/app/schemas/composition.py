@@ -3,12 +3,13 @@ from typing import List, Optional, Any
 from enum import Enum
 from datetime import datetime
 
-from app.models.publication import PublicationStatus, PublicationType, BlockType
+from app.models.composition import CompositionStatus, CompositionScope, BlockType
 
 
 class OutputFormat(str, Enum):
     DOCX = "docx"
     LATEX = "latex"
+
 
 class ContentPosition(str, Enum):
     """Where to place additional content (answers, explanations, etc.)"""
@@ -19,7 +20,7 @@ class ContentPosition(str, Enum):
 
 # --- Export ---
 
-class PublicationExportOptions(BaseModel):
+class CompositionExportOptions(BaseModel):
     title: Optional[str] = None
     format: OutputFormat = OutputFormat.DOCX
     content_position: ContentPosition = ContentPosition.AFTER_QUESTION
@@ -30,24 +31,52 @@ class PublicationExportOptions(BaseModel):
     include_source: bool = False
 
 
-# --- Publication CRUD ---
+# --- Folder ---
 
-class PublicationCreate(BaseModel):
+class FolderCreate(BaseModel):
+    name: str
+    kind: str                       # component / deliverable
+    subject_id: int
+    scope: Optional[str] = None     # deliverable 树: team / personal
+    parent_id: Optional[int] = None
+
+
+class FolderUpdate(BaseModel):
+    name: Optional[str] = None
+    parent_id: Optional[int] = None  # 移动
+
+
+class FolderRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    name: str
+    parent_id: Optional[int] = None
+    kind: str
+    scope: Optional[str] = None
+    subject_id: int
+    owner_id: int
+    sequence: Optional[int] = 0
+
+
+# --- Composition CRUD ---
+
+class CompositionCreate(BaseModel):
     title: str
-    pub_type: PublicationType = PublicationType.EXAM_PAPER
-    subject_id: Optional[int] = None
+    comp_type: str = "exam_paper"
+    folder_id: Optional[int] = None      # 缺省 -> 解析/创建对应根文件夹
+    subject_id: Optional[int] = None     # 无 folder_id 时用于解析根文件夹
+    scope: Optional[str] = None          # deliverable 缺省 personal
     description: Optional[str] = None
     difficulty: Optional[int] = None
-    knowledge_point_ids: Optional[List[int]] = None
 
 
-class PublicationUpdate(BaseModel):
+class CompositionUpdate(BaseModel):
     title: Optional[str] = None
-    subject_id: Optional[int] = None
     description: Optional[str] = None
-    status: Optional[PublicationStatus] = None
+    status: Optional[CompositionStatus] = None
     difficulty: Optional[int] = None
-    knowledge_point_ids: Optional[List[int]] = None
+    folder_id: Optional[int] = None      # 移动 (可跨 scope)
 
 
 # --- Blocks ---
@@ -70,6 +99,7 @@ class BlockWrite(BaseModel):
     block_type: BlockType
     content: Optional[Any] = None
     ref_question_id: Optional[int] = None
+    ref_composition_id: Optional[int] = None
 
 
 class BlocksReplace(BaseModel):
@@ -85,25 +115,26 @@ class BlockRead(BaseModel):
     sequence: int
     content: Optional[Any] = None
     ref_question_id: Optional[int] = None
+    ref_composition_id: Optional[int] = None
     question: Optional[QuestionBrief] = None
 
 
-class PublicationRead(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
-
+class CompositionRead(BaseModel):
     id: int
-    pub_type: str
+    comp_type: str
+    kind: Optional[str] = None
     title: str
     description: Optional[str] = None
     status: str
     difficulty: Optional[int] = None
+    folder_id: int
     subject_id: Optional[int] = None
+    scope: Optional[str] = None
     owner_id: int
     created_at: datetime
     updated_at: datetime
     block_count: int = 0
 
 
-class PublicationDetail(PublicationRead):
+class CompositionDetail(CompositionRead):
     blocks: List[BlockRead] = []
-    knowledge_point_ids: List[int] = []

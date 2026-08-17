@@ -212,45 +212,65 @@ export interface PaperDetail extends Paper {
   items: PaperItem[]
 }
 
-// --- Publication (Block Canvas) ---
+// --- Composition (Block Canvas) ---
 
-export type BlockType = 'heading' | 'text' | 'question' | 'page_break'
+export type BlockType = 'heading' | 'text' | 'question' | 'component_ref' | 'page_break'
 
-export type PublicationType = 'exam_paper' | 'study_guide' | 'question_group'
+export type CompositionKind = 'component' | 'deliverable'
 
-export interface PublicationBlock {
+export type CompositionScope = 'team' | 'personal'
+
+/** 版式(注册表驱动): 题组 / 试卷 / 学案 / 专题讲义 ... */
+export type CompType = 'question_group' | 'exam_paper' | 'study_guide' | 'handout'
+
+export interface Folder {
+  id: number
+  name: string
+  parent_id?: number | null
+  kind: CompositionKind
+  scope?: CompositionScope | null
+  subject_id: number
+  owner_id: number
+  sequence?: number
+}
+
+export interface CompositionBlock {
   id: number
   block_type: BlockType
   sequence: number
   content?: Record<string, any> | null
   ref_question_id?: number | null
+  ref_composition_id?: number | null
   question?: QuestionBrief | null
 }
 
-export interface Publication {
+export interface Composition {
   id: number
-  pub_type: PublicationType
+  comp_type: CompType
+  kind?: CompositionKind | null
   title: string
   description?: string | null
-  status: 'draft' | 'archived'
+  status: 'draft' | 'published' | 'archived'
   difficulty?: number | null
+  folder_id: number
   subject_id?: number | null
+  scope?: CompositionScope | null
   owner_id: number
   created_at: string
   updated_at: string
   block_count: number
 }
 
-export interface PublicationDetail extends Publication {
-  blocks: PublicationBlock[]
-  knowledge_point_ids: number[]
+export interface CompositionDetail extends Composition {
+  blocks: CompositionBlock[]
 }
 
-/** Block payload for saving (PUT /publications/:id/blocks). */
+/** Block payload for saving (PUT /compositions/:id/blocks). */
 export interface BlockWrite {
   block_type: BlockType
   content?: Record<string, any> | null
   ref_question_id?: number | null
+  ref_composition_id?: number | null
 }
 
 
