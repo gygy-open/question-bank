@@ -1,4 +1,4 @@
-import type { Composition, CompositionDetail, BlockWrite, CompType, CompositionKind, CompositionScope } from '~/types'
+import type { Composition, CompositionDetail, BlockWrite, CompType, CompositionScope } from '~/types'
 
 export interface CompositionCreatePayload {
   title: string
@@ -30,7 +30,6 @@ export interface CompositionExportOptions {
 }
 
 export interface CompositionListParams {
-  kind?: CompositionKind
   scope?: CompositionScope
   subject_id?: number | null
   comp_type?: CompType

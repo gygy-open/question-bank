@@ -216,8 +216,6 @@ export interface PaperDetail extends Paper {
 
 export type BlockType = 'heading' | 'text' | 'question' | 'component_ref' | 'page_break'
 
-export type CompositionKind = 'component' | 'deliverable'
-
 export type CompositionScope = 'team' | 'personal'
 
 /** 版式(注册表驱动): 题组 / 试卷 / 学案 / 专题讲义 ... */
@@ -227,8 +225,7 @@ export interface Folder {
   id: number
   name: string
   parent_id?: number | null
-  kind: CompositionKind
-  scope?: CompositionScope | null
+  scope: CompositionScope
   subject_id: number
   owner_id: number
   sequence?: number
@@ -242,12 +239,12 @@ export interface CompositionBlock {
   ref_question_id?: number | null
   ref_composition_id?: number | null
   question?: QuestionBrief | null
+  ref_composition?: CompositionBrief | null
 }
 
 export interface Composition {
   id: number
   comp_type: CompType
-  kind?: CompositionKind | null
   title: string
   description?: string | null
   status: 'draft' | 'published' | 'archived'
@@ -259,6 +256,13 @@ export interface Composition {
   created_at: string
   updated_at: string
   block_count: number
+}
+
+/** 供 component_ref 块预览的组稿摘要. */
+export interface CompositionBrief {
+  id: number
+  title: string
+  comp_type: CompType
 }
 
 export interface CompositionDetail extends Composition {

@@ -1,8 +1,7 @@
-import type { Folder, CompositionKind, CompositionScope } from '~/types'
+import type { Folder, CompositionScope } from '~/types'
 
 export interface FolderCreatePayload {
   name: string
-  kind: CompositionKind
   subject_id: number
   scope?: CompositionScope | null
   parent_id?: number | null
@@ -14,7 +13,6 @@ export interface FolderUpdatePayload {
 }
 
 export interface FolderListParams {
-  kind: CompositionKind
   subject_id?: number | null
   scope?: CompositionScope | null
 }

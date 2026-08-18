@@ -2,7 +2,7 @@ from typing import List, Optional
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 
-from app.models.composition import Folder, CompositionScope
+from app.models.composition import Folder, FolderScope
 
 
 class CRUDFolder:
@@ -12,33 +12,28 @@ class CRUDFolder:
         *,
         owner_id: int,
         subject_id: int,
-        kind: str,
-        scope: Optional[str] = None,
+        scope: str = FolderScope.PERSONAL.value,
     ) -> Folder:
-        """找到或创建 (owner, subject, kind, scope) 的根文件夹 (parent_id 为空)。
+        """找到或创建根文件夹 (parent_id 为空).
 
-        component 树全员共享: 忽略 owner 维度, scope 恒 NULL。
+        personal: 按 (subject_id, owner_id, scope) 唯一; team: 按 (subject_id, scope) 全组共用一个。
         """
         query = select(Folder).where(
             Folder.parent_id.is_(None),
             Folder.subject_id == subject_id,
-            Folder.kind == kind,
+            Folder.scope == scope,
         )
-        if kind == "component":
-            scope = None
-            query = query.where(Folder.scope.is_(None))
-        else:
-            scope = scope or CompositionScope.PERSONAL.value
-            query = query.where(Folder.scope == scope, Folder.owner_id == owner_id)
+        if scope == FolderScope.PERSONAL.value:
+            query = query.where(Folder.owner_id == owner_id)
 
         existing = (await db.execute(query)).scalars().first()
         if existing:
             return existing
 
-        name = "题组库" if kind == "component" else ("团队作品" if scope == "team" else "我的作品")
+        name = "团队共享" if scope == FolderScope.TEAM.value else "我的空间"
         folder = Folder(
-            name=name, parent_id=None, kind=kind, scope=scope,
-            subject_id=subject_id, owner_id=owner_id, sequence=0,
+            name=name, parent_id=None,
+            subject_id=subject_id, owner_id=owner_id, scope=scope, sequence=0,
         )
         db.add(folder)
         await db.commit()
@@ -55,28 +50,24 @@ class CRUDFolder:
         db: AsyncSession,
         *,
         subject_id: int,
-        kind: str,
         scope: Optional[str] = None,
         owner_id: Optional[int] = None,
     ) -> List[Folder]:
-        query = select(Folder).where(Folder.subject_id == subject_id, Folder.kind == kind)
-        if kind == "component":
-            query = query.where(Folder.scope.is_(None))
-        else:
-            if scope:
-                query = query.where(Folder.scope == scope)
-            if scope == CompositionScope.PERSONAL.value and owner_id is not None:
-                query = query.where(Folder.owner_id == owner_id)
+        query = select(Folder).where(Folder.subject_id == subject_id)
+        if scope is not None:
+            query = query.where(Folder.scope == scope)
+        if owner_id is not None:
+            query = query.where(Folder.owner_id == owner_id)
+        
         query = query.order_by(Folder.sequence, Folder.name)
-        return (await db.execute(query)).scalars().all()
+        return list((await db.execute(query)).scalars().all())
 
     async def create(self, db: AsyncSession, *, obj_in, owner_id: int) -> Folder:
         folder = Folder(
             name=obj_in.name,
-            kind=obj_in.kind,
-            scope=obj_in.scope if obj_in.kind != "component" else None,
             subject_id=obj_in.subject_id,
             parent_id=obj_in.parent_id,
+            scope=obj_in.scope,
             owner_id=owner_id,
         )
         db.add(folder)

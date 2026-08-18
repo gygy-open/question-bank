@@ -16,8 +16,7 @@ from .composition import (
     Composition,
     CompositionBlock,
     CompositionStatus,
-    CompositionKind,
-    CompositionScope,
+    FolderScope,
     BlockType,
     Folder,
 )

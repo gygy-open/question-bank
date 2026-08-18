@@ -4,9 +4,7 @@ import { useDebounceFn } from '@vueuse/core'
 import { Button } from '@/components/ui/button'
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
-import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Textarea } from '@/components/ui/textarea'
 import { Separator } from '@/components/ui/separator'
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
@@ -17,14 +15,14 @@ import {
 import { Checkbox } from '@/components/ui/checkbox'
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
 import {
-  ArrowLeft, Download, Loader2, CheckCircle, Plus, FileDown,
+  ArrowLeft, Download, Loader2, CheckCircle, FileDown,
 } from '@lucide/vue'
 import { toast } from 'vue-sonner'
 import BlockCanvas from '@/components/canvas/BlockCanvas.vue'
 import { toEditorBlock, toBlockWrite, type EditorBlock } from '@/components/canvas/blockRegistry'
 import PaperQuestionDetailSheet from '@/components/PaperQuestionDetailSheet.vue'
 import { useCompositions } from '~/composables/useCompositions'
-import type { CompositionDetail, Subject, KnowledgePoint } from '~/types'
+import type { CompositionDetail, Subject, KnowledgePoint, CompType } from '~/types'
 
 const route = useRoute()
 const router = useRouter()
@@ -47,7 +45,12 @@ const savingStatus = ref('')
 const detailSheetOpen = ref(false)
 const detailQuestionId = ref<number | null>(null)
 
-const canvasContext = { pubType: 'exam_paper' as const, showAnswers: false }
+// 教学模块需展示答案便于编辑核对; 讲义/试卷默认不展示
+const canvasContext = computed(() => ({
+  pubType: (publication.value?.comp_type ?? 'exam_paper') as CompType,
+  showAnswers: publication.value?.comp_type === 'question_group',
+  compId: pubId,
+}))
 
 const load = async () => {
   loading.value = true
@@ -109,7 +112,6 @@ const savePaperInfo = useDebounceFn(async () => {
   try {
     await update(pubId, {
       title: publication.value.title,
-      description: publication.value.description ?? null,
     })
     saved.value = true
     savingStatus.value = '已保存'
@@ -126,10 +128,6 @@ const viewQuestion = (block: EditorBlock) => {
     detailQuestionId.value = block.question.id
     detailSheetOpen.value = true
   }
-}
-
-const goToLibrary = () => {
-  router.push('/questions')
 }
 
 // --- Export ---
@@ -165,7 +163,7 @@ const doExport = async () => {
     document.body.removeChild(link)
     window.URL.revokeObjectURL(url)
     exportOpen.value = false
-    toast.success('试卷已导出')
+    toast.success('已导出')
   } catch {
     toast.error('导出失败')
   } finally {
@@ -217,23 +215,15 @@ watch(
       <!-- Left: paper preview / canvas -->
       <div class="flex-1 overflow-y-auto bg-muted/30">
         <div class="p-6 max-w-3xl mx-auto">
-          <div class="flex items-center justify-between mb-4">
-            <div class="text-sm text-muted-foreground">共 {{ questionCount }} 道题目</div>
-            <Button variant="outline" size="sm" @click="goToLibrary">
-              <Plus class="mr-2 h-4 w-4" /> 去题库添加
-            </Button>
-          </div>
-
-          <div
-            v-if="blocks.length > 0"
-            class="bg-background rounded-lg shadow-sm border px-10 py-8"
-          >
-            <!-- 试卷抬头 -->
+          <div class="bg-background rounded-lg shadow-sm border px-10 py-8">
+            <!-- 抬头: 标题直接在此编辑 -->
             <div class="text-center mb-6 pb-4 border-b">
-              <h1 class="text-2xl font-bold">{{ publication.title }}</h1>
-              <p v-if="publication.description" class="text-sm text-muted-foreground mt-2">
-                {{ publication.description }}
-              </p>
+              <input
+                v-model="publication.title"
+                class="w-full bg-transparent text-center text-2xl font-bold outline-none focus:bg-muted/40 rounded-md px-2 py-1"
+                placeholder="无标题"
+                @blur="savePaperInfo"
+              />
             </div>
 
             <BlockCanvas
@@ -242,16 +232,10 @@ watch(
               @change="onCanvasChange"
               @view-detail="viewQuestion"
             />
-          </div>
 
-          <div
-            v-else
-            class="bg-background rounded-lg shadow-sm border flex flex-col items-center justify-center py-16 text-center"
-          >
-            <p class="text-muted-foreground mb-4">还没有内容</p>
-            <Button @click="goToLibrary">
-              <Plus class="mr-2 h-4 w-4" /> 去题库添加题目
-            </Button>
+            <p v-if="blocks.length === 0" class="mt-4 text-center text-sm text-muted-foreground">
+              还没有内容，点击上方「插入内容」或悬停在块之间开始编辑
+            </p>
           </div>
         </div>
       </div>
@@ -259,35 +243,6 @@ watch(
       <!-- Right: config panel -->
       <div class="hidden md:block w-80 overflow-y-auto bg-muted/20 border-l">
         <div class="p-4 space-y-6">
-          <Card>
-            <CardHeader class="pb-3">
-              <CardTitle class="text-base">基本信息</CardTitle>
-            </CardHeader>
-            <CardContent class="space-y-4">
-              <div class="space-y-2">
-                <Label>标题</Label>
-                <Input v-model="publication.title" />
-              </div>
-              <div class="space-y-2">
-                <Label>科目</Label>
-                <Select v-model="publication.subject_id" disabled>
-                  <SelectTrigger>
-                    <SelectValue placeholder="选择科目" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem v-for="s in subjects" :key="s.id" :value="s.id">
-                      {{ s.name }}
-                    </SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div class="space-y-2">
-                <Label>描述</Label>
-                <Textarea v-model="publication.description" rows="3" @blur="savePaperInfo" />
-              </div>
-            </CardContent>
-          </Card>
-
           <Card>
             <CardHeader class="pb-3">
               <CardTitle class="text-base">题目统计</CardTitle>

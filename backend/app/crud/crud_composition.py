@@ -1,20 +1,17 @@
 from typing import List, Optional
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, desc, func, or_, and_
+from sqlalchemy import select, desc, func
 from sqlalchemy.orm import selectinload
 
 from app.crud.base import CRUDBase
 from app.models.composition import (
     Composition,
     CompositionBlock,
-    CompositionStatus,
-    CompositionScope,
     BlockType,
     Folder,
+    FolderScope,
 )
-from app.models.question import Question
 from app.schemas.composition import CompositionCreate, CompositionUpdate, BlockWrite
-from app.services.composition_registry import kind_for
 from app.crud.crud_folder import folder as crud_folder
 
 
@@ -24,11 +21,8 @@ class CRUDComposition(CRUDBase[Composition, CompositionCreate, CompositionUpdate
     ) -> int:
         if obj_in.folder_id:
             return obj_in.folder_id
-        kind = kind_for(obj_in.comp_type).value
-        root = await crud_folder.ensure_root(
-            db, owner_id=owner_id, subject_id=subject_id, kind=kind,
-            scope=obj_in.scope or CompositionScope.PERSONAL.value,
-        )
+        scope = obj_in.scope.value if hasattr(obj_in.scope, "value") else obj_in.scope
+        root = await crud_folder.ensure_root(db, owner_id=owner_id, subject_id=subject_id, scope=scope)
         return root.id
 
     async def create_for_owner(
@@ -53,18 +47,14 @@ class CRUDComposition(CRUDBase[Composition, CompositionCreate, CompositionUpdate
     async def get_owned(
         self, db: AsyncSession, *, comp_id: int, owner_id: int
     ) -> Optional[Composition]:
-        """获取一份可编辑的组稿: 本人拥有, 或属于团队/共享文件夹 (全员可编辑)。"""
+        """可编辑: 本人创建, 或属于团队共享文件夹 (全组可编辑)。"""
         query = (
             select(Composition)
             .join(Folder, Composition.folder_id == Folder.id)
             .options(selectinload(Composition.folder))
             .where(
                 Composition.id == comp_id,
-                or_(
-                    Composition.owner_id == owner_id,
-                    Folder.scope == CompositionScope.TEAM.value,
-                    Folder.kind == "component",
-                ),
+                (Composition.owner_id == owner_id) | (Folder.scope == FolderScope.TEAM.value),
             )
         )
         return (await db.execute(query)).scalars().first()
@@ -72,32 +62,29 @@ class CRUDComposition(CRUDBase[Composition, CompositionCreate, CompositionUpdate
     async def get_detail(
         self, db: AsyncSession, *, comp_id: int, owner_id: int
     ) -> Optional[Composition]:
+        """查看详情: 本人的 or 团队共享的可见。"""
         query = (
             select(Composition)
             .join(Folder, Composition.folder_id == Folder.id)
             .options(
                 selectinload(Composition.blocks).selectinload(CompositionBlock.question),
+                selectinload(Composition.blocks).selectinload(CompositionBlock.ref_composition),
                 selectinload(Composition.folder),
             )
             .where(
                 Composition.id == comp_id,
-                or_(
-                    Composition.owner_id == owner_id,
-                    Folder.scope == CompositionScope.TEAM.value,
-                    Folder.kind == "component",
-                ),
+                (Composition.owner_id == owner_id) | (Folder.scope == FolderScope.TEAM.value),
             )
         )
         return (await db.execute(query)).scalars().first()
 
-    async def get_multi(
+    async def list(
         self,
         db: AsyncSession,
         *,
-        current_user_id: int,
-        kind: Optional[str] = None,
-        scope: Optional[str] = None,
+        owner_id: Optional[int] = None,
         subject_id: Optional[int] = None,
+        scope: Optional[str] = None,
         comp_type: Optional[str] = None,
         folder_id: Optional[int] = None,
         status: Optional[str] = None,
@@ -115,12 +102,12 @@ class CRUDComposition(CRUDBase[Composition, CompositionCreate, CompositionUpdate
                 selectinload(Composition.folder),
             )
         )
-        if kind:
-            query = query.where(Folder.kind == kind)
-        if scope:
-            query = query.where(Folder.scope == scope)
         if subject_id:
             query = query.where(Folder.subject_id == subject_id)
+        if scope:
+            query = query.where(Folder.scope == scope)
+        if owner_id:
+            query = query.where(Composition.owner_id == owner_id)
         if folder_id:
             query = query.where(Composition.folder_id == folder_id)
         if comp_type:
@@ -132,18 +119,6 @@ class CRUDComposition(CRUDBase[Composition, CompositionCreate, CompositionUpdate
         if keyword:
             query = query.where(Composition.title.ilike(f"%{keyword}%"))
 
-        # 可见性: personal 仅本人; component 草稿仅创建人可见, 其余(团队/已发布)全员可见
-        query = query.where(
-            or_(
-                Composition.owner_id == current_user_id,
-                and_(
-                    Folder.kind == "component",
-                    Composition.status != CompositionStatus.DRAFT.value,
-                ),
-                Folder.scope == CompositionScope.TEAM.value,
-            )
-        )
-
         if sort == "created_desc":
             query = query.order_by(desc(Composition.created_at))
         elif sort == "title_asc":
@@ -152,7 +127,7 @@ class CRUDComposition(CRUDBase[Composition, CompositionCreate, CompositionUpdate
             query = query.order_by(desc(Composition.updated_at))
 
         query = query.offset(skip).limit(limit)
-        return (await db.execute(query)).scalars().all()
+        return list((await db.execute(query)).scalars().all())
 
     async def update_composition(
         self, db: AsyncSession, *, db_obj: Composition, obj_in: CompositionUpdate

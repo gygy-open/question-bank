@@ -96,7 +96,7 @@ const navActiveClass = 'border-l-2 border-transparent data-[active=true]:border-
       <SidebarGroup>
         <SidebarGroupContent class="flex flex-col gap-3">
           <div>
-            <SidebarGroupLabel>资源库</SidebarGroupLabel>
+            <SidebarGroupLabel>资源</SidebarGroupLabel>
             <SidebarMenu>
               <SidebarMenuItem>
                 <SidebarMenuButton as-child :is-active="route.path === '/questions'" :class="navActiveClass">
@@ -106,33 +106,25 @@ const navActiveClass = 'border-l-2 border-transparent data-[active=true]:border-
                   </NuxtLink>
                 </SidebarMenuButton>
               </SidebarMenuItem>
-              <SidebarMenuItem>
-                <SidebarMenuButton as-child :is-active="route.path.startsWith('/library') && route.query.type === 'group'" :class="navActiveClass">
-                  <NuxtLink to="/library?type=group">
-                    <Package />
-                    <span>题组</span>
-                  </NuxtLink>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
             </SidebarMenu>
           </div>
 
           <div>
-            <SidebarGroupLabel>作品库</SidebarGroupLabel>
+            <SidebarGroupLabel>教研空间</SidebarGroupLabel>
             <SidebarMenu>
               <SidebarMenuItem>
-                <SidebarMenuButton as-child :is-active="route.path.startsWith('/library') && route.query.type !== 'group' && route.query.scope === 'team'" :class="navActiveClass">
+                <SidebarMenuButton as-child :is-active="route.path.startsWith('/library') && route.query.scope === 'team'" :class="navActiveClass">
                   <NuxtLink to="/library?scope=team">
                     <Users />
-                    <span>团队空间</span>
+                    <span>团队</span>
                   </NuxtLink>
                 </SidebarMenuButton>
               </SidebarMenuItem>
               <SidebarMenuItem>
-                <SidebarMenuButton as-child :is-active="route.path.startsWith('/library') && route.query.type !== 'group' && route.query.scope !== 'team'" :class="navActiveClass">
+                <SidebarMenuButton as-child :is-active="route.path.startsWith('/library') && route.query.scope !== 'team'" :class="navActiveClass">
                   <NuxtLink to="/library?scope=personal">
                     <User />
-                    <span>我的空间</span>
+                    <span>我的</span>
                   </NuxtLink>
                 </SidebarMenuButton>
               </SidebarMenuItem>

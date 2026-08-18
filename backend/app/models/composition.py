@@ -7,22 +7,16 @@ import enum
 from .base import Base
 
 
-class CompositionKind(str, enum.Enum):
-    """组稿的性质; folder 按它分成两棵树(资源库/作品库)."""
-    COMPONENT = "component"      # 题组等可复用预制件
-    DELIVERABLE = "deliverable"  # 试卷 / 学案 / 讲义等交付物
-
-
 class CompositionStatus(str, enum.Enum):
-    DRAFT = "draft"           # 题组=未公开草稿; 作品=编辑中
-    PUBLISHED = "published"   # 题组进入共享库
-    ARCHIVED = "archived"
+    DRAFT = "draft"           # 草稿
+    PUBLISHED = "published"   # 发布/公开
+    ARCHIVED = "archived"     # 归档
 
 
-class CompositionScope(str, enum.Enum):
-    """仅 deliverable 树有意义."""
-    TEAM = "team"             # 教研组共享, 全员可编辑
-    PERSONAL = "personal"     # 仅本人
+class FolderScope(str, enum.Enum):
+    """空间隔离: 团队共享 or 仅本人可见."""
+    TEAM = "team"
+    PERSONAL = "personal"
 
 
 class BlockType(str, enum.Enum):
@@ -34,53 +28,46 @@ class BlockType(str, enum.Enum):
 
 
 class Folder(Base):
-    """树形文件夹, 是 subject/scope/kind 的唯一权威; 组稿归属其一并继承这些属性.
-
-    约束(应用层保证): 子文件夹的 subject_id/kind/scope 必须与父一致.
-    """
+    """树形文件夹. 任何组稿都在某级文件夹下."""
     __tablename__ = "folders"
 
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String(255), nullable=False)
     parent_id = Column(Integer, ForeignKey("folders.id", ondelete="CASCADE"), nullable=True, index=True)  # NULL = 树根
-    kind = Column(String(20), nullable=False)                                    # component / deliverable
-    scope = Column(String(20), nullable=True)                                    # 仅 deliverable 树: team / personal
     subject_id = Column(Integer, ForeignKey("subjects.id"), nullable=False, index=True)
-    owner_id = Column(Integer, ForeignKey("user.id"), nullable=False, index=True)  # 建者; personal 树据此区分各用户
+    owner_id = Column(Integer, ForeignKey("user.id"), nullable=False, index=True)
+    scope = Column(String(20), nullable=False, default=FolderScope.PERSONAL.value, index=True)
     sequence = Column(Integer, default=0)
     created_at = Column(DateTime, default=datetime.utcnow)
 
     children = relationship("Folder", backref="parent", remote_side=[id])
 
     __table_args__ = (
-        Index("ix_folders_tree", "subject_id", "kind", "scope"),
+        Index("ix_folders_tree", "subject_id", "scope"),
     )
 
 
 class Composition(Base):
-    """通用组稿: 题组(component) 与 作品(deliverable) 统一, 由有序块编排组合.
-
-    subject_id / scope / kind 均不落库 —— 由所属 folder(kind 亦可由 comp_type 注册表映射)派生.
-    """
+    """通用组稿: 题组/讲义/试卷等各类图文混合文档."""
     __tablename__ = "compositions"
 
     id = Column(Integer, primary_key=True, index=True)
     folder_id = Column(Integer, ForeignKey("folders.id", ondelete="CASCADE"), nullable=False, index=True)
 
-    comp_type = Column(String(50), nullable=False, index=True)  # 注册表驱动: question_group / exam_paper / study_guide / handout ...
+    comp_type = Column(String(50), nullable=False, index=True)  # 决定文档表现形式: question_group / exam_paper / study_guide / handout ...
     title = Column(String(255), nullable=False)
     description = Column(Text, nullable=True)
     status = Column(String(20), default=CompositionStatus.DRAFT.value, nullable=False, index=True)
 
-    difficulty = Column(Integer, nullable=True)                 # 题组元数据(非派生, 保留)
-    meta_data = Column(JSON, nullable=True)                     # 各 comp_type 扩展: 分值 / 导出偏好 / 蓝图
+    difficulty = Column(Integer, nullable=True)                 
+    meta_data = Column(JSON, nullable=True)                     
 
-    owner_id = Column(Integer, ForeignKey("user.id"), nullable=False, index=True)  # 创建人(≠ folder.owner_id)
+    owner_id = Column(Integer, ForeignKey("user.id"), nullable=False, index=True)
 
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
-    owner = relationship("User", back_populates="compositions")
+    owner = relationship("User", back_populates="compositions", primaryjoin="Composition.owner_id == User.id")
     folder = relationship("Folder")
     blocks = relationship(
         "CompositionBlock",
@@ -90,7 +77,6 @@ class Composition(Base):
         foreign_keys="CompositionBlock.composition_id",
     )
 
-    # 便捷派生(读取需 folder 已加载; 查询时按 folder join 过滤)
     @property
     def subject_id(self):
         return self.folder.subject_id if self.folder else None
@@ -98,10 +84,6 @@ class Composition(Base):
     @property
     def scope(self):
         return self.folder.scope if self.folder else None
-
-    @property
-    def kind(self):
-        return self.folder.kind if self.folder else None
 
 
 class CompositionBlock(Base):

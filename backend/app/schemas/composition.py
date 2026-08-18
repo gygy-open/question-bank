@@ -3,7 +3,7 @@ from typing import List, Optional, Any
 from enum import Enum
 from datetime import datetime
 
-from app.models.composition import CompositionStatus, CompositionScope, BlockType
+from app.models.composition import CompositionStatus, FolderScope, BlockType
 
 
 class OutputFormat(str, Enum):
@@ -35,9 +35,8 @@ class CompositionExportOptions(BaseModel):
 
 class FolderCreate(BaseModel):
     name: str
-    kind: str                       # component / deliverable
     subject_id: int
-    scope: Optional[str] = None     # deliverable 树: team / personal
+    scope: FolderScope = FolderScope.PERSONAL
     parent_id: Optional[int] = None
 
 
@@ -52,10 +51,9 @@ class FolderRead(BaseModel):
     id: int
     name: str
     parent_id: Optional[int] = None
-    kind: str
-    scope: Optional[str] = None
     subject_id: int
     owner_id: int
+    scope: str
     sequence: Optional[int] = 0
 
 
@@ -66,7 +64,7 @@ class CompositionCreate(BaseModel):
     comp_type: str = "exam_paper"
     folder_id: Optional[int] = None      # 缺省 -> 解析/创建对应根文件夹
     subject_id: Optional[int] = None     # 无 folder_id 时用于解析根文件夹
-    scope: Optional[str] = None          # deliverable 缺省 personal
+    scope: FolderScope = FolderScope.PERSONAL  # 无 folder_id 时用于解析根文件夹归属空间
     description: Optional[str] = None
     difficulty: Optional[int] = None
 
@@ -107,6 +105,15 @@ class BlocksReplace(BaseModel):
     blocks: List[BlockWrite]
 
 
+class CompositionBrief(BaseModel):
+    """供 component_ref 块预览引用的教学模块/组稿摘要."""
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    title: str
+    comp_type: str
+
+
 class BlockRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
@@ -117,12 +124,12 @@ class BlockRead(BaseModel):
     ref_question_id: Optional[int] = None
     ref_composition_id: Optional[int] = None
     question: Optional[QuestionBrief] = None
+    ref_composition: Optional[CompositionBrief] = None
 
 
 class CompositionRead(BaseModel):
     id: int
     comp_type: str
-    kind: Optional[str] = None
     title: str
     description: Optional[str] = None
     status: str

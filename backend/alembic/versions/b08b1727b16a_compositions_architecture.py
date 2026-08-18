@@ -1,19 +1,18 @@
-"""compositions folders blocks from papers
+"""compositions architecture
 
-Revision ID: 680d028884fa
+Revision ID: b08b1727b16a
 Revises: 326519e83a77
-Create Date: 2026-08-17 17:38:05.543602
+Create Date: 2026-08-18 16:05:17.162934
 
 """
 from typing import Sequence, Union
-from datetime import datetime
 
 from alembic import op
 import sqlalchemy as sa
 
 
 # revision identifiers, used by Alembic.
-revision: str = '680d028884fa'
+revision: str = 'b08b1727b16a'
 down_revision: Union[str, Sequence[str], None] = '326519e83a77'
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
@@ -26,10 +25,9 @@ def upgrade() -> None:
     sa.Column('id', sa.Integer(), nullable=False),
     sa.Column('name', sa.String(length=255), nullable=False),
     sa.Column('parent_id', sa.Integer(), nullable=True),
-    sa.Column('kind', sa.String(length=20), nullable=False),
-    sa.Column('scope', sa.String(length=20), nullable=True),
     sa.Column('subject_id', sa.Integer(), nullable=False),
     sa.Column('owner_id', sa.Integer(), nullable=False),
+    sa.Column('scope', sa.String(length=20), nullable=False),
     sa.Column('sequence', sa.Integer(), nullable=True),
     sa.Column('created_at', sa.DateTime(), nullable=True),
     sa.ForeignKeyConstraint(['owner_id'], ['user.id'], name=op.f('fk_folders_owner_id_user')),
@@ -41,8 +39,9 @@ def upgrade() -> None:
         batch_op.create_index(batch_op.f('ix_folders_id'), ['id'], unique=False)
         batch_op.create_index(batch_op.f('ix_folders_owner_id'), ['owner_id'], unique=False)
         batch_op.create_index(batch_op.f('ix_folders_parent_id'), ['parent_id'], unique=False)
+        batch_op.create_index(batch_op.f('ix_folders_scope'), ['scope'], unique=False)
         batch_op.create_index(batch_op.f('ix_folders_subject_id'), ['subject_id'], unique=False)
-        batch_op.create_index('ix_folders_tree', ['subject_id', 'kind', 'scope'], unique=False)
+        batch_op.create_index('ix_folders_tree', ['subject_id', 'scope'], unique=False)
 
     op.create_table('compositions',
     sa.Column('id', sa.Integer(), nullable=False),
@@ -86,6 +85,9 @@ def upgrade() -> None:
         batch_op.create_index(batch_op.f('ix_composition_blocks_id'), ['id'], unique=False)
 
     # --- Data migration: papers/paper_questions -> compositions/composition_blocks ---
+    from datetime import datetime
+    import json as json_lib
+
     bind = op.get_bind()
 
     folders_tbl = sa.table(
@@ -93,10 +95,9 @@ def upgrade() -> None:
         sa.column('id', sa.Integer),
         sa.column('name', sa.String),
         sa.column('parent_id', sa.Integer),
-        sa.column('kind', sa.String),
-        sa.column('scope', sa.String),
         sa.column('subject_id', sa.Integer),
         sa.column('owner_id', sa.Integer),
+        sa.column('scope', sa.String),
         sa.column('sequence', sa.Integer),
         sa.column('created_at', sa.String),
     )
@@ -132,7 +133,7 @@ def upgrade() -> None:
     if papers:
         fallback_subject = bind.execute(sa.text("SELECT MIN(id) FROM subjects")).scalar()
 
-        # 1) 为每个 (owner, subject) 建"个人·作品"根文件夹
+        # 1) 为每个 (owner, subject) 建一个个人收容根目录
         folder_rows = []
         folder_map = {}
         next_folder_id = 1
@@ -145,12 +146,11 @@ def upgrade() -> None:
                 folder_map[key] = next_folder_id
                 folder_rows.append({
                     'id': next_folder_id,
-                    'name': '我的试卷',
+                    'name': '迁移的试卷',
                     'parent_id': None,
-                    'kind': 'deliverable',
-                    'scope': 'personal',
                     'subject_id': subject_id,
                     'owner_id': p.owner_id,
+                    'scope': 'personal',
                     'sequence': 0,
                     'created_at': datetime.utcnow().isoformat(sep=' '),
                 })
@@ -158,7 +158,7 @@ def upgrade() -> None:
         if folder_rows:
             op.bulk_insert(folders_tbl, folder_rows)
 
-        # 2) paper -> composition (保留 id 以便 blocks 对齐)
+        # 2) 迁移 papers 到 compositions
         comp_rows = []
         valid_paper_ids = set()
         for p in papers:
@@ -182,31 +182,38 @@ def upgrade() -> None:
         if comp_rows:
             op.bulk_insert(comps_tbl, comp_rows)
 
-        # 3) paper_questions -> blocks (section_title -> heading, score -> content)
+        # 3) 迁移 paper_questions 到 blocks
         items = bind.execute(sa.text(
             "SELECT paper_id, question_id, sequence, section_title, score "
             "FROM paper_questions ORDER BY paper_id, sequence"
         )).fetchall()
+
         block_rows = []
         current_paper = None
         seq = 0
+
         for it in items:
             if it.paper_id not in valid_paper_ids:
                 continue
             if it.paper_id != current_paper:
                 current_paper = it.paper_id
                 seq = 0
+
             if it.section_title:
                 block_rows.append({
                     'composition_id': it.paper_id,
-                    'block_type': 'heading',
+                    'block_type': 'text',
                     'sequence': seq,
-                    'content': {'text': it.section_title, 'level': 2},
+                    'content': json_lib.dumps({'text': it.section_title, 'style': 'heading'}),
                     'ref_question_id': None,
                     'ref_composition_id': None,
                 })
                 seq += 1
-            content = {'score': it.score} if it.score is not None else None
+
+            content = None
+            if it.score is not None:
+                content = json_lib.dumps({"score": it.score})
+
             block_rows.append({
                 'composition_id': it.paper_id,
                 'block_type': 'question',
@@ -216,8 +223,10 @@ def upgrade() -> None:
                 'ref_composition_id': None,
             })
             seq += 1
+
         if block_rows:
             op.bulk_insert(blocks_tbl, block_rows)
+    # --- End Data Migration ---
 
     with op.batch_alter_table('papers', schema=None) as batch_op:
         batch_op.drop_index(batch_op.f('ix_papers_id'))
@@ -286,6 +295,7 @@ def downgrade() -> None:
     with op.batch_alter_table('folders', schema=None) as batch_op:
         batch_op.drop_index('ix_folders_tree')
         batch_op.drop_index(batch_op.f('ix_folders_subject_id'))
+        batch_op.drop_index(batch_op.f('ix_folders_scope'))
         batch_op.drop_index(batch_op.f('ix_folders_parent_id'))
         batch_op.drop_index(batch_op.f('ix_folders_owner_id'))
         batch_op.drop_index(batch_op.f('ix_folders_id'))

@@ -15,7 +15,7 @@ import { toast } from 'vue-sonner'
 import { useCompositions } from '~/composables/useCompositions'
 import { useFolders } from '~/composables/useFolders'
 import { formatRelativeTime } from '@/lib/utils'
-import type { Composition, Folder, CompType, CompositionScope } from '~/types'
+import type { Composition, Folder, CompType } from '~/types'
 
 const route = useRoute()
 const router = useRouter()
@@ -23,12 +23,8 @@ const { list, create, update, remove, duplicate } = useCompositions()
 const { list: listFolders, create: createFolder } = useFolders()
 const { currentSubjectId } = useSubjectContext()
 
-const kind = computed<'component' | 'deliverable'>(
-  () => (route.query.type === 'group' ? 'component' : 'deliverable'),
-)
-const isComponent = computed(() => kind.value === 'component')
-
-const scope = ref<CompositionScope>((route.query.scope as CompositionScope) || 'personal')
+// Removed 'kind' - everything is now just a composition in a space
+const scope = ref<'team' | 'personal'>((route.query.scope as 'team' | 'personal') || 'personal')
 const compTypeFilter = ref<CompType | 'all'>('all')
 const activeFolderId = ref<number | 'all'>('all')
 
@@ -36,16 +32,19 @@ const folders = ref<Folder[]>([])
 const items = ref<Composition[]>([])
 const loading = ref(false)
 
-const compTypeLabels: Record<string, string> = {
-  question_group: '题组', exam_paper: '试卷', study_guide: '学案', handout: '专题讲义',
+// Provide nice labels and styling for comp types in UI
+const compTypeMeta: Record<string, { label: string, color: string }> = {
+  question_group: { label: '教学模块', color: 'bg-green-100 text-green-700 dark:bg-green-900/30' },
+  exam_paper: { label: '试卷', color: 'bg-orange-100 text-orange-700 dark:bg-orange-900/30' },
+  study_guide: { label: '学案', color: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30' },
+  handout: { label: '讲义', color: 'bg-purple-100 text-purple-700 dark:bg-purple-900/30' }
 }
 
 const loadFolders = async () => {
   try {
     folders.value = await listFolders({
-      kind: kind.value,
       subject_id: currentSubjectId.value,
-      scope: isComponent.value ? undefined : scope.value,
+      scope: scope.value,
     })
   } catch {
     folders.value = []
@@ -56,9 +55,8 @@ const loadItems = async () => {
   loading.value = true
   try {
     items.value = await list({
-      kind: kind.value,
-      scope: isComponent.value ? undefined : scope.value,
       subject_id: currentSubjectId.value,
+      scope: scope.value,
       comp_type: compTypeFilter.value === 'all' ? undefined : compTypeFilter.value,
       folder_id: activeFolderId.value === 'all' ? undefined : activeFolderId.value,
       sort: 'updated_desc',
@@ -77,18 +75,15 @@ const reload = async () => {
 
 onMounted(reload)
 watch(currentSubjectId, reload)
-watch(() => route.query.type, () => {
-  compTypeFilter.value = 'all'
-  activeFolderId.value = 'all'
-  reload()
-})
+
 watch(() => route.query.scope, (v) => {
-  if (v) scope.value = v as CompositionScope
+  if (v) scope.value = v as 'team'|'personal'
+  activeFolderId.value = 'all'
   reload()
 })
 
 const setScope = (v: string | number) => {
-  scope.value = v as CompositionScope
+  scope.value = v as 'team'|'personal'
   activeFolderId.value = 'all'
   router.replace({ query: { ...route.query, scope: scope.value } })
 }
@@ -104,18 +99,17 @@ const selectFolder = (id: number | 'all') => {
 }
 
 const editItem = (item: Composition) => {
-  router.push(isComponent.value ? `/groups/${item.id}/edit` : `/papers/${item.id}/edit`)
+  router.push(`/editor/${item.id}/edit`)
 }
-
-const defaultCompType = computed<CompType>(() => (isComponent.value ? 'question_group' : 'exam_paper'))
 
 const createItem = async (comp_type: CompType) => {
   try {
+    const label = compTypeMeta[comp_type]?.label || '新文档'
     const item = await create({
-      title: `新${compTypeLabels[comp_type]} ${new Date().toLocaleDateString()}`,
+      title: `${label} ${new Date().toLocaleDateString()}`,
       comp_type,
       subject_id: currentSubjectId.value ?? null,
-      scope: isComponent.value ? null : scope.value,
+      scope: scope.value,
       folder_id: activeFolderId.value === 'all' ? null : activeFolderId.value,
     })
     editItem(item)
@@ -130,9 +124,8 @@ const newFolder = async () => {
   try {
     await createFolder({
       name,
-      kind: kind.value,
       subject_id: currentSubjectId.value as number,
-      scope: isComponent.value ? null : scope.value,
+      scope: scope.value,
       parent_id: null,
     })
     toast.success('已创建文件夹')
@@ -183,7 +176,7 @@ const deleteItem = async (item: Composition) => {
   }
 }
 
-const pageTitle = computed(() => (isComponent.value ? '题组' : '作品库'))
+const pageTitle = computed(() => (scope.value === 'team' ? '团队空间' : '我的空间'))
 </script>
 
 <template>
@@ -192,18 +185,14 @@ const pageTitle = computed(() => (isComponent.value ? '题组' : '作品库'))
       <DropdownMenu>
         <DropdownMenuTrigger as-child>
           <Button size="sm">
-            <Plus class="mr-2 h-4 w-4" /> 新建
+            <Plus class="mr-2 h-4 w-4" /> 新建教研资产
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end">
-          <template v-if="isComponent">
-            <DropdownMenuItem @click="createItem('question_group')">新建题组</DropdownMenuItem>
-          </template>
-          <template v-else>
-            <DropdownMenuItem @click="createItem('exam_paper')">新建试卷</DropdownMenuItem>
-            <DropdownMenuItem @click="createItem('study_guide')">新建学案</DropdownMenuItem>
-            <DropdownMenuItem @click="createItem('handout')">新建专题讲义</DropdownMenuItem>
-          </template>
+          <DropdownMenuItem @click="createItem('question_group')">新建教学模块 (切片)</DropdownMenuItem>
+          <DropdownMenuItem @click="createItem('exam_paper')">新建试卷</DropdownMenuItem>
+          <DropdownMenuItem @click="createItem('study_guide')">新建学案</DropdownMenuItem>
+          <DropdownMenuItem @click="createItem('handout')">新建讲义</DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
     </template>
@@ -239,16 +228,10 @@ const pageTitle = computed(() => (isComponent.value ? '题组' : '作品库'))
     <!-- Right: content -->
     <div class="flex flex-1 flex-col overflow-y-auto px-4 py-4 space-y-4">
       <div class="flex items-center justify-between gap-4 flex-wrap">
-        <Tabs v-if="!isComponent" :model-value="scope" @update:model-value="setScope">
-          <TabsList>
-            <TabsTrigger value="team">团队空间</TabsTrigger>
-            <TabsTrigger value="personal">我的空间</TabsTrigger>
-          </TabsList>
-        </Tabs>
-
-        <Tabs v-if="!isComponent" :model-value="compTypeFilter" @update:model-value="setCompType">
+        <Tabs :model-value="compTypeFilter" @update:model-value="setCompType">
           <TabsList>
             <TabsTrigger value="all">全部</TabsTrigger>
+            <TabsTrigger value="question_group">教学模块</TabsTrigger>
             <TabsTrigger value="exam_paper">试卷</TabsTrigger>
             <TabsTrigger value="study_guide">学案</TabsTrigger>
             <TabsTrigger value="handout">讲义</TabsTrigger>
@@ -272,11 +255,9 @@ const pageTitle = computed(() => (isComponent.value ? '题组' : '作品库'))
         >
           <CardHeader class="pb-3">
             <div class="flex items-start justify-between">
-              <Badge variant="outline" class="gap-1">
-                <Package v-if="isComponent" class="h-3 w-3" />
-                <FileText v-else class="h-3 w-3" />
-                {{ compTypeLabels[item.comp_type] || item.comp_type }}
-              </Badge>
+              <span :class="['inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-semibold', compTypeMeta[item.comp_type]?.color || 'bg-gray-100 text-gray-700']">
+                {{ compTypeMeta[item.comp_type]?.label || item.comp_type }}
+              </span>
               <DropdownMenu>
                 <DropdownMenuTrigger as-child @click.stop>
                   <Button variant="ghost" size="icon" class="h-8 w-8 opacity-0 group-hover:opacity-100">
@@ -304,7 +285,7 @@ const pageTitle = computed(() => (isComponent.value ? '题组' : '作品库'))
           <CardContent>
             <h3 class="font-medium truncate">{{ item.title }}</h3>
             <div class="mt-2 flex items-center gap-2 text-xs text-muted-foreground">
-              <Badge variant="secondary">{{ item.block_count }} 项</Badge>
+              <Badge variant="secondary">{{ item.block_count || 0 }} 项</Badge>
               <span>{{ formatRelativeTime(item.updated_at) }}</span>
             </div>
           </CardContent>
@@ -313,8 +294,8 @@ const pageTitle = computed(() => (isComponent.value ? '题组' : '作品库'))
 
       <div v-else class="flex flex-col items-center justify-center py-16 text-center text-muted-foreground">
         <p class="mb-4">这里还没有内容</p>
-        <Button @click="createItem(defaultCompType)">
-          <Plus class="mr-2 h-4 w-4" /> 新建{{ compTypeLabels[defaultCompType] }}
+        <Button @click="createItem(compTypeFilter === 'all' ? 'exam_paper' : (compTypeFilter as CompType))">
+          <Plus class="mr-2 h-4 w-4" /> 新建{{ compTypeFilter === 'all' ? '试卷' : compTypeMeta[compTypeFilter]?.label }}
         </Button>
       </div>
     </div>

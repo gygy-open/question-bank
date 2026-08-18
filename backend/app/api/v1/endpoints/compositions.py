@@ -15,6 +15,7 @@ from app.schemas.composition import (
     CompositionDetail,
     BlockRead,
     QuestionBrief,
+    CompositionBrief,
 )
 from app.services.composition_renderer import composition_renderer
 
@@ -27,7 +28,6 @@ def _to_read(comp: models.Composition) -> CompositionRead:
     return CompositionRead(
         id=comp.id,
         comp_type=comp.comp_type,
-        kind=comp.kind,
         title=comp.title,
         description=comp.description,
         status=comp.status,
@@ -52,13 +52,13 @@ def _to_detail(comp: models.Composition) -> CompositionDetail:
             ref_question_id=b.ref_question_id,
             ref_composition_id=b.ref_composition_id,
             question=QuestionBrief.model_validate(b.question) if b.question else None,
+            ref_composition=CompositionBrief.model_validate(b.ref_composition) if b.ref_composition else None,
         )
         for b in comp.blocks
     ]
     return CompositionDetail(
         id=comp.id,
         comp_type=comp.comp_type,
-        kind=comp.kind,
         title=comp.title,
         description=comp.description,
         status=comp.status,
@@ -78,9 +78,8 @@ def _to_detail(comp: models.Composition) -> CompositionDetail:
 async def list_compositions(
     db: deps.SessionDep,
     current_user: models.User = Depends(deps.get_current_active_user),
-    kind: Optional[str] = None,
-    scope: Optional[str] = None,
     subject_id: Optional[int] = None,
+    scope: Optional[str] = None,
     comp_type: Optional[str] = None,
     folder_id: Optional[int] = None,
     status: Optional[str] = None,
@@ -92,15 +91,16 @@ async def list_compositions(
 ) -> Any:
     if subject_id is None:
         subject_id = current_user.last_active_subject_id or current_user.subject_id
-    comps = await crud.composition.get_multi(
+    # personal 空间只看自己的; team 空间全组共享, 不按 owner 过滤
+    owner_filter = current_user.id if scope == "personal" else None
+    comps = await crud.composition.list(
         db,
-        current_user_id=current_user.id,
-        kind=kind,
-        scope=scope,
+        owner_id=owner_filter,
+        status=status,
         subject_id=subject_id,
+        scope=scope,
         comp_type=comp_type,
         folder_id=folder_id,
-        status=status,
         keyword=keyword,
         difficulty=difficulty,
         sort=sort,

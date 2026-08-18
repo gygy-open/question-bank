@@ -49,15 +49,20 @@ const displayNumbers = computed<Record<string, number>>(() => {
 
 const onDragEnd = () => emit('change')
 
-const insertAfter = (index: number, type: BlockType) => {
+const resolveBlocks = (payload: BlockType | EditorBlock | EditorBlock[]): EditorBlock[] => {
+  if (typeof payload === 'string') return [newEditorBlock(payload)]
+  return Array.isArray(payload) ? payload : [payload]
+}
+
+const insertAfter = (index: number, payload: BlockType | EditorBlock | EditorBlock[]) => {
   const next = [...props.modelValue]
-  next.splice(index + 1, 0, newEditorBlock(type))
+  next.splice(index + 1, 0, ...resolveBlocks(payload))
   emit('update:modelValue', next)
   emit('change')
 }
 
-const insertAtStart = (type: BlockType) => {
-  emit('update:modelValue', [newEditorBlock(type), ...props.modelValue])
+const insertAtStart = (payload: BlockType | EditorBlock | EditorBlock[]) => {
+  emit('update:modelValue', [...resolveBlocks(payload), ...props.modelValue])
   emit('change')
 }
 
