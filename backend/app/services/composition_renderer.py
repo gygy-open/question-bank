@@ -8,13 +8,21 @@ from typing import List, Dict, Any, Callable, Optional
 from pathlib import Path
 
 import pypandoc
+from enum import Enum
 
 from app.models.question import Question, QuestionType
 from app.models.composition import CompositionBlock, BlockType
-from app.schemas.composition import OutputFormat, ContentPosition
+from app.schemas.composition import OutputFormat
 from app.core.config import settings
 
 logger = logging.getLogger(__name__)
+
+
+class ContentPosition(str, Enum):
+    """答案/解析等附加内容的落位 (来自文档级设置 meta_data.answer_position)。"""
+    AFTER_QUESTION = "after_question"  # 紧跟每道题
+    END_OF_PAPER = "end_of_paper"      # 统一收纳到卷末
+    HIDDEN = "hidden"                   # 不输出
 
 
 class CompositionRenderer:

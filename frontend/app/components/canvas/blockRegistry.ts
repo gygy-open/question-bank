@@ -1,9 +1,8 @@
 import { Heading2, AlignLeft, SeparatorHorizontal } from '@lucide/vue'
-import type { BlockType, QuestionBrief, CompositionBrief } from '~/types'
+import type { BlockType, QuestionBrief } from '~/types'
 import HeadingBlock from './blocks/HeadingBlock.vue'
 import TextBlock from './blocks/TextBlock.vue'
 import QuestionBlock from './blocks/QuestionBlock.vue'
-import ComponentRefBlock from './blocks/ComponentRefBlock.vue'
 import PageBreakBlock from './blocks/PageBreakBlock.vue'
 
 /** 编辑期的客户端块模型 (带稳定 key，供 v-for / 拖拽使用)。 */
@@ -13,15 +12,12 @@ export interface EditorBlock {
   content: Record<string, any>
   ref_question_id?: number | null
   question?: QuestionBrief | null
-  ref_composition_id?: number | null
-  ref_composition?: CompositionBrief | null
 }
 
 export const blockRegistry: Record<BlockType, any> = {
   heading: HeadingBlock,
   text: TextBlock,
   question: QuestionBlock,
-  component_ref: ComponentRefBlock,
   page_break: PageBreakBlock,
 }
 
@@ -61,16 +57,12 @@ export const toEditorBlock = (b: {
   content?: Record<string, any> | null
   ref_question_id?: number | null
   question?: QuestionBrief | null
-  ref_composition_id?: number | null
-  ref_composition?: CompositionBrief | null
 }): EditorBlock => ({
   key: uid(),
   block_type: b.block_type,
   content: b.content ? { ...b.content } : {},
   ref_question_id: b.ref_question_id ?? null,
   question: b.question ?? null,
-  ref_composition_id: b.ref_composition_id ?? null,
-  ref_composition: b.ref_composition ?? null,
 })
 
 /** 编辑块 -> 保存负载。 */
@@ -78,5 +70,4 @@ export const toBlockWrite = (b: EditorBlock) => ({
   block_type: b.block_type,
   content: b.content && Object.keys(b.content).length ? b.content : null,
   ref_question_id: b.ref_question_id ?? null,
-  ref_composition_id: b.ref_composition_id ?? null,
 })

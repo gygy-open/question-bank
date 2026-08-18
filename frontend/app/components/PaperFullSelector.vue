@@ -23,7 +23,7 @@ const emit = defineEmits<{
   added: []
 }>()
 
-const { list, create, appendQuestions } = useCompositions()
+const { list, createFromTemplate, appendQuestions } = useCompositions()
 const { currentSubjectId } = useSubjectContext()
 
 const loading = ref(false)
@@ -41,7 +41,7 @@ const filteredPapers = computed(() => {
 const loadPapers = async () => {
   loading.value = true
   try {
-    papers.value = await list({ comp_type: 'exam_paper', subject_id: currentSubjectId.value, sort: 'updated_desc' })
+    papers.value = await list({ subject_id: currentSubjectId.value, sort: 'updated_desc' })
   } catch {
     toast.error('加载试卷失败')
   } finally {
@@ -79,7 +79,7 @@ const confirmAdd = async () => {
 const createNewPaper = async () => {
   submitting.value = true
   try {
-    const paper = await create({ title: `新试卷 ${new Date().toLocaleDateString()}`, comp_type: 'exam_paper' })
+    const paper = await createFromTemplate({ source: 'system', key: 'exam_paper', title: `新试卷 ${new Date().toLocaleDateString()}` })
     await appendQuestions(paper.id, props.questionIds)
     toast.success(`已创建并加入 ${props.questionIds.length} 道题`)
     emit('added')

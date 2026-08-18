@@ -214,12 +214,17 @@ export interface PaperDetail extends Paper {
 
 // --- Composition (Block Canvas) ---
 
-export type BlockType = 'heading' | 'text' | 'question' | 'component_ref' | 'page_break'
+export type BlockType = 'heading' | 'text' | 'question' | 'page_break'
 
 export type CompositionScope = 'team' | 'personal'
 
-/** 版式(注册表驱动): 题组 / 试卷 / 学案 / 专题讲义 ... */
-export type CompType = 'question_group' | 'exam_paper' | 'study_guide' | 'handout'
+export type AnswerPosition = 'after_question' | 'end_of_paper' | 'hidden'
+
+/** 文档级设置 (存于 meta_data), 由模板 seed, 编辑器可改, 导出读取。 */
+export interface CompositionSettings {
+  show_answers?: boolean
+  answer_position?: AnswerPosition
+}
 
 export interface Folder {
   id: number
@@ -237,18 +242,17 @@ export interface CompositionBlock {
   sequence: number
   content?: Record<string, any> | null
   ref_question_id?: number | null
-  ref_composition_id?: number | null
   question?: QuestionBrief | null
-  ref_composition?: CompositionBrief | null
 }
 
 export interface Composition {
   id: number
-  comp_type: CompType
   title: string
   description?: string | null
   status: 'draft' | 'published' | 'archived'
+  is_template: boolean
   difficulty?: number | null
+  meta_data?: CompositionSettings | null
   folder_id: number
   subject_id?: number | null
   scope?: CompositionScope | null
@@ -258,11 +262,15 @@ export interface Composition {
   block_count: number
 }
 
-/** 供 component_ref 块预览的组稿摘要. */
-export interface CompositionBrief {
-  id: number
-  title: string
-  comp_type: CompType
+/** 新建起点: 系统预置模板 (source=system) 或自定义模板 (source=custom)。 */
+export interface TemplateItem {
+  source: 'system' | 'custom'
+  key?: string | null
+  id?: number | null
+  label: string
+  icon?: string | null
+  description?: string | null
+  scope?: CompositionScope | null
 }
 
 export interface CompositionDetail extends Composition {
@@ -274,7 +282,6 @@ export interface BlockWrite {
   block_type: BlockType
   content?: Record<string, any> | null
   ref_question_id?: number | null
-  ref_composition_id?: number | null
 }
 
 

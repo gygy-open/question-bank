@@ -14,7 +14,7 @@ const props = defineProps<{
 
 const emit = defineEmits<{ change: []; 'view-detail': [] }>()
 
-const ctx = inject(CanvasContextKey, { pubType: 'exam_paper', showAnswers: false })
+const ctx = inject(CanvasContextKey, { showAnswers: false })
 
 const q = computed(() => props.block.question)
 const isChoice = computed(

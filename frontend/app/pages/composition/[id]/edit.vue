@@ -22,7 +22,7 @@ import BlockCanvas from '@/components/canvas/BlockCanvas.vue'
 import { toEditorBlock, toBlockWrite, type EditorBlock } from '@/components/canvas/blockRegistry'
 import PaperQuestionDetailSheet from '@/components/PaperQuestionDetailSheet.vue'
 import { useCompositions } from '~/composables/useCompositions'
-import type { CompositionDetail, Subject, KnowledgePoint, CompType } from '~/types'
+import type { CompositionDetail, CompositionSettings, Subject, KnowledgePoint } from '~/types'
 
 const route = useRoute()
 const router = useRouter()
@@ -37,6 +37,8 @@ const { data: knowledgePoints } = await useAPI<KnowledgePoint[]>('/knowledge-poi
 const publication = ref<CompositionDetail | null>(null)
 const blocks = ref<EditorBlock[]>([])
 const loading = ref(true)
+// 所见即所得: 答案落位作为文档级设置持久化, 导出时由后端读取
+const docPlacement = ref<'after_question' | 'end_of_paper' | 'hidden'>('after_question')
 
 const saving = ref(false)
 const saved = ref(false)
@@ -45,10 +47,9 @@ const savingStatus = ref('')
 const detailSheetOpen = ref(false)
 const detailQuestionId = ref<number | null>(null)
 
-// 教学模块需展示答案便于编辑核对; 讲义/试卷默认不展示
+// 题块是否展示答案由文档级设置决定 (所见即所得)
 const canvasContext = computed(() => ({
-  pubType: (publication.value?.comp_type ?? 'exam_paper') as CompType,
-  showAnswers: publication.value?.comp_type === 'question_group',
+  showAnswers: publication.value?.meta_data?.show_answers ?? false,
   compId: pubId,
 }))
 
@@ -58,6 +59,9 @@ const load = async () => {
     const data = await get(pubId)
     publication.value = data
     blocks.value = data.blocks.map(toEditorBlock)
+    docPlacement.value = data.meta_data?.show_answers === false
+      ? 'hidden'
+      : (data.meta_data?.answer_position ?? 'after_question')
   } catch {
     toast.error('加载试卷失败')
     router.push('/library?scope=personal')
@@ -68,9 +72,14 @@ const load = async () => {
 
 await load()
 
-const questionCount = computed(
-  () => blocks.value.filter((b) => b.block_type === 'question').length,
-)
+// Prefer real browser back navigation; fall back only when there's no prior history (e.g. direct link).
+const goBack = () => {
+  if (window.history.state?.back) {
+    router.back()
+  } else {
+    router.push('/library?scope=personal')
+  }
+}
 
 const typeStatList = computed(() => {
   const labels: Record<string, string> = {
@@ -135,7 +144,6 @@ const exportOpen = ref(false)
 const exporting = ref(false)
 const exportForm = ref({
   format: 'docx' as 'docx' | 'latex',
-  content_position: 'after_question' as 'after_question' | 'end_of_paper' | 'hidden',
   include_answer: false,
   include_analysis: false,
   include_explanation: false,
@@ -143,7 +151,21 @@ const exportForm = ref({
   include_source: false,
 })
 
-const contentPositionEnabled = computed(() => exportForm.value.content_position !== 'hidden')
+// 所见即所得: 答案落位作为文档级设置持久化, 导出时由后端读取
+const contentPositionEnabled = computed(() => docPlacement.value !== 'hidden')
+
+const saveSettings = async () => {
+  if (!publication.value) return
+  const meta: CompositionSettings = docPlacement.value === 'hidden'
+    ? { show_answers: false, answer_position: 'after_question' }
+    : { show_answers: true, answer_position: docPlacement.value }
+  publication.value.meta_data = meta
+  try {
+    await update(pubId, { meta_data: meta })
+  } catch {
+    /* 非关键路径, 静默失败 */
+  }
+}
 
 const doExport = async () => {
   if (!publication.value) return
@@ -187,12 +209,11 @@ watch(
     <div class="border-b bg-background sticky top-0 z-10">
       <div class="flex items-center justify-between px-4 py-3 gap-3">
         <div class="flex items-center gap-3 min-w-0">
-          <Button variant="ghost" size="icon" @click="router.push('/library?scope=personal')">
+          <Button variant="ghost" size="icon" @click="goBack">
             <ArrowLeft class="h-4 w-4" />
           </Button>
           <div class="min-w-0">
             <h1 class="text-lg font-semibold truncate">{{ publication.title }}</h1>
-            <p class="text-sm text-muted-foreground">{{ questionCount }} 题</p>
           </div>
         </div>
 
@@ -290,7 +311,7 @@ watch(
 
         <div class="space-y-3">
           <Label>附加内容显示位置</Label>
-          <RadioGroup v-model="exportForm.content_position">
+          <RadioGroup v-model="docPlacement" @update:model-value="saveSettings">
             <div class="flex items-center space-x-2">
               <RadioGroupItem id="pos_after" value="after_question" />
               <Label for="pos_after" class="font-normal cursor-pointer">

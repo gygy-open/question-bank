@@ -1,13 +1,13 @@
-import type { Composition, CompositionDetail, BlockWrite, CompType, CompositionScope } from '~/types'
+import type { Composition, CompositionDetail, BlockWrite, CompositionScope, CompositionSettings, TemplateItem } from '~/types'
 
 export interface CompositionCreatePayload {
   title: string
-  comp_type?: CompType
   folder_id?: number | null
   subject_id?: number | null
   scope?: CompositionScope | null
   description?: string | null
   difficulty?: number | null
+  meta_data?: CompositionSettings | null
 }
 
 export interface CompositionUpdatePayload {
@@ -16,12 +16,12 @@ export interface CompositionUpdatePayload {
   status?: 'draft' | 'published' | 'archived'
   difficulty?: number | null
   folder_id?: number | null
+  meta_data?: CompositionSettings | null
 }
 
 export interface CompositionExportOptions {
   title?: string
   format: 'docx' | 'latex'
-  content_position: 'after_question' | 'end_of_paper' | 'hidden'
   include_answer: boolean
   include_analysis: boolean
   include_explanation: boolean
@@ -32,12 +32,21 @@ export interface CompositionExportOptions {
 export interface CompositionListParams {
   scope?: CompositionScope
   subject_id?: number | null
-  comp_type?: CompType
   folder_id?: number | null
   status?: string
   keyword?: string
   difficulty?: number | null
   sort?: string
+}
+
+export interface CreateFromTemplatePayload {
+  source?: 'system' | 'custom'
+  key?: string | null
+  template_id?: number | null
+  title?: string | null
+  folder_id?: number | null
+  subject_id?: number | null
+  scope?: CompositionScope | null
 }
 
 export function useCompositions() {
@@ -74,17 +83,19 @@ export function useCompositions() {
       body: { question_ids: questionIds },
     })
 
-  /** 引用式插入题组: 追加一个 component_ref 块 (跟随更新)。 */
-  const importGroup = (id: number, groupId: number) =>
-    $api<CompositionDetail>(`/compositions/${id}/blocks/import-group/${groupId}`, {
-      method: 'POST',
+  /** 新建起点列表: 系统预置模板 + 当前学科可见的自定义模板。 */
+  const listTemplates = (subjectId?: number | null) =>
+    $api<TemplateItem[]>('/compositions/templates/list', {
+      query: { subject_id: subjectId ?? undefined },
     })
 
-  /** 拆开: 将某 component_ref 块展开为深拷贝的普通块。 */
-  const detachComponent = (id: number, blockId: number) =>
-    $api<CompositionDetail>(`/compositions/${id}/blocks/${blockId}/detach`, {
-      method: 'POST',
-    })
+  /** 从模板新建 = 一次深拷贝, 不留来源关联。 */
+  const createFromTemplate = (payload: CreateFromTemplatePayload) =>
+    $api<Composition>('/compositions/templates/new', { method: 'POST', body: payload })
+
+  /** 把现有文档另存为自定义模板。 */
+  const saveAsTemplate = (id: number, payload: { title?: string, scope?: CompositionScope }) =>
+    $api<Composition>(`/compositions/${id}/save-as-template`, { method: 'POST', body: payload })
 
   const download = (id: number, options: CompositionExportOptions) =>
     $api<Blob>(`/compositions/${id}/download`, {
@@ -102,8 +113,9 @@ export function useCompositions() {
     duplicate,
     saveBlocks,
     appendQuestions,
-    importGroup,
-    detachComponent,
+    listTemplates,
+    createFromTemplate,
+    saveAsTemplate,
     download,
   }
 }

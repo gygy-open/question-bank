@@ -33,10 +33,10 @@ class CRUDComposition(CRUDBase[Composition, CompositionCreate, CompositionUpdate
         )
         db_obj = Composition(
             title=obj_in.title,
-            comp_type=obj_in.comp_type,
             folder_id=folder_id,
             description=obj_in.description,
             difficulty=obj_in.difficulty,
+            meta_data=obj_in.meta_data,
             owner_id=owner_id,
         )
         db.add(db_obj)
@@ -68,7 +68,6 @@ class CRUDComposition(CRUDBase[Composition, CompositionCreate, CompositionUpdate
             .join(Folder, Composition.folder_id == Folder.id)
             .options(
                 selectinload(Composition.blocks).selectinload(CompositionBlock.question),
-                selectinload(Composition.blocks).selectinload(CompositionBlock.ref_composition),
                 selectinload(Composition.folder),
             )
             .where(
@@ -85,11 +84,11 @@ class CRUDComposition(CRUDBase[Composition, CompositionCreate, CompositionUpdate
         owner_id: Optional[int] = None,
         subject_id: Optional[int] = None,
         scope: Optional[str] = None,
-        comp_type: Optional[str] = None,
         folder_id: Optional[int] = None,
         status: Optional[str] = None,
         keyword: Optional[str] = None,
         difficulty: Optional[int] = None,
+        is_template: bool = False,
         sort: str = "updated_desc",
         skip: int = 0,
         limit: int = 100,
@@ -101,6 +100,7 @@ class CRUDComposition(CRUDBase[Composition, CompositionCreate, CompositionUpdate
                 selectinload(Composition.blocks),
                 selectinload(Composition.folder),
             )
+            .where(Composition.is_template.is_(is_template))
         )
         if subject_id:
             query = query.where(Folder.subject_id == subject_id)
@@ -110,8 +110,6 @@ class CRUDComposition(CRUDBase[Composition, CompositionCreate, CompositionUpdate
             query = query.where(Composition.owner_id == owner_id)
         if folder_id:
             query = query.where(Composition.folder_id == folder_id)
-        if comp_type:
-            query = query.where(Composition.comp_type == comp_type)
         if status:
             query = query.where(Composition.status == status)
         if difficulty:
@@ -165,7 +163,6 @@ class CRUDComposition(CRUDBase[Composition, CompositionCreate, CompositionUpdate
                     sequence=index,
                     content=block.content,
                     ref_question_id=block.ref_question_id,
-                    ref_composition_id=block.ref_composition_id,
                 )
             )
         await db.commit()
@@ -195,14 +192,8 @@ class CRUDComposition(CRUDBase[Composition, CompositionCreate, CompositionUpdate
     async def get_render_blocks(
         self, db: AsyncSession, *, comp_id: int
     ) -> List[CompositionBlock]:
-        """渲染用: 将 component_ref 块就地展开为被引题组的有序块 (单层)。"""
-        result: List[CompositionBlock] = []
-        for b in await self.get_ordered_blocks(db, comp_id=comp_id):
-            if b.block_type == BlockType.COMPONENT_REF.value and b.ref_composition_id:
-                result.extend(await self.get_ordered_blocks(db, comp_id=b.ref_composition_id))
-            else:
-                result.append(b)
-        return result
+        """渲染用: 返回有序块 (所见即所得, 无引用展开)。"""
+        return await self.get_ordered_blocks(db, comp_id=comp_id)
 
     async def _next_block_sequence(self, db: AsyncSession, *, comp_id: int) -> int:
         result = await db.execute(
@@ -233,78 +224,26 @@ class CRUDComposition(CRUDBase[Composition, CompositionCreate, CompositionUpdate
         await db.refresh(composition)
         return composition
 
-    async def append_component_ref(
-        self, db: AsyncSession, *, composition: Composition, group_id: int
+    async def duplicate(
+        self,
+        db: AsyncSession,
+        *,
+        composition: Composition,
+        title: Optional[str] = None,
+        folder_id: Optional[int] = None,
+        owner_id: Optional[int] = None,
+        is_template: bool = False,
     ) -> Composition:
-        """引用式插入: 追加一个指向题组的 component_ref 块 (跟随更新)。"""
-        seq = await self._next_block_sequence(db, comp_id=composition.id)
-        db.add(
-            CompositionBlock(
-                composition_id=composition.id,
-                block_type=BlockType.COMPONENT_REF.value,
-                sequence=seq,
-                content=None,
-                ref_composition_id=group_id,
-            )
-        )
-        await db.commit()
-        await db.refresh(composition)
-        return composition
-
-    async def detach_component_ref(
-        self, db: AsyncSession, *, composition: Composition, block_id: int
-    ) -> Composition:
-        """拆开: 把某个 component_ref 块替换为被引题组块的深拷贝 (剥离引用)。"""
-        block = (
-            await db.execute(
-                select(CompositionBlock).where(
-                    CompositionBlock.id == block_id,
-                    CompositionBlock.composition_id == composition.id,
-                )
-            )
-        ).scalars().first()
-        if not block or block.block_type != BlockType.COMPONENT_REF.value or not block.ref_composition_id:
-            return composition
-
-        source = await self.get_ordered_blocks(db, comp_id=block.ref_composition_id)
-        all_blocks = await self.get_ordered_blocks(db, comp_id=composition.id)
-
-        # 重排: 用深拷贝的子块替换该 component_ref 块的位置
-        rebuilt: List[CompositionBlock] = []
-        for b in all_blocks:
-            if b.id == block.id:
-                for s in source:
-                    rebuilt.append(
-                        CompositionBlock(
-                            composition_id=composition.id,
-                            block_type=s.block_type,
-                            content=s.content,
-                            ref_question_id=s.ref_question_id,
-                        )
-                    )
-            else:
-                rebuilt.append(b)
-
-        for old in all_blocks:
-            await db.delete(old)
-        await db.flush()
-        for index, nb in enumerate(rebuilt):
-            nb.sequence = index
-            db.add(nb)
-        await db.commit()
-        await db.refresh(composition)
-        return composition
-
-    async def duplicate(self, db: AsyncSession, *, composition: Composition) -> Composition:
+        """深拷贝一份组稿 (含全部块), 与源解耦; 也用于从模板新建/另存为模板。"""
         new_comp = Composition(
-            title=f"{composition.title} (副本)",
-            comp_type=composition.comp_type,
-            folder_id=composition.folder_id,
+            title=title or f"{composition.title} (副本)",
+            folder_id=folder_id or composition.folder_id,
             description=composition.description,
             status=composition.status,
             difficulty=composition.difficulty,
             meta_data=composition.meta_data,
-            owner_id=composition.owner_id,
+            is_template=is_template,
+            owner_id=owner_id or composition.owner_id,
         )
         db.add(new_comp)
         await db.flush()
@@ -324,7 +263,59 @@ class CRUDComposition(CRUDBase[Composition, CompositionCreate, CompositionUpdate
                     sequence=block.sequence,
                     content=block.content,
                     ref_question_id=block.ref_question_id,
-                    ref_composition_id=block.ref_composition_id,
+                )
+            )
+        await db.commit()
+        await db.refresh(new_comp, ["blocks", "folder"])
+        return new_comp
+
+    # ------------------------------------------------------------------
+    # Templates
+    # ------------------------------------------------------------------
+    async def list_templates(
+        self, db: AsyncSession, *, subject_id: int, owner_id: int
+    ) -> List[Composition]:
+        """自定义模板: 同学科下团队共享的 + 本人个人空间的。"""
+        query = (
+            select(Composition)
+            .join(Folder, Composition.folder_id == Folder.id)
+            .options(selectinload(Composition.blocks), selectinload(Composition.folder))
+            .where(
+                Composition.is_template.is_(True),
+                Folder.subject_id == subject_id,
+                (Folder.scope == FolderScope.TEAM.value)
+                | ((Folder.scope == FolderScope.PERSONAL.value) & (Composition.owner_id == owner_id)),
+            )
+            .order_by(desc(Composition.updated_at))
+        )
+        return list((await db.execute(query)).scalars().all())
+
+    async def create_from_system_template(
+        self,
+        db: AsyncSession,
+        *,
+        template,
+        title: str,
+        folder_id: int,
+        owner_id: int,
+    ) -> Composition:
+        """从硬编码系统模板新建: 写入默认设置 + 初始块骨架。"""
+        new_comp = Composition(
+            title=title,
+            folder_id=folder_id,
+            meta_data=dict(template.meta_data),
+            owner_id=owner_id,
+        )
+        db.add(new_comp)
+        await db.flush()
+        for index, block in enumerate(template.blocks):
+            db.add(
+                CompositionBlock(
+                    composition_id=new_comp.id,
+                    block_type=block["block_type"],
+                    sequence=index,
+                    content=block.get("content"),
+                    ref_question_id=block.get("ref_question_id"),
                 )
             )
         await db.commit()

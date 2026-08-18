@@ -11,19 +11,11 @@ class OutputFormat(str, Enum):
     LATEX = "latex"
 
 
-class ContentPosition(str, Enum):
-    """Where to place additional content (answers, explanations, etc.)"""
-    AFTER_QUESTION = "after_question"  # Immediately after each question
-    END_OF_PAPER = "end_of_paper"      # Unified appendix at the end
-    HIDDEN = "hidden"                   # Don't include at all
-
-
 # --- Export ---
 
 class CompositionExportOptions(BaseModel):
     title: Optional[str] = None
     format: OutputFormat = OutputFormat.DOCX
-    content_position: ContentPosition = ContentPosition.AFTER_QUESTION
     include_answer: bool = True
     include_analysis: bool = True
     include_explanation: bool = True
@@ -61,12 +53,12 @@ class FolderRead(BaseModel):
 
 class CompositionCreate(BaseModel):
     title: str
-    comp_type: str = "exam_paper"
     folder_id: Optional[int] = None      # 缺省 -> 解析/创建对应根文件夹
     subject_id: Optional[int] = None     # 无 folder_id 时用于解析根文件夹
     scope: FolderScope = FolderScope.PERSONAL  # 无 folder_id 时用于解析根文件夹归属空间
     description: Optional[str] = None
     difficulty: Optional[int] = None
+    meta_data: Optional[Any] = None      # 文档级设置: show_answers / answer_position 等
 
 
 class CompositionUpdate(BaseModel):
@@ -75,6 +67,7 @@ class CompositionUpdate(BaseModel):
     status: Optional[CompositionStatus] = None
     difficulty: Optional[int] = None
     folder_id: Optional[int] = None      # 移动 (可跨 scope)
+    meta_data: Optional[Any] = None      # 文档级设置
 
 
 # --- Blocks ---
@@ -97,21 +90,11 @@ class BlockWrite(BaseModel):
     block_type: BlockType
     content: Optional[Any] = None
     ref_question_id: Optional[int] = None
-    ref_composition_id: Optional[int] = None
 
 
 class BlocksReplace(BaseModel):
     """整表覆写: 前端提交完整有序块列表。"""
     blocks: List[BlockWrite]
-
-
-class CompositionBrief(BaseModel):
-    """供 component_ref 块预览引用的教学模块/组稿摘要."""
-    model_config = ConfigDict(from_attributes=True)
-
-    id: int
-    title: str
-    comp_type: str
 
 
 class BlockRead(BaseModel):
@@ -122,18 +105,17 @@ class BlockRead(BaseModel):
     sequence: int
     content: Optional[Any] = None
     ref_question_id: Optional[int] = None
-    ref_composition_id: Optional[int] = None
     question: Optional[QuestionBrief] = None
-    ref_composition: Optional[CompositionBrief] = None
 
 
 class CompositionRead(BaseModel):
     id: int
-    comp_type: str
     title: str
     description: Optional[str] = None
     status: str
+    is_template: bool = False
     difficulty: Optional[int] = None
+    meta_data: Optional[Any] = None
     folder_id: int
     subject_id: Optional[int] = None
     scope: Optional[str] = None
@@ -145,3 +127,33 @@ class CompositionRead(BaseModel):
 
 class CompositionDetail(CompositionRead):
     blocks: List[BlockRead] = []
+
+
+# --- Templates ---
+
+class TemplateItem(BaseModel):
+    """新建时的起点: 系统预置 (source=system, key 为硬编码标识) 或自定义 (source=custom, id 为组稿 id)。"""
+    source: str                      # "system" | "custom"
+    key: Optional[str] = None        # system 模板标识
+    id: Optional[int] = None         # custom 模板对应的 composition id
+    label: str
+    icon: Optional[str] = None
+    description: Optional[str] = None
+    scope: Optional[str] = None      # custom: personal / team
+
+
+class CreateFromTemplate(BaseModel):
+    """从模板新建: 系统模板给 key, 自定义模板给 template_id。"""
+    source: str = "system"           # "system" | "custom"
+    key: Optional[str] = None
+    template_id: Optional[int] = None
+    title: Optional[str] = None
+    folder_id: Optional[int] = None
+    subject_id: Optional[int] = None
+    scope: FolderScope = FolderScope.PERSONAL
+
+
+class SaveAsTemplate(BaseModel):
+    """将现有文档另存为自定义模板。"""
+    title: Optional[str] = None
+    scope: FolderScope = FolderScope.PERSONAL

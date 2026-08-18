@@ -23,7 +23,7 @@ const emit = defineEmits<{
   added: []
 }>()
 
-const { list, create, appendQuestions } = useCompositions()
+const { list, createFromTemplate, appendQuestions } = useCompositions()
 const { currentSubjectId } = useSubjectContext()
 
 const loading = ref(false)
@@ -41,7 +41,7 @@ const filteredGroups = computed(() => {
 const loadGroups = async () => {
   loading.value = true
   try {
-    groups.value = await list({ comp_type: 'question_group', subject_id: currentSubjectId.value, sort: 'updated_desc' })
+    groups.value = await list({ subject_id: currentSubjectId.value, sort: 'updated_desc' })
   } catch {
     toast.error('加载题组失败')
   } finally {
@@ -79,9 +79,10 @@ const confirmAdd = async () => {
 const createNewGroup = async () => {
   submitting.value = true
   try {
-    const group = await create({
+    const group = await createFromTemplate({
+      source: 'system',
+      key: 'question_group',
       title: `新题组 ${new Date().toLocaleDateString()}`,
-      comp_type: 'question_group',
       subject_id: currentSubjectId.value ?? null,
     })
     await appendQuestions(group.id, props.questionIds)

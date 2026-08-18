@@ -15,9 +15,14 @@ from app.schemas.composition import (
     CompositionDetail,
     BlockRead,
     QuestionBrief,
-    CompositionBrief,
+    TemplateItem,
+    CreateFromTemplate,
+    SaveAsTemplate,
 )
-from app.services.composition_renderer import composition_renderer
+from app.services.composition_renderer import composition_renderer, ContentPosition
+from app.services.composition_templates import SYSTEM_TEMPLATES
+from app.crud.crud_folder import folder as crud_folder
+from app.models.composition import FolderScope
 
 logger = logging.getLogger(__name__)
 
@@ -27,11 +32,12 @@ router = APIRouter()
 def _to_read(comp: models.Composition) -> CompositionRead:
     return CompositionRead(
         id=comp.id,
-        comp_type=comp.comp_type,
         title=comp.title,
         description=comp.description,
         status=comp.status,
+        is_template=comp.is_template,
         difficulty=comp.difficulty,
+        meta_data=comp.meta_data,
         folder_id=comp.folder_id,
         subject_id=comp.subject_id,
         scope=comp.scope,
@@ -50,19 +56,18 @@ def _to_detail(comp: models.Composition) -> CompositionDetail:
             sequence=b.sequence,
             content=b.content,
             ref_question_id=b.ref_question_id,
-            ref_composition_id=b.ref_composition_id,
             question=QuestionBrief.model_validate(b.question) if b.question else None,
-            ref_composition=CompositionBrief.model_validate(b.ref_composition) if b.ref_composition else None,
         )
         for b in comp.blocks
     ]
     return CompositionDetail(
         id=comp.id,
-        comp_type=comp.comp_type,
         title=comp.title,
         description=comp.description,
         status=comp.status,
+        is_template=comp.is_template,
         difficulty=comp.difficulty,
+        meta_data=comp.meta_data,
         folder_id=comp.folder_id,
         subject_id=comp.subject_id,
         scope=comp.scope,
@@ -80,7 +85,6 @@ async def list_compositions(
     current_user: models.User = Depends(deps.get_current_active_user),
     subject_id: Optional[int] = None,
     scope: Optional[str] = None,
-    comp_type: Optional[str] = None,
     folder_id: Optional[int] = None,
     status: Optional[str] = None,
     keyword: Optional[str] = None,
@@ -99,7 +103,6 @@ async def list_compositions(
         status=status,
         subject_id=subject_id,
         scope=scope,
-        comp_type=comp_type,
         folder_id=folder_id,
         keyword=keyword,
         difficulty=difficulty,
@@ -181,6 +184,120 @@ async def duplicate_composition(
     return _to_read(new_comp)
 
 
+@router.get("/templates/list", response_model=List[TemplateItem])
+async def list_templates(
+    *,
+    db: deps.SessionDep,
+    subject_id: Optional[int] = None,
+    current_user: models.User = Depends(deps.get_current_active_user),
+) -> Any:
+    """新建起点: 系统预置模板 + 当前学科下本人可见的自定义模板。"""
+    if subject_id is None:
+        subject_id = current_user.last_active_subject_id or current_user.subject_id
+    items: List[TemplateItem] = [
+        TemplateItem(
+            source="system",
+            key=t.key,
+            label=t.label,
+            icon=t.icon,
+            description=t.description,
+        )
+        for t in SYSTEM_TEMPLATES.values()
+    ]
+    if subject_id is not None:
+        customs = await crud.composition.list_templates(
+            db, subject_id=subject_id, owner_id=current_user.id
+        )
+        items.extend(
+            TemplateItem(
+                source="custom",
+                id=c.id,
+                label=c.title,
+                description=c.description,
+                scope=c.scope,
+            )
+            for c in customs
+        )
+    return items
+
+
+@router.post("/templates/new", response_model=CompositionRead)
+async def create_from_template(
+    *,
+    db: deps.SessionDep,
+    payload: CreateFromTemplate,
+    current_user: models.User = Depends(deps.get_current_active_user),
+) -> Any:
+    """从模板新建 = 一次深拷贝, 不留来源关联。"""
+    subject_id = payload.subject_id or current_user.last_active_subject_id or current_user.subject_id
+    if payload.folder_id:
+        folder_id = payload.folder_id
+    else:
+        scope = payload.scope.value if hasattr(payload.scope, "value") else payload.scope
+        root = await crud_folder.ensure_root(
+            db, owner_id=current_user.id, subject_id=subject_id, scope=scope
+        )
+        folder_id = root.id
+
+    if payload.source == "custom":
+        if not payload.template_id:
+            raise HTTPException(status_code=422, detail="template_id required")
+        tpl = await crud.composition.get_detail(
+            db, comp_id=payload.template_id, owner_id=current_user.id
+        )
+        if not tpl or not tpl.is_template:
+            raise HTTPException(status_code=404, detail="Template not found")
+        new_comp = await crud.composition.duplicate(
+            db,
+            composition=tpl,
+            title=payload.title or tpl.title,
+            folder_id=folder_id,
+            owner_id=current_user.id,
+            is_template=False,
+        )
+        return _to_read(new_comp)
+
+    template = SYSTEM_TEMPLATES.get(payload.key or "")
+    if not template:
+        raise HTTPException(status_code=404, detail="System template not found")
+    new_comp = await crud.composition.create_from_system_template(
+        db,
+        template=template,
+        title=payload.title or template.label,
+        folder_id=folder_id,
+        owner_id=current_user.id,
+    )
+    return _to_read(new_comp)
+
+
+@router.post("/{comp_id}/save-as-template", response_model=CompositionRead)
+async def save_as_template(
+    *,
+    db: deps.SessionDep,
+    comp_id: int,
+    payload: SaveAsTemplate,
+    current_user: models.User = Depends(deps.get_current_active_user),
+) -> Any:
+    """把现有文档另存为自定义模板 (深拷贝, 存入按学科+空间隔离的模板库)。"""
+    comp = await crud.composition.get_detail(db, comp_id=comp_id, owner_id=current_user.id)
+    if not comp:
+        raise HTTPException(status_code=404, detail="Composition not found")
+    subject_id = comp.subject_id or current_user.last_active_subject_id or current_user.subject_id
+    scope = payload.scope.value if hasattr(payload.scope, "value") else payload.scope
+    root = await crud_folder.ensure_root(
+        db, owner_id=current_user.id, subject_id=subject_id, scope=scope
+    )
+    new_tpl = await crud.composition.duplicate(
+        db,
+        composition=comp,
+        title=payload.title or comp.title,
+        folder_id=root.id,
+        owner_id=current_user.id,
+        is_template=True,
+    )
+    return _to_read(new_tpl)
+
+
 @router.put("/{comp_id}/blocks", response_model=CompositionDetail)
 async def replace_blocks(
     *,
@@ -215,43 +332,6 @@ async def add_question_blocks(
     return _to_detail(comp)
 
 
-@router.post("/{comp_id}/blocks/import-group/{group_id}", response_model=CompositionDetail)
-async def import_group(
-    *,
-    db: deps.SessionDep,
-    comp_id: int,
-    group_id: int,
-    current_user: models.User = Depends(deps.get_current_active_user),
-) -> Any:
-    """引用式插入: 追加一个指向题组的 component_ref 块 (跟随更新)。"""
-    target = await crud.composition.get_owned(db, comp_id=comp_id, owner_id=current_user.id)
-    if not target:
-        raise HTTPException(status_code=404, detail="Composition not found")
-    group = await crud.composition.get_owned(db, comp_id=group_id, owner_id=current_user.id)
-    if not group:
-        raise HTTPException(status_code=404, detail="Question group not found")
-    await crud.composition.append_component_ref(db, composition=target, group_id=group_id)
-    target = await crud.composition.get_detail(db, comp_id=comp_id, owner_id=current_user.id)
-    return _to_detail(target)
-
-
-@router.post("/{comp_id}/blocks/{block_id}/detach", response_model=CompositionDetail)
-async def detach_component(
-    *,
-    db: deps.SessionDep,
-    comp_id: int,
-    block_id: int,
-    current_user: models.User = Depends(deps.get_current_active_user),
-) -> Any:
-    """拆开: 把某个 component_ref 块替换为被引题组块的深拷贝 (剥离引用)。"""
-    comp = await crud.composition.get_owned(db, comp_id=comp_id, owner_id=current_user.id)
-    if not comp:
-        raise HTTPException(status_code=404, detail="Composition not found")
-    await crud.composition.detach_component_ref(db, composition=comp, block_id=block_id)
-    comp = await crud.composition.get_detail(db, comp_id=comp_id, owner_id=current_user.id)
-    return _to_detail(comp)
-
-
 @router.post("/{comp_id}/download")
 async def download_composition(
     *,
@@ -260,7 +340,7 @@ async def download_composition(
     options: CompositionExportOptions,
     current_user: models.User = Depends(deps.get_current_active_user),
 ) -> Any:
-    """Generate and download a composition preserving block order (component_ref expanded)."""
+    """Generate and download a composition preserving block order (WYSIWYG)."""
     comp = await crud.composition.get_owned(db, comp_id=comp_id, owner_id=current_user.id)
     if not comp:
         raise HTTPException(status_code=404, detail="Composition not found")
@@ -269,13 +349,23 @@ async def download_composition(
     if not blocks:
         raise HTTPException(status_code=404, detail="Composition has no content")
 
+    # 所见即所得: 答案显隐与落位由文档级设置决定, 不再每次导出选择
+    meta = comp.meta_data or {}
+    if meta.get("show_answers") is False:
+        content_position = ContentPosition.HIDDEN
+    else:
+        try:
+            content_position = ContentPosition(meta.get("answer_position", "after_question"))
+        except ValueError:
+            content_position = ContentPosition.AFTER_QUESTION
+
     title = options.title or comp.title
     try:
         file_path = composition_renderer.generate_file(
             title,
             blocks,
             options.format,
-            content_position=options.content_position,
+            content_position=content_position,
             include_answer=options.include_answer,
             include_analysis=options.include_analysis,
             include_explanation=options.include_explanation,

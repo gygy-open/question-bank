@@ -27,7 +27,6 @@ const search = useDebounceFn(async () => {
   loading.value = true
   try {
     const data = await list({
-      comp_type: 'question_group',
       subject_id: currentSubjectId.value,
       keyword: keyword.value || undefined,
       sort: 'updated_desc',
@@ -51,12 +50,12 @@ watch(keyword, search)
 
 <template>
   <div>
-    <Input v-model="keyword" placeholder="搜索教学模块..." class="h-8 text-sm mb-2" autofocus />
+    <Input v-model="keyword" placeholder="搜索文档..." class="h-8 text-sm mb-2" autofocus />
     <div v-if="loading" class="flex justify-center py-6">
       <Loader2 class="h-4 w-4 animate-spin text-muted-foreground" />
     </div>
     <div v-else-if="results.length === 0" class="py-6 text-center text-xs text-muted-foreground">
-      没有找到教学模块
+      没有找到文档
     </div>
     <div v-else class="max-h-72 overflow-y-auto space-y-1">
       <button

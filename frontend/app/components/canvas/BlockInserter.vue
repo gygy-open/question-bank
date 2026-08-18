@@ -17,9 +17,7 @@ const open = ref(false)
 const mode = ref<'menu' | 'question' | 'module'>('menu')
 const cloning = ref(false)
 
-const ctx = inject(CanvasContextKey, { pubType: 'exam_paper', showAnswers: false })
-// 教学模块内不允许再嵌套教学模块引用, 避免无限套娃
-const canInsertModule = ctx.pubType !== 'question_group'
+const ctx = inject(CanvasContextKey, { showAnswers: false })
 
 const onOpenChange = (v: boolean) => {
   open.value = v
@@ -36,7 +34,7 @@ const pickQuestion = (q: QuestionBrief) => {
   emit('insert', newQuestionBlock(q))
 }
 
-/** 教学模块作为模板导入: 深拷贝其全部块, 与源解耦, 可直接修改。 */
+/** 克隆其他文档: 深拷贝其全部块, 与源解耦, 可直接修改。 */
 const pickModule = async (c: Composition) => {
   cloning.value = true
   try {
@@ -44,7 +42,7 @@ const pickModule = async (c: Composition) => {
     open.value = false
     emit('insert', detail.blocks.map(toEditorBlock))
   } catch {
-    toast.error('导入教学模块失败')
+    toast.error('导入文档内容失败')
   } finally {
     cloning.value = false
   }
@@ -67,11 +65,10 @@ const pickModule = async (c: Composition) => {
           <FileQuestion class="h-4 w-4 text-muted-foreground" /> 题目
         </button>
         <button
-          v-if="canInsertModule"
           class="w-full flex items-center gap-2 px-2 py-1.5 text-sm rounded-md hover:bg-muted transition-colors text-left"
           @click="mode = 'module'"
         >
-          <Blocks class="h-4 w-4 text-muted-foreground" /> 教学模块
+          <Blocks class="h-4 w-4 text-muted-foreground" /> 克隆文档
         </button>
         <button
           v-for="b in insertableBlocks"

@@ -1,5 +1,5 @@
 from sqlalchemy import (
-    Column, Integer, String, Text, DateTime, ForeignKey, Index, JSON,
+    Column, Integer, String, Text, DateTime, ForeignKey, Index, JSON, Boolean,
 )
 from sqlalchemy.orm import relationship
 from datetime import datetime
@@ -23,7 +23,6 @@ class BlockType(str, enum.Enum):
     HEADING = "heading"              # 大题/分节标题
     TEXT = "text"                    # 富文本段落 (markdown)
     QUESTION = "question"            # 引用单题
-    COMPONENT_REF = "component_ref"  # 引用整个题组(跟随更新, 可拆开)
     PAGE_BREAK = "page_break"        # 分页符
 
 
@@ -54,10 +53,10 @@ class Composition(Base):
     id = Column(Integer, primary_key=True, index=True)
     folder_id = Column(Integer, ForeignKey("folders.id", ondelete="CASCADE"), nullable=False, index=True)
 
-    comp_type = Column(String(50), nullable=False, index=True)  # 决定文档表现形式: question_group / exam_paper / study_guide / handout ...
     title = Column(String(255), nullable=False)
     description = Column(Text, nullable=True)
     status = Column(String(20), default=CompositionStatus.DRAFT.value, nullable=False, index=True)
+    is_template = Column(Boolean, nullable=False, default=False, index=True)  # True = 存放在模板库, 仅作克隆源
 
     difficulty = Column(Integer, nullable=True)                 
     meta_data = Column(JSON, nullable=True)                     
@@ -74,7 +73,6 @@ class Composition(Base):
         back_populates="composition",
         cascade="all, delete-orphan",
         order_by="CompositionBlock.sequence",
-        foreign_keys="CompositionBlock.composition_id",
     )
 
     @property
@@ -87,7 +85,7 @@ class Composition(Base):
 
 
 class CompositionBlock(Base):
-    """内容块: 题组与作品共用. component_ref 走同表自引用实现引用式编排."""
+    """内容块: 标题/富文本/单题引用/分页符."""
     __tablename__ = "composition_blocks"
 
     id = Column(Integer, primary_key=True, index=True)
@@ -99,13 +97,10 @@ class CompositionBlock(Base):
     # 块专属数据: text -> {"text": md}; heading -> {"text": str, "level": int}; question -> {"score": float}
     content = Column(JSON, nullable=True)
 
-    # 引用(按 block_type 二选一)
-    ref_question_id = Column(Integer, ForeignKey("questions.id"), nullable=True)        # question
-    ref_composition_id = Column(Integer, ForeignKey("compositions.id"), nullable=True)  # component_ref -> 指向题组
+    ref_question_id = Column(Integer, ForeignKey("questions.id"), nullable=True)
 
-    composition = relationship("Composition", back_populates="blocks", foreign_keys=[composition_id])
+    composition = relationship("Composition", back_populates="blocks")
     question = relationship("Question")
-    ref_composition = relationship("Composition", foreign_keys=[ref_composition_id])
 
     __table_args__ = (
         Index("ix_comp_block_seq", "composition_id", "sequence"),
