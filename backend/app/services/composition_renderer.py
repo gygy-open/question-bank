@@ -8,21 +8,21 @@ from typing import List, Dict, Any, Callable, Optional
 from pathlib import Path
 
 import pypandoc
-from enum import Enum
 
 from app.models.question import Question, QuestionType
 from app.models.composition import CompositionBlock, BlockType
 from app.schemas.composition import OutputFormat
+from app.services.composition_display import (
+    FIELD_ORDER,
+    FIELD_SOURCE,
+    FIELD_LABEL,
+    REGION_INLINE,
+    REGION_APPENDIX,
+    resolve_region,
+)
 from app.core.config import settings
 
 logger = logging.getLogger(__name__)
-
-
-class ContentPosition(str, Enum):
-    """答案/解析等附加内容的落位 (来自文档级设置 meta_data.answer_position)。"""
-    AFTER_QUESTION = "after_question"  # 紧跟每道题
-    END_OF_PAPER = "end_of_paper"      # 统一收纳到卷末
-    HIDDEN = "hidden"                   # 不输出
 
 
 class CompositionRenderer:
@@ -88,33 +88,27 @@ class CompositionRenderer:
     # ------------------------------------------------------------------
     # Block -> Markdown
     # ------------------------------------------------------------------
-    def _append_question_details(
+    def _field_value(self, q: Question, field: str) -> str:
+        if field == "answer":
+            return self._format_answer(q)
+        return getattr(q, FIELD_SOURCE[field], None) or ""
+
+    def _render_fields(
         self,
         md_lines: List[str],
         q: Question,
-        include_answer: bool,
-        include_analysis: bool,
-        include_explanation: bool,
-        include_summary: bool,
-        include_source: bool,
+        fields: List[str],
         image_handler: Optional[Callable[[Path], str]] = None,
     ):
-        if include_answer and q.answer:
-            md_lines.append(
-                f"**【答案】** {self._process_images(self._format_answer(q), image_handler)}"
-            )
-            md_lines.append("")
-        if include_analysis and q.thinking:
-            md_lines.append(f"**【分析】** {self._process_images(q.thinking, image_handler)}")
-            md_lines.append("")
-        if include_explanation and q.analysis:
-            md_lines.append(f"**【解析】** {self._process_images(q.analysis, image_handler)}")
-            md_lines.append("")
-        if include_summary and q.summary:
-            md_lines.append(f"**【总结】** {self._process_images(q.summary, image_handler)}")
-            md_lines.append("")
-        if include_source and q.source:
-            md_lines.append(f"**【来源】** {self._process_images(q.source, image_handler)}")
+        """按注册表顺序渲染选定字段 (答案/分析/解析/总结/来源)。"""
+        for field in FIELD_ORDER:
+            if field not in fields:
+                continue
+            value = self._field_value(q, field)
+            if not value:
+                continue
+            label = FIELD_LABEL[field]
+            md_lines.append(f"**【{label}】** {self._process_images(str(value), image_handler)}")
             md_lines.append("")
 
     def _render_question_body(
@@ -158,17 +152,12 @@ class CompositionRenderer:
         self,
         title: str,
         blocks: List[CompositionBlock],
-        content_position: ContentPosition = ContentPosition.AFTER_QUESTION,
-        include_answer: bool = True,
-        include_analysis: bool = True,
-        include_explanation: bool = True,
-        include_summary: bool = True,
-        include_source: bool = False,
+        doc_display: Optional[dict] = None,
         image_handler: Optional[Callable[[Path], str]] = None,
     ) -> str:
         md_lines: List[str] = [f"# {title}", ""]
         counter = 0
-        appendix_questions: List[Question] = []
+        appendix: List[tuple] = []  # (number, question, [appendix_fields])
 
         for block in blocks:
             btype = block.block_type
@@ -194,29 +183,34 @@ class CompositionRenderer:
                     continue
                 counter += 1
                 self._render_question_body(md_lines, q, counter, image_handler)
-                if content_position == ContentPosition.AFTER_QUESTION:
-                    self._append_question_details(
-                        md_lines, q, include_answer, include_analysis,
-                        include_explanation, include_summary, include_source, image_handler,
-                    )
-                elif content_position == ContentPosition.END_OF_PAPER:
-                    appendix_questions.append(q)
+
+                block_display = block.content if isinstance(block.content, dict) else None
+                block_display = block_display.get("display") if block_display else None
+                inline_fields: List[str] = []
+                appendix_fields: List[str] = []
+                for field in FIELD_ORDER:
+                    region = resolve_region(field, block_display, doc_display)
+                    if region == REGION_INLINE:
+                        inline_fields.append(field)
+                    elif region == REGION_APPENDIX:
+                        appendix_fields.append(field)
+                if inline_fields:
+                    self._render_fields(md_lines, q, inline_fields, image_handler)
+                if appendix_fields:
+                    appendix.append((counter, q, appendix_fields))
                 md_lines.append("")
 
-        if content_position == ContentPosition.END_OF_PAPER and appendix_questions:
+        if appendix:
             md_lines.append("```{=latex}")
             md_lines.append("\\newpage")
             md_lines.append("```")
             md_lines.append("")
             md_lines.append("# 参考答案与解析")
             md_lines.append("")
-            for idx, q in enumerate(appendix_questions, start=1):
-                md_lines.append(f"**{idx}.** ")
+            for number, q, fields in appendix:
+                md_lines.append(f"**{number}.** ")
                 md_lines.append("")
-                self._append_question_details(
-                    md_lines, q, include_answer, include_analysis,
-                    include_explanation, include_summary, include_source, image_handler,
-                )
+                self._render_fields(md_lines, q, fields, image_handler)
                 md_lines.append("")
 
         return "\n".join(md_lines)
@@ -229,32 +223,17 @@ class CompositionRenderer:
         title: str,
         blocks: List[CompositionBlock],
         format: OutputFormat,
-        content_position: ContentPosition = ContentPosition.AFTER_QUESTION,
-        include_answer: bool = True,
-        include_analysis: bool = True,
-        include_explanation: bool = True,
-        include_summary: bool = True,
-        include_source: bool = False,
+        doc_display: Optional[dict] = None,
     ) -> str:
-        logger.debug(
-            f"Rendering publication '{title}' as {format.value}, position={content_position.value}"
-        )
-        if content_position == ContentPosition.HIDDEN:
-            include_answer = include_analysis = include_explanation = include_summary = include_source = False
+        logger.debug(f"Rendering publication '{title}' as {format.value}")
 
         if format == OutputFormat.LATEX:
-            return self._generate_latex_zip(
-                title, blocks, content_position, include_answer, include_analysis,
-                include_explanation, include_summary, include_source,
-            )
+            return self._generate_latex_zip(title, blocks, doc_display)
 
         # DOCX via pandoc
         fd, path = tempfile.mkstemp(suffix=f".{format.value}")
         os.close(fd)
-        markdown_content = self.generate_markdown(
-            title, blocks, content_position, include_answer, include_analysis,
-            include_explanation, include_summary, include_source,
-        )
+        markdown_content = self.generate_markdown(title, blocks, doc_display)
         extra_args = ['--standalone']
         reference_doc = os.path.join(self.template_dir, "yuanxuan-standard-math.docx")
         if os.path.exists(reference_doc):
@@ -278,12 +257,7 @@ class CompositionRenderer:
         self,
         title: str,
         blocks: List[CompositionBlock],
-        content_position: ContentPosition,
-        include_answer: bool,
-        include_analysis: bool,
-        include_explanation: bool,
-        include_summary: bool,
-        include_source: bool,
+        doc_display: Optional[dict] = None,
     ) -> str:
         with tempfile.TemporaryDirectory() as tmpdirname:
             base_dir = Path(tmpdirname)
@@ -296,9 +270,7 @@ class CompositionRenderer:
                 return f"images/{dst_name}"
 
             markdown_content = self.generate_markdown(
-                title, blocks, content_position, include_answer, include_analysis,
-                include_explanation, include_summary, include_source,
-                image_handler=latex_image_handler,
+                title, blocks, doc_display, image_handler=latex_image_handler,
             )
             tex_file = base_dir / f"{title}.tex"
             preamble = self._load_preamble()

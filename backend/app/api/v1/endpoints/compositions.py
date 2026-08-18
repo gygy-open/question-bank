@@ -19,7 +19,7 @@ from app.schemas.composition import (
     CreateFromTemplate,
     SaveAsTemplate,
 )
-from app.services.composition_renderer import composition_renderer, ContentPosition
+from app.services.composition_renderer import composition_renderer
 from app.services.composition_templates import SYSTEM_TEMPLATES
 from app.crud.crud_folder import folder as crud_folder
 from app.models.composition import FolderScope
@@ -349,15 +349,8 @@ async def download_composition(
     if not blocks:
         raise HTTPException(status_code=404, detail="Composition has no content")
 
-    # 所见即所得: 答案显隐与落位由文档级设置决定, 不再每次导出选择
-    meta = comp.meta_data or {}
-    if meta.get("show_answers") is False:
-        content_position = ContentPosition.HIDDEN
-    else:
-        try:
-            content_position = ContentPosition(meta.get("answer_position", "after_question"))
-        except ValueError:
-            content_position = ContentPosition.AFTER_QUESTION
+    # 所见即所得: 内容与落位完全由文档 display 策略决定
+    doc_display = (comp.meta_data or {}).get("display")
 
     title = options.title or comp.title
     try:
@@ -365,12 +358,7 @@ async def download_composition(
             title,
             blocks,
             options.format,
-            content_position=content_position,
-            include_answer=options.include_answer,
-            include_analysis=options.include_analysis,
-            include_explanation=options.include_explanation,
-            include_summary=options.include_summary,
-            include_source=options.include_source,
+            doc_display=doc_display,
         )
 
         extension = options.format.value

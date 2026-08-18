@@ -22,11 +22,6 @@ export interface CompositionUpdatePayload {
 export interface CompositionExportOptions {
   title?: string
   format: 'docx' | 'latex'
-  include_answer: boolean
-  include_analysis: boolean
-  include_explanation: boolean
-  include_summary: boolean
-  include_source: boolean
 }
 
 export interface CompositionListParams {

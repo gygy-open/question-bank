@@ -185,6 +185,7 @@ export interface QuestionBrief {
   thinking?: string | null
   analysis?: string | null
   summary?: string | null
+  source?: string | null
 }
 
 export interface PaperItem {
@@ -220,10 +221,21 @@ export type CompositionScope = 'team' | 'personal'
 
 export type AnswerPosition = 'after_question' | 'end_of_paper' | 'hidden'
 
-/** 文档级设置 (存于 meta_data), 由模板 seed, 编辑器可改, 导出读取。 */
+/** 内容字段落位区域 (开放枚举)。 */
+export type DisplayRegion = 'inline' | 'appendix' | 'hidden'
+
+/** 可配置显示的字段。 */
+export type DisplayField = 'answer' | 'analysis' | 'explanation' | 'summary' | 'source'
+
+/** 显示策略: 文档级默认与题块级覆盖共用同一结构。 */
+export interface DisplayPolicy {
+  v?: number
+  fields?: Partial<Record<DisplayField, { region: DisplayRegion }>>
+}
+
+/** 文档级设置 (存于 meta_data)。 */
 export interface CompositionSettings {
-  show_answers?: boolean
-  answer_position?: AnswerPosition
+  display?: DisplayPolicy
 }
 
 export interface Folder {

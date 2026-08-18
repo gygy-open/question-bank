@@ -16,11 +16,6 @@ class OutputFormat(str, Enum):
 class CompositionExportOptions(BaseModel):
     title: Optional[str] = None
     format: OutputFormat = OutputFormat.DOCX
-    include_answer: bool = True
-    include_analysis: bool = True
-    include_explanation: bool = True
-    include_summary: bool = True
-    include_source: bool = False
 
 
 # --- Folder ---
@@ -84,6 +79,7 @@ class QuestionBrief(BaseModel):
     thinking: Optional[str] = None
     analysis: Optional[str] = None
     summary: Optional[str] = None
+    source: Optional[str] = None
 
 
 class BlockWrite(BaseModel):

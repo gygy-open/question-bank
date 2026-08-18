@@ -17,7 +17,7 @@ const open = ref(false)
 const mode = ref<'menu' | 'question' | 'module'>('menu')
 const cloning = ref(false)
 
-const ctx = inject(CanvasContextKey, { showAnswers: false })
+const ctx = inject(CanvasContextKey, { documentDisplay: null })
 
 const onOpenChange = (v: boolean) => {
   open.value = v

@@ -12,17 +12,16 @@ import {
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
 } from '@/components/ui/dialog'
-import { Checkbox } from '@/components/ui/checkbox'
-import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
 import {
   ArrowLeft, Download, Loader2, CheckCircle, FileDown,
 } from '@lucide/vue'
 import { toast } from 'vue-sonner'
 import BlockCanvas from '@/components/canvas/BlockCanvas.vue'
+import DocumentDisplaySettings from '@/components/canvas/DocumentDisplaySettings.vue'
 import { toEditorBlock, toBlockWrite, type EditorBlock } from '@/components/canvas/blockRegistry'
 import PaperQuestionDetailSheet from '@/components/PaperQuestionDetailSheet.vue'
 import { useCompositions } from '~/composables/useCompositions'
-import type { CompositionDetail, CompositionSettings, Subject, KnowledgePoint } from '~/types'
+import type { CompositionDetail, CompositionSettings, DisplayPolicy, Subject, KnowledgePoint } from '~/types'
 
 const route = useRoute()
 const router = useRouter()
@@ -37,8 +36,6 @@ const { data: knowledgePoints } = await useAPI<KnowledgePoint[]>('/knowledge-poi
 const publication = ref<CompositionDetail | null>(null)
 const blocks = ref<EditorBlock[]>([])
 const loading = ref(true)
-// 所见即所得: 答案落位作为文档级设置持久化, 导出时由后端读取
-const docPlacement = ref<'after_question' | 'end_of_paper' | 'hidden'>('after_question')
 
 const saving = ref(false)
 const saved = ref(false)
@@ -47,9 +44,9 @@ const savingStatus = ref('')
 const detailSheetOpen = ref(false)
 const detailQuestionId = ref<number | null>(null)
 
-// 题块是否展示答案由文档级设置决定 (所见即所得)
+// 题块按文档级显示策略解析 (所见即所得)
 const canvasContext = computed(() => ({
-  showAnswers: publication.value?.meta_data?.show_answers ?? false,
+  documentDisplay: publication.value?.meta_data?.display ?? null,
   compId: pubId,
 }))
 
@@ -59,9 +56,6 @@ const load = async () => {
     const data = await get(pubId)
     publication.value = data
     blocks.value = data.blocks.map(toEditorBlock)
-    docPlacement.value = data.meta_data?.show_answers === false
-      ? 'hidden'
-      : (data.meta_data?.answer_position ?? 'after_question')
   } catch {
     toast.error('加载试卷失败')
     router.push('/library?scope=personal')
@@ -144,21 +138,12 @@ const exportOpen = ref(false)
 const exporting = ref(false)
 const exportForm = ref({
   format: 'docx' as 'docx' | 'latex',
-  include_answer: false,
-  include_analysis: false,
-  include_explanation: false,
-  include_summary: false,
-  include_source: false,
 })
 
-// 所见即所得: 答案落位作为文档级设置持久化, 导出时由后端读取
-const contentPositionEnabled = computed(() => docPlacement.value !== 'hidden')
-
-const saveSettings = async () => {
+// 文档级显示策略变更即持久化 (所见即所得)
+const onDisplayChange = async (display: DisplayPolicy) => {
   if (!publication.value) return
-  const meta: CompositionSettings = docPlacement.value === 'hidden'
-    ? { show_answers: false, answer_position: 'after_question' }
-    : { show_answers: true, answer_position: docPlacement.value }
+  const meta: CompositionSettings = { ...(publication.value.meta_data || {}), display }
   publication.value.meta_data = meta
   try {
     await update(pubId, { meta_data: meta })
@@ -173,7 +158,7 @@ const doExport = async () => {
   try {
     const blob = await download(pubId, {
       title: publication.value.title,
-      ...exportForm.value,
+      format: exportForm.value.format,
     })
     const url = window.URL.createObjectURL(blob)
     const link = document.createElement('a')
@@ -224,6 +209,10 @@ watch(
             <span>{{ savingStatus }}</span>
           </div>
           <Separator orientation="vertical" class="h-6" />
+          <DocumentDisplaySettings
+            :model-value="publication.meta_data?.display"
+            @update:model-value="onDisplayChange"
+          />
           <Button size="sm" @click="exportOpen = true">
             <Download class="mr-2 h-4 w-4" /> 导出
           </Button>
@@ -305,67 +294,6 @@ watch(
               <SelectItem value="latex">LaTeX (.zip)</SelectItem>
             </SelectContent>
           </Select>
-        </div>
-
-        <Separator />
-
-        <div class="space-y-3">
-          <Label>附加内容显示位置</Label>
-          <RadioGroup v-model="docPlacement" @update:model-value="saveSettings">
-            <div class="flex items-center space-x-2">
-              <RadioGroupItem id="pos_after" value="after_question" />
-              <Label for="pos_after" class="font-normal cursor-pointer">
-                <div class="flex flex-col">
-                  <span>题目后</span>
-                  <span class="text-xs text-muted-foreground">每题后紧跟答案和解析</span>
-                </div>
-              </Label>
-            </div>
-            <div class="flex items-center space-x-2">
-              <RadioGroupItem id="pos_end" value="end_of_paper" />
-              <Label for="pos_end" class="font-normal cursor-pointer">
-                <div class="flex flex-col">
-                  <span>卷尾附录</span>
-                  <span class="text-xs text-muted-foreground">统一放在试卷末尾</span>
-                </div>
-              </Label>
-            </div>
-            <div class="flex items-center space-x-2">
-              <RadioGroupItem id="pos_hidden" value="hidden" />
-              <Label for="pos_hidden" class="font-normal cursor-pointer">
-                <div class="flex flex-col">
-                  <span>不显示</span>
-                  <span class="text-xs text-muted-foreground">仅导出题目内容</span>
-                </div>
-              </Label>
-            </div>
-          </RadioGroup>
-        </div>
-
-        <div v-if="contentPositionEnabled" class="space-y-2">
-          <Label>包含项目</Label>
-          <div class="flex flex-wrap gap-4">
-            <div class="flex items-center space-x-2">
-              <Checkbox id="ex_answer" v-model="exportForm.include_answer" />
-              <Label for="ex_answer" class="font-normal cursor-pointer">标准答案</Label>
-            </div>
-            <div class="flex items-center space-x-2">
-              <Checkbox id="ex_analysis" v-model="exportForm.include_analysis" />
-              <Label for="ex_analysis" class="font-normal cursor-pointer">分析</Label>
-            </div>
-            <div class="flex items-center space-x-2">
-              <Checkbox id="ex_explanation" v-model="exportForm.include_explanation" />
-              <Label for="ex_explanation" class="font-normal cursor-pointer">解析</Label>
-            </div>
-            <div class="flex items-center space-x-2">
-              <Checkbox id="ex_summary" v-model="exportForm.include_summary" />
-              <Label for="ex_summary" class="font-normal cursor-pointer">总结</Label>
-            </div>
-            <div class="flex items-center space-x-2">
-              <Checkbox id="ex_source" v-model="exportForm.include_source" />
-              <Label for="ex_source" class="font-normal cursor-pointer">来源</Label>
-            </div>
-          </div>
         </div>
       </div>
       <DialogFooter>
