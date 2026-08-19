@@ -25,6 +25,28 @@ export const REGION_LABEL: Record<DisplayRegion, string> = {
   hidden: '不显示',
 }
 
+/** 字段含义提示 (辅助区分命名易混淆的 分析/解析)。 */
+export const FIELD_HINT: Record<DisplayField, string> = {
+  answer: '题目的正确答案',
+  analysis: '解题思路（题库中的"思路"内容）',
+  explanation: '详细解析过程',
+  summary: '本题考点小结',
+  source: '题目出处来源',
+}
+
+export interface DocumentPreset {
+  value: string
+  label: string
+  regions: Partial<Record<DisplayField, DisplayRegion>>
+}
+
+/** 文档级快捷预设: 一键铺满 5 个字段的显示策略。 */
+export const DOCUMENT_PRESETS: DocumentPreset[] = [
+  { value: 'blank', label: '仅题干', regions: {} },
+  { value: 'answer_inline', label: '答案跟题', regions: { answer: 'inline', explanation: 'inline' } },
+  { value: 'answer_appendix', label: '答案卷末', regions: { answer: 'appendix', explanation: 'appendix' } },
+]
+
 const SYSTEM_DEFAULT: DisplayRegion = 'hidden'
 
 const regionOf = (display: DisplayPolicy | null | undefined, field: DisplayField): DisplayRegion | undefined =>
@@ -48,8 +70,3 @@ export const makeDisplay = (regions: Partial<Record<DisplayField, DisplayRegion>
 /** 取题目某字段的值 (用于编辑器内联预览)。 */
 export const fieldValue = (q: QuestionBrief, field: DisplayField): string | null | undefined =>
   q[FIELD_SOURCE[field]] as string | null | undefined
-
-/** 例题预设: 答案 + 分析内联。 */
-export const EXAMPLE_OVERRIDE: DisplayPolicy = {
-  fields: { answer: { region: 'inline' }, analysis: { region: 'inline' } },
-}

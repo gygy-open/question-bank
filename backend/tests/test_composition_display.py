@@ -44,7 +44,7 @@ def test_resolve_region_cascade():
 
 def test_inline_before_appendix():
     doc = make_display({"answer": REGION_INLINE, "explanation": REGION_APPENDIX})
-    md = composition_renderer.generate_markdown("卷", [_block(_q())], doc_display=doc)
+    md = composition_renderer.generate_markdown([_block(_q())], doc_display=doc)
 
     assert "【答案】" in md
     assert "参考答案与解析" in md
@@ -56,7 +56,7 @@ def test_block_override_forces_inline():
     doc = make_display({"answer": REGION_HIDDEN})
     block = _block(_q(), display={"fields": {"answer": {"region": REGION_INLINE}}})
 
-    md = composition_renderer.generate_markdown("卷", [block], doc_display=doc)
+    md = composition_renderer.generate_markdown([block], doc_display=doc)
 
     assert "【答案】" in md
     assert "参考答案与解析" not in md
@@ -64,7 +64,7 @@ def test_block_override_forces_inline():
 
 def test_hidden_fields_absent():
     doc = make_display({})  # 全部兜底 hidden
-    md = composition_renderer.generate_markdown("卷", [_block(_q())], doc_display=doc)
+    md = composition_renderer.generate_markdown([_block(_q())], doc_display=doc)
 
     assert "【答案】" not in md
     assert "参考答案与解析" not in md

@@ -111,14 +111,20 @@ class CompositionRenderer:
             md_lines.append(f"**【{label}】** {self._process_images(str(value), image_handler)}")
             md_lines.append("")
 
+    def _format_score(self, score: float) -> str:
+        return str(int(score)) if score == int(score) else str(score)
+
     def _render_question_body(
         self,
         md_lines: List[str],
         q: Question,
-        number: int,
+        number: Optional[str],
         image_handler: Optional[Callable[[Path], str]] = None,
+        score: Optional[float] = None,
     ):
-        md_lines.append(f"**{number}.** {self._process_images(q.content, image_handler)}")
+        prefix = f"**{number}.** " if number else ""
+        suffix = f"\uff08{self._format_score(score)}\u5206\uff09" if score is not None else ""
+        md_lines.append(f"{prefix}{self._process_images(q.content, image_handler)}{suffix}")
         md_lines.append("")
         if q.options:
             opts = q.options
@@ -150,13 +156,21 @@ class CompositionRenderer:
 
     def generate_markdown(
         self,
-        title: str,
         blocks: List[CompositionBlock],
         doc_display: Optional[dict] = None,
         image_handler: Optional[Callable[[Path], str]] = None,
+        doc_numbering: Optional[dict] = None,
+        doc_scoring: Optional[dict] = None,
     ) -> str:
-        md_lines: List[str] = [f"# {title}", ""]
+        doc_numbering = doc_numbering or {}
+        auto_number = doc_numbering.get("auto", True)
+        scope = doc_numbering.get("scope", "section")
+        scoring_enabled = (doc_scoring or {}).get("enabled", True)
+
+        md_lines: List[str] = []
         counter = 0
+        outline_path: List[int] = []  # 层级编号 (scope=outline) 用: 索引 0/1/2 对应 H2/H3/H4
+        leaf_counter = 0              # 层级编号下, 当前路径内的题目序号
         appendix: List[tuple] = []  # (number, question, [appendix_fields])
 
         for block in blocks:
@@ -164,8 +178,17 @@ class CompositionRenderer:
             if btype == BlockType.HEADING.value:
                 text = self._block_content_text(block).strip()
                 if text:
-                    counter = 0
-                    md_lines.append(f"## {self._process_images(text, image_handler)}")
+                    content = block.content if isinstance(block.content, dict) else {}
+                    level = min(max(int(content.get("level") or 2), 1), 4)
+                    if scope == "outline":
+                        if level >= 2:
+                            idx = level - 2
+                            current = outline_path[idx] if idx < len(outline_path) else 0
+                            outline_path = outline_path[:idx] + [current + 1]
+                            leaf_counter = 0
+                    elif scope != "document":
+                        counter = 0
+                    md_lines.append(f"{'#' * level} {self._process_images(text, image_handler)}")
                     md_lines.append("")
             elif btype == BlockType.TEXT.value:
                 text = self._block_content_text(block).strip()
@@ -181,8 +204,20 @@ class CompositionRenderer:
                 q = block.question
                 if not q:
                     continue
-                counter += 1
-                self._render_question_body(md_lines, q, counter, image_handler)
+                block_content = block.content if isinstance(block.content, dict) else {}
+                label_override = block_content.get("label_override")
+                number: Optional[str] = None
+                if label_override is not None:
+                    number = label_override
+                elif auto_number:
+                    if scope == "outline":
+                        leaf_counter += 1
+                        number = ".".join(str(n) for n in (outline_path + [leaf_counter]))
+                    else:
+                        counter += 1
+                        number = str(counter)
+                score = block_content.get("score") if scoring_enabled else None
+                self._render_question_body(md_lines, q, number, image_handler, score=score)
 
                 block_display = block.content if isinstance(block.content, dict) else None
                 block_display = block_display.get("display") if block_display else None
@@ -197,7 +232,7 @@ class CompositionRenderer:
                 if inline_fields:
                     self._render_fields(md_lines, q, inline_fields, image_handler)
                 if appendix_fields:
-                    appendix.append((counter, q, appendix_fields))
+                    appendix.append((number, q, appendix_fields))
                 md_lines.append("")
 
         if appendix:
@@ -208,7 +243,7 @@ class CompositionRenderer:
             md_lines.append("# 参考答案与解析")
             md_lines.append("")
             for number, q, fields in appendix:
-                md_lines.append(f"**{number}.** ")
+                md_lines.append(f"**{number}.** " if number else "")
                 md_lines.append("")
                 self._render_fields(md_lines, q, fields, image_handler)
                 md_lines.append("")
@@ -224,16 +259,20 @@ class CompositionRenderer:
         blocks: List[CompositionBlock],
         format: OutputFormat,
         doc_display: Optional[dict] = None,
+        doc_numbering: Optional[dict] = None,
+        doc_scoring: Optional[dict] = None,
     ) -> str:
         logger.debug(f"Rendering publication '{title}' as {format.value}")
 
         if format == OutputFormat.LATEX:
-            return self._generate_latex_zip(title, blocks, doc_display)
+            return self._generate_latex_zip(title, blocks, doc_display, doc_numbering, doc_scoring)
 
         # DOCX via pandoc
         fd, path = tempfile.mkstemp(suffix=f".{format.value}")
         os.close(fd)
-        markdown_content = self.generate_markdown(title, blocks, doc_display)
+        markdown_content = self.generate_markdown(
+            blocks, doc_display, doc_numbering=doc_numbering, doc_scoring=doc_scoring,
+        )
         extra_args = ['--standalone']
         reference_doc = os.path.join(self.template_dir, "yuanxuan-standard-math.docx")
         if os.path.exists(reference_doc):
@@ -258,6 +297,8 @@ class CompositionRenderer:
         title: str,
         blocks: List[CompositionBlock],
         doc_display: Optional[dict] = None,
+        doc_numbering: Optional[dict] = None,
+        doc_scoring: Optional[dict] = None,
     ) -> str:
         with tempfile.TemporaryDirectory() as tmpdirname:
             base_dir = Path(tmpdirname)
@@ -270,7 +311,8 @@ class CompositionRenderer:
                 return f"images/{dst_name}"
 
             markdown_content = self.generate_markdown(
-                title, blocks, doc_display, image_handler=latex_image_handler,
+                blocks, doc_display, image_handler=latex_image_handler,
+                doc_numbering=doc_numbering, doc_scoring=doc_scoring,
             )
             tex_file = base_dir / f"{title}.tex"
             preamble = self._load_preamble()

@@ -233,10 +233,24 @@ export interface DisplayPolicy {
   fields?: Partial<Record<DisplayField, { region: DisplayRegion }>>
 }
 
+/** 题号编号策略 (文档级默认, 无题块级覆盖)。 */
+export interface NumberingPolicy {
+  auto?: boolean                    // 默认 true; 关闭则全文档不显示题号
+  scope?: 'section' | 'document' | 'outline'  // 'section' 遇标题重置; 'document' 全文连续; 'outline' 按 H2~H4 嵌套生成 "2.1.3" 式题号
+}
+
+/** 赋分策略 (文档级默认, 无题块级覆盖)。 */
+export interface ScoringPolicy {
+  enabled?: boolean  // 默认 true; 关闭则隐藏分值输入/展示, 且导出时不打印分值 (不清除已录入的分数)
+}
+
 /** 文档级设置 (存于 meta_data)。 */
 export interface CompositionSettings {
   display?: DisplayPolicy
+  numbering?: NumberingPolicy
+  scoring?: ScoringPolicy
 }
+
 
 export interface Folder {
   id: number

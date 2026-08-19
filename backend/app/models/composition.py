@@ -20,7 +20,7 @@ class FolderScope(str, enum.Enum):
 
 
 class BlockType(str, enum.Enum):
-    HEADING = "heading"              # 大题/分节标题
+    HEADING = "heading"              # 标题 (H1~H4, 由 content.level 决定层级)
     TEXT = "text"                    # 富文本段落 (markdown)
     QUESTION = "question"            # 引用单题
     PAGE_BREAK = "page_break"        # 分页符

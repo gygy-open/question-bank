@@ -3,7 +3,7 @@ import { ref, inject } from 'vue'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { Button } from '@/components/ui/button'
 import { Plus, ChevronLeft, FileQuestion, Blocks, Loader2 } from '@lucide/vue'
-import { insertableBlocks, newQuestionBlock, toEditorBlock, type EditorBlock } from './blockRegistry'
+import { insertableBlocks, newQuestionBlock, newEditorBlock, toEditorBlock, type EditorBlock } from './blockRegistry'
 import { CanvasContextKey } from './useCanvasContext'
 import QuestionPicker from './QuestionPicker.vue'
 import ModulePicker from './ModulePicker.vue'
@@ -24,9 +24,9 @@ const onOpenChange = (v: boolean) => {
   if (v) mode.value = 'menu'
 }
 
-const pickStatic = (type: BlockType) => {
+const pickStatic = (b: { type: BlockType; level?: number }) => {
   open.value = false
-  emit('insert', type)
+  emit('insert', newEditorBlock(b.type, b.level))
 }
 
 const pickQuestion = (q: QuestionBrief) => {
@@ -72,9 +72,9 @@ const pickModule = async (c: Composition) => {
         </button>
         <button
           v-for="b in insertableBlocks"
-          :key="b.type"
+          :key="b.label"
           class="w-full flex items-center gap-2 px-2 py-1.5 text-sm rounded-md hover:bg-muted transition-colors text-left"
-          @click="pickStatic(b.type)"
+          @click="pickStatic(b)"
         >
           <component :is="b.icon" class="h-4 w-4 text-muted-foreground" />
           {{ b.label }}

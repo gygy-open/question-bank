@@ -1,9 +1,15 @@
 <script setup lang="ts">
 import { computed } from 'vue'
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
+import {
+  DropdownMenuSub,
+  DropdownMenuSubContent,
+  DropdownMenuSubTrigger,
+} from '@/components/ui/dropdown-menu'
 import { Button } from '@/components/ui/button'
-import { Settings2, Sparkles } from '@lucide/vue'
-import { FIELD_ORDER, FIELD_LABEL, EXAMPLE_OVERRIDE } from '@/lib/displayPolicy'
+import { Input } from '@/components/ui/input'
+import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
+import { Settings2, X } from '@lucide/vue'
+import { FIELD_ORDER, FIELD_LABEL } from '@/lib/displayPolicy'
 import type { EditorBlock } from '../blockRegistry'
 import type { DisplayField, DisplayRegion } from '~/types'
 
@@ -21,7 +27,8 @@ const CHOICES: { value: Choice; label: string }[] = [
 const overrideOf = (field: DisplayField): Choice =>
   (props.block.content?.display?.fields?.[field]?.region as Choice) ?? 'inherit'
 
-const setOverride = (field: DisplayField, value: Choice) => {
+const setOverride = (field: DisplayField, value: Choice | undefined) => {
+  if (!value) return
   const content = props.block.content
   if (!content.display) content.display = { fields: {} }
   if (!content.display.fields) content.display.fields = {}
@@ -35,56 +42,76 @@ const setOverride = (field: DisplayField, value: Choice) => {
   emit('change')
 }
 
-const markAsExample = () => {
-  props.block.content.display = JSON.parse(JSON.stringify(EXAMPLE_OVERRIDE))
+// 输入框内容 (哪怕删空成 "") 与"完全没有覆盖"是两个不同状态, 后者要靠下面的清除按钮
+const labelOverride = computed({
+  get: () => props.block.content.label_override ?? '',
+  set: (v: string) => {
+    props.block.content.label_override = v
+    emit('change')
+  },
+})
+const hasLabelOverride = computed(() => props.block.content.label_override !== undefined)
+const clearLabelOverride = () => {
+  delete props.block.content.label_override
   emit('change')
 }
 
 const hasOverride = computed(() => {
   const fields = props.block.content?.display?.fields
-  return !!fields && Object.keys(fields).length > 0
+  return (!!fields && Object.keys(fields).length > 0) || hasLabelOverride.value
 })
 </script>
 
 <template>
-  <Popover>
-    <PopoverTrigger as-child>
-      <Button
-        variant="ghost"
-        size="icon"
-        class="relative h-7 w-7 text-muted-foreground"
-        title="本题显示设置"
-      >
-        <Settings2 class="h-4 w-4" />
-        <span
-          v-if="hasOverride"
-          class="absolute right-0.5 top-0.5 h-1.5 w-1.5 rounded-full bg-primary"
+  <DropdownMenuSub>
+    <DropdownMenuSubTrigger>
+      <Settings2 /> 显示设置
+      <span
+        v-if="hasOverride"
+        class="ml-1 h-1.5 w-1.5 shrink-0 rounded-full bg-primary"
+      />
+    </DropdownMenuSubTrigger>
+    <DropdownMenuSubContent class="w-72 p-3" @click.stop>
+      <div class="mb-2 text-sm font-medium">本题显示设置</div>
+
+      <div class="mb-3 flex items-center gap-2">
+        <span class="w-9 shrink-0 text-xs text-muted-foreground">题号</span>
+        <Input
+          v-model="labelOverride"
+          placeholder="留空则自动编号"
+          class="h-7 flex-1 text-xs"
+          @keydown.stop
         />
-      </Button>
-    </PopoverTrigger>
-    <PopoverContent class="w-72 p-3" align="end" @click.stop>
-      <div class="mb-2 flex items-center justify-between">
-        <span class="text-sm font-medium">本题显示设置</span>
-        <Button variant="secondary" size="sm" class="h-6 px-2 text-xs" @click="markAsExample">
-          <Sparkles class="mr-1 h-3 w-3" /> 标为例题
+        <Button
+          v-if="hasLabelOverride"
+          variant="ghost"
+          size="icon"
+          class="h-7 w-7 shrink-0"
+          title="恢复自动编号"
+          @click="clearLabelOverride"
+        >
+          <X class="h-3.5 w-3.5" />
         </Button>
       </div>
+
       <div class="space-y-2">
         <div v-for="f in FIELD_ORDER" :key="f" class="flex items-center gap-2">
-          <span class="w-8 shrink-0 text-xs text-muted-foreground">{{ FIELD_LABEL[f] }}</span>
-          <div class="flex flex-1 gap-0.5 rounded-md border p-0.5">
-            <button
-              v-for="c in CHOICES"
-              :key="c.value"
-              class="flex-1 rounded px-1 py-0.5 text-xs transition-colors"
-              :class="overrideOf(f) === c.value ? 'bg-primary text-primary-foreground' : 'hover:bg-muted'"
-              @click="setOverride(f, c.value)"
-            >
+          <span class="w-9 shrink-0 text-xs text-muted-foreground">{{ FIELD_LABEL[f] }}</span>
+          <ToggleGroup
+            type="single"
+            :model-value="overrideOf(f)"
+            class="flex-1"
+            :spacing="0"
+            variant="outline"
+            size="sm"
+            @update:model-value="(v) => setOverride(f, v as Choice | undefined)"
+          >
+            <ToggleGroupItem v-for="c in CHOICES" :key="c.value" :value="c.value" class="flex-1 text-xs">
               {{ c.label }}
-            </button>
-          </div>
+            </ToggleGroupItem>
+          </ToggleGroup>
         </div>
       </div>
-    </PopoverContent>
-  </Popover>
+    </DropdownMenuSubContent>
+  </DropdownMenuSub>
 </template>

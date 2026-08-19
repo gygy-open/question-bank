@@ -1,10 +1,7 @@
 <script setup lang="ts">
 import { computed, inject } from 'vue'
 import { Input } from '@/components/ui/input'
-import { Button } from '@/components/ui/button'
-import { Eye } from '@lucide/vue'
 import MarkdownPreview from '@/components/MarkdownPreview.vue'
-import QuestionDisplayOverride from './QuestionDisplayOverride.vue'
 import type { EditorBlock } from '../blockRegistry'
 import { CanvasContextKey } from '../useCanvasContext'
 import { FIELD_ORDER, FIELD_LABEL, resolveRegion, fieldValue } from '@/lib/displayPolicy'
@@ -12,12 +9,14 @@ import type { DisplayField } from '~/types'
 
 const props = defineProps<{
   block: EditorBlock
-  number: number
+  number?: string
 }>()
 
-const emit = defineEmits<{ change: []; 'view-detail': [] }>()
+const emit = defineEmits<{ change: [] }>()
 
 const ctx = inject(CanvasContextKey, { documentDisplay: null })
+
+const scoringEnabled = computed(() => ctx.documentScoring?.enabled !== false)
 
 const q = computed(() => props.block.question)
 const isChoice = computed(
@@ -47,33 +46,28 @@ const score = computed({
 </script>
 
 <template>
-  <div class="group/q relative pl-8 pr-28 py-2 rounded-md hover:bg-muted/40 transition-colors">
-    <!-- right-11 让开画布层右上角的删除按钮 (right-2) -->
+  <div class="group/q relative pl-8 pr-20 py-2 rounded-md hover:bg-muted/40 transition-colors">
+    <!-- 分值: 题目自身的高频属性, 留在块内内联编辑; 查看/显示设置等低频操作收进手柄菜单 -->
     <div
-      class="absolute right-11 top-1.5 flex items-center gap-1.5 opacity-0 group-hover/q:opacity-100 transition-opacity"
+      v-if="scoringEnabled"
+      class="absolute right-2 top-1.5 flex items-center gap-1.5 opacity-0 group-hover/q:opacity-100 transition-opacity"
     >
-      <div class="flex items-center gap-1">
-        <Input
-          v-model.number="score"
-          type="number"
-          min="0"
-          step="0.5"
-          placeholder="分值"
-          class="h-7 w-16 text-xs"
-        />
-      </div>
-      <Button variant="ghost" size="icon" class="h-7 w-7" title="查看题目" @click="emit('view-detail')">
-        <Eye class="h-4 w-4" />
-      </Button>
-      <QuestionDisplayOverride :block="block" @change="emit('change')" />
+      <Input
+        v-model.number="score"
+        type="number"
+        min="0"
+        step="0.5"
+        placeholder="分值"
+        class="h-7 w-16 text-xs"
+      />
     </div>
 
     <div class="flex gap-2">
-      <span class="font-medium text-foreground shrink-0">{{ number }}.</span>
+      <span v-if="number" class="font-medium text-foreground shrink-0">{{ number }}.</span>
       <div class="flex-1 min-w-0 leading-relaxed">
         <MarkdownPreview v-if="q" :content="q.content" />
         <span v-else class="text-muted-foreground italic">题目已删除</span>
-        <span v-if="score != null" class="ml-2 text-xs text-muted-foreground">（{{ score }} 分）</span>
+        <span v-if="scoringEnabled && score != null" class="ml-2 text-xs text-muted-foreground">（{{ score }} 分）</span>
       </div>
     </div>
 

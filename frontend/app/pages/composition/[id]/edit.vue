@@ -13,7 +13,13 @@ import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
 } from '@/components/ui/dialog'
 import {
-  ArrowLeft, Download, Loader2, CheckCircle, FileDown,
+  Accordion, AccordionItem, AccordionContent, AccordionTrigger,
+} from '@/components/ui/accordion'
+import {
+  Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger,
+} from '@/components/ui/sheet'
+import {
+  ArrowLeft, Download, Loader2, CheckCircle, FileDown, Settings,
 } from '@lucide/vue'
 import { toast } from 'vue-sonner'
 import BlockCanvas from '@/components/canvas/BlockCanvas.vue'
@@ -21,7 +27,9 @@ import DocumentDisplaySettings from '@/components/canvas/DocumentDisplaySettings
 import { toEditorBlock, toBlockWrite, type EditorBlock } from '@/components/canvas/blockRegistry'
 import PaperQuestionDetailSheet from '@/components/PaperQuestionDetailSheet.vue'
 import { useCompositions } from '~/composables/useCompositions'
-import type { CompositionDetail, CompositionSettings, DisplayPolicy, Subject, KnowledgePoint } from '~/types'
+import type {
+  CompositionDetail, CompositionSettings, DisplayPolicy, NumberingPolicy, ScoringPolicy, Subject, KnowledgePoint,
+} from '~/types'
 
 const route = useRoute()
 const router = useRouter()
@@ -47,6 +55,8 @@ const detailQuestionId = ref<number | null>(null)
 // 题块按文档级显示策略解析 (所见即所得)
 const canvasContext = computed(() => ({
   documentDisplay: publication.value?.meta_data?.display ?? null,
+  documentNumbering: publication.value?.meta_data?.numbering ?? null,
+  documentScoring: publication.value?.meta_data?.scoring ?? null,
   compId: pubId,
 }))
 
@@ -147,8 +157,35 @@ const onDisplayChange = async (display: DisplayPolicy) => {
   publication.value.meta_data = meta
   try {
     await update(pubId, { meta_data: meta })
+    toast.success('显示设置已更新')
   } catch {
-    /* 非关键路径, 静默失败 */
+    toast.error('显示设置保存失败')
+  }
+}
+
+// 文档级编号策略变更即持久化
+const onNumberingChange = async (numbering: NumberingPolicy) => {
+  if (!publication.value) return
+  const meta: CompositionSettings = { ...(publication.value.meta_data || {}), numbering }
+  publication.value.meta_data = meta
+  try {
+    await update(pubId, { meta_data: meta })
+    toast.success('编号设置已更新')
+  } catch {
+    toast.error('编号设置保存失败')
+  }
+}
+
+// 文档级赋分策略变更即持久化 (影响编辑器内展示与导出是否打印分值)
+const onScoringChange = async (scoring: ScoringPolicy) => {
+  if (!publication.value) return
+  const meta: CompositionSettings = { ...(publication.value.meta_data || {}), scoring }
+  publication.value.meta_data = meta
+  try {
+    await update(pubId, { meta_data: meta })
+    toast.success('赋分设置已更新')
+  } catch {
+    toast.error('赋分设置保存失败')
   }
 }
 
@@ -198,7 +235,13 @@ watch(
             <ArrowLeft class="h-4 w-4" />
           </Button>
           <div class="min-w-0">
-            <h1 class="text-lg font-semibold truncate">{{ publication.title }}</h1>
+            <!-- 系统层文档名 (库列表/搜索用), 与正文标题 block 解耦 -->
+            <input
+              v-model="publication.title"
+              class="w-full max-w-xs truncate rounded-md bg-transparent px-1 text-lg font-semibold outline-none focus:bg-muted/40"
+              placeholder="无标题"
+              @blur="savePaperInfo"
+            />
           </div>
         </div>
 
@@ -209,10 +252,29 @@ watch(
             <span>{{ savingStatus }}</span>
           </div>
           <Separator orientation="vertical" class="h-6" />
-          <DocumentDisplaySettings
-            :model-value="publication.meta_data?.display"
-            @update:model-value="onDisplayChange"
-          />
+          <!-- 桌面端设置常驻右侧栏, 这里只给窄屏一个入口 -->
+          <Sheet>
+            <SheetTrigger as-child>
+              <Button variant="outline" size="icon" class="md:hidden">
+                <Settings class="h-4 w-4" />
+              </Button>
+            </SheetTrigger>
+            <SheetContent side="right" class="w-80 overflow-y-auto sm:max-w-sm">
+              <SheetHeader>
+                <SheetTitle>文档设置</SheetTitle>
+              </SheetHeader>
+              <div class="px-4 pb-4">
+                <DocumentDisplaySettings
+                  :model-value="publication.meta_data?.display"
+                  :numbering="publication.meta_data?.numbering"
+                  :scoring="publication.meta_data?.scoring"
+                  @update:model-value="onDisplayChange"
+                  @update:numbering="onNumberingChange"
+                  @update:scoring="onScoringChange"
+                />
+              </div>
+            </SheetContent>
+          </Sheet>
           <Button size="sm" @click="exportOpen = true">
             <Download class="mr-2 h-4 w-4" /> 导出
           </Button>
@@ -223,19 +285,9 @@ watch(
     <!-- Main -->
     <div class="flex flex-1 overflow-hidden">
       <!-- Left: paper preview / canvas -->
-      <div class="flex-1 overflow-y-auto bg-muted/30">
-        <div class="p-6 max-w-3xl mx-auto">
-          <div class="bg-background rounded-lg shadow-sm border px-10 py-8">
-            <!-- 抬头: 标题直接在此编辑 -->
-            <div class="text-center mb-6 pb-4 border-b">
-              <input
-                v-model="publication.title"
-                class="w-full bg-transparent text-center text-2xl font-bold outline-none focus:bg-muted/40 rounded-md px-2 py-1"
-                placeholder="无标题"
-                @blur="savePaperInfo"
-              />
-            </div>
-
+      <div class="flex-1 overflow-y-auto bg-background">
+        <div class="p-6 max-w-4xl mx-auto">
+          <div class="px-10 py-8">
             <BlockCanvas
               v-model="blocks"
               :context="canvasContext"
@@ -271,6 +323,24 @@ watch(
               </div>
             </CardContent>
           </Card>
+
+          <Accordion type="single" collapsible default-value="display" class="rounded-lg border bg-background px-3">
+            <AccordionItem value="display" class="border-none">
+              <AccordionTrigger class="py-3 text-base font-semibold hover:no-underline">
+                文档设置
+              </AccordionTrigger>
+              <AccordionContent class="pb-3">
+                <DocumentDisplaySettings
+                  :model-value="publication.meta_data?.display"
+                  :numbering="publication.meta_data?.numbering"
+                  :scoring="publication.meta_data?.scoring"
+                  @update:model-value="onDisplayChange"
+                  @update:numbering="onNumberingChange"
+                  @update:scoring="onScoringChange"
+                />
+              </AccordionContent>
+            </AccordionItem>
+          </Accordion>
         </div>
       </div>
     </div>

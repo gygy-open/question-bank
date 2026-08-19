@@ -351,6 +351,8 @@ async def download_composition(
 
     # 所见即所得: 内容与落位完全由文档 display 策略决定
     doc_display = (comp.meta_data or {}).get("display")
+    doc_numbering = (comp.meta_data or {}).get("numbering")
+    doc_scoring = (comp.meta_data or {}).get("scoring")
 
     title = options.title or comp.title
     try:
@@ -359,6 +361,8 @@ async def download_composition(
             blocks,
             options.format,
             doc_display=doc_display,
+            doc_numbering=doc_numbering,
+            doc_scoring=doc_scoring,
         )
 
         extension = options.format.value
