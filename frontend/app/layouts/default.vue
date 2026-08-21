@@ -7,14 +7,13 @@ import { useLocalStorage, useSessionStorage } from '@vueuse/core'
 
 const { fetchUser, token, user } = useAuth()
 const { state: updateState, check: checkUpdate } = useUpdateCheck()
-const { init: initSubjectContext } = useSubjectContext()
 const ignoredVersion = useLocalStorage('ignored-update-version', '')
 const hasPrompted = useSessionStorage('update-prompted', false)
 
 onMounted(async () => {
+  // 科目上下文已由 auth.global.ts 中间件在进入本布局前初始化完毕
   if (token.value) {
     await fetchUser()
-    await initSubjectContext()
   }
   // 让所有登录用户都能检查更新，以便进行对应权限的弹窗提示
   await checkUpdate()
