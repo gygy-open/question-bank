@@ -1,19 +1,22 @@
 <script setup lang="ts">
-import type MarkdownPreviewVue from '~/components/MarkdownPreview.vue';
-
 definePageMeta({
   layout: false
 })
 
-const content = ref<string>('')
+import RichEditor from '~/components/rich-editor/RichEditor.vue';
+import { renderRichContentToHTML } from '~/components/rich-editor/renderRichContent';
 
+const schema = ref('')
 </script>
 
 <template>
   <div class="p-6 flex gap-4">
-    <TiptapEditor v-model="content" class="flex-1" />
-    <div class="border p-4 flex-1">
-      <MarkdownPreview :content="content" />
-    </div>
+    <RichEditor v-model="schema"  />
   </div>
+  <Card class="p-4">
+    <pre class="text-xs whitespace-pre-wrap">{{ schema }}</pre>
+  </Card>
+  <Card class="p-4 mt-4">
+    <div class="prose prose-sm dark:prose-invert max-w-none" v-html="renderRichContentToHTML(schema)" />
+  </Card>
 </template>
