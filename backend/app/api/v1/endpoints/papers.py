@@ -20,6 +20,7 @@ from app.schemas.paper import (
     QuestionBrief,
 )
 from app.services.paper_generator import paper_generator
+from app.services.question_content import validate_question_for_exam
 
 logger = logging.getLogger(__name__)
 
@@ -173,7 +174,10 @@ async def add_items(
     paper = await crud.paper.get_owned(db, paper_id=paper_id, owner_id=current_user.id)
     if not paper:
         raise HTTPException(status_code=404, detail="Paper not found")
-    await crud.paper.add_items(db, paper=paper, question_ids=items_in.question_ids)
+    try:
+        await crud.paper.add_items(db, paper=paper, question_ids=items_in.question_ids)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
     paper = await crud.paper.get_detail(db, paper_id=paper_id, owner_id=current_user.id)
     return _to_detail(paper)
 
@@ -261,6 +265,12 @@ async def download_managed_paper(
 
     questions = [item.question for item in items]
     section_titles = [item.section_title for item in items]
+
+    try:
+        for question in questions:
+            validate_question_for_exam(question)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=f"Paper contains incomplete question: {exc}") from exc
 
     title = options.title or paper.title
     try:

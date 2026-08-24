@@ -17,7 +17,7 @@ from __future__ import annotations
 import json
 from typing import Any, Dict, List, Optional
 
-from app.models.question import QuestionType
+from app.models.question import QuestionStatus, QuestionType
 
 RichDoc = Dict[str, Any]
 
@@ -120,22 +120,28 @@ def normalize_options(q_type: Optional[QuestionType], options: Any) -> Optional[
 def validate_question_domain(
     *,
     q_type: Optional[QuestionType],
+    status: Optional[QuestionStatus],
     content: Any,
     options: Any,
     answer: Any,
     partial: bool = False,
+    require_complete: bool = False,
 ) -> None:
     """跨字段领域校验(见 PRD §11)。
 
     partial=True(更新 payload):缺失字段跳过相关跨字段检查,避免误拒。
-    partial=False(创建 / CRUD 合并后终检):要求 content 存在且完整校验。
+    draft 允许题干/答案暂不完整;pending/published 或 require_complete=True 时执行
+    可用于审核、发布、组卷的完整性校验。partial=True 时只校验本次可判定的结构约束。
     """
-    # 1. content:非 partial 时必填且为合法 doc。
-    if not partial:
-        if content is None:
-            raise ValueError("content is required")
-        validate_rich_doc(content)
-    elif content is not None:
+    must_be_complete = require_complete or status in {
+        QuestionStatus.PENDING,
+        QuestionStatus.PUBLISHED,
+    }
+
+    # 1. 题干是题目记录的最小内容;答案完整性才随生命周期变化。
+    if content is None and not partial:
+        raise ValueError("content is required")
+    if content is not None:
         validate_rich_doc(content)
 
     # 2. option id 唯一(有 options 就校验)。
@@ -151,6 +157,8 @@ def validate_question_domain(
         raise ValueError(f"{q_type.value} 题型不应包含 options")
 
     if answer is None:
+        if must_be_complete and not partial:
+            raise ValueError("answer is required")
         return
 
     kind = answer.get("kind")
@@ -165,17 +173,48 @@ def validate_question_domain(
         option_ids = {o.get("id") for o in (options or [])}
         if kind == "single_choice":
             correct = answer.get("correct")
-            if correct not in option_ids:
+            if correct and correct not in option_ids:
                 raise ValueError(f"single_choice correct '{correct}' 不在 options 中")
+            if must_be_complete and not correct:
+                raise ValueError("single_choice correct 不能为空")
         else:
-            for correct in answer.get("correct", []):
+            correct_ids = answer.get("correct", [])
+            for correct in correct_ids:
                 if correct not in option_ids:
                     raise ValueError(f"multiple_choice correct '{correct}' 不在 options 中")
+            if must_be_complete and not correct_ids:
+                raise ValueError("multiple_choice correct 不能为空")
 
     # 6. fill:题干含 blank 节点时,blankId 与 answer blanks id 按顺序一一对应。
     if kind == "fill_in_the_blank" and content is not None:
         blank_ids = collect_blank_ids(content)
-        if blank_ids:
+        if blank_ids and (must_be_complete or answer.get("blanks")):
             answer_ids = [b.get("id") for b in answer.get("blanks", [])]
             if blank_ids != answer_ids:
                 raise ValueError("题干 blank 节点的 blankId 必须与 answer blanks 顺序一一对应")
+
+    if kind == "fill_in_the_blank" and must_be_complete:
+        blanks = answer.get("blanks", [])
+        if not blanks:
+            raise ValueError("fill_in_the_blank blanks 不能为空")
+        if any(not blank.get("accept") or any(item is None for item in blank.get("accept", [])) for blank in blanks):
+            raise ValueError("blank accept 必须是非空的 RichDoc 列表")
+
+    if kind == "free_response" and must_be_complete and answer.get("reference") is None:
+        raise ValueError("free_response reference 不能为空")
+
+
+def validate_question_for_exam(question: Any) -> None:
+    """校验 ORM Question 是否可用于组卷/导出，不依赖题目当前生命周期状态。"""
+    q_type = question.q_type
+    if isinstance(q_type, str):
+        q_type = QuestionType(q_type)
+    validate_question_domain(
+        q_type=q_type,
+        status=None,
+        content=parse_json_field(question.content),
+        options=question.options,
+        answer=parse_json_field(question.answer),
+        partial=False,
+        require_complete=True,
+    )

@@ -1,6 +1,6 @@
 # PRD:题目数据模型 v2(考试系统重构)
 
-> 状态:设计定稿 · 实施中(Phase 1)
+> 状态:已实施
 > 范围:题目**数据接口(逻辑契约)** + **RichDoc / Tiptap schema** + **MD→Tiptap 转换规格** + **物理存储与迁移**。
 > 不含:AI 导入、Paper 导出(后续独立 PRD;本期只保证数据结构可被它们消费)。
 
@@ -8,11 +8,11 @@
 
 1. **版本编号**:`SCHEMA_VERSION = 1`(v2 内容的目标版本号)。**存量未迁移**行的 `content_schema_version = 0`。
 2. **迁移闸门**:只处理 `content_schema_version < 1` 的行;转换成功置 `1`;`downgrade()` 从归档表还原并把版本拨回 `0`。下文 §8/§10/§12 中出现的 "`version < 2`" / "置 `2`" / "拨回 `1`" 为旧草稿措辞,一律以本条 `< 1 / 1 / 0` 为准。
-3. **`legacy_unresolved` variant**:新增一个**只读、仅迁移期**产生的 `AnswerSpec` variant,承载无法解析的旧答案原文;正式的 `single_choice` / `multiple_choice` / `true_false` 的 `correct` 字段**保持非空**(不允许用空 `correct` 表达"未解析")。
+3. **`legacy_unresolved` variant**:新增一个**只读、仅迁移期**产生的 `AnswerSpec` variant,只承载**非空但无法解析**的旧答案原文。旧答案为空时迁移为 `answer = null`,不伪装成解析失败。
 4. **API 字段名**:对外 API 继续沿用 `content` / `thinking` / `analysis` / `summary` 等既有名称(逻辑名 `stem` / `explanation.*` 仅用于文档),不改动前端契约字段名。
 5. **迁移实现**:MD→RichDoc 与答案转换统一用 **Python 转换器**(`app/services/question_content_v1.py`),Alembic data-migration 直接调用它,不再依赖前端一次性 Node 脚本。
 6. **`needs_review`**:仅存在于数据库列,用于人工复核筛选,**不进入 API 响应 / pydantic schema**。
-7. **AI / Paper**:本期只做**最小适配**保证可消费新结构,完整改造留后续 PRD。
+7. **生命周期完整性**:题干始终必填;`draft` 的答案可为 `null` 或未完成结构;进入 `pending` / `published` 时答案必须完整。加入试卷和导出时再次按完整规则校验,与当前状态无关。
 
 ## 1. 背景与目标
 
@@ -58,7 +58,7 @@ interface Question {
 
   stem: RichDoc                   // 题干(物理列仍叫 content)
   options?: Option[]              // 仅选择类题型
-  answer: AnswerSpec              // 判别联合,见 §6(可判分/参考答案)
+  answer: AnswerSpec | null       // draft 可暂未填写;见 §6、§11
   explanation: Explanation        // 解析三段
 
   // 以下结构/元数据不变
@@ -200,7 +200,7 @@ interface LegacyUnresolvedAnswer {
 
 - **只读**:仅由存量迁移产生,前端不提供该 variant 的编辑分支;人工复核后应改成正式 variant。
 - 该行同时在数据库 `needs_review = 1`(§0.6:`needs_review` 不进 API,仅供后台筛选)。
-- 正式 choice/true_false 的 `correct` 永远非空;"未解析"只用这个 variant 表达,不用空 `correct`。
+- `legacy_unresolved` 不表示“暂未填写”;无答案统一用 `null`。draft 中正式答案 variant 可暂时不完整,但不能进入审核、发布或组卷。
 
 ## 7. RichDoc / Tiptap Schema 白名单 + MD→Tiptap 映射
 
@@ -290,6 +290,7 @@ MD→Tiptap 转换器的**目标节点集必须 = 编辑器/渲染器 schema**(`
 > 前置:转换**之前**先把每行 v1 原文快照入 `questions_content_archive_v1`(§8.1);转换以 `content_schema_version` 为幂等闸门(只处理 `version < 1` 的行),可安全重跑。
 
 - **stem / explanation / option.content**:`MD → RichDoc`(§7 转换器),直译。
+- **空 answer**:迁移为 `null`;draft 不打复核标记,pending/published 打 `needs_review`。只有非空但无法解析的答案才写 `legacy_unresolved`。
 - **选择题 answer**(旧为自由 md 串,如 "A" / "答案:A,因为…"):
   - 抽取字母 → 映射到对应 `option.label` → 得 `option.id` → 填 `correct`;
   - 多余解释性文字 → 迁移进 `analysis`;
@@ -299,11 +300,15 @@ MD→Tiptap 转换器的**目标节点集必须 = 编辑器/渲染器 schema**(`
 - **填空**(旧 `List[List[str]]`):按顺序生成 `blanks[i].id = blk_{i+1}`,每个 str → `accept[j]` 的 RichDoc;题干 `____` 保留(下标绑定)。
 - **解答**:旧 md answer → `reference` RichDoc。
 
-## 11. 校验规则(pydantic)
+## 11. 校验规则(pydantic + 使用场景)
 
+- 题干始终必填,数据库继续保持 `content NOT NULL`。
 - `answer.kind` 必须与 `q_type` 一致。
 - choice:`correct` 引用的 id 必须存在于 `options`。
-- fill:`blanks` 非空、每空 `accept` 非空;题干含 `blank` 节点时,`blankId` 与 `blanks[].id` 一一对应。
+- draft:答案可为 `null`;choice 的 `correct`、multiple 的集合、fill 的 `blanks/accept`、free response 的 `reference` 可暂时为空。
+- pending/published:答案必须存在且完整;fill 的 `blanks` 非空、每空 `accept` 非空;free response 的 `reference` 非空。
+- 题干含 `blank` 节点且已填写填空答案时,`blankId` 与 `blanks[].id` 一一对应。
+- 试卷加入和导出均使用 `require_complete=True` 二次校验,不能通过 draft 状态绕过考试完整性要求。
 - 每个 RichDoc 根节点 `type === "doc"`。
 
 ## 12. 实施顺序(建议,验证优先)

@@ -452,6 +452,7 @@ async def propose_question_draft(db: AsyncSession, args: Dict[str, Any]) -> str:
         try:
             v2_fields = adapt_legacy_question(
                 q_type=args.get("q_type"),
+                status=QuestionStatus.DRAFT,
                 content=args.get("content"),
                 options=args.get("options"),
                 answer=args.get("answer"),
@@ -526,6 +527,7 @@ async def propose_questions_batch(db: AsyncSession, args: Dict[str, Any]) -> str
         # Legacy(AI 工具产出的旧字符串)→ 严格 v2 字段。无法解析答案时抛出,由调用方标失败。
         v2_fields = adapt_legacy_question(
             q_type=q_data.get("q_type"),
+            status=QuestionStatus.DRAFT,
             content=q_data.get("content"),
             options=q_data.get("options"),
             answer=q_data.get("answer"),

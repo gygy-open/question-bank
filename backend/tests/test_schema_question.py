@@ -1,7 +1,7 @@
 import pytest
 from pydantic import ValidationError
 
-from app.models.question import QuestionType
+from app.models.question import QuestionStatus, QuestionType
 from app.schemas.question import QuestionCreate, QuestionUpdate
 
 
@@ -22,6 +22,20 @@ def _options():
         {"id": "opt_a", "label": "A", "content": doc("甲")},
         {"id": "opt_b", "label": "B", "content": doc("乙")},
     ]
+
+
+def test_answer_may_be_missing_only_for_draft():
+    draft = QuestionCreate(content=doc("题干"), q_type=QuestionType.FREE_RESPONSE)
+    assert draft.answer is None
+    assert draft.status == QuestionStatus.DRAFT
+
+    for status in (QuestionStatus.PENDING, QuestionStatus.PUBLISHED):
+        with pytest.raises(ValidationError):
+            QuestionCreate(
+                content=doc("题干"),
+                q_type=QuestionType.FREE_RESPONSE,
+                status=status,
+            )
 
 
 # --------------------------------------------------------------------------- #
@@ -189,21 +203,32 @@ def test_fill_blank_ids_mismatch_rejected():
         )
 
 
-def test_fill_blank_accept_must_be_non_empty():
+def test_draft_fill_blank_accept_may_be_empty():
+    question = QuestionCreate(
+        content=doc("___ 是首都"),
+        q_type=QuestionType.FILL_IN_THE_BLANK,
+        answer={"kind": "fill_in_the_blank", "blanks": [{"id": "blk_1", "accept": []}]},
+    )
+    assert question.status == QuestionStatus.DRAFT
+
+
+def test_pending_fill_blank_accept_must_be_non_empty():
     with pytest.raises(ValidationError):
         QuestionCreate(
             content=doc("___ 是首都"),
             q_type=QuestionType.FILL_IN_THE_BLANK,
             answer={"kind": "fill_in_the_blank", "blanks": [{"id": "blk_1", "accept": []}]},
+            status=QuestionStatus.PENDING,
         )
 
 
-def test_fill_blanks_must_be_non_empty():
+def test_published_fill_blanks_must_be_non_empty():
     with pytest.raises(ValidationError):
         QuestionCreate(
             content=doc("题干"),
             q_type=QuestionType.FILL_IN_THE_BLANK,
             answer={"kind": "fill_in_the_blank", "blanks": []},
+            status=QuestionStatus.PUBLISHED,
         )
 
 

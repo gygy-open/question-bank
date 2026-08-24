@@ -201,6 +201,7 @@ async def create_questions_batch_legacy(
         try:
             v2_fields = adapt_legacy_question(
                 q_type=item.q_type,
+                status=item.status,
                 content=item.content,
                 options=item.options,
                 answer=item.answer,

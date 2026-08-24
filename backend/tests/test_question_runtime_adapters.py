@@ -4,6 +4,7 @@ import json
 import types
 
 import pytest
+from types import SimpleNamespace
 
 from app.services.question_content import to_db_json
 from app.services.question_content_v1 import (
@@ -11,6 +12,7 @@ from app.services.question_content_v1 import (
     convert_options,
     markdown_to_rich_doc,
 )
+from app.services.question_content import to_db_json, validate_question_for_exam
 from app.services.question_legacy_adapter import (
     LegacyQuestionError,
     adapt_legacy_question,
@@ -83,13 +85,14 @@ def test_adapter_free_response_reference_and_optional():
     assert v2["answer"]["kind"] == "free_response"
     assert v2["answer"]["reference"]["type"] == "doc"
 
-    v2_none = adapt_legacy_question(q_type="free_response", content="解答")
+    v2_none = adapt_legacy_question(q_type="free_response", status="draft", content="解答")
     assert v2_none["answer"] is None
 
 
 def test_adapter_converts_richtext_fields():
     v2 = adapt_legacy_question(
         q_type="free_response",
+        status="draft",
         content="题干 $x^2$",
         thinking="**思路**",
         analysis="解析",
@@ -121,6 +124,22 @@ def test_adapter_rejects_unresolved_true_false():
 def test_adapter_rejects_empty_content():
     with pytest.raises(LegacyQuestionError):
         adapt_legacy_question(q_type="free_response", content="   ")
+
+
+def test_adapter_rejects_empty_answer_for_pending():
+    with pytest.raises(LegacyQuestionError):
+        adapt_legacy_question(q_type="free_response", status="pending", content="题干")
+
+
+def test_exam_validation_rejects_incomplete_draft():
+    question = SimpleNamespace(
+        q_type="free_response",
+        content=to_db_json(markdown_to_rich_doc("题干")),
+        options=None,
+        answer=None,
+    )
+    with pytest.raises(ValueError, match="answer is required"):
+        validate_question_for_exam(question)
 
 
 # --------------------------------------------------------------------------- #

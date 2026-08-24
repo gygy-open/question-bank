@@ -94,6 +94,7 @@ async def process_task(db: AsyncSession, task: ImportTask):
                 try:
                     v2_fields = adapt_legacy_question(
                         q_type=q_type,
+                        status=QuestionStatus.PENDING,
                         content=q_data.get("content"),
                         options=q_data.get("options"),
                         answer=q_data.get("answer"),

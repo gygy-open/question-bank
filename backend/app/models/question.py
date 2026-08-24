@@ -69,7 +69,7 @@ class Question(Base):
     deleted_at = Column(DateTime, nullable=True) # 软删除时间
     
     q_type = Column(Enum(QuestionType, values_callable=lambda obj: [e.value for e in obj]), nullable=False) # 题目类型
-    status = Column(String(20), default=QuestionStatus.PUBLISHED.value, nullable=False) # 状态
+    status = Column(String(20), default=QuestionStatus.DRAFT.value, nullable=False) # 状态
     difficulty = Column(Integer, default=1) # 难度 1-5
     review_count = Column(Integer, default=0) # 审核次数
 

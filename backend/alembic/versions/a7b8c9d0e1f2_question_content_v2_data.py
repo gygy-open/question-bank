@@ -60,6 +60,7 @@ def _questions_table() -> sa.Table:
         "questions",
         sa.column("id", sa.Integer),
         sa.column("q_type", sa.String),
+        sa.column("status", sa.String),
         sa.column("content", sa.Text),
         sa.column("options", sa.JSON),
         sa.column("answer", sa.Text),
@@ -150,8 +151,12 @@ def _convert_batch(bind: sa.engine.Connection, questions: sa.Table, rows: Sequen
         analysis_doc = markdown_to_rich_doc(r.analysis)
         summary_doc = markdown_to_rich_doc(r.summary)
         answer_spec, needs_review = convert_answer(r.q_type, r.answer, options)
+        answer_missing = answer_spec is None
+        needs_review = needs_review or (
+            answer_missing and r.status in {"pending", "published"}
+        )
 
-        if answer_spec.get("kind") == "legacy_unresolved":
+        if answer_spec and answer_spec.get("kind") == "legacy_unresolved":
             # 原答案原文并入 analysis(不覆盖既有解析)。
             analysis_doc = merge_legacy_answer_into_analysis(analysis_doc, r.answer)
 
@@ -194,6 +199,7 @@ def upgrade() -> None:
             sa.select(
                 questions.c.id,
                 questions.c.q_type,
+                questions.c.status,
                 questions.c.content,
                 questions.c.options,
                 questions.c.answer,

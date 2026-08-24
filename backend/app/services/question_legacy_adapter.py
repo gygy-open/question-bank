@@ -25,12 +25,6 @@ from app.services.question_content_v1 import (
 __all__ = ["LegacyQuestionError", "adapt_legacy_question"]
 
 _CHOICE_TYPES = {"single_choice", "multiple_choice"}
-_ANSWER_REQUIRED_TYPES = {
-    "single_choice",
-    "multiple_choice",
-    "true_false",
-    "fill_in_the_blank",
-}
 # 旧选项字符串的行首 label,如 "A. xxx" / "A、xxx" / "A) xxx" / "A：xxx"。
 _OPTION_LABEL_RE = re.compile(r"^\s*([A-Za-z])\s*[\.、\)．:：]\s*(.*)$", re.DOTALL)
 
@@ -84,6 +78,7 @@ def _normalize_legacy_options(raw_options: Any) -> list[dict[str, Any]]:
 def adapt_legacy_question(
     *,
     q_type: Any,
+    status: Any = "pending",
     content: Any,
     options: Any = None,
     answer: Any = None,
@@ -97,6 +92,7 @@ def adapt_legacy_question(
     无法解析选择/判断/填空答案时抛 ``LegacyQuestionError``。
     """
     qt = _q_type_value(q_type)
+    status_value = _q_type_value(status)
 
     content_doc = markdown_to_rich_doc(None if content is None else str(content))
     if content_doc is None:
@@ -107,7 +103,10 @@ def adapt_legacy_question(
         v2_options = _normalize_legacy_options(options) or None
 
     answer_spec: Optional[dict[str, Any]] = None
-    if answer is not None or qt in _ANSWER_REQUIRED_TYPES:
+    answer_present = answer is not None and (
+        not isinstance(answer, str) or bool(answer.strip())
+    )
+    if answer_present:
         spec, needs_review = convert_answer(qt, answer, v2_options or [])
         if needs_review:
             raw = "" if answer is None else str(answer)
@@ -116,6 +115,11 @@ def adapt_legacy_question(
                 warnings=[f"answer_unresolved:{qt}"],
             )
         answer_spec = spec
+    elif status_value in {"pending", "published"}:
+        raise LegacyQuestionError(
+            f"{qt} 答案为空,不能进入 {status_value} 状态",
+            warnings=[f"answer_missing:{qt}"],
+        )
 
     return {
         "content": content_doc,

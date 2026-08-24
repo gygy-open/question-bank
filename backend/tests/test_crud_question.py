@@ -2,7 +2,7 @@ import pytest
 
 from app.crud.crud_question import question as crud_question
 from app.models.knowledge_point import KnowledgePoint
-from app.models.question import QuestionType, SCHEMA_VERSION
+from app.models.question import QuestionStatus, QuestionType, SCHEMA_VERSION
 from app.models.subject import Subject
 from app.models.tag import Tag
 from app.schemas.question import Question as QuestionSchema
@@ -133,6 +133,25 @@ async def test_update_answer_dangling_option_rejected_after_merge(db_session):
             db_session,
             db_obj=created,
             obj_in=QuestionUpdate(answer={"kind": "single_choice", "correct": "opt_missing"}),
+        )
+
+
+async def test_status_only_publish_rejects_incomplete_draft(db_session):
+    subject, _, _ = await _seed_taxonomy(db_session)
+    created = await crud_question.create_with_tags(
+        db_session,
+        obj_in=QuestionCreate(
+            content=doc("未完成"),
+            q_type=QuestionType.FREE_RESPONSE,
+            subject_id=subject.id,
+        ),
+    )
+
+    with pytest.raises(ValueError, match="answer is required"):
+        await crud_question.update_with_tags(
+            db_session,
+            db_obj=created,
+            obj_in=QuestionUpdate(status=QuestionStatus.PUBLISHED),
         )
 
 

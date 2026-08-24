@@ -141,11 +141,13 @@ describe('validateQuestionDraft', () => {
         expect(validateQuestionDraft(d)).toBe('题干不能为空')
     })
 
-    it('单选未选正确答案报错', () => {
+    it('草稿允许答案为空或未完成', () => {
         const d = createEmptyDraft()
         d.content = doc('题干')
+        expect(d.answer).toBeNull()
+        expect(validateQuestionDraft(d)).toBeNull()
         d.answer = { kind: 'single_choice', correct: '' }
-        expect(validateQuestionDraft(d)).toBe('请选择正确答案')
+        expect(validateQuestionDraft(d)).toBeNull()
     })
 
     it('合法单选通过', () => {
@@ -155,11 +157,12 @@ describe('validateQuestionDraft', () => {
         expect(validateQuestionDraft(d)).toBeNull()
     })
 
-    it('多选空集合报错', () => {
+    it('pending 多选空集合报错', () => {
         const d = createEmptyDraft()
         d.content = doc('题干')
         d.q_type = 'multiple_choice'
         d.answer = { kind: 'multiple_choice', correct: [] }
+        d.status = 'pending'
         expect(validateQuestionDraft(d)).toBe('请至少选择一个正确答案')
     })
 
@@ -171,7 +174,7 @@ describe('validateQuestionDraft', () => {
         expect(validateQuestionDraft(d)).toContain('旧格式')
     })
 
-    it('填空缺参考答案报错，且题干填空数量需匹配', () => {
+    it('published 填空缺参考答案报错，且题干填空数量需匹配', () => {
         const d = createEmptyDraft()
         d.q_type = 'fill_in_the_blank'
         d.content = stemWithBlanks('b1', 'b2')
@@ -182,6 +185,7 @@ describe('validateQuestionDraft', () => {
                 { id: 'b2', accept: [doc('x')] },
             ],
         }
+        d.status = 'published'
         expect(validateQuestionDraft(d)).toBe('第 1 空至少需要一个参考答案')
 
         d.answer = {

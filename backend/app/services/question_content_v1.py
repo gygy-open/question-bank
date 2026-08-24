@@ -401,7 +401,7 @@ def _parse_true_false(raw: str) -> Optional[bool]:
 
 def convert_answer(
     q_type: str, raw_answer: Any, options: Optional[list[Node]] = None
-) -> tuple[AnswerSpec, bool]:
+) -> tuple[Optional[AnswerSpec], bool]:
     """把旧 answer 升级为 AnswerSpec;返回 (answer_spec, needs_review)。
 
     - single/multiple/true_false 无法解析 → legacy_unresolved + needs_review=True。
@@ -409,6 +409,11 @@ def convert_answer(
     """
     options = options or []
     qt = getattr(q_type, "value", q_type)
+
+    # 真正缺失的答案不是“有内容但无法解析”。迁移保持为 null，是否需要复核由
+    # 题目生命周期(status)决定。
+    if raw_answer is None or (isinstance(raw_answer, str) and not raw_answer.strip()):
+        return None, False
 
     if qt == "fill_in_the_blank":
         return _convert_fill_answer(raw_answer)

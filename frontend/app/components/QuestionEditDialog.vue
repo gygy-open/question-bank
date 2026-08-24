@@ -52,7 +52,6 @@ import RichContent from './rich-editor/RichContent.vue'
 import {
   type QuestionDraft,
   buildQuestionPayload,
-  createDefaultAnswer,
   createDefaultOptions,
   dbQuestionToDraft,
   generateOptionId,
@@ -164,7 +163,7 @@ function switchDraftType(d: QuestionDraft, newType: QuestionType) {
   if (isChoiceType(newType) && d.options.length === 0) {
     d.options = createDefaultOptions()
   }
-  d.answer = createDefaultAnswer(newType, d.options, d.content)
+  d.answer = null
 }
 
 const initState = () => {

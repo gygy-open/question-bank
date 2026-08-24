@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
 import { Checkbox } from '@/components/ui/checkbox'
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
-import { Plus, Trash2, X, RotateCcw } from '@lucide/vue'
+import { Eraser, Plus, Trash2, X, RotateCcw } from '@lucide/vue'
 import type { AnswerSpec, Blank, OptionSpec, QuestionType, RichDoc } from '@/types'
 import RichEditor from '@/components/rich-editor/RichEditor.vue'
 import RichContent from '@/components/rich-editor/RichContent.vue'
@@ -59,7 +59,7 @@ function toggleMultiple(id: string, checked: boolean | 'indeterminate') {
 
 // --- true / false ---
 const trueFalseValue = computed<string>({
-    get: () => (model.value?.kind === 'true_false' ? String(model.value.correct) : 'true'),
+    get: () => (model.value?.kind === 'true_false' ? String(model.value.correct) : ''),
     set: (v) => {
         model.value = { kind: 'true_false', correct: v === 'true' }
     },
@@ -113,11 +113,26 @@ function refillFromLegacy() {
         model.value?.kind === 'legacy_unresolved' ? model.value.expected_kind : props.qType
     model.value = createDefaultAnswer(expected, options.value, props.stem ?? null)
 }
+
+function clearAnswer() {
+    model.value = null
+}
 </script>
 
 <template>
     <div class="space-y-2">
-        <Label>答案</Label>
+        <div class="flex items-center justify-between gap-2">
+            <Label>答案</Label>
+            <Button
+                v-if="model && model.kind !== 'legacy_unresolved'"
+                variant="ghost"
+                size="sm"
+                class="h-7 text-muted-foreground"
+                @click="clearAnswer"
+            >
+                <Eraser class="mr-1 h-3.5 w-3.5" /> 暂不填写
+            </Button>
+        </div>
 
         <!-- 旧格式未解析：只读原文 + 重新填写 -->
         <div v-if="model && model.kind === 'legacy_unresolved'" class="space-y-2">

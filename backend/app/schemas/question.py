@@ -49,13 +49,6 @@ class SingleChoiceAnswer(BaseModel):
     kind: Literal["single_choice"]
     correct: str
 
-    @field_validator("correct")
-    @classmethod
-    def _non_empty(cls, v: str) -> str:
-        if not v or not v.strip():
-            raise ValueError("single_choice correct 不能为空")
-        return v
-
 
 class MultipleChoiceAnswer(BaseModel):
     kind: Literal["multiple_choice"]
@@ -80,24 +73,9 @@ class Blank(BaseModel):
             raise ValueError("blank id 不能为空")
         return v
 
-    @field_validator("accept")
-    @classmethod
-    def _accept_non_empty(cls, v: List[Any]) -> List[Any]:
-        if not v or any(item is None for item in v):
-            raise ValueError("blank accept 必须是非空的 RichDoc 列表")
-        return v
-
-
 class FillBlankAnswer(BaseModel):
     kind: Literal["fill_in_the_blank"]
     blanks: List[Blank]
-
-    @field_validator("blanks")
-    @classmethod
-    def _blanks_non_empty(cls, v: List[Blank]) -> List[Blank]:
-        if not v:
-            raise ValueError("fill_in_the_blank blanks 不能为空")
-        return v
 
 
 class FreeResponseAnswer(BaseModel):
@@ -144,7 +122,7 @@ class QuestionBase(BaseModel):
     analysis: RichDoc = None
     summary: RichDoc = None
     q_type: QuestionType
-    status: QuestionStatus = QuestionStatus.PUBLISHED
+    status: QuestionStatus = QuestionStatus.DRAFT
     difficulty: int = 1
     source: Optional[str] = None
     parent_id: Optional[int] = None
@@ -178,6 +156,7 @@ class QuestionCreate(QuestionBase):
         self.options = normalize_options(self.q_type, self.options)
         validate_question_domain(
             q_type=self.q_type,
+            status=self.status,
             content=self.content,
             options=_options_to_dicts(self.options),
             answer=_answer_to_dict(self.answer),
@@ -208,6 +187,7 @@ class QuestionUpdate(QuestionBase):
         options = normalize_options(self.q_type, self.options)
         validate_question_domain(
             q_type=self.q_type,
+            status=self.status,
             content=self.content,
             options=_options_to_dicts(options),
             answer=_answer_to_dict(self.answer),

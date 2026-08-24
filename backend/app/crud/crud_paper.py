@@ -7,6 +7,7 @@ from app.crud.base import CRUDBase
 from app.models.paper import Paper, PaperQuestion
 from app.models.question import Question
 from app.schemas.paper import PaperCreate, PaperUpdate
+from app.services.question_content import validate_question_for_exam
 
 
 class CRUDPaper(CRUDBase[Paper, PaperCreate, PaperUpdate]):
@@ -88,6 +89,23 @@ class CRUDPaper(CRUDBase[Paper, PaperCreate, PaperUpdate]):
     async def add_items(
         self, db: AsyncSession, *, paper: Paper, question_ids: List[int]
     ) -> Paper:
+        result = await db.execute(
+            select(Question).where(
+                Question.id.in_(question_ids),
+                Question.deleted_at.is_(None),
+            )
+        )
+        questions = result.scalars().all()
+        questions_by_id = {question.id: question for question in questions}
+        missing_ids = [question_id for question_id in question_ids if question_id not in questions_by_id]
+        if missing_ids:
+            raise ValueError(f"Questions not found: {missing_ids}")
+        for question_id in question_ids:
+            try:
+                validate_question_for_exam(questions_by_id[question_id])
+            except ValueError as exc:
+                raise ValueError(f"Question {question_id} is not ready for exam: {exc}") from exc
+
         seq = await self._next_sequence(db, paper_id=paper.id)
         for qid in question_ids:
             db.add(PaperQuestion(paper_id=paper.id, question_id=qid, sequence=seq))

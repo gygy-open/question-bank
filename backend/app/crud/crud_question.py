@@ -4,7 +4,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func, or_
 from sqlalchemy.orm import selectinload
 from app.crud.base import CRUDBase
-from app.models.question import Question, QuestionType
+from app.models.question import Question, QuestionStatus, QuestionType
 from app.models.tag import Tag
 from app.schemas.question import QuestionCreate, QuestionUpdate
 from app.crud.crud_knowledge_point import knowledge_point as knowledge_point_crud
@@ -371,12 +371,16 @@ class CRUDQuestion(CRUDBase[Question, QuestionCreate, QuestionUpdate]):
         merged_answer = update_data["answer"] if "answer" in update_data else parse_json_field(db_obj.answer)
         merged_options = update_data["options"] if "options" in update_data else db_obj.options
         merged_options = normalize_options(merged_q_type, merged_options)
+        merged_status = update_data.get("status", db_obj.status)
+        if isinstance(merged_status, str):
+            merged_status = QuestionStatus(merged_status)
 
         if merged_answer and merged_answer.get("kind") == "legacy_unresolved":
             raise ValueError("legacy_unresolved 只读,不允许写入")
 
         validate_question_domain(
             q_type=merged_q_type,
+            status=merged_status,
             content=merged_content,
             options=merged_options,
             answer=merged_answer,

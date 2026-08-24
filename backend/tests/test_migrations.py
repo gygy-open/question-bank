@@ -173,6 +173,32 @@ _FIXTURES = [
         expect_kind="free_response",
         expect_review=False,
     ),
+    dict(
+        id=7,
+        q_type="free_response",
+        status="draft",
+        content="尚未作答的草稿",
+        options=None,
+        answer="   ",
+        thinking=None,
+        analysis=None,
+        summary=None,
+        expect_kind=None,
+        expect_review=False,
+    ),
+    dict(
+        id=8,
+        q_type="free_response",
+        status="published",
+        content="缺少答案的已发布题",
+        options=None,
+        answer=None,
+        thinking=None,
+        analysis=None,
+        summary=None,
+        expect_kind=None,
+        expect_review=True,
+    ),
 ]
 
 
@@ -194,7 +220,7 @@ def _seed_v1_fixtures(sync_url):
                         "analysis": f["analysis"],
                         "summary": f["summary"],
                         "q_type": f["q_type"],
-                        "status": "published",
+                        "status": f.get("status", "published"),
                         # content_schema_version / needs_review rely on server_default.
                     }
                     for f in _FIXTURES
@@ -252,8 +278,8 @@ def test_data_migration_converts_archives_and_flags(tmp_path):
         row = questions[f["id"]]
         assert row["content_schema_version"] == 1
         assert bool(row["needs_review"]) is f["expect_review"]
-        answer = json.loads(row["answer"])
-        assert answer["kind"] == f["expect_kind"]
+        answer = json.loads(row["answer"]) if row["answer"] is not None else None
+        assert (answer or {}).get("kind") == f["expect_kind"]
         # content is now v2 RichDoc JSON, not the original markdown.
         assert json.loads(row["content"])["type"] == "doc"
 

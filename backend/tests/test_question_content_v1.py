@@ -280,7 +280,7 @@ def test_free_response_answer():
 
 def test_free_response_empty_reference_is_none():
     spec, needs_review = convert_answer("free_response", "")
-    assert spec == {"kind": "free_response", "reference": None}
+    assert spec is None
     assert needs_review is False
 
 
