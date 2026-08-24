@@ -212,6 +212,22 @@ _FIXTURES = [
         expect_kind="free_response",
         expect_review=True,
     ),
+    dict(
+        id=10,
+        q_type="free_response",
+        status="published",
+        content=(
+            '![](/static/media/image6.png){width="1.5881944444444445in"\n'
+            'height="1.18125in"}'
+        ),
+        options=None,
+        answer="正常答案",
+        thinking=None,
+        analysis=None,
+        summary=None,
+        expect_kind="free_response",
+        expect_review=False,
+    ),
 ]
 
 
@@ -300,6 +316,13 @@ def test_data_migration_converts_archives_and_flags(tmp_path):
     q1 = questions[1]
     opt_ids = {o["id"] for o in q1["options"]}
     assert json.loads(q1["answer"])["correct"] in opt_ids
+
+    # Pandoc image dimensions are consumed into numeric CSS-pixel attrs.
+    q10_content = json.loads(questions[10]["content"])
+    q10_image = q10_content["content"][0]["content"][0]
+    assert q10_image["attrs"]["width"] == 152.4667
+    assert q10_image["attrs"]["height"] == 113.4
+    assert len(q10_content["content"][0]["content"]) == 1
 
     # Unresolved choice: original answer text merged into analysis, existing kept.
     q2_analysis = rich_doc_to_plain_text(json.loads(questions[2]["analysis"]))

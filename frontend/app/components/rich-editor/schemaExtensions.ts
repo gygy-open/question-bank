@@ -14,6 +14,8 @@ export interface SchemaExtensionOptions {
     mathNodeView?: NodeViewRenderer
     /** 填空节点的自定义 nodeView（编辑器可用来交互；只读渲染不传，走 renderHTML 占位）。 */
     blankNodeView?: NodeViewRenderer
+    /** 编辑器启用图片四角等比缩放；静态渲染不创建 nodeView。 */
+    imageResizable?: boolean
 }
 
 declare module '@tiptap/core' {
@@ -103,7 +105,18 @@ export function getSchemaExtensions(options: SchemaExtensionOptions = {}) {
         Superscript,
         Subscript,
         TextAlign.configure({ types: ['paragraph'] }),
-        Image.configure({ inline: false }),
+        Image.configure({
+            inline: false,
+            resize: options.imageResizable
+                ? {
+                    enabled: true,
+                    directions: ['top-left', 'top-right', 'bottom-left', 'bottom-right'],
+                    minWidth: 32,
+                    minHeight: 32,
+                    alwaysPreserveAspectRatio: true,
+                }
+                : false,
+        }),
         Table.configure({ resizable: false }),
         TableRow,
         TableHeader,

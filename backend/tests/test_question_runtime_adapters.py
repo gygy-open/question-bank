@@ -6,13 +6,16 @@ import types
 import pytest
 from types import SimpleNamespace
 
-from app.services.question_content import to_db_json
+from app.services.question_content import (
+    to_db_json,
+    validate_question_for_exam,
+    validate_rich_doc,
+)
 from app.services.question_content_v1 import (
     convert_answer,
     convert_options,
     markdown_to_rich_doc,
 )
-from app.services.question_content import to_db_json, validate_question_for_exam
 from app.services.question_legacy_adapter import (
     LegacyQuestionError,
     adapt_legacy_question,
@@ -193,6 +196,24 @@ def test_rich_doc_to_markdown_block_math_image_list():
     img = markdown_to_rich_doc("![cat](/static/media/cat.png)")
     assert "![cat](/static/media/cat.png)" in rich_doc_to_markdown(img)
 
+    sized_img = {
+        "type": "doc",
+        "content": [
+            {
+                "type": "image",
+                "attrs": {
+                    "src": "/static/media/cat.png",
+                    "alt": "cat",
+                    "width": 152.4667,
+                    "height": 113.4,
+                },
+            }
+        ],
+    }
+    assert rich_doc_to_markdown(sized_img) == (
+        '![cat](/static/media/cat.png){width="1.5882in" height="1.1813in"}'
+    )
+
     block = markdown_to_rich_doc("$$\n\\frac{a}{b}\n$$")
     md = rich_doc_to_markdown(block)
     assert md.startswith("$$") and "\\frac{a}{b}" in md
@@ -201,6 +222,32 @@ def test_rich_doc_to_markdown_block_math_image_list():
 def test_rich_doc_to_markdown_accepts_json_string():
     doc = markdown_to_rich_doc("hello")
     assert rich_doc_to_markdown(to_db_json(doc)) == "hello"
+
+
+def test_rich_doc_image_dimensions_must_be_valid_px_numbers():
+    valid = {
+        "type": "doc",
+        "content": [
+            {
+                "type": "image",
+                "attrs": {"src": "/image.png", "width": 320.5, "height": 180},
+            }
+        ],
+    }
+    assert validate_rich_doc(valid) is valid
+
+    for invalid in ("320px", 0, -1, float("inf"), 20_001, True):
+        doc = {
+            "type": "doc",
+            "content": [
+                {
+                    "type": "image",
+                    "attrs": {"src": "/image.png", "width": invalid},
+                }
+            ],
+        }
+        with pytest.raises(ValueError, match="image width"):
+            validate_rich_doc(doc)
 
 
 def test_rich_doc_to_markdown_unknown_node_does_not_crash():

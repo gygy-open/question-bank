@@ -219,7 +219,7 @@ MD→Tiptap 转换器的**目标节点集必须 = 编辑器/渲染器 schema**(`
 | `hardBreak` | 行尾两空格 / 换行 | 已有 |
 | `inlineMath`(attr `latex`) | `$...$` | 已有 |
 | `blockMath`(attr `latex`) | `$$...$$` | 已有 |
-| `image`(attr `src`,`alt`) | `![alt](url)` | 已有 |
+| `image`(attr `src`,`alt`,`title`,`width`,`height`) | `![alt](url)` + Pandoc 尺寸属性 | 已有;尺寸可编辑 |
 | `textAlign`(paragraph 属性) | 无 md 对应,保持默认 | 已有 |
 | `table` / `tableRow` / `tableCell` | `\| a \| b \|` | **需补扩展** |
 | `blank`(attr `blankId`) | 无 md 对应(填空新节点) | **需新增** |
@@ -230,11 +230,14 @@ MD→Tiptap 转换器的**目标节点集必须 = 编辑器/渲染器 schema**(`
 - **兜底规则**:任何无法识别的 Markdown / HTML → 包成 `paragraph` + `text` 保留原文,**绝不静默丢字符**。
 - **复核信号**:上述已决定的降级属于正常转换,不打标;未知 Markdown/HTML、解析异常、非空输入无法产出 RichDoc 时返回复核信号。迁移聚合题干、三段解析、所有选项正文及答案内部 RichDoc 的信号,任一异常即置 `needs_review = 1`。
 - **空 / 边界**:空字段 → DB `NULL`;`Blank.accept[]` 至少 1 项;`Option` 必有 `id`。
+- **图片尺寸契约**:`image.attrs.width` / `height` 为可空的有限正数,单位固定为 CSS px,JSON 中只存数值、不带单位;最大值 `20000`。未指定尺寸时按图片自然尺寸展示。
 
 ### 7.3 MD→Tiptap 映射细则
 
 - 行内公式 `$...$` → `inlineMath { attrs.latex }`;块公式 `$$...$$` → `blockMath { attrs.latex }`。latex 原样保留,不做转义处理。
 - 图片 `![alt](url)` → `image { attrs.src=url, attrs.alt=alt }`;`/static/media/` 路径原样保留。
+- Pandoc 图片属性 `![alt](url){width="1.5in" height="2cm"}`(属性内部可换行,也兼容紧邻下一行的属性块)→ `image.attrs.width/height` 数值 px。迁移支持 `px` / `in` / `cm` / `mm` / `pt`,统一按 `1in = 96px` 换算并最多保留 4 位小数;非法单位、非正数或超限值不写入 attrs,同时打 `needs_review`。
+- 编辑器使用 Tiptap Image 原生四角缩放,默认锁定宽高比,最小 `32px`;拖拽完成后直接更新节点的数值 `width/height`。只读 Web 渲染保留目标宽度并用 `max-width:100%;height:auto` 防止窄屏溢出和变形。
 - 上/下标源为 HTML `<sup>` / `<sub>`(旧编辑器产出)→ 对应 mark。
 - 列表 / 加粗 / 斜体按标准 CommonMark 语义映射。
 - 降级项按 §7.2 处理。
@@ -293,6 +296,7 @@ MD→Tiptap 转换器的**目标节点集必须 = 编辑器/渲染器 schema**(`
 - **stem / explanation / option.content**:`MD → RichDoc`(§7 转换器),直译。
 - **空 answer**:迁移为 `null`,无论 `draft` / `pending` / `published` 都不因缺失打复核标记;答案完整性由发布、组卷与导出校验负责。只有非空但无法解析的答案才写 `legacy_unresolved`。
 - **复核聚合**:`stem`、`thinking`、`analysis`、`summary`、每个 `option.content`、解答题 `reference`、每个填空 `accept` 中,任一非空 Markdown 输入返回复核信号,整行 `needs_review = 1`。
+- **图片尺寸**:旧 Markdown/Pandoc 物理单位在转换边界统一换算为数值 px,属性块由图片节点消费,不得残留为普通文本。RichDoc → Markdown/Pandoc/Word 导出时再按 `in = px / 96` 转回物理单位;Web 端直接消费 px。
 - **选择题 answer**(旧为自由 md 串,如 "A" / "答案:A,因为…"):
   - 抽取字母 → 映射到对应 `option.label` → 得 `option.id` → 填 `correct`;
   - 多余解释性文字 → 迁移进 `analysis`;
@@ -312,6 +316,7 @@ MD→Tiptap 转换器的**目标节点集必须 = 编辑器/渲染器 schema**(`
 - 题干含 `blank` 节点且已填写填空答案时,`blankId` 与 `blanks[].id` 一一对应。
 - 试卷加入和导出均使用 `require_complete=True` 二次校验,不能通过 draft 状态绕过考试完整性要求。
 - 每个 RichDoc 根节点 `type === "doc"`。
+- 图片 `width` / `height` 若存在,必须是 `(0, 20000]` 范围内的有限数值 px;禁止 `"320px"`、百分比、任意 CSS `style` 或非数值。
 
 ## 12. 实施顺序(建议,验证优先)
 

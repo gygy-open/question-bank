@@ -15,6 +15,7 @@
 from __future__ import annotations
 
 import json
+import math
 from typing import Any, Dict, List, Optional
 
 from app.models.question import QuestionStatus, QuestionType
@@ -80,6 +81,30 @@ def validate_rich_doc(doc: Any) -> Optional[RichDoc]:
     content = doc.get("content", [])
     if not isinstance(content, list):
         raise ValueError("RichDoc 'content' must be a list")
+
+    def validate_node(node: Any) -> None:
+        if not isinstance(node, dict):
+            return
+        if node.get("type") == "image":
+            attrs = node.get("attrs") or {}
+            for name in ("width", "height"):
+                value = attrs.get(name)
+                if value is None:
+                    continue
+                if (
+                    not isinstance(value, (int, float))
+                    or isinstance(value, bool)
+                    or not math.isfinite(float(value))
+                    or float(value) <= 0
+                    or float(value) > 20_000
+                ):
+                    raise ValueError(
+                        f"image {name} must be a finite number between 0 and 20000 px"
+                    )
+        for child in node.get("content") or []:
+            validate_node(child)
+
+    validate_node(doc)
     return doc
 
 

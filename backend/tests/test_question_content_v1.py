@@ -96,6 +96,56 @@ def test_image():
     assert img["attrs"]["alt"] == "cat"
 
 
+def test_image_pandoc_dimensions_are_normalized_to_px():
+    doc, needs_review = markdown_to_rich_doc_with_review(
+        '![](/static/media/image6.png){width="1.5881944444444445in"\n'
+        'height="1.18125in"}'
+    )
+    image = doc["content"][0]["content"][0]
+
+    assert needs_review is False
+    assert image == {
+        "type": "image",
+        "attrs": {
+            "src": "/static/media/image6.png",
+            "alt": "",
+            "width": 152.4667,
+            "height": 113.4,
+        },
+    }
+
+
+def test_image_detached_pandoc_dimensions_are_supported():
+    doc, needs_review = markdown_to_rich_doc_with_review(
+        '![](/static/media/image6.png)\n'
+        '{width="2.54cm" height="25.4mm"}'
+    )
+    nodes = doc["content"][0]["content"]
+
+    assert needs_review is False
+    assert nodes == [
+        {
+            "type": "image",
+            "attrs": {
+                "src": "/static/media/image6.png",
+                "alt": "",
+                "width": 96.0,
+                "height": 96.0,
+            },
+        }
+    ]
+
+
+def test_invalid_image_dimension_marks_review_without_storing_css():
+    doc, needs_review = markdown_to_rich_doc_with_review(
+        '![](/static/media/image6.png){width="50%"}'
+    )
+    image = doc["content"][0]["content"][0]
+
+    assert needs_review is True
+    assert "width" not in image["attrs"]
+
+
 # --------------------------------------------------------------------------- #
 # lists
 # --------------------------------------------------------------------------- #

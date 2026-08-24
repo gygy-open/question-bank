@@ -13,6 +13,7 @@
 
 from __future__ import annotations
 
+import math
 from typing import Any, Optional
 
 from app.services.question_content import parse_json_field
@@ -141,7 +142,20 @@ def _image_md(node: dict[str, Any]) -> str:
     attrs = node.get("attrs") or {}
     src = str(attrs.get("src", ""))
     alt = str(attrs.get("alt", "") or "")
-    return f"![{alt}]({src})"
+    image = f"![{alt}]({src})"
+    dimensions: list[str] = []
+    for name in ("width", "height"):
+        value = attrs.get(name)
+        if not isinstance(value, (int, float)) or isinstance(value, bool):
+            continue
+        px = float(value)
+        if not math.isfinite(px) or px <= 0:
+            continue
+        inches = f"{px / 96:.4f}".rstrip("0").rstrip(".")
+        dimensions.append(f'{name}="{inches}in"')
+    if dimensions:
+        return f"{image}{{{' '.join(dimensions)}}}"
+    return image
 
 
 def _table_to_md(node: dict[str, Any]) -> str:

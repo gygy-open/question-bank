@@ -23,7 +23,12 @@ export const richContentFixture: RichDoc = {
         },
         {
             type: 'image',
-            attrs: { src: 'https://example.com/diagram.png', alt: '示意图' },
+            attrs: {
+                src: 'https://example.com/diagram.png',
+                alt: '示意图',
+                width: 152.4667,
+                height: 113.4,
+            },
         },
         {
             type: 'table',

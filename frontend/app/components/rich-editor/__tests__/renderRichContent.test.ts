@@ -38,6 +38,8 @@ describe('renderRichContentToHTML', () => {
         expect(html).toBeTruthy()
         expect(html).toContain('<table')
         expect(html).toContain('<img')
+        expect(html).toContain('width="152.4667"')
+        expect(html).toContain('height="113.4"')
         // window 存在时会把 data-latex 渲染成 KaTeX
         expect(html).toContain('katex')
     })

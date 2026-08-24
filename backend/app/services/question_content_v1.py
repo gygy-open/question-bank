@@ -23,6 +23,7 @@ from typing import Any, Optional
 
 from markdown_it import MarkdownIt
 from markdown_it.tree import SyntaxTreeNode
+from mdit_py_plugins.attrs import attrs_plugin
 from mdit_py_plugins.dollarmath import dollarmath_plugin
 
 # RichDoc / 节点的宽松别名(全部是可 JSON 序列化的原生 dict/list)。
@@ -35,7 +36,26 @@ _MD_PARSER = (
     MarkdownIt("commonmark", {"html": True})
     .enable("strikethrough")
     .use(dollarmath_plugin, double_inline=True)
+    .use(attrs_plugin, after=("image",), allowed=("width", "height"))
 )
+
+_DETACHED_IMAGE_SIZE_RE = re.compile(
+    r"(!\[[^\]\n]*\]\([^\n]*?\))[ \t]*\r?\n[ \t]*"
+    r"(\{(?=[^{}]*(?:width|height)\s*=)[^{}]*\})",
+    re.IGNORECASE,
+)
+_IMAGE_DIMENSION_RE = re.compile(
+    r"^\s*(\d+(?:\.\d+)?|\.\d+)\s*(px|in|cm|mm|pt)\s*$",
+    re.IGNORECASE,
+)
+_PX_PER_UNIT = {
+    "px": 1.0,
+    "in": 96.0,
+    "cm": 96.0 / 2.54,
+    "mm": 96.0 / 25.4,
+    "pt": 96.0 / 72.0,
+}
+_MAX_IMAGE_DIMENSION_PX = 20_000.0
 
 
 # --------------------------------------------------------------------------- #
@@ -56,7 +76,8 @@ def markdown_to_rich_doc_with_review(md: Optional[str]) -> tuple[RichDoc, bool]:
 
     needs_review = [False]
     try:
-        tokens = _MD_PARSER.parse(md)
+        normalized_md = _DETACHED_IMAGE_SIZE_RE.sub(r"\1\2", md)
+        tokens = _MD_PARSER.parse(normalized_md)
         root = SyntaxTreeNode(tokens)
 
         content: list[Node] = []
@@ -183,7 +204,7 @@ def _convert_inline(
         elif t.startswith("math_inline"):
             out.append({"type": "inlineMath", "attrs": {"latex": node.content.strip()}})
         elif t == "image":
-            out.append(_image(node))
+            out.append(_image(node, needs_review))
         elif t == "html_inline":
             handled = _apply_html_inline(node.content, html_marks)
             if not handled and node.content:
@@ -240,14 +261,37 @@ def _text(text: str, marks: Optional[list[Mark]] = None) -> Node:
     return node
 
 
-def _image(node: SyntaxTreeNode) -> Node:
+def _image(node: SyntaxTreeNode, needs_review: list[bool]) -> Node:
     attrs = dict(node.attrs)
     src = str(attrs.get("src", ""))
     # alt 文本在 image 节点的子文本节点里(markdown-it 不放进 attrs)。
     alt = attrs.get("alt") or "".join(
         c.content for c in node.children if c.type == "text"
     ) or node.content or ""
-    return {"type": "image", "attrs": {"src": src, "alt": str(alt)}}
+    image_attrs: dict[str, Any] = {"src": src, "alt": str(alt)}
+    title = attrs.get("title")
+    if title:
+        image_attrs["title"] = str(title)
+    for name in ("width", "height"):
+        raw_dimension = attrs.get(name)
+        if raw_dimension is None:
+            continue
+        dimension = _image_dimension_to_px(raw_dimension)
+        if dimension is None:
+            needs_review[0] = True
+            continue
+        image_attrs[name] = dimension
+    return {"type": "image", "attrs": image_attrs}
+
+
+def _image_dimension_to_px(raw: Any) -> Optional[float]:
+    match = _IMAGE_DIMENSION_RE.fullmatch(str(raw))
+    if not match:
+        return None
+    value = float(match.group(1)) * _PX_PER_UNIT[match.group(2).lower()]
+    if value <= 0 or value > _MAX_IMAGE_DIMENSION_PX:
+        return None
+    return round(value, 4)
 
 
 def _dedupe_marks(marks: list[Mark]) -> list[Mark]:

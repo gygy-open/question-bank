@@ -138,7 +138,10 @@ function insertTable() {
 const editor = useEditor({
     content: model.value ?? '',
     extensions: [
-        ...getSchemaExtensions({ mathNodeView: createMathNodeView() }),
+        ...getSchemaExtensions({
+            mathNodeView: createMathNodeView(),
+            imageResizable: true,
+        }),
         ResetFormatOnEnter,
         Placeholder.configure({
             placeholder: props.placeholder,

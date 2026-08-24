@@ -25,3 +25,10 @@ const html = computed(() => renderRichContentToHTML(props.content))
         <div v-else-if="!isEmpty" v-html="html" />
     </div>
 </template>
+
+<style scoped>
+.rich-content :deep(img) {
+    max-width: 100%;
+    height: auto;
+}
+</style>
