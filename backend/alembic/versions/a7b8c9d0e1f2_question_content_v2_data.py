@@ -31,8 +31,8 @@ from sqlalchemy.dialects.mysql import LONGTEXT
 
 from app.services.question_content_v1 import (
     convert_answer,
-    convert_options,
-    markdown_to_rich_doc,
+    convert_options_with_review,
+    markdown_to_rich_doc_with_review,
     merge_legacy_answer_into_analysis,
 )
 
@@ -145,15 +145,25 @@ def _archive_batch(bind: sa.engine.Connection, archive: sa.Table, rows: Sequence
 def _convert_batch(bind: sa.engine.Connection, questions: sa.Table, rows: Sequence[Any]) -> None:
     """逐行转换写回 questions,成功即置 version=1、needs_review 依结果。"""
     for r in rows:
-        options = convert_options(r.options)
-        content_doc = markdown_to_rich_doc(r.content)
-        thinking_doc = markdown_to_rich_doc(r.thinking)
-        analysis_doc = markdown_to_rich_doc(r.analysis)
-        summary_doc = markdown_to_rich_doc(r.summary)
-        answer_spec, needs_review = convert_answer(r.q_type, r.answer, options)
-        answer_missing = answer_spec is None
-        needs_review = needs_review or (
-            answer_missing and r.status in {"pending", "published"}
+        options, options_needs_review = convert_options_with_review(r.options)
+        content_doc, content_needs_review = markdown_to_rich_doc_with_review(r.content)
+        thinking_doc, thinking_needs_review = markdown_to_rich_doc_with_review(
+            r.thinking
+        )
+        analysis_doc, analysis_needs_review = markdown_to_rich_doc_with_review(
+            r.analysis
+        )
+        summary_doc, summary_needs_review = markdown_to_rich_doc_with_review(r.summary)
+        answer_spec, answer_needs_review = convert_answer(r.q_type, r.answer, options)
+        needs_review = any(
+            (
+                options_needs_review,
+                content_needs_review,
+                thinking_needs_review,
+                analysis_needs_review,
+                summary_needs_review,
+                answer_needs_review,
+            )
         )
 
         if answer_spec and answer_spec.get("kind") == "legacy_unresolved":
@@ -199,7 +209,6 @@ def upgrade() -> None:
             sa.select(
                 questions.c.id,
                 questions.c.q_type,
-                questions.c.status,
                 questions.c.content,
                 questions.c.options,
                 questions.c.answer,

@@ -43,39 +43,49 @@ _MD_PARSER = (
 # --------------------------------------------------------------------------- #
 def markdown_to_rich_doc(md: Optional[str]) -> RichDoc:
     """把一段 Markdown 转成 Tiptap RichDoc;空/纯空白 → None。"""
+    doc, _ = markdown_to_rich_doc_with_review(md)
+    return doc
+
+
+def markdown_to_rich_doc_with_review(md: Optional[str]) -> tuple[RichDoc, bool]:
+    """转换 Markdown,并返回是否因未知/异常输入需要人工复核。"""
     if md is None:
-        return None
+        return None, False
     if md.strip() == "":
-        return None
+        return None, False
 
-    tokens = _MD_PARSER.parse(md)
-    root = SyntaxTreeNode(tokens)
+    needs_review = [False]
+    try:
+        tokens = _MD_PARSER.parse(md)
+        root = SyntaxTreeNode(tokens)
 
-    content: list[Node] = []
-    for child in root.children:
-        content.extend(_convert_block(child))
+        content: list[Node] = []
+        for child in root.children:
+            content.extend(_convert_block(child, needs_review))
+    except Exception:
+        return {"type": "doc", "content": [_paragraph([_text(md)])]}, True
 
     if not content:
-        return None
-    return {"type": "doc", "content": content}
+        return {"type": "doc", "content": [_paragraph([_text(md)])]}, True
+    return {"type": "doc", "content": content}, needs_review[0]
 
 
-def _convert_block(node: SyntaxTreeNode) -> list[Node]:
+def _convert_block(node: SyntaxTreeNode, needs_review: list[bool]) -> list[Node]:
     """把一个块级 SyntaxTreeNode 转成 0..N 个 Tiptap 块节点。"""
     t = node.type
 
     if t == "paragraph":
-        return [_paragraph(_convert_inline(node.children))]
+        return [_paragraph(_convert_inline(node.children, needs_review))]
 
     if t == "heading":
         # 降级:标题 → 普通段落,保留可见文字。
-        return [_paragraph(_convert_inline(node.children))]
+        return [_paragraph(_convert_inline(node.children, needs_review))]
 
     if t == "blockquote":
         # 降级:引用 → 内部块原样展开(保留可见文字)。
         out: list[Node] = []
         for child in node.children:
-            out.extend(_convert_block(child))
+            out.extend(_convert_block(child, needs_review))
         return out
 
     if t in ("bullet_list", "ordered_list"):
@@ -84,7 +94,7 @@ def _convert_block(node: SyntaxTreeNode) -> list[Node]:
         for item in node.children:
             item_content: list[Node] = []
             for child in item.children:
-                item_content.extend(_convert_block(child))
+                item_content.extend(_convert_block(child, needs_review))
             if not item_content:
                 item_content = [_paragraph([])]
             items.append({"type": "listItem", "content": item_content})
@@ -107,14 +117,16 @@ def _convert_block(node: SyntaxTreeNode) -> list[Node]:
 
     if t == "html_block":
         # 降级:原始 HTML 块 → 纯文本,保留原文不丢字符。
+        needs_review[0] = True
         text = node.content.strip()
         return [_paragraph([_text(text)] if text else [])]
 
     # 未知块:优先展开子节点,否则把可见内容塞进段落,绝不丢字符。
+    needs_review[0] = True
     if node.children:
         out = []
         for child in node.children:
-            out.extend(_convert_block(child))
+            out.extend(_convert_block(child, needs_review))
         return out
     if node.content:
         return [_paragraph([_text(node.content)])]
@@ -122,7 +134,9 @@ def _convert_block(node: SyntaxTreeNode) -> list[Node]:
 
 
 def _convert_inline(
-    children: list[SyntaxTreeNode], active_marks: Optional[list[Mark]] = None
+    children: list[SyntaxTreeNode],
+    needs_review: list[bool],
+    active_marks: Optional[list[Mark]] = None,
 ) -> list[Node]:
     """把一串行内 SyntaxTreeNode 转成 Tiptap 行内节点列表。
 
@@ -140,16 +154,26 @@ def _convert_inline(
         if t == "text":
             if node.content:
                 out.append(_text(node.content, current))
+        elif t == "inline":
+            out.extend(_convert_inline(node.children, needs_review, current))
         elif t == "strong":
-            out.extend(_convert_inline(node.children, current + [{"type": "bold"}]))
+            out.extend(
+                _convert_inline(
+                    node.children, needs_review, current + [{"type": "bold"}]
+                )
+            )
         elif t == "em":
-            out.extend(_convert_inline(node.children, current + [{"type": "italic"}]))
+            out.extend(
+                _convert_inline(
+                    node.children, needs_review, current + [{"type": "italic"}]
+                )
+            )
         elif t == "s":
             # 删除线未启用:降级为无 mark 文本,保留文字。
-            out.extend(_convert_inline(node.children, current))
+            out.extend(_convert_inline(node.children, needs_review, current))
         elif t == "link":
             # 链接 mark 未在白名单:降级保留链接文字。
-            out.extend(_convert_inline(node.children, current))
+            out.extend(_convert_inline(node.children, needs_review, current))
         elif t == "code_inline":
             # 降级:行内代码 → 纯文本,保留代码原文。
             if node.content:
@@ -164,11 +188,13 @@ def _convert_inline(
             handled = _apply_html_inline(node.content, html_marks)
             if not handled and node.content:
                 # 无法识别的行内 HTML → 原样保留为文本,不丢字符。
+                needs_review[0] = True
                 out.append(_text(node.content, current))
         else:
             # 未知行内节点:优先展开子节点,否则保留原文。
+            needs_review[0] = True
             if node.children:
-                out.extend(_convert_inline(node.children, current))
+                out.extend(_convert_inline(node.children, needs_review, current))
             elif node.content:
                 out.append(_text(node.content, current))
 
@@ -281,9 +307,16 @@ def make_option_id(index: int, label: str, content_md: str) -> str:
 
 def convert_options(raw_options: Any) -> list[Node]:
     """把旧 options([{label, content(md)}])升级为 [{id, label, content: RichDoc}]。"""
+    options, _ = convert_options_with_review(raw_options)
+    return options
+
+
+def convert_options_with_review(raw_options: Any) -> tuple[list[Node], bool]:
+    """升级 options,并聚合所有选项正文的 Markdown 转换复核信号。"""
     if not isinstance(raw_options, list):
-        return []
+        return [], False
     out: list[Node] = []
+    needs_review = False
     for index, opt in enumerate(raw_options):
         if isinstance(opt, dict):
             label = str(opt.get("label", "") or "")
@@ -292,14 +325,16 @@ def convert_options(raw_options: Any) -> list[Node]:
             label = ""
             content_md = opt
         content_md = "" if content_md is None else str(content_md)
+        content, content_needs_review = markdown_to_rich_doc_with_review(content_md)
+        needs_review = needs_review or content_needs_review
         out.append(
             {
                 "id": make_option_id(index, label, content_md),
                 "label": label,
-                "content": markdown_to_rich_doc(content_md),
+                "content": content,
             }
         )
-    return out
+    return out, needs_review
 
 
 # --------------------------------------------------------------------------- #
@@ -421,7 +456,8 @@ def convert_answer(
     raw_str = "" if raw_answer is None else str(raw_answer)
 
     if qt == "free_response":
-        return {"kind": "free_response", "reference": markdown_to_rich_doc(raw_str)}, False
+        reference, needs_review = markdown_to_rich_doc_with_review(raw_str)
+        return {"kind": "free_response", "reference": reference}, needs_review
 
     if qt == "single_choice":
         ids = _extract_option_ids(raw_str, options)
@@ -466,7 +502,8 @@ def _convert_fill_answer(raw_answer: Any) -> tuple[AnswerSpec, bool]:
         accept: list[RichDoc] = []
         for item in group:
             item_str = "" if item is None else str(item)
-            doc = markdown_to_rich_doc(item_str)
+            doc, item_needs_review = markdown_to_rich_doc_with_review(item_str)
+            needs_review = needs_review or item_needs_review
             if doc is not None:
                 accept.append(doc)
         if not accept:

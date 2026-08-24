@@ -5,8 +5,10 @@ import json
 from app.services.question_content_v1 import (
     convert_answer,
     convert_options,
+    convert_options_with_review,
     make_option_id,
     markdown_to_rich_doc,
+    markdown_to_rich_doc_with_review,
     merge_legacy_answer_into_analysis,
     merge_rich_docs,
     rich_doc_to_plain_text,
@@ -164,6 +166,21 @@ def test_unknown_html_inline_preserved():
     assert "b" in rich_doc_to_plain_text(doc)
 
 
+def test_markdown_review_signal_distinguishes_supported_degradation():
+    empty_doc, empty_review = markdown_to_rich_doc_with_review(None)
+    heading_doc, heading_review = markdown_to_rich_doc_with_review("# Title")
+    unknown_doc, unknown_review = markdown_to_rich_doc_with_review(
+        "a<span>b</span>c"
+    )
+
+    assert empty_doc is None
+    assert empty_review is False
+    assert rich_doc_to_plain_text(heading_doc) == "Title"
+    assert heading_review is False
+    assert "b" in rich_doc_to_plain_text(unknown_doc)
+    assert unknown_review is True
+
+
 def test_result_is_json_serializable():
     doc = markdown_to_rich_doc("**b** $x$ ![a](/u.png)")
     json.dumps(doc)  # 不抛异常即可
@@ -185,6 +202,18 @@ def test_option_content_converted_to_rich_doc():
     result = convert_options(opts)
     assert result[0]["label"] == "A"
     assert result[0]["content"]["type"] == "doc"
+
+
+def test_option_content_review_signal_is_aggregated():
+    result, needs_review = convert_options_with_review(
+        [
+            {"label": "A", "content": "normal"},
+            {"label": "B", "content": "<unknown>tag</unknown>"},
+        ]
+    )
+
+    assert len(result) == 2
+    assert needs_review is True
 
 
 def test_make_option_id_stable():
@@ -276,6 +305,15 @@ def test_free_response_answer():
     assert needs_review is False
     assert spec["kind"] == "free_response"
     assert spec["reference"]["type"] == "doc"
+
+
+def test_free_response_propagates_markdown_review_signal():
+    spec, needs_review = convert_answer(
+        "free_response", "参考 <unknown>答案</unknown>"
+    )
+
+    assert spec["kind"] == "free_response"
+    assert needs_review is True
 
 
 def test_free_response_empty_reference_is_none():

@@ -11,7 +11,7 @@
 3. **`legacy_unresolved` variant**:新增一个**只读、仅迁移期**产生的 `AnswerSpec` variant,只承载**非空但无法解析**的旧答案原文。旧答案为空时迁移为 `answer = null`,不伪装成解析失败。
 4. **API 字段名**:对外 API 继续沿用 `content` / `thinking` / `analysis` / `summary` 等既有名称(逻辑名 `stem` / `explanation.*` 仅用于文档),不改动前端契约字段名。
 5. **迁移实现**:MD→RichDoc 与答案转换统一用 **Python 转换器**(`app/services/question_content_v1.py`),Alembic data-migration 直接调用它,不再依赖前端一次性 Node 脚本。
-6. **`needs_review`**:仅存在于数据库列,用于人工复核筛选,**不进入 API 响应 / pydantic schema**。
+6. **`needs_review`**:仅存在于数据库列,表示存量内容迁移中至少一个非空字段无法可靠转换,用于人工复核筛选,**不进入 API 响应 / pydantic schema**。空答案无论题目状态如何都不因缺失而打标;答案完整性由生命周期校验负责。
 7. **生命周期完整性**:题干始终必填;`draft` 的答案可为 `null` 或未完成结构;进入 `pending` / `published` 时答案必须完整。加入试卷和导出时再次按完整规则校验,与当前状态无关。
 
 ## 1. 背景与目标
@@ -33,7 +33,7 @@
 3. **答案用判别联合(discriminated union)**:按 `kind` 区分,新增题型只加一个 variant,不动存量行。
 4. **引用用稳定 id,不用展示序号**:选项/填空用内部 `id` 绑定答案,`label`("A"/"甲")只用于展示,支持乱序、改标签不坏数据。
 5. **空 = `null`**,不存空 doc。
-6. **迁移不丢内容**:任何无法识别的输入降级为纯文本保留,脏数据打标记待人工复核。
+6. **迁移不丢内容**:任何无法识别的输入降级为纯文本保留;任一非空 Markdown 字段无法可靠转换或答案无法结构化时,整行打标记待人工复核。
 
 ## 3. 核心类型
 
@@ -228,6 +228,7 @@ MD→Tiptap 转换器的**目标节点集必须 = 编辑器/渲染器 schema**(`
 
 - **降级策略(已决定)**:`heading(#)`、`blockquote(>)`、`strike(~~x~~)`、`code`/代码块、`horizontalRule(---)` 一律**降级为纯文本段落**,保留其可见文字,**不启用对应节点**。
 - **兜底规则**:任何无法识别的 Markdown / HTML → 包成 `paragraph` + `text` 保留原文,**绝不静默丢字符**。
+- **复核信号**:上述已决定的降级属于正常转换,不打标;未知 Markdown/HTML、解析异常、非空输入无法产出 RichDoc 时返回复核信号。迁移聚合题干、三段解析、所有选项正文及答案内部 RichDoc 的信号,任一异常即置 `needs_review = 1`。
 - **空 / 边界**:空字段 → DB `NULL`;`Blank.accept[]` 至少 1 项;`Option` 必有 `id`。
 
 ### 7.3 MD→Tiptap 映射细则
@@ -290,7 +291,8 @@ MD→Tiptap 转换器的**目标节点集必须 = 编辑器/渲染器 schema**(`
 > 前置:转换**之前**先把每行 v1 原文快照入 `questions_content_archive_v1`(§8.1);转换以 `content_schema_version` 为幂等闸门(只处理 `version < 1` 的行),可安全重跑。
 
 - **stem / explanation / option.content**:`MD → RichDoc`(§7 转换器),直译。
-- **空 answer**:迁移为 `null`;draft 不打复核标记,pending/published 打 `needs_review`。只有非空但无法解析的答案才写 `legacy_unresolved`。
+- **空 answer**:迁移为 `null`,无论 `draft` / `pending` / `published` 都不因缺失打复核标记;答案完整性由发布、组卷与导出校验负责。只有非空但无法解析的答案才写 `legacy_unresolved`。
+- **复核聚合**:`stem`、`thinking`、`analysis`、`summary`、每个 `option.content`、解答题 `reference`、每个填空 `accept` 中,任一非空 Markdown 输入返回复核信号,整行 `needs_review = 1`。
 - **选择题 answer**(旧为自由 md 串,如 "A" / "答案:A,因为…"):
   - 抽取字母 → 映射到对应 `option.label` → 得 `option.id` → 填 `correct`;
   - 多余解释性文字 → 迁移进 `analysis`;
@@ -321,7 +323,7 @@ MD→Tiptap 转换器的**目标节点集必须 = 编辑器/渲染器 schema**(`
   - a. `CREATE TABLE questions_content_archive_v1`(用 inspector 检测,已存在则跳过)。
   - b. **分批**(`LIMIT 500`,以 `version < 1` 为滚动闸门)读待转换行;先把其中**尚未入归档表**的行快照进归档表(逐批 `NOT IN archive` 去重,而非一次性 `INSERT ... SELECT`,以便同批直接喂 Python 转换器且不重复归档)。
   - c. 逐行调 `app/services/question_content_v1.py` 转换六个内容字段 + options 写回 `questions`(内容字段存 JSON **字符串**、`options` 存 JSON **对象**;全程 Core,JSON 参数在 SQLite/MySQL 一致),成功即置 `content_schema_version = 1`。
-  - d. 转换失败/无法解析的行:原文降级保留(§10)+ `needs_review = 1`,`version` **仍置 1**(避免重跑死循环)。选择/判断的 `legacy_unresolved` 用确定性 RichDoc 合并 helper `merge_legacy_answer_into_analysis` 把原答案原文**追加**进 `analysis`(不覆盖既有解析)。事后从归档表人工救。
+  - d. 聚合每行所有 Markdown 槽位和答案结构化的复核信号;任一非空字段转换失败/无法解析时,原文降级保留(§10)+ `needs_review = 1`,`version` **仍置 1**(避免重跑死循环)。空答案不因题目状态打标。选择/判断的 `legacy_unresolved` 用确定性 RichDoc 合并 helper `merge_legacy_answer_into_analysis` 把原答案原文**追加**进 `analysis`(不覆盖既有解析)。事后从归档表人工救。
   - e. upgrade 末尾把 `content_schema_version` 的 server_default 从 0 改为 1(与 ORM `SCHEMA_VERSION=1` 对齐)。`downgrade()`:从归档表逐批还原**仍存在**的 `question_id` 的六个内容字段 + options,`version` 拨回 0、`needs_review` 清 0,server_default 改回 0;**归档表保留不 drop**(真可回滚,因原文还在)。
 
   > MySQL DDL 非事务(隐式 commit),建表/回填/转换不是原子事务;靠上述 "inspector 建表跳过 + `version<1` + `NOT IN archive`" 的幂等设计兜底,而非依赖事务回滚。
@@ -459,7 +461,7 @@ ORDER BY question_id;
 
 - 所有迁移行 `content_schema_version = 1`
 - 正常题目 `needs_review = 0`
-- 脏答案题目 `needs_review = 1`
+- 任一内容字段转换异常或答案无法结构化的题目 `needs_review = 1`
 - `content` 是以 `{"type":"doc"...}` 开头的 JSON
 - `answer` 是包含 `kind` 的 AnswerSpec JSON
 - 选择题答案引用 `options[].id`，不再引用 `A/B`
