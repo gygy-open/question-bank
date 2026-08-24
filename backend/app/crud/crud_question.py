@@ -1,15 +1,21 @@
 from typing import List, Optional, Union, Dict, Any
 from datetime import datetime
-from fastapi.encoders import jsonable_encoder
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func, or_
 from sqlalchemy.orm import selectinload
 from app.crud.base import CRUDBase
-from app.models.question import Question
+from app.models.question import Question, QuestionType
 from app.models.tag import Tag
 from app.schemas.question import QuestionCreate, QuestionUpdate
 from app.crud.crud_knowledge_point import knowledge_point as knowledge_point_crud
 from app.services.activity_logger import log_activity
+from app.services.question_content import (
+    normalize_options,
+    parse_json_field,
+    serialize_write_fields,
+    to_db_json,
+    validate_question_domain,
+)
 
 from app.models.knowledge_point import KnowledgePoint
 from app.models.import_task import ImportTask
@@ -291,7 +297,10 @@ class CRUDQuestion(CRUDBase[Question, QuestionCreate, QuestionUpdate]):
         # The caller is responsible for setting the correct parent_id after the parent is created.
         if isinstance(obj_in_data.get("parent_id"), str):
             obj_in_data["parent_id"] = None
-        
+
+        # Centralized v2 JSON boundary: rich-text / answer -> JSON strings; options stays native JSON.
+        obj_in_data = serialize_write_fields(obj_in_data)
+
         db_obj = Question(**obj_in_data)
         if user_id:
             db_obj.created_by = user_id
@@ -351,13 +360,40 @@ class CRUDQuestion(CRUDBase[Question, QuestionCreate, QuestionUpdate]):
             
         tag_ids = update_data.pop("tag_ids", None)
         knowledge_point_ids = update_data.pop("knowledge_point_ids", None)
-        
-        # Update standard fields
-        obj_data = jsonable_encoder(db_obj)
-        for field in obj_data:
+
+        # Merge v2 content state (current DB row + overlay), then run full domain validation
+        # before persisting. This is the authoritative net for partial updates.
+        merged_q_type = update_data.get("q_type", db_obj.q_type)
+        if isinstance(merged_q_type, str):
+            merged_q_type = QuestionType(merged_q_type)
+
+        merged_content = update_data["content"] if "content" in update_data else parse_json_field(db_obj.content)
+        merged_answer = update_data["answer"] if "answer" in update_data else parse_json_field(db_obj.answer)
+        merged_options = update_data["options"] if "options" in update_data else db_obj.options
+        merged_options = normalize_options(merged_q_type, merged_options)
+
+        if merged_answer and merged_answer.get("kind") == "legacy_unresolved":
+            raise ValueError("legacy_unresolved 只读,不允许写入")
+
+        validate_question_domain(
+            q_type=merged_q_type,
+            content=merged_content,
+            options=merged_options,
+            answer=merged_answer,
+            partial=False,
+        )
+
+        db_obj.content = to_db_json(merged_content)
+        db_obj.answer = to_db_json(merged_answer)
+        db_obj.options = merged_options
+        db_obj.q_type = merged_q_type
+        for field in ("thinking", "analysis", "summary"):
+            if field in update_data:
+                setattr(db_obj, field, to_db_json(update_data[field]))
+        for field in ("status", "difficulty", "source", "subject_id", "parent_id"):
             if field in update_data:
                 setattr(db_obj, field, update_data[field])
-                
+
         if user_id:
             db_obj.updated_by = user_id
             

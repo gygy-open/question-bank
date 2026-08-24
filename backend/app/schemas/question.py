@@ -1,8 +1,13 @@
-from pydantic import BaseModel, field_validator, model_validator
-from typing import Optional, List, Any, Dict
-import json
+from pydantic import BaseModel, BeforeValidator, Field, field_validator, model_validator
+from typing import Optional, List, Any, Dict, Literal, Annotated, Union
 from datetime import datetime
 from app.models.question import QuestionType, QuestionStatus
+from app.services.question_content import (
+    normalize_options,
+    parse_json_field,
+    validate_question_domain,
+    validate_rich_doc,
+)
 from .tag import Tag
 from .knowledge_point import KnowledgePoint
 from .user import User
@@ -10,41 +15,150 @@ from .activity_log import ActivityLog
 from .subject import Subject
 from .import_task import ImportTask
 
+
+# --------------------------------------------------------------------------- #
+# RichDoc:统一富文本原子。ORM 存 JSON 字符串 / API 传对象;before 校验统一解析并校验根节点。
+# --------------------------------------------------------------------------- #
+def _coerce_rich_doc(v: Any) -> Any:
+    return validate_rich_doc(parse_json_field(v))
+
+
+RichDoc = Annotated[Optional[Dict[str, Any]], BeforeValidator(_coerce_rich_doc)]
+
+
+# --------------------------------------------------------------------------- #
+# Option
+# --------------------------------------------------------------------------- #
+class Option(BaseModel):
+    id: str
+    label: str
+    content: RichDoc = None
+
+    @field_validator("id")
+    @classmethod
+    def _id_non_empty(cls, v: str) -> str:
+        if not v or not v.strip():
+            raise ValueError("option id 不能为空")
+        return v
+
+
+# --------------------------------------------------------------------------- #
+# AnswerSpec 判别联合(见 PRD §6)
+# --------------------------------------------------------------------------- #
+class SingleChoiceAnswer(BaseModel):
+    kind: Literal["single_choice"]
+    correct: str
+
+    @field_validator("correct")
+    @classmethod
+    def _non_empty(cls, v: str) -> str:
+        if not v or not v.strip():
+            raise ValueError("single_choice correct 不能为空")
+        return v
+
+
+class MultipleChoiceAnswer(BaseModel):
+    kind: Literal["multiple_choice"]
+    correct: List[str]
+    grading: Optional[Literal["all_or_nothing", "partial"]] = None
+
+
+class TrueFalseAnswer(BaseModel):
+    kind: Literal["true_false"]
+    correct: bool
+
+
+class Blank(BaseModel):
+    id: str
+    accept: List[RichDoc]
+    match: Optional[Literal["exact", "ignore_space", "ignore_case", "numeric"]] = None
+
+    @field_validator("id")
+    @classmethod
+    def _id_non_empty(cls, v: str) -> str:
+        if not v or not v.strip():
+            raise ValueError("blank id 不能为空")
+        return v
+
+    @field_validator("accept")
+    @classmethod
+    def _accept_non_empty(cls, v: List[Any]) -> List[Any]:
+        if not v or any(item is None for item in v):
+            raise ValueError("blank accept 必须是非空的 RichDoc 列表")
+        return v
+
+
+class FillBlankAnswer(BaseModel):
+    kind: Literal["fill_in_the_blank"]
+    blanks: List[Blank]
+
+    @field_validator("blanks")
+    @classmethod
+    def _blanks_non_empty(cls, v: List[Blank]) -> List[Blank]:
+        if not v:
+            raise ValueError("fill_in_the_blank blanks 不能为空")
+        return v
+
+
+class FreeResponseAnswer(BaseModel):
+    kind: Literal["free_response"]
+    reference: RichDoc = None
+
+
+class LegacyUnresolvedAnswer(BaseModel):
+    kind: Literal["legacy_unresolved"]
+    expected_kind: QuestionType
+    raw: RichDoc = None
+
+
+# 读 union(API 响应可读取 legacy_unresolved);写请求另行拒绝 legacy。
+AnswerSpec = Annotated[
+    Union[
+        SingleChoiceAnswer,
+        MultipleChoiceAnswer,
+        TrueFalseAnswer,
+        FillBlankAnswer,
+        FreeResponseAnswer,
+        LegacyUnresolvedAnswer,
+    ],
+    Field(discriminator="kind"),
+]
+
+
+def _answer_to_dict(answer: Any) -> Optional[Dict[str, Any]]:
+    return answer.model_dump() if answer is not None else None
+
+
+def _options_to_dicts(options: Any) -> Optional[List[Dict[str, Any]]]:
+    return [o.model_dump() for o in options] if options else None
+
+
+# --------------------------------------------------------------------------- #
+# Question schemas
+# --------------------------------------------------------------------------- #
 class QuestionBase(BaseModel):
-    content: str
-    options: Optional[List[Dict[str, Any]]] = None
-    answer: Optional[str] = None
-    thinking: Optional[str] = None
-    analysis: Optional[str] = None
-    summary: Optional[str] = None
+    content: RichDoc
+    options: Optional[List[Option]] = None
+    answer: Optional[AnswerSpec] = None
+    thinking: RichDoc = None
+    analysis: RichDoc = None
+    summary: RichDoc = None
     q_type: QuestionType
     status: QuestionStatus = QuestionStatus.PUBLISHED
     difficulty: int = 1
     source: Optional[str] = None
     parent_id: Optional[int] = None
 
-    @field_validator('options', mode='before')
+    @field_validator("answer", mode="before")
     @classmethod
-    def parse_options(cls, v: Any) -> Any:
-        if v is None:
-            return None
-        if isinstance(v, list):
-            new_options = []
-            for i, item in enumerate(v):
-                if isinstance(item, str):
-                    # Convert string "A. content" to dict
-                    parts = item.split(".", 1)
-                    if len(parts) == 2 and len(parts[0]) <= 3:
-                        label = parts[0].strip()
-                        content = parts[1].strip()
-                        new_options.append({"label": label, "content": content})
-                    else:
-                        label = chr(65 + i) if i < 26 else str(i+1)
-                        new_options.append({"label": label, "content": item})
-                else:
-                    new_options.append(item)
-            return new_options
-        return v
+    def _parse_answer(cls, v: Any) -> Any:
+        return parse_json_field(v)
+
+
+def _reject_legacy(answer: Any) -> None:
+    if isinstance(answer, LegacyUnresolvedAnswer):
+        raise ValueError("legacy_unresolved 只读,不允许出现在写请求中")
+
 
 class QuestionCreate(QuestionBase):
     knowledge_point_ids: List[int] = []
@@ -54,68 +168,67 @@ class QuestionCreate(QuestionBase):
     ai_suggested_tags: Optional[Dict[str, List[str]]] = None
     children: Optional[List['QuestionCreate']] = None
     temp_id: Optional[str] = None
-    
-    # Override parent_id to allow string UUIDs during creation/import
+
+    # parent_id 允许创建/导入期传入字符串 UUID(占位),CRUD 再落地为真实 id。
     parent_id: Optional[Any] = None
-    
+
     @model_validator(mode='after')
-    def validate_answer_format(self) -> 'QuestionCreate':
-        """Validate answer format for fill-in-the-blank questions on creation"""
-        if self.q_type == QuestionType.FILL_IN_THE_BLANK and self.answer:
-            try:
-                parsed = json.loads(self.answer)
-                if not isinstance(parsed, list):
-                    raise ValueError("Answer for fill-in-the-blank must be a JSON list")
-                # Optional: Validate inner structure List[List[str]]
-                for item in parsed:
-                    if not isinstance(item, list):
-                         # If it's not a list of lists, it might be a simple list of answers. 
-                         # We could enforce List[List[str]] but let's be lenient or just check it's a list.
-                         pass
-            except json.JSONDecodeError:
-                raise ValueError("Answer for fill-in-the-blank must be a valid JSON string")
+    def _validate_domain(self) -> 'QuestionCreate':
+        _reject_legacy(self.answer)
+        self.options = normalize_options(self.q_type, self.options)
+        validate_question_domain(
+            q_type=self.q_type,
+            content=self.content,
+            options=_options_to_dicts(self.options),
+            answer=_answer_to_dict(self.answer),
+            partial=False,
+        )
         return self
+
 
 class QuestionBatchCreate(BaseModel):
     filename: Optional[str] = None
     file_path: Optional[str] = None
     questions: List[QuestionCreate]
 
+
 class QuestionUpdate(QuestionBase):
-    content: Optional[str] = None
-    answer: Optional[str] = None
+    content: RichDoc = None
     q_type: Optional[QuestionType] = None
     status: Optional[QuestionStatus] = None
     knowledge_point_ids: Optional[List[int]] = None
     tag_ids: Optional[List[int]] = None
     subject_id: Optional[int] = None
-    
+
     @model_validator(mode='after')
-    def validate_answer_format(self) -> 'QuestionUpdate':
-        """Validate answer format for fill-in-the-blank questions on update"""
-        if self.q_type == QuestionType.FILL_IN_THE_BLANK and self.answer:
-            try:
-                parsed = json.loads(self.answer)
-                if not isinstance(parsed, list):
-                    raise ValueError("Answer for fill-in-the-blank must be a JSON list")
-                for item in parsed:
-                    if not isinstance(item, list):
-                         pass
-            except json.JSONDecodeError:
-                raise ValueError("Answer for fill-in-the-blank must be a valid JSON string")
+    def _validate_partial_domain(self) -> 'QuestionUpdate':
+        _reject_legacy(self.answer)
+        # 不改写 self.options(避免污染 model_fields_set / exclude_unset);
+        # 归一化只用于本次 partial 校验,真正落库的归一化由 CRUD 合并现状后执行。
+        options = normalize_options(self.q_type, self.options)
+        validate_question_domain(
+            q_type=self.q_type,
+            content=self.content,
+            options=_options_to_dicts(options),
+            answer=_answer_to_dict(self.answer),
+            partial=True,
+        )
         return self
+
 
 class QuestionReview(BaseModel):
     status: QuestionStatus
     comment: Optional[str] = None
 
+
 class QuestionSummary(QuestionBase):
     id: int
     created_at: datetime
     updated_at: datetime
-    
+
     class Config:
         from_attributes = True
+
 
 class Question(QuestionBase):
     id: int
@@ -125,7 +238,7 @@ class Question(QuestionBase):
     created_at: datetime
     updated_at: datetime
     tags: List[Tag] = []
-    
+
     review_count: int = 0
     creator: Optional[User] = None
     updater: Optional[User] = None
@@ -143,6 +256,7 @@ class Question(QuestionBase):
     class Config:
         from_attributes = True
 
+
 class QuestionPage(BaseModel):
     items: List[Question]
     total: int
@@ -150,15 +264,57 @@ class QuestionPage(BaseModel):
     size: int
     pages: int
 
+
 class QuestionBatchConfirm(BaseModel):
     question_ids: List[int]
     action: str # "approve" or "reject"
 
+
 class QuestionBatchDelete(BaseModel):
     ids: List[int]
+
 
 class QuestionBatchUpdate(BaseModel):
     ids: List[int]
     source: Optional[str] = None
 
+
 Question.model_rebuild()
+
+
+# --------------------------------------------------------------------------- #
+# Legacy 导入(智能导入工作台):旧字符串形态 payload,由后端 adapter 转 v2。
+# 严格 QuestionCreate 不接受旧格式;前端不复制 Python 解析规则。
+# --------------------------------------------------------------------------- #
+class LegacyQuestionCreate(BaseModel):
+    content: Optional[str] = None
+    q_type: QuestionType
+    options: Optional[List[Any]] = None
+    answer: Optional[Any] = None
+    thinking: Optional[str] = None
+    analysis: Optional[str] = None
+    summary: Optional[str] = None
+    difficulty: int = 1
+    knowledge_point_ids: List[int] = []
+    tag_ids: Optional[List[int]] = []
+    subject_id: Optional[int] = None
+    ai_suggested_tags: Optional[Dict[str, List[str]]] = None
+    status: QuestionStatus = QuestionStatus.PENDING
+    source: Optional[str] = None
+
+
+class LegacyQuestionBatchCreate(BaseModel):
+    filename: Optional[str] = None
+    file_path: Optional[str] = None
+    questions: List[LegacyQuestionCreate]
+
+
+class LegacyBatchError(BaseModel):
+    index: int
+    message: str
+
+
+class LegacyBatchResult(BaseModel):
+    import_task_id: Optional[int] = None
+    created: List[Question] = []
+    failed: List[LegacyBatchError] = []

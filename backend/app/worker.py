@@ -19,6 +19,10 @@ from app.schemas.question import QuestionCreate
 from app.services.doc_processor import doc_processor
 from app.services.embedding import reload_embedding_function
 from app.services.question_service import question_service
+from app.services.question_legacy_adapter import (
+    LegacyQuestionError,
+    adapt_legacy_question,
+)
 
 logging.basicConfig(
     level=logging.INFO,
@@ -67,6 +71,7 @@ async def process_task(db: AsyncSession, task: ImportTask):
             # Save questions
             questions_data = result.get("questions", [])
             saved_count = 0
+            failed_count = 0
             
             creator_id = task.user_id
             
@@ -83,51 +88,25 @@ async def process_task(db: AsyncSession, task: ImportTask):
                     q_type = QuestionType.FILL_IN_THE_BLANK
                 elif "free" in q_type_str or "response" in q_type_str or "essay" in q_type_str or "解答" in q_type_str or "short" in q_type_str: 
                     q_type = QuestionType.FREE_RESPONSE
-                
-                # Handle answer format
-                answer_val = q_data.get("answer")
-                if q_type == QuestionType.FILL_IN_THE_BLANK:
-                    # Ensure answer is JSON string of List[List[str]]
-                    if isinstance(answer_val, list):
-                        # If it's a flat list [ans1, ans2], convert to [[ans1], [ans2]]
-                        # If it's already [[ans1], [ans2]], keep it
-                        # If it's [ans1, [ans2]], normalize
-                        normalized_ans = []
-                        for item in answer_val:
-                            if isinstance(item, list):
-                                normalized_ans.append([str(i) for i in item])
-                            else:
-                                normalized_ans.append([str(item)])
-                        answer_val = json.dumps(normalized_ans, ensure_ascii=False)
-                    elif isinstance(answer_val, str):
-                        # If it's a string, try to parse it or wrap it
-                        try:
-                            parsed = json.loads(answer_val)
-                            if isinstance(parsed, list):
-                                # Normalize structure to List[List[str]]
-                                normalized_ans = []
-                                for item in parsed:
-                                    if isinstance(item, list):
-                                        normalized_ans.append([str(i) for i in item])
-                                    else:
-                                        normalized_ans.append([str(item)])
-                                answer_val = json.dumps(normalized_ans, ensure_ascii=False)
-                            else:
-                                # Parsed but not a list (e.g. number, quoted string, boolean, dict)
-                                # Treat as single blank content
-                                answer_val = json.dumps([[str(parsed)]], ensure_ascii=False)
-                        except:
-                            # Treat as single blank
-                            answer_val = json.dumps([[answer_val]], ensure_ascii=False)
-                    elif answer_val is not None:
-                        # Handle other types (int, float, dict, etc.) by wrapping them
-                        answer_val = json.dumps([[str(answer_val)]], ensure_ascii=False)
-                else:
-                    # For other types, ensure it's a string
-                    if isinstance(answer_val, (list, dict)):
-                        answer_val = json.dumps(answer_val, ensure_ascii=False)
-                    elif answer_val is not None:
-                        answer_val = str(answer_val)
+
+                # Legacy(旧字符串)→ 严格 v2 字段。无法解析的答案在此处直接失败,
+                # 不静默写入 legacy_unresolved。
+                try:
+                    v2_fields = adapt_legacy_question(
+                        q_type=q_type,
+                        content=q_data.get("content"),
+                        options=q_data.get("options"),
+                        answer=q_data.get("answer"),
+                        thinking=q_data.get("thinking"),
+                        analysis=q_data.get("analysis"),
+                        summary=q_data.get("summary"),
+                    )
+                except LegacyQuestionError as adapt_err:
+                    failed_count += 1
+                    logger.warning(
+                        f"Task {task.id}: skip un-adaptable legacy question: {adapt_err}"
+                    )
+                    continue
 
                 # Prepare AI suggested tags
                 ai_suggested_tags = {}
@@ -146,12 +125,12 @@ async def process_task(db: AsyncSession, task: ImportTask):
 
                 # Create Question Schema
                 question_in = QuestionCreate(
-                    content=q_data.get("content"),
-                    options=q_data.get("options"),
-                    answer=answer_val,
-                    thinking=q_data.get("thinking"),
-                    analysis=q_data.get("analysis"),
-                    summary=q_data.get("summary"),
+                    content=v2_fields["content"],
+                    options=v2_fields["options"],
+                    answer=v2_fields["answer"],
+                    thinking=v2_fields["thinking"],
+                    analysis=v2_fields["analysis"],
+                    summary=v2_fields["summary"],
                     q_type=q_type,
                     status=QuestionStatus.PENDING,
                     difficulty=q_data.get("difficulty", 1),
@@ -170,9 +149,14 @@ async def process_task(db: AsyncSession, task: ImportTask):
 
                 saved_count += 1
             
-            task.result_summary = json.dumps({"count": saved_count, "proc_task_id": result.get("task_id")})
+            task.result_summary = json.dumps(
+                {"count": saved_count, "failed": failed_count, "proc_task_id": result.get("task_id")}
+            )
             task.status = ImportTaskStatus.COMPLETED
-            logger.info(f"Task {task.id} completed. Saved {saved_count} questions.")
+            logger.info(
+                f"Task {task.id} completed. Saved {saved_count} questions, "
+                f"{failed_count} skipped (un-adaptable)."
+            )
         else:
             task.status = ImportTaskStatus.FAILED
             task.error_message = "No result from processor"

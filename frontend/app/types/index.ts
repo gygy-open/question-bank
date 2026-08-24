@@ -1,3 +1,31 @@
+export type {
+  RichDoc,
+  RichDocNode,
+  RichNode,
+  RichMark,
+} from './richContent'
+export type {
+  QuestionType,
+  QuestionStatus,
+  OptionSpec,
+  AnswerSpec,
+  SingleChoiceAnswer,
+  MultipleChoiceAnswer,
+  TrueFalseAnswer,
+  FillBlankAnswer,
+  FreeResponseAnswer,
+  LegacyUnresolvedAnswer,
+  Blank,
+} from './question'
+
+import type { RichDoc } from './richContent'
+import type {
+  QuestionType,
+  QuestionStatus,
+  OptionSpec,
+  AnswerSpec,
+} from './question'
+
 export interface Subject {
   id: number
   name: string
@@ -124,14 +152,14 @@ export interface ImportTask {
 
 export interface Question {
   id: number
-  content: string
-  options?: any[]
-  answer: string
-  thinking?: string
-  analysis?: string
-  summary?: string
-  q_type: string
-  status: 'draft' | 'pending' | 'published' | 'archived'
+  content: RichDoc
+  options?: OptionSpec[] | null
+  answer?: AnswerSpec | null
+  thinking?: RichDoc
+  analysis?: RichDoc
+  summary?: RichDoc
+  q_type: QuestionType
+  status: QuestionStatus
   difficulty: number
   knowledge_points: KnowledgePoint[]
   tags: Tag[]
@@ -151,11 +179,13 @@ export interface Question {
   children?: Question[]
 }
 
+// 导入工作台条目：保持旧的 Markdown 字符串格式（题干/选项/答案均为字符串），
+// 由旧 TiptapEditor/MarkdownPreview 服务，落库前才转换为 v2 RichDoc。
 export interface ImportItem {
   id: string
   selected: boolean
   content: string
-  q_type: 'single_choice' | 'multiple_choice' | 'true_false' | 'fill_in_the_blank' | 'free_response'
+  q_type: QuestionType
   options: { label: string, content: string }[]
   answer: string
   thinking?: string
@@ -177,14 +207,14 @@ export interface QuestionPage {
 
 export interface QuestionBrief {
   id: number
-  content: string
-  q_type: string
+  content: RichDoc
+  q_type: QuestionType
   difficulty: number
-  options?: { label: string; content: string }[] | null
-  answer?: string | null
-  thinking?: string | null
-  analysis?: string | null
-  summary?: string | null
+  options?: OptionSpec[] | null
+  answer?: AnswerSpec | null
+  thinking?: RichDoc
+  analysis?: RichDoc
+  summary?: RichDoc
 }
 
 export interface PaperItem {

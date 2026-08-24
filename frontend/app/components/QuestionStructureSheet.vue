@@ -11,7 +11,7 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { BookOpen } from '@lucide/vue'
 import type { Question } from '@/types'
-import MarkdownPreview from './MarkdownPreview.vue'
+import RichContent from './rich-editor/RichContent.vue'
 
 const props = defineProps<{
   open: boolean
@@ -83,7 +83,7 @@ const isOpen = computed({
                 查看此题
               </Button>
             </div>
-            <MarkdownPreview :content="question.parent.content" class="text-sm opacity-80" />
+            <RichContent :content="question.parent.content" class="text-sm opacity-80" />
           </div>
         </div>
 
@@ -99,7 +99,7 @@ const isOpen = computed({
               <Badge variant="default">当前题目</Badge>
               <span class="text-sm text-muted-foreground">ID: {{ question.id }}</span>
             </div>
-            <MarkdownPreview :content="question.content" class="text-sm" />
+            <RichContent :content="question.content" class="text-sm" />
             
             <!-- Knowledge Points -->
             <div v-if="question.knowledge_points?.length" class="mt-3 flex flex-wrap gap-2">
@@ -121,7 +121,7 @@ const isOpen = computed({
                 <div class="flex items-center gap-2 mb-2">
                   <span class="text-sm text-muted-foreground">ID: {{ child.id }}</span>
                 </div>
-                <MarkdownPreview :content="child.content" class="text-sm" />
+                <RichContent :content="child.content" class="text-sm" />
                 
                 <!-- Child Knowledge Points -->
                 <div v-if="child.knowledge_points?.length" class="mt-3 flex flex-wrap gap-2">

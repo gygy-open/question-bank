@@ -1,8 +1,18 @@
 # PRD:题目数据模型 v2(考试系统重构)
 
-> 状态:设计定稿 · 待实现
+> 状态:设计定稿 · 实施中(Phase 1)
 > 范围:题目**数据接口(逻辑契约)** + **RichDoc / Tiptap schema** + **MD→Tiptap 转换规格** + **物理存储与迁移**。
 > 不含:AI 导入、Paper 导出(后续独立 PRD;本期只保证数据结构可被它们消费)。
+
+## 0. 已确认决策(实施基线,优先级高于下文旧措辞)
+
+1. **版本编号**:`SCHEMA_VERSION = 1`(v2 内容的目标版本号)。**存量未迁移**行的 `content_schema_version = 0`。
+2. **迁移闸门**:只处理 `content_schema_version < 1` 的行;转换成功置 `1`;`downgrade()` 从归档表还原并把版本拨回 `0`。下文 §8/§10/§12 中出现的 "`version < 2`" / "置 `2`" / "拨回 `1`" 为旧草稿措辞,一律以本条 `< 1 / 1 / 0` 为准。
+3. **`legacy_unresolved` variant**:新增一个**只读、仅迁移期**产生的 `AnswerSpec` variant,承载无法解析的旧答案原文;正式的 `single_choice` / `multiple_choice` / `true_false` 的 `correct` 字段**保持非空**(不允许用空 `correct` 表达"未解析")。
+4. **API 字段名**:对外 API 继续沿用 `content` / `thinking` / `analysis` / `summary` 等既有名称(逻辑名 `stem` / `explanation.*` 仅用于文档),不改动前端契约字段名。
+5. **迁移实现**:MD→RichDoc 与答案转换统一用 **Python 转换器**(`app/services/question_content_v1.py`),Alembic data-migration 直接调用它,不再依赖前端一次性 Node 脚本。
+6. **`needs_review`**:仅存在于数据库列,用于人工复核筛选,**不进入 API 响应 / pydantic schema**。
+7. **AI / Paper**:本期只做**最小适配**保证可消费新结构,完整改造留后续 PRD。
 
 ## 1. 背景与目标
 
@@ -34,7 +44,7 @@ type RichDoc = { type: "doc"; content: Node[] } | null
 // 稳定标识(非展示序号),如 "opt_a1b2" / "blk_1"
 type Id = string
 
-// 顶层结构版本,便于未来再迁移
+// v2 内容的目标结构版本(存量未迁移行为 0,见 §0)
 const SCHEMA_VERSION = 1
 ```
 
@@ -94,6 +104,7 @@ type AnswerSpec =
   | TrueFalseAnswer
   | FillBlankAnswer
   | FreeResponseAnswer
+  | LegacyUnresolvedAnswer         // 只读、仅迁移期产生,见 §6.6
 ```
 
 ### 6.1 单选 single_choice
@@ -177,6 +188,20 @@ interface FreeResponseAnswer {
 }
 ```
 
+### 6.6 迁移兜底 legacy_unresolved(只读,仅迁移期)
+
+```ts
+interface LegacyUnresolvedAnswer {
+  kind: "legacy_unresolved"
+  expected_kind: QuestionType     // 迁移前预期题型
+  raw: RichDoc                    // 无法解析的旧答案原文(不丢弃)
+}
+```
+
+- **只读**:仅由存量迁移产生,前端不提供该 variant 的编辑分支;人工复核后应改成正式 variant。
+- 该行同时在数据库 `needs_review = 1`(§0.6:`needs_review` 不进 API,仅供后台筛选)。
+- 正式 choice/true_false 的 `correct` 永远非空;"未解析"只用这个 variant 表达,不用空 `correct`。
+
 ## 7. RichDoc / Tiptap Schema 白名单 + MD→Tiptap 映射
 
 MD→Tiptap 转换器的**目标节点集必须 = 编辑器/渲染器 schema**(`frontend/app/components/rich-editor/schemaExtensions.ts`),否则跑版丢内容。
@@ -213,7 +238,7 @@ MD→Tiptap 转换器的**目标节点集必须 = 编辑器/渲染器 schema**(`
 - 列表 / 加粗 / 斜体按标准 CommonMark 语义映射。
 - 降级项按 §7.2 处理。
 
-> 实现建议:存量迁移的 MD→Tiptap 用**前端自带管线**(复用 `tiptap-markdown` + 数学扩展)跑一次性 Node 脚本,保真度最高;桌面运行时不依赖它。运行时 Python 侧只需单向的 `to_plain_text` / `to_latex`(后续 PRD)。
+> 实现约束:存量迁移的 MD→Tiptap 使用 **Python 转换器**,由 Alembic data revision 直接调用,确保桌面无人值守迁移不依赖 Node.js。前端使用共享 fixtures 验证转换结果与 Tiptap schema 兼容。
 
 ## 8. 物理存储映射与模型改动
 
@@ -225,25 +250,50 @@ MD→Tiptap 转换器的**目标节点集必须 = 编辑器/渲染器 schema**(`
 | `options` | `options`(已 JSON) | 结构升级为 `{id,label,content:RichDoc}` |
 | `answer`(AnswerSpec) | `answer` | `TEXT` → `LONGTEXT`,**统一存判别联合 JSON**(取代旧 md 串 / `List[List[str]]`) |
 | `explanation.*` | `thinking` / `analysis` / `summary` | `TEXT` → `LONGTEXT`,各存 RichDoc JSON |
-| — | 新增 `content_schema_version SMALLINT NOT NULL DEFAULT 1` | 未来再迁移用 |
+| — | 新增 `content_schema_version SMALLINT NOT NULL DEFAULT 0` | 结构 revision 标记存量行未迁移;data revision 完成后将新行默认值改为 1 |
+| — | 新增 `needs_review BOOL NOT NULL DEFAULT 0` | 迁移无法解析行的人工复核标记(见 §10) |
 
 `Question` 主键 / 关系 / 父子(材料题)/ 元数据一律不动。
+
+### 8.1 原始数据保全:快照归档表(方案二,已定稿)
+
+本项目是**开源、有存量用户**,且以**桌面 App** 形态自动在用户本机 MySQL 上无人值守跑迁移(`run.py` 启动即 migrate),外部备份指望不上。因此迁移必须自带**库内后悔药**。
+
+**做法**:`questions` **原地升级**(不新建 `questions_v2`,避免拖动 tags / knowledge_points / papers / activity_log 多态 / self-ref 这整张 FK 关系图);迁移前先把 v1 原文**快照**进一张无 FK 的纯归档表 `questions_content_archive_v1`。
+
+归档表(迁移内联定义,**不进 ORM 模型**):
+
+| 列 | 类型 | 说明 |
+|---|---|---|
+| `question_id` | `INT` PK | = `questions.id`,**不加外键**(纯快照,避免级联/删除耦合) |
+| `content` / `answer` / `thinking` / `analysis` / `summary` | `LONGTEXT` | v1 原文快照 |
+| `options` | `JSON` | v1 原 options 快照 |
+| `archived_at` | `DATETIME` | 快照时间 |
+
+- 归档表不对外暴露:无端点、无 pydantic schema、`CRUDBase` 不感知,纯保险。
+- **不进 ORM / autogenerate**:`alembic/env.py` 用 `include_object` 精确忽略表名
+  `questions_content_archive_v1`(仅此一张,不宽泛忽略其它对象),否则 `alembic check`
+  会把它误报成"应 DROP"的漂移。
+- **可重放**:任何行事后发现转错,从归档表取原文重跑 MD→RichDoc 即可,不依赖外部备份。
+- **可清理**:观察期 + 抽样复核 `needs_review` 后,用独立 Alembic revision `DROP TABLE` 收尾,不留长期负担。
 
 ## 9. 向前兼容策略
 
 1. **新增题型**:只加 `AnswerSpec` 一个 `kind` variant + 前端一个编辑/渲染分支,存量行不受影响。
 2. **填空绑定双模式**:新内容用 `blank` 节点 `blankId` 精确绑定;旧内容按 `blanks[]` 下标顺序绑定 → 平滑升级。
 3. **稳定 id**:选项/空用 `id` 引用,允许改 `label`、乱序、洗牌。
-4. **legacy 兜底**:迁移期无法解析的旧数据(见 §10)原文进兜底字段并打 `needs_review` 标记,不丢弃。
+4. **legacy 兜底**:迁移期无法解析的旧数据(见 §10)原文进兜底字段并打 `needs_review` 标记,不丢弃;且**全部 v1 原文另存快照归档表 `questions_content_archive_v1`(§8.1),可随时重放转换**。
 5. **版本列**:`content_schema_version` 让下一次 schema 演进可定向迁移。
 
 ## 10. 存量迁移映射规则(v1 → v2)
+
+> 前置:转换**之前**先把每行 v1 原文快照入 `questions_content_archive_v1`(§8.1);转换以 `content_schema_version` 为幂等闸门(只处理 `version < 1` 的行),可安全重跑。
 
 - **stem / explanation / option.content**:`MD → RichDoc`(§7 转换器),直译。
 - **选择题 answer**(旧为自由 md 串,如 "A" / "答案:A,因为…"):
   - 抽取字母 → 映射到对应 `option.label` → 得 `option.id` → 填 `correct`;
   - 多余解释性文字 → 迁移进 `analysis`;
-  - **无法解析** → `correct` 置空 + 原文塞入 `analysis` + 打 `needs_review` 标记。
+  - **无法解析** → 写入 `legacy_unresolved`(包含预期题型与原答案 RichDoc),原文同时并入 `analysis`,打 `needs_review` 标记。
 - **多选**:解析 "ABD" / "A、B、D" → 多个 id 集合。
 - **判断**:识别 对/错/√/×/T/F → boolean。
 - **填空**(旧 `List[List[str]]`):按顺序生成 `blanks[i].id = blk_{i+1}`,每个 str → `accept[j]` 的 RichDoc;题干 `____` 保留(下标绑定)。
@@ -258,11 +308,21 @@ MD→Tiptap 转换器的**目标节点集必须 = 编辑器/渲染器 schema**(`
 
 ## 12. 实施顺序(建议,验证优先)
 
-1. 写 **MD→Tiptap 转换器**(前端管线),对生产数据副本 **dry-run**;`to_plain_text(convert(md))` 与原文去格式后文本等价,抽样人工比对渲染。
+1. 写 **MD→Tiptap Python 转换器**,并用前端共享 fixtures 做 Tiptap schema 契约测试;对生产数据副本 **dry-run**;`to_plain_text(convert(md))` 与原文去格式后文本等价,抽样人工比对渲染。转换器对同一 md 结果确定、迁移可重跑。
 2. 定 **pydantic schema**(§3–§6)与校验(§11)。
-3. 改 **模型**(§8:LONGTEXT + 版本列)并 `just make_migration` / `just migrate`。
-4. 写 **Alembic 数据迁移**(§10),迁移前全库备份、转换器可重跑。
+3. **Revision 1(结构)**:`just make_migration` 改列类型(LONGTEXT)+ 新增 `content_schema_version` / `needs_review`(§8)。revision `f1a2b3c4d5e6`,方言感知(MySQL `LONGTEXT` / SQLite `TEXT`),SQLite 走 batch 重建。
+4. **Revision 2(快照 + 数据转换,data-only,内联 `sa.table`)**— revision `a7b8c9d0e1f2`,down_revision `f1a2b3c4d5e6`,全程幂等、可重跑:
+
+  - a. `CREATE TABLE questions_content_archive_v1`(用 inspector 检测,已存在则跳过)。
+  - b. **分批**(`LIMIT 500`,以 `version < 1` 为滚动闸门)读待转换行;先把其中**尚未入归档表**的行快照进归档表(逐批 `NOT IN archive` 去重,而非一次性 `INSERT ... SELECT`,以便同批直接喂 Python 转换器且不重复归档)。
+  - c. 逐行调 `app/services/question_content_v1.py` 转换六个内容字段 + options 写回 `questions`(内容字段存 JSON **字符串**、`options` 存 JSON **对象**;全程 Core,JSON 参数在 SQLite/MySQL 一致),成功即置 `content_schema_version = 1`。
+  - d. 转换失败/无法解析的行:原文降级保留(§10)+ `needs_review = 1`,`version` **仍置 1**(避免重跑死循环)。选择/判断的 `legacy_unresolved` 用确定性 RichDoc 合并 helper `merge_legacy_answer_into_analysis` 把原答案原文**追加**进 `analysis`(不覆盖既有解析)。事后从归档表人工救。
+  - e. upgrade 末尾把 `content_schema_version` 的 server_default 从 0 改为 1(与 ORM `SCHEMA_VERSION=1` 对齐)。`downgrade()`:从归档表逐批还原**仍存在**的 `question_id` 的六个内容字段 + options,`version` 拨回 0、`needs_review` 清 0,server_default 改回 0;**归档表保留不 drop**(真可回滚,因原文还在)。
+
+  > MySQL DDL 非事务(隐式 commit),建表/回填/转换不是原子事务;靠上述 "inspector 建表跳过 + `version<1` + `NOT IN archive`" 的幂等设计兜底,而非依赖事务回滚。
+
 5. 前端切 `RichEditor` + `renderRichContentToHTML`,移除 Markdown 分支。
+6. **清理(独立 Revision,下一个发布版才合入)**:观察期 + 抽样复核 `needs_review` 后 `DROP TABLE questions_content_archive_v1`。
 
 ## 13. 后续 PRD(依赖本模型,本期不做)
 

@@ -22,7 +22,7 @@ definePageMeta({
             编辑器使用说明
           </CardTitle>
           <CardDescription>
-            本系统采用所见即所得的 Markdown 编辑器，支持丰富的文本格式和数学公式。
+            题库采用所见即所得的富文本编辑器，题目内容以结构化富文本存储；智能导入支持 Markdown 文档。
           </CardDescription>
         </CardHeader>
         <CardContent class="space-y-6">
@@ -158,7 +158,7 @@ definePageMeta({
 
                 <div class="mt-4 p-3 bg-blue-50 dark:bg-blue-950/30 rounded border border-blue-200 dark:border-blue-800">
                   <p class="text-xs text-blue-900 dark:text-blue-100">
-                    💡 <strong>提示：</strong> 公式在编辑器中会以 <code class="px-1 py-0.5 bg-white dark:bg-gray-900 rounded">$公式内容$</code> 的形式保存为 Markdown。
+                    💡 <strong>提示：</strong> 在编辑器中可直接输入 <code class="px-1 py-0.5 bg-white dark:bg-gray-900 rounded">$公式内容$</code> 快速插入公式，题目以富文本结构化存储。
                   </p>
                 </div>
               </div>
@@ -224,7 +224,7 @@ definePageMeta({
 
                 <div class="mt-2 p-3 bg-amber-50 dark:bg-amber-950/30 rounded border border-amber-200 dark:border-amber-800">
                   <p class="text-xs text-amber-900 dark:text-amber-100">
-                    ⚠️ <strong>注意：</strong> 图片会自动上传到服务器，上传后以 <code class="px-1 py-0.5 bg-white dark:bg-gray-900 rounded">![](url)</code> 的 Markdown 格式保存。
+                    ⚠️ <strong>注意：</strong> 图片会自动上传到服务器，并作为富文本图片节点嵌入题目内容。
                   </p>
                 </div>
               </div>

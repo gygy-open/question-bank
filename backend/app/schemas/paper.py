@@ -1,9 +1,11 @@
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, field_validator
 from typing import List, Optional, Any
 from enum import Enum
 from datetime import datetime
 
 from app.models.paper import PaperStatus
+from app.services.question_content import parse_json_field
+from app.schemas.question import AnswerSpec, Option, RichDoc
 
 class OutputFormat(str, Enum):
     DOCX = "docx"
@@ -59,14 +61,19 @@ class QuestionBrief(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: int
-    content: str
+    content: RichDoc = None
     q_type: str
     difficulty: int
-    options: Optional[Any] = None
-    answer: Optional[str] = None
-    thinking: Optional[str] = None
-    analysis: Optional[str] = None
-    summary: Optional[str] = None
+    options: Optional[List[Option]] = None
+    answer: Optional[AnswerSpec] = None
+    thinking: RichDoc = None
+    analysis: RichDoc = None
+    summary: RichDoc = None
+
+    @field_validator("answer", mode="before")
+    @classmethod
+    def _parse_answer(cls, v: Any) -> Any:
+        return parse_json_field(v)
 
 
 class PaperItemRead(BaseModel):

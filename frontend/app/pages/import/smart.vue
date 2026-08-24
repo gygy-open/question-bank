@@ -316,11 +316,13 @@ const handleImport = async () => {
 
     isImporting.value = true
     try {
+        // 智能导入是 legacy 路径：直接发送旧字符串字段，由后端 adapter 统一转 v2，
+        // 前端不复制后端答案解析/稳定 id 规则。
         const questions = selectedItems.map(item => ({
             content: item.content,
             q_type: item.q_type,
             options: (item.q_type === 'single_choice' || item.q_type === 'multiple_choice') ? item.options : [],
-            answer: (typeof item.answer === 'object' && item.answer !== null) ? JSON.stringify(item.answer) : item.answer,
+            answer: item.answer,
             thinking: item.thinking,
             analysis: item.analysis,
             difficulty: item.difficulty,
@@ -338,16 +340,23 @@ const handleImport = async () => {
             questions: questions
         }
 
-        const createdQuestions = await $api<any[]>('/questions/batch', {
+        const result = await $api<{
+            import_task_id: number | null
+            created: { import_task_id?: number }[]
+            failed: { index: number, message: string }[]
+        }>('/questions/batch-legacy', {
             method: 'POST',
             body: payload
         })
 
-        if (createdQuestions && createdQuestions.length > 0) {
-            importedTaskId.value = createdQuestions[0].import_task_id
-        }
+        importedTaskId.value = result.import_task_id
 
-        toast.success(`成功导入 ${selectedItems.length} 道题目`)
+        const createdCount = result.created.length
+        if (result.failed.length > 0) {
+            toast.warning(`${result.failed.length} 道题目无法解析已跳过，成功导入 ${createdCount} 道`)
+        } else {
+            toast.success(`成功导入 ${createdCount} 道题目`)
+        }
         step.value = 'success'
     } catch (e: any) {
         toast.error('导入失败', { description: e.message })

@@ -4,18 +4,26 @@ These run the real Alembic chain (not ``create_all``) so schema-level dialect
 problems and model/migration drift surface in CI. MySQL is covered separately
 in CI where a real server is available.
 """
+import json
 import os
 
 import pytest
+import sqlalchemy as sa
 from alembic import command
 from alembic.runtime.migration import MigrationContext
 from alembic.script import ScriptDirectory
 from sqlalchemy import create_engine
 
 from app.db.migrations import _alembic_config
+from app.services.question_content_v1 import rich_doc_to_plain_text
 
 # Set by the CI MySQL job to a real server; skipped locally when unset.
 MYSQL_TEST_URL = os.getenv("MYSQL_TEST_URL")
+
+# Revisions exercised by the data-migration tests below.
+STRUCTURE_REV = "f1a2b3c4d5e6"
+DATA_REV = "a7b8c9d0e1f2"
+ARCHIVE_TABLE = "questions_content_archive_v1"
 
 
 def _sqlite_urls(tmp_path):
@@ -54,3 +62,284 @@ def test_upgrade_head_on_mysql():
     # Only a real MySQL exposes dialect-specific failures (types, ALTER, charset)
     # that SQLite cannot emulate; drift is already covered on SQLite above.
     command.upgrade(_alembic_config(MYSQL_TEST_URL), "head")
+
+
+# --------------------------------------------------------------------------- #
+# Phase 3: content v1 -> v2 data migration (archive + convert + reversible)
+# --------------------------------------------------------------------------- #
+def _minimal_options(labels_contents):
+    return [{"label": lbl, "content": md} for lbl, md in labels_contents]
+
+
+# Core projection used to seed / read ``questions`` without importing the ORM.
+def _questions_seed_table():
+    return sa.table(
+        "questions",
+        sa.column("id", sa.Integer),
+        sa.column("content", sa.Text),
+        sa.column("options", sa.JSON),
+        sa.column("answer", sa.Text),
+        sa.column("thinking", sa.Text),
+        sa.column("analysis", sa.Text),
+        sa.column("summary", sa.Text),
+        sa.column("content_schema_version", sa.SmallInteger),
+        sa.column("needs_review", sa.Boolean),
+        sa.column("q_type", sa.String),
+        sa.column("status", sa.String),
+    )
+
+
+def _archive_read_table():
+    return sa.table(
+        ARCHIVE_TABLE,
+        sa.column("question_id", sa.Integer),
+        sa.column("content", sa.Text),
+        sa.column("options", sa.JSON),
+        sa.column("archived_at", sa.DateTime),
+    )
+
+
+# v1 fixtures spanning all five answer kinds plus one unresolved (dirty) choice.
+_FIXTURES = [
+    dict(
+        id=1,
+        q_type="single_choice",
+        content="选择题**题干**",
+        options=_minimal_options([("A", "alpha"), ("B", "beta")]),
+        answer="A",
+        thinking=None,
+        analysis=None,
+        summary=None,
+        expect_kind="single_choice",
+        expect_review=False,
+    ),
+    dict(
+        id=2,
+        q_type="single_choice",
+        content="无法解析的选择题",
+        options=_minimal_options([("A", "alpha"), ("B", "beta")]),
+        answer="见解析",  # no letter -> legacy_unresolved
+        thinking=None,
+        analysis="既有解析不可丢",
+        summary=None,
+        expect_kind="legacy_unresolved",
+        expect_review=True,
+    ),
+    dict(
+        id=3,
+        q_type="multiple_choice",
+        content="多选题",
+        options=_minimal_options([("A", "a"), ("B", "b"), ("C", "c")]),
+        answer="A、C",
+        thinking=None,
+        analysis=None,
+        summary=None,
+        expect_kind="multiple_choice",
+        expect_review=False,
+    ),
+    dict(
+        id=4,
+        q_type="true_false",
+        content="判断题",
+        options=None,
+        answer="对",
+        thinking=None,
+        analysis=None,
+        summary=None,
+        expect_kind="true_false",
+        expect_review=False,
+    ),
+    dict(
+        id=5,
+        q_type="fill_in_the_blank",
+        content="填空 ____ 和 ____",
+        options=None,
+        answer=json.dumps([["x"], ["y"]]),
+        thinking=None,
+        analysis=None,
+        summary=None,
+        expect_kind="fill_in_the_blank",
+        expect_review=False,
+    ),
+    dict(
+        id=6,
+        q_type="free_response",
+        content="解答题",
+        options=None,
+        answer="参考 **答案**",
+        thinking="思路",
+        analysis=None,
+        summary=None,
+        expect_kind="free_response",
+        expect_review=False,
+    ),
+]
+
+
+def _seed_v1_fixtures(sync_url):
+    """Insert v1 rows at the structure-revision state (version defaults to 0)."""
+    table = _questions_seed_table()
+    engine = create_engine(sync_url)
+    try:
+        with engine.begin() as conn:
+            conn.execute(
+                table.insert(),
+                [
+                    {
+                        "id": f["id"],
+                        "content": f["content"],
+                        "options": f["options"],
+                        "answer": f["answer"],
+                        "thinking": f["thinking"],
+                        "analysis": f["analysis"],
+                        "summary": f["summary"],
+                        "q_type": f["q_type"],
+                        "status": "published",
+                        # content_schema_version / needs_review rely on server_default.
+                    }
+                    for f in _FIXTURES
+                ],
+            )
+    finally:
+        engine.dispose()
+
+
+def _fetch_questions(sync_url):
+    table = _questions_seed_table()
+    engine = create_engine(sync_url)
+    try:
+        with engine.connect() as conn:
+            rows = conn.execute(
+                sa.select(table).order_by(table.c.id)
+            ).mappings().all()
+    finally:
+        engine.dispose()
+    return {r["id"]: dict(r) for r in rows}
+
+
+def _fetch_archive(sync_url):
+    table = _archive_read_table()
+    engine = create_engine(sync_url)
+    try:
+        with engine.connect() as conn:
+            rows = conn.execute(
+                sa.select(table).order_by(table.c.question_id)
+            ).mappings().all()
+    finally:
+        engine.dispose()
+    return {r["question_id"]: dict(r) for r in rows}
+
+
+def test_data_migration_converts_archives_and_flags(tmp_path):
+    async_url, sync_url = _sqlite_urls(tmp_path)
+    cfg = _alembic_config(async_url)
+
+    # Structure revision, then seed v1 rows (version=0), then the data revision.
+    command.upgrade(cfg, STRUCTURE_REV)
+    _seed_v1_fixtures(sync_url)
+    command.upgrade(cfg, DATA_REV)
+
+    questions = _fetch_questions(sync_url)
+    archive = _fetch_archive(sync_url)
+
+    # Archive holds an untouched v1 snapshot for every migrated row.
+    assert set(archive) == {f["id"] for f in _FIXTURES}
+    assert archive[1]["content"] == "选择题**题干**"
+    assert archive[1]["options"] == _minimal_options([("A", "alpha"), ("B", "beta")])
+
+    # Every processed row is version=1; answer kind + needs_review match expectations.
+    for f in _FIXTURES:
+        row = questions[f["id"]]
+        assert row["content_schema_version"] == 1
+        assert bool(row["needs_review"]) is f["expect_review"]
+        answer = json.loads(row["answer"])
+        assert answer["kind"] == f["expect_kind"]
+        # content is now v2 RichDoc JSON, not the original markdown.
+        assert json.loads(row["content"])["type"] == "doc"
+
+    # single_choice resolved to an option id present in the upgraded options.
+    q1 = questions[1]
+    opt_ids = {o["id"] for o in q1["options"]}
+    assert json.loads(q1["answer"])["correct"] in opt_ids
+
+    # Unresolved choice: original answer text merged into analysis, existing kept.
+    q2_analysis = rich_doc_to_plain_text(json.loads(questions[2]["analysis"]))
+    assert "既有解析不可丢" in q2_analysis
+    assert "见解析" in q2_analysis
+
+    # fill / free_response shapes.
+    assert json.loads(questions[5]["answer"])["blanks"][0]["id"] == "blk_1"
+    assert json.loads(questions[6]["answer"])["reference"]["type"] == "doc"
+
+
+def test_data_migration_rerun_is_idempotent(tmp_path):
+    async_url, sync_url = _sqlite_urls(tmp_path)
+    cfg = _alembic_config(async_url)
+
+    command.upgrade(cfg, STRUCTURE_REV)
+    _seed_v1_fixtures(sync_url)
+    command.upgrade(cfg, DATA_REV)
+
+    # Simulate an interrupted run (DDL implicit-commit / crash): one row is back
+    # at v0 while its archive snapshot already exists. Re-running upgrade() must
+    # not double-archive (PK) and must re-convert the row deterministically.
+    table = _questions_seed_table()
+    engine = create_engine(sync_url)
+    try:
+        with engine.begin() as conn:
+            conn.execute(
+                table.update().where(table.c.id == 1).values(
+                    content_schema_version=0,
+                    content="选择题**题干**",
+                    answer="A",
+                    options=_minimal_options([("A", "alpha"), ("B", "beta")]),
+                )
+            )
+    finally:
+        engine.dispose()
+
+    # Stamp back to structure rev and re-run the data revision upgrade().
+    command.stamp(cfg, STRUCTURE_REV)
+    command.upgrade(cfg, DATA_REV)
+
+    archive = _fetch_archive(sync_url)
+    questions = _fetch_questions(sync_url)
+    # No duplicate archive rows despite the re-run.
+    assert len(archive) == len(_FIXTURES)
+    assert questions[1]["content_schema_version"] == 1
+    assert json.loads(questions[1]["answer"])["kind"] == "single_choice"
+
+
+def test_data_migration_downgrade_restores_v1(tmp_path):
+    async_url, sync_url = _sqlite_urls(tmp_path)
+    cfg = _alembic_config(async_url)
+
+    command.upgrade(cfg, STRUCTURE_REV)
+    _seed_v1_fixtures(sync_url)
+    command.upgrade(cfg, DATA_REV)
+
+    # Roll the data revision back: original six fields + options restored from
+    # archive, version back to 0, needs_review cleared. Archive table is kept.
+    command.downgrade(cfg, STRUCTURE_REV)
+
+    questions = _fetch_questions(sync_url)
+    for f in _FIXTURES:
+        row = questions[f["id"]]
+        assert row["content"] == f["content"]
+        assert row["options"] == f["options"]
+        assert row["answer"] == f["answer"]
+        assert row["analysis"] == f["analysis"]
+        assert row["content_schema_version"] == 0
+        assert bool(row["needs_review"]) is False
+
+    engine = create_engine(sync_url)
+    try:
+        insp = sa.inspect(engine)
+        assert ARCHIVE_TABLE in insp.get_table_names()
+    finally:
+        engine.dispose()
+
+    # Re-upgrade must convert cleanly again from the restored v1 state.
+    command.upgrade(cfg, DATA_REV)
+    questions = _fetch_questions(sync_url)
+    assert all(questions[f["id"]]["content_schema_version"] == 1 for f in _FIXTURES)

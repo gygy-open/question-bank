@@ -10,6 +10,10 @@ from pathlib import Path
 from jinja2 import Environment, FileSystemLoader
 from app.models.question import Question, QuestionType
 from app.schemas.paper import OutputFormat, ContentPosition
+from app.services.question_render import (
+    answer_spec_to_markdown,
+    rich_doc_to_markdown,
+)
 from app.core.config import settings
 
 logger = logging.getLogger(__name__)
@@ -63,30 +67,17 @@ class PaperGenerator:
         return re.sub(r'!\[(.*?)\]\((.*?)\)', replace_match, text)
 
     def _format_answer(self, q: Question) -> str:
-        """Format answer based on question type"""
-        answer = q.answer
-        if not answer:
-            return ""
-            
-        q_type = q.q_type
-        if hasattr(q_type, "value"): 
-            q_type = q_type.value
-        
-        if q_type == QuestionType.FILL_IN_THE_BLANK.value:
-            try:
-                ans_obj = json.loads(answer)
-                if isinstance(ans_obj, list):
-                    parts = []
-                    for item in ans_obj:
-                        if isinstance(item, list):
-                            parts.append(" 或 ".join(str(x) for x in item))
-                        else:
-                            parts.append(str(item))
-                    return "；".join(parts)
-            except:
-                pass
-                
-        return answer
+        """Format DB AnswerSpec (JSON) into human-readable Markdown."""
+        return answer_spec_to_markdown(q.answer, q.options)
+
+    def _option_text(self, opt: Dict[str, Any]) -> str:
+        """Render an option's content: v2 RichDoc -> Markdown, with legacy fallback."""
+        raw = opt.get('content')
+        if isinstance(raw, (dict, str)) and raw:
+            text = rich_doc_to_markdown(raw)
+            if text:
+                return text
+        return str(opt.get('text', '') or "")
 
     def _md_to_latex(self, text: str, image_handler: Optional[Callable[[Path], str]] = None) -> str:
         """Convert markdown text to latex fragment"""
@@ -132,12 +123,12 @@ class PaperGenerator:
             if hasattr(q_type, "value"):
                 q_type = q_type.value
             q_data: Dict[str, Any] = {
-                "content_tex": self._md_to_latex(q.content, image_handler),
+                "content_tex": self._md_to_latex(rich_doc_to_markdown(q.content), image_handler),
                 "options_tex": [],
                 "answer_tex": self._md_to_latex(self._format_answer(q), image_handler) if (include_details and include_answer) else "",
-                "thinking_tex": self._md_to_latex(q.thinking, image_handler) if (include_details and include_analysis) else "",
-                "analysis_tex": self._md_to_latex(q.analysis, image_handler) if (include_details and include_explanation) else "",
-                "summary_tex": self._md_to_latex(q.summary, image_handler) if (include_details and include_summary) else "",
+                "thinking_tex": self._md_to_latex(rich_doc_to_markdown(q.thinking), image_handler) if (include_details and include_analysis) else "",
+                "analysis_tex": self._md_to_latex(rich_doc_to_markdown(q.analysis), image_handler) if (include_details and include_explanation) else "",
+                "summary_tex": self._md_to_latex(rich_doc_to_markdown(q.summary), image_handler) if (include_details and include_summary) else "",
                 "source_tex": self._md_to_latex(q.source, image_handler) if (include_details and include_source) else "",
                 "reserve_space": q_type == QuestionType.FREE_RESPONSE.value,
             }
@@ -150,10 +141,15 @@ class PaperGenerator:
                         pass
                 if isinstance(opts, list):
                     for opt in opts:
-                        # Try 'content' first (frontend uses this), then 'text' (legacy/import), then string
-                        text = ""
+                        # v2 option content 是 RichDoc；兼容 legacy 的 'text'/纯字符串。
                         if isinstance(opt, dict):
-                            text = opt.get('content') or opt.get('text', '')
+                            raw = opt.get('content')
+                            if isinstance(raw, (dict, str)):
+                                text = rich_doc_to_markdown(raw) if raw else ""
+                            else:
+                                text = ""
+                            if not text:
+                                text = str(opt.get('text', '') or "")
                         else:
                             text = str(opt)
                         q_data["options_tex"].append(self._md_to_latex(text, image_handler))
@@ -199,13 +195,13 @@ class PaperGenerator:
             md_lines.append(f"**【答案】** {self._process_images(formatted_answer)}")
             md_lines.append("")
         if include_analysis and q.thinking:
-            md_lines.append(f"**【分析】** {self._process_images(q.thinking)}")
+            md_lines.append(f"**【分析】** {self._process_images(rich_doc_to_markdown(q.thinking))}")
             md_lines.append("")
         if include_explanation and q.analysis:
-            md_lines.append(f"**【解析】** {self._process_images(q.analysis)}")
+            md_lines.append(f"**【解析】** {self._process_images(rich_doc_to_markdown(q.analysis))}")
             md_lines.append("")
         if include_summary and q.summary:
-            md_lines.append(f"**【总结】** {self._process_images(q.summary)}")
+            md_lines.append(f"**【总结】** {self._process_images(rich_doc_to_markdown(q.summary))}")
             md_lines.append("")
         if include_source and q.source:
             md_lines.append(f"**【来源】** {self._process_images(q.source)}")
@@ -228,7 +224,7 @@ class PaperGenerator:
                 md_lines.append("")
             for q in section["questions"]:
                 # Use bold number instead of list to avoid indentation issues
-                md_lines.append(f"**{question_number}.** {self._process_images(q.content)}")
+                md_lines.append(f"**{question_number}.** {self._process_images(rich_doc_to_markdown(q.content))}")
                 md_lines.append("")
                 question_number += 1
 
@@ -244,16 +240,14 @@ class PaperGenerator:
                         if opts and isinstance(opts[0], dict) and "label" in opts[0]:
                             for o in opts:
                                 label = o.get('label', '')
-                                text = o.get('content') or o.get('text', '')
+                                text = self._option_text(o)
                                 # Escape dot to prevent list conversion, use double space for line break
                                 md_lines.append(f"{label}\\. {self._process_images(text)}  ")
                         else:
                             for idx, opt in enumerate(opts):
                                 label = chr(65 + idx)  # A, B, C...
-                                text = opt
-                                if isinstance(opt, dict):
-                                    text = opt.get('content') or opt.get('text', '')
-                                md_lines.append(f"{label}\\. {self._process_images(str(text))}  ")
+                                text = self._option_text(opt) if isinstance(opt, dict) else str(opt)
+                                md_lines.append(f"{label}\\. {self._process_images(text)}  ")
                         md_lines.append("")  # Blank line after options
 
                 # Add details after question if position is AFTER_QUESTION

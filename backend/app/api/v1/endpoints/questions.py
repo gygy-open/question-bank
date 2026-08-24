@@ -8,6 +8,7 @@ from app.api import deps
 from app.models.question import QuestionType, Question, QuestionStatus
 from app.models.import_task import ImportTask, ImportTaskStatus
 from app.services.question_service import question_service
+from app.services.question_legacy_adapter import LegacyQuestionError, adapt_legacy_question
 from app.services.activity_logger import log_activity
 
 router = APIRouter()
@@ -164,6 +165,87 @@ async def create_questions_batch(
         created_questions.append(question)
         
     return created_questions
+
+@router.post("/batch-legacy", response_model=schemas.LegacyBatchResult)
+async def create_questions_batch_legacy(
+    *,
+    db: deps.SessionDep,
+    batch_in: schemas.LegacyQuestionBatchCreate,
+    current_user: models.User = Depends(deps.get_current_active_user),
+) -> Any:
+    """智能导入工作台专用:接收旧字符串形态题目,后端统一经 adapter 转严格 v2 后落库。
+
+    严格 QuestionCreate 不接受旧格式;前端不复制 Python 解析规则。无法解析的答案不静默
+    写入 legacy_unresolved,而是按条上报到 failed。
+    """
+    if not batch_in.questions:
+        return schemas.LegacyBatchResult()
+
+    import_task = ImportTask(
+        user_id=current_user.id,
+        description=batch_in.filename or f"Batch import of {len(batch_in.questions)} questions",
+        source="smart_import",
+        file_path=batch_in.file_path or "virtual",
+        original_filename=batch_in.filename or "smart_import.json",
+        file_type="json",
+        status=ImportTaskStatus.COMPLETED,
+    )
+    db.add(import_task)
+    await db.commit()
+    await db.refresh(import_task)
+
+    created: List[models.Question] = []
+    failed: List[schemas.LegacyBatchError] = []
+
+    for index, item in enumerate(batch_in.questions):
+        try:
+            v2_fields = adapt_legacy_question(
+                q_type=item.q_type,
+                content=item.content,
+                options=item.options,
+                answer=item.answer,
+                thinking=item.thinking,
+                analysis=item.analysis,
+                summary=item.summary,
+            )
+        except LegacyQuestionError as adapt_err:
+            failed.append(schemas.LegacyBatchError(index=index, message=str(adapt_err)))
+            continue
+
+        subject_id = item.subject_id or current_user.last_active_subject_id or current_user.subject_id
+        question_in = schemas.QuestionCreate(
+            content=v2_fields["content"],
+            options=v2_fields["options"],
+            answer=v2_fields["answer"],
+            thinking=v2_fields["thinking"],
+            analysis=v2_fields["analysis"],
+            summary=v2_fields["summary"],
+            q_type=item.q_type,
+            status=item.status,
+            difficulty=item.difficulty,
+            subject_id=subject_id,
+            knowledge_point_ids=item.knowledge_point_ids,
+            tag_ids=item.tag_ids or [],
+            ai_suggested_tags=item.ai_suggested_tags,
+            source=item.source or batch_in.filename,
+        )
+        try:
+            question = await question_service.create_question(
+                db=db,
+                question_in=question_in,
+                user_id=current_user.id,
+                import_task_id=import_task.id,
+            )
+        except ValueError as create_err:
+            failed.append(schemas.LegacyBatchError(index=index, message=str(create_err)))
+            continue
+        created.append(question)
+
+    return schemas.LegacyBatchResult(
+        import_task_id=import_task.id,
+        created=created,
+        failed=failed,
+    )
 
 @router.get("/{id}", response_model=schemas.Question)
 async def read_question(

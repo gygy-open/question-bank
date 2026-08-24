@@ -1,6 +1,7 @@
 <script setup lang="ts">
+import { computed } from 'vue'
 import type { Editor } from '@tiptap/vue-3'
-import { ImageIcon, List, ListOrdered, Undo2, Redo2, Sigma, SquareSigma } from '@lucide/vue'
+import { ImageIcon, List, ListOrdered, Undo2, Redo2, Sigma, SquareSigma, SquareDashed, Table as TableIcon } from '@lucide/vue'
 import { Button } from '@/components/ui/button'
 import { Separator } from '@/components/ui/separator'
 import {
@@ -12,10 +13,28 @@ import {
 import { getInlineFormatItems, type ToolbarItem } from './inlineFormatItems'
 import RichEditorAlignMenu from './RichEditorAlignMenu.vue'
 
-const props = defineProps<{ editor: Editor }>()
-const emit = defineEmits<{ image: []; math: [boolean] }>()
+const props = defineProps<{ editor: Editor; allowBlank?: boolean }>()
+const emit = defineEmits<{ image: []; math: [boolean]; blank: []; table: [] }>()
 
 const inlineItems = getInlineFormatItems(props.editor)
+
+const insertGroup = computed<ToolbarItem[]>(() => {
+    const items: ToolbarItem[] = [
+        {
+            label: '插入表格',
+            icon: TableIcon,
+            action: () => emit('table'),
+        },
+    ]
+    if (props.allowBlank) {
+        items.push({
+            label: '插入填空',
+            icon: SquareDashed,
+            action: () => emit('blank'),
+        })
+    }
+    return items
+})
 
 const groups: ToolbarItem[][] = [
     inlineItems.slice(0, 3), // 加粗 斜体 下划线
@@ -96,6 +115,22 @@ const historyGroup: ToolbarItem[] = [
                     <TooltipContent>{{ item.label }}</TooltipContent>
                 </Tooltip>
             </template>
+
+            <Separator orientation="vertical" class="mx-1 h-6" />
+            <Tooltip v-for="item in insertGroup" :key="item.label">
+                <TooltipTrigger as-child>
+                    <Button
+                        type="button"
+                        size="icon"
+                        class="size-8"
+                        variant="ghost"
+                        @click="item.action"
+                    >
+                        <component :is="item.icon" class="size-4" />
+                    </Button>
+                </TooltipTrigger>
+                <TooltipContent>{{ item.label }}</TooltipContent>
+            </Tooltip>
 
             <div class="ml-auto flex items-center gap-0.5">
                 <Tooltip v-for="item in historyGroup" :key="item.label">

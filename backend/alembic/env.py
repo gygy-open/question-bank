@@ -1,6 +1,5 @@
 from logging.config import fileConfig
 
-from sqlalchemy import engine_from_config
 from sqlalchemy import pool
 from sqlalchemy.ext.asyncio import async_engine_from_config
 
@@ -10,17 +9,9 @@ import asyncio
 import sys
 import os
 sys.path.append(os.getcwd())
-from app.models import Base
-# Import all models to ensure they are loaded for autogenerate
-from app.models import (
-    User,
-    Subject,
-    KnowledgePoint,
-    Tag,
-    Question,
-    ActivityLog,
-    SystemSetting
-)
+
+import app.models  # noqa: F401, E402 - registers every model for autogenerate
+from app.models import Base  # noqa: E402
 from app.core.config import settings, get_db_url
 
 # this is the Alembic Config object, which provides
@@ -73,11 +64,21 @@ def run_migrations_offline() -> None:
         context.run_migrations()
 
 
+# 迁移内联建的无 FK 归档表,不进 ORM;autogenerate / command.check 必须忽略它,
+# 否则会误报 "应 DROP" 的漂移。仅精确匹配该表名,不宽泛忽略其它对象。
+_MIGRATION_ONLY_TABLES = {"questions_content_archive_v1"}
+
+
+def _include_object(object, name, type_, reflected, compare_to):
+    return not (type_ == "table" and name in _MIGRATION_ONLY_TABLES)
+
+
 def do_run_migrations(connection):
     context.configure(
         connection=connection, 
         target_metadata=target_metadata,
-        render_as_batch=True
+        render_as_batch=True,
+        include_object=_include_object,
     )
 
     with context.begin_transaction():

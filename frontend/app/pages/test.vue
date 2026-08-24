@@ -5,8 +5,9 @@ definePageMeta({
 
 import RichEditor from '~/components/rich-editor/RichEditor.vue';
 import { renderRichContentToHTML } from '~/components/rich-editor/renderRichContent';
+import type { RichDoc } from '@/types'
 
-const schema = ref('')
+const schema = ref<RichDoc>(null)
 </script>
 
 <template>

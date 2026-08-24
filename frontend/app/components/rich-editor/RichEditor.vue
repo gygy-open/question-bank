@@ -14,11 +14,17 @@ import { getSchemaExtensions } from './schemaExtensions'
 import { ResetFormatOnEnter } from './resetFormatExtension'
 import { createMathNodeView } from './mathFieldExtensions'
 import { MATH_EDITOR_KEY, type OpenMathEditorParams } from './mathEditorKey'
+import { isEmptyRichDoc } from './richDoc'
+import type { RichDoc } from '@/types'
 
-const model = defineModel<string>({ default: '' })
-const props = withDefaults(defineProps<{ placeholder?: string }>(), {
-    placeholder: '输入内容，或输入 “/” 唤起命令菜单…',
-})
+const model = defineModel<RichDoc>({ default: null })
+const props = withDefaults(
+    defineProps<{ placeholder?: string; allowBlank?: boolean }>(),
+    {
+        placeholder: '输入内容，或输入 “/” 唤起命令菜单…',
+        allowBlank: false,
+    },
+)
 
 const { uploadImage } = useImageUpload()
 const fileInputRef = ref<HTMLInputElement | null>(null)
@@ -117,8 +123,20 @@ function cancelMath() {
     }
 }
 
+function insertBlank() {
+    editor.value?.chain().focus().insertBlank().run()
+}
+
+function insertTable() {
+    editor.value
+        ?.chain()
+        .focus()
+        .insertTable({ rows: 2, cols: 2, withHeaderRow: true })
+        .run()
+}
+
 const editor = useEditor({
-    content: model.value ? JSON.parse(model.value) : '',
+    content: model.value ?? '',
     extensions: [
         ...getSchemaExtensions({ mathNodeView: createMathNodeView() }),
         ResetFormatOnEnter,
@@ -165,7 +183,8 @@ const editor = useEditor({
         },
     },
     onUpdate: ({ editor }) => {
-        model.value = JSON.stringify(editor.getJSON())
+        const doc = editor.getJSON() as RichDoc
+        model.value = isEmptyRichDoc(doc) ? null : doc
     },
 })
 
@@ -173,18 +192,22 @@ watch(model, (value) => {
     if (!editor.value) {
         return
     }
-    const isSame = JSON.stringify(editor.value.getJSON()) === value
-    if (isSame) {
+    const current = editor.value.getJSON() as RichDoc
+    // 空态互相等价（null 与“只有空段落”），不必重设
+    if (isEmptyRichDoc(value) && isEmptyRichDoc(current)) {
+        return
+    }
+    if (JSON.stringify(current) === JSON.stringify(value)) {
         return
     }
     // emitUpdate: false 防止触发 onUpdate 造成死循环
-    editor.value.commands.setContent(value ? JSON.parse(value) : '', { emitUpdate: false })
+    editor.value.commands.setContent(value ?? '', { emitUpdate: false })
 })
 </script>
 
 <template>
     <div class="rich-editor overflow-hidden rounded-md border border-border bg-background">
-        <RichEditorToolbar v-if="editor" :editor="editor" @image="triggerImagePicker" @math="openInsertMath" />
+        <RichEditorToolbar v-if="editor" :editor="editor" :allow-blank="allowBlank" @image="triggerImagePicker" @math="openInsertMath" @blank="insertBlank" @table="insertTable" />
 
         <div class="relative">
             <DragHandle v-if="editor" :editor="editor" class="rich-editor__drag-handle">

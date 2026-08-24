@@ -1,6 +1,15 @@
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue'
-import type { Question, KnowledgePoint, ImportItem, Tag, TagCategory } from '@/types'
+import type {
+  Question,
+  KnowledgePoint,
+  ImportItem,
+  Tag,
+  TagCategory,
+  Subject,
+  QuestionType,
+  OptionSpec,
+} from '@/types'
 import {
   Dialog,
   DialogScrollContent,
@@ -9,7 +18,7 @@ import {
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
 import { Input } from '@/components/ui/input'
-import { Plus, Trash2, Save, FileText, Loader2, Check, ChevronsUpDown, X } from '@lucide/vue'
+import { Plus, Trash2, Save, Loader2, Check, ChevronsUpDown, X } from '@lucide/vue'
 import {
   Select,
   SelectContent,
@@ -32,16 +41,32 @@ import {
 } from '@/components/ui/command'
 import { Badge } from '@/components/ui/badge'
 import { cn } from '@/lib/utils'
+import { toast } from 'vue-sonner'
 import KnowledgePointSelector from './KnowledgePointSelector.vue'
 import MarkdownPreview from './MarkdownPreview.vue'
 import TiptapEditor from './TiptapEditor.vue'
 import AnswerEditor from './AnswerEditor.vue'
+import AnswerDisplay from './AnswerDisplay.vue'
+import RichEditor from './rich-editor/RichEditor.vue'
+import RichContent from './rich-editor/RichContent.vue'
+import {
+  type QuestionDraft,
+  buildQuestionPayload,
+  createDefaultAnswer,
+  createDefaultOptions,
+  dbQuestionToDraft,
+  generateOptionId,
+  isChoiceType,
+  nextOptionLabel,
+  pruneAnswerOptionRef,
+  validateQuestionDraft,
+} from '@/lib/questionModel'
 
 interface Props {
   open: boolean
   question?: ImportItem | Question | Partial<Question> | null
   knowledgePoints?: KnowledgePoint[]
-  subjects?: any[]
+  subjects?: Subject[]
   mode?: 'import' | 'create' | 'edit'
   autoFillSubjectId?: number | null
 }
@@ -53,269 +78,220 @@ const props = withDefaults(defineProps<Props>(), {
 
 const emit = defineEmits<{
   (e: 'update:open', value: boolean): void
-  (e: 'success', data: any): void
+  (e: 'success', data: Question): void
   (e: 'save', question: ImportItem): void
 }>()
 
 const { $api } = useNuxtApp()
 
-const editingQuestion = ref<any>(null)
+const isImportMode = computed(() => props.mode === 'import')
+
+// 两套互斥的编辑态：import 走旧 Markdown 字符串 ImportItem；create/edit 走 v2 RichDoc 草稿。
+const importItem = ref<ImportItem | null>(null)
+const draft = ref<QuestionDraft | null>(null)
+
+const isSubmitting = ref(false)
+const openTagSelect = ref(false)
+
+const activeSubjectId = computed<number | undefined>(
+  () =>
+    draft.value?.subject_id
+    ?? importItem.value?.subject_id
+    ?? props.autoFillSubjectId
+    ?? undefined,
+)
+
 const { data: tags, refresh: refreshTags } = useAPI<Tag[]>('/tags', {
-  query: computed(() => ({
-    subject_id: editingQuestion.value?.subject_id || props.autoFillSubjectId || undefined
-  })),
+  query: computed(() => ({ subject_id: activeSubjectId.value || undefined })),
   immediate: false,
   watch: false,
 })
 const { data: tagCategories, refresh: refreshTagCategories } = useAPI<TagCategory[]>('/tag-categories', {
-  query: computed(() => ({
-    subject_id: editingQuestion.value?.subject_id || props.autoFillSubjectId || undefined
-  })),
+  query: computed(() => ({ subject_id: activeSubjectId.value || undefined })),
   immediate: false,
   watch: false,
 })
 
-// Only fetch once a real subject is available (never send an empty subject_id).
-watch(() => editingQuestion.value?.subject_id || props.autoFillSubjectId, (newId) => {
+watch(activeSubjectId, (newId) => {
   if (newId) {
     refreshTags()
     refreshTagCategories()
   }
 }, { immediate: true })
 
-const isSubmitting = ref(false)
-const openTagSelect = ref(false)
-
 const availableKnowledgePoints = computed(() => {
   if (!props.knowledgePoints) return []
-  if (editingQuestion.value?.subject_id) {
-    // Use loose comparison or conversion to handle string/number mismatch
-    return props.knowledgePoints.filter(kp => kp.subject_id == editingQuestion.value.subject_id)
+  if (activeSubjectId.value) {
+    return props.knowledgePoints.filter(kp => kp.subject_id == activeSubjectId.value)
   }
-  // If no subject selected, return all knowledge points (or maybe empty? Let's return all for flexibility in import mode)
-  // But usually we want to restrict. However, if the user hasn't picked a subject, showing nothing might be confusing.
-  // Let's return empty to encourage subject selection, as KPs are subject-specific.
-  return [] 
+  return []
 })
 
-const initQuestion = () => {
+// --- shared field accessors (map to whichever edit state is active) ---
+const qType = computed<QuestionType>({
+  get: () => (isImportMode.value ? importItem.value?.q_type : draft.value?.q_type) ?? 'single_choice',
+  set: (v) => {
+    if (isImportMode.value) {
+      if (importItem.value) importItem.value.q_type = v
+    } else if (draft.value) {
+      switchDraftType(draft.value, v)
+    }
+  },
+})
+
+const difficulty = computed<number>({
+  get: () => (isImportMode.value ? importItem.value?.difficulty : draft.value?.difficulty) ?? 3,
+  set: (v) => {
+    if (isImportMode.value) { if (importItem.value) importItem.value.difficulty = v }
+    else if (draft.value) draft.value.difficulty = v
+  },
+})
+
+const knowledgePointIds = computed<number[]>({
+  get: () =>
+    (isImportMode.value ? importItem.value?.knowledge_point_ids : draft.value?.knowledge_point_ids) ?? [],
+  set: (v) => {
+    if (isImportMode.value) { if (importItem.value) importItem.value.knowledge_point_ids = v }
+    else if (draft.value) draft.value.knowledge_point_ids = v
+  },
+})
+
+// --- db draft type switching: reinit options + answer for the new variant ---
+function switchDraftType(d: QuestionDraft, newType: QuestionType) {
+  const oldType = d.q_type
+  if (oldType === newType) return
+  d.q_type = newType
+  if (isChoiceType(newType) && d.options.length === 0) {
+    d.options = createDefaultOptions()
+  }
+  d.answer = createDefaultAnswer(newType, d.options, d.content)
+}
+
+const initState = () => {
   openTagSelect.value = false
-  const newQuestion = props.question
-  if (newQuestion) {
-    editingQuestion.value = JSON.parse(JSON.stringify(newQuestion))
-
-    // Ensure string fields are not null for TiptapEditor
-    if (editingQuestion.value) {
-      editingQuestion.value.content = editingQuestion.value.content || ''
-      
-      // Handle answer based on type
-      if (editingQuestion.value.q_type === 'fill_in_the_blank') {
-        try {
-          if (typeof editingQuestion.value.answer === 'string') {
-             editingQuestion.value.answer = JSON.parse(editingQuestion.value.answer)
-          }
-          if (!Array.isArray(editingQuestion.value.answer)) {
-             editingQuestion.value.answer = [['']]
-          }
-        } catch (e) {
-          editingQuestion.value.answer = [['']]
-        }
-      } else {
-        editingQuestion.value.answer = editingQuestion.value.answer || ''
-      }
-
-      editingQuestion.value.thinking = editingQuestion.value.thinking || ''
-      editingQuestion.value.analysis = editingQuestion.value.analysis || ''
-      editingQuestion.value.summary = editingQuestion.value.summary || ''
-      editingQuestion.value.source = editingQuestion.value.source || ''
-      
-      if (editingQuestion.value.options) {
-        editingQuestion.value.options.forEach((opt: any) => {
-          opt.content = opt.content || ''
-        })
-      }
-    }
-
-    // Ensure options exist
-    if (editingQuestion.value && !editingQuestion.value.options) {
-      editingQuestion.value.options = []
-    }
-    // Initialize knowledge_point_ids for database questions
-    if (editingQuestion.value && (newQuestion as Question).knowledge_points && !editingQuestion.value.knowledge_point_ids) {
-      editingQuestion.value.knowledge_point_ids = (newQuestion as Question).knowledge_points?.map(c => c.id) || []
-    }
-    // Initialize tag_ids for database questions
-    if (editingQuestion.value && (newQuestion as Question).tags && !editingQuestion.value.tag_ids) {
-      editingQuestion.value.tag_ids = (newQuestion as Question).tags?.map(t => t.id) || []
-    }
-    if (editingQuestion.value && !editingQuestion.value.status) {
-      editingQuestion.value.status = 'draft'
-    }
-    
-    // Handle partial initialization (e.g. for Decompose action)
-    if (props.mode === 'create' && !editingQuestion.value.id) {
-       // Fill in defaults if missing
-       if (!editingQuestion.value.q_type) editingQuestion.value.q_type = 'single_choice'
-       if (!editingQuestion.value.options) {
-          editingQuestion.value.options = [
+  if (isImportMode.value) {
+    draft.value = null
+    const src = props.question as ImportItem | null
+    const item: ImportItem = src
+      ? JSON.parse(JSON.stringify(src))
+      : {
+          id: 'temp-' + Date.now(),
+          selected: true,
+          content: '',
+          q_type: 'single_choice',
+          options: [
             { label: 'A', content: '' },
             { label: 'B', content: '' },
             { label: 'C', content: '' },
-            { label: 'D', content: '' }
-          ]
-       }
-       if (!editingQuestion.value.difficulty) editingQuestion.value.difficulty = 3
-       if (!editingQuestion.value.knowledge_point_ids) editingQuestion.value.knowledge_point_ids = []
-       if (!editingQuestion.value.tag_ids) editingQuestion.value.tag_ids = []
-    }
-
-    // Auto-fill subject_id if provided and missing
-    if (editingQuestion.value && !editingQuestion.value.subject_id && props.autoFillSubjectId) {
-      editingQuestion.value.subject_id = props.autoFillSubjectId
-    }
-    // If still no subject_id and subjects list is available and has only one item, auto-select it
-    if (editingQuestion.value && !editingQuestion.value.subject_id && props.subjects && props.subjects.length === 1) {
-      editingQuestion.value.subject_id = props.subjects[0].id
-    }
+            { label: 'D', content: '' },
+          ],
+          answer: '',
+          thinking: '',
+          analysis: '',
+          difficulty: 3,
+          knowledge_point_ids: [],
+          subject_id: props.autoFillSubjectId ?? undefined,
+        }
+    item.content = item.content || ''
+    item.answer = typeof item.answer === 'string' ? item.answer : ''
+    item.thinking = item.thinking || ''
+    item.analysis = item.analysis || ''
+    item.options = item.options || []
+    item.knowledge_point_ids = item.knowledge_point_ids || []
+    if (!item.subject_id && props.autoFillSubjectId) item.subject_id = props.autoFillSubjectId
+    importItem.value = item
   } else {
-    // Initialize empty question - use a temporary object for creation
-    editingQuestion.value = {
-      id: 'temp-' + Date.now(),
-      selected: false,
-      content: '',
-      q_type: 'single_choice',
-      options: [
-        { label: 'A', content: '' },
-        { label: 'B', content: '' },
-        { label: 'C', content: '' },
-        { label: 'D', content: '' }
-      ],
-      answer: '',
-      thinking: '',
-      analysis: '',
-      summary: '',
-      source: '',
-      difficulty: 3,
-      status: 'draft',
-      knowledge_point_ids: [],
-      tag_ids: [],
-      subject_id: props.autoFillSubjectId || undefined,
-      parent_id: undefined
-    }
+    importItem.value = null
+    const fallbackSubject =
+      props.autoFillSubjectId
+      ?? (props.subjects && props.subjects.length === 1 ? props.subjects[0].id : undefined)
+      ?? undefined
+    draft.value = dbQuestionToDraft(
+      (props.question as Partial<Question>) ?? {},
+      { subjectId: fallbackSubject },
+    )
   }
 }
 
-watch(() => props.question, initQuestion, { immediate: true })
+watch(() => props.question, initState, { immediate: true })
+watch(() => props.open, (isOpen) => { if (isOpen) initState() })
+watch(() => props.mode, initState)
 
-watch(() => props.open, (isOpen) => {
-  if (isOpen) {
-    initQuestion()
-  }
-})
+const title = computed(() => (props.mode === 'edit' ? '编辑题目' : '新增题目'))
 
-const title = computed(() => {
-  return props.mode === 'edit' ? '编辑题目' : '新增题目'
-})
-
-const addOption = () => {
-  if (!editingQuestion.value) return
-  const labels = ['A', 'B', 'C', 'D', 'E', 'F', 'G']
-  const nextLabel = labels[editingQuestion.value.options?.length || 0] || '?'
-  if (!editingQuestion.value.options) {
-    editingQuestion.value.options = []
-  }
-  editingQuestion.value.options.push({ label: nextLabel, content: '' })
+// --- import option handlers (legacy string options) ---
+const importAddOption = () => {
+  if (!importItem.value) return
+  importItem.value.options.push({ label: nextOptionLabel(importItem.value.options.length), content: '' })
+}
+const importRemoveOption = (index: number) => {
+  importItem.value?.options.splice(index, 1)
 }
 
-const removeOption = (index: number) => {
-  if (!editingQuestion.value?.options) return
-  editingQuestion.value.options.splice(index, 1)
+// --- db draft option handlers (v2 OptionSpec with stable ids) ---
+const draftAddOption = () => {
+  if (!draft.value) return
+  const opt: OptionSpec = {
+    id: generateOptionId(),
+    label: nextOptionLabel(draft.value.options.length),
+    content: null,
+  }
+  draft.value.options.push(opt)
+}
+const draftRemoveOption = (index: number) => {
+  if (!draft.value) return
+  const [removed] = draft.value.options.splice(index, 1)
+  // 重排 label（A/B/C…）并清理 answer 对被删选项的引用。
+  draft.value.options.forEach((o, i) => { o.label = nextOptionLabel(i) })
+  if (removed) draft.value.answer = pruneAnswerOptionRef(draft.value.answer, removed.id)
 }
 
-const handleSave = () => {
-  if (!editingQuestion.value) return
-  
-  emit('save', editingQuestion.value)
+// --- save flows ---
+const handleSaveImport = () => {
+  if (!importItem.value) return
+  emit('save', importItem.value)
   emit('update:open', false)
 }
 
 const handlePublish = async () => {
-  if (!editingQuestion.value) return
+  if (!draft.value) return
+  const error = validateQuestionDraft(draft.value)
+  if (error) {
+    toast.error(error)
+    return
+  }
   isSubmitting.value = true
-
   try {
-    const payload = {
-      content: editingQuestion.value.content,
-      q_type: editingQuestion.value.q_type,
-      options: (editingQuestion.value.q_type === 'single_choice' || editingQuestion.value.q_type === 'multiple_choice') ? editingQuestion.value.options : [],
-      answer: editingQuestion.value.q_type === 'fill_in_the_blank' ? JSON.stringify(editingQuestion.value.answer) : editingQuestion.value.answer,
-      thinking: editingQuestion.value.thinking,
-      analysis: editingQuestion.value.analysis,
-      summary: editingQuestion.value.summary,
-      source: editingQuestion.value.source,
-      difficulty: editingQuestion.value.difficulty,
-      knowledge_point_ids: editingQuestion.value.knowledge_point_ids || [],
-      tag_ids: editingQuestion.value.tag_ids || [],
-      status: editingQuestion.value.status,
-      subject_id: editingQuestion.value.subject_id,
-      parent_id: editingQuestion.value.parent_id || null
-    }
-
-    if (props.mode === 'edit') {
-      await $api(`/questions/${editingQuestion.value.id}`, {
-        method: 'PUT',
-        body: payload,
-      })
+    const payload = buildQuestionPayload(draft.value)
+    let saved: Question
+    if (props.mode === 'edit' && draft.value.id) {
+      saved = await $api<Question>(`/questions/${draft.value.id}`, { method: 'PUT', body: payload })
     } else {
-      await $api('/questions', {
-        method: 'POST',
-        body: payload,
-      })
+      saved = await $api<Question>('/questions', { method: 'POST', body: payload })
     }
-
-    emit('success', editingQuestion.value)
+    emit('success', saved)
     emit('update:open', false)
-  } catch (error) {
-    console.error(error)
+  } catch (err: unknown) {
+    console.error(err)
+    toast.error('保存失败', { description: err instanceof Error ? err.message : undefined })
   } finally {
     isSubmitting.value = false
   }
 }
 
-const handleClose = () => {
-  emit('update:open', false)
-}
+const handleClose = () => emit('update:open', false)
 
+// --- tags (db mode only) ---
 const selectedTags = computed(() => {
-  if (!tags.value || !editingQuestion.value?.tag_ids) return []
-  return tags.value.filter(t => editingQuestion.value.tag_ids.includes(t.id))
+  if (!tags.value || !draft.value) return []
+  return tags.value.filter(t => draft.value!.tag_ids.includes(t.id))
 })
-
 const toggleTag = (tagId: number) => {
-  if (!editingQuestion.value) return
-  if (!editingQuestion.value.tag_ids) editingQuestion.value.tag_ids = []
-  
-  const index = editingQuestion.value.tag_ids.indexOf(tagId)
-  if (index === -1) {
-    editingQuestion.value.tag_ids.push(tagId)
-  } else {
-    editingQuestion.value.tag_ids.splice(index, 1)
-  }
+  if (!draft.value) return
+  const idx = draft.value.tag_ids.indexOf(tagId)
+  if (idx === -1) draft.value.tag_ids.push(tagId)
+  else draft.value.tag_ids.splice(idx, 1)
 }
-
-watch(() => editingQuestion.value?.q_type, (newType, oldType) => {
-  if (!editingQuestion.value || !newType || !oldType || newType === oldType) return
-
-  // Also handle options if switching to choice types
-  if ((newType === 'single_choice' || newType === 'multiple_choice') && (!editingQuestion.value.options || editingQuestion.value.options.length === 0)) {
-        editingQuestion.value.options = [
-        { label: 'A', content: '' },
-        { label: 'B', content: '' },
-        { label: 'C', content: '' },
-        { label: 'D', content: '' }
-      ]
-  }
-})
 </script>
 
 <template>
@@ -327,30 +303,18 @@ watch(() => editingQuestion.value?.q_type, (newType, oldType) => {
       <div class="flex w-full flex-col bg-background min-h-screen lg:h-full">
         <!-- Header -->
         <div class="sticky top-0 z-50 flex items-center justify-between border-b border-border/50 px-6 py-4 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80 lg:static lg:bg-background">
-          <DialogTitle class="text-lg">{{ title }}</DialogTitle>
+          <DialogTitle class="text-lg">{{ isImportMode ? '编辑导入题目' : title }}</DialogTitle>
           <div class="flex items-center gap-2">
-            <Button
-              v-if="mode !== 'import'"
-              size="sm"
-              @click="handlePublish"
-              :disabled="isSubmitting"
-            >
+            <Button v-if="!isImportMode" size="sm" @click="handlePublish" :disabled="isSubmitting">
               <Loader2 v-if="isSubmitting" class="mr-2 h-4 w-4 animate-spin" />
               <Save v-else class="mr-2 h-4 w-4" />
               {{ mode === 'create' ? '保存' : '更新' }}
             </Button>
-            <Button
-              v-if="mode === 'import'"
-              size="sm"
-              @click="handleSave"
-              :disabled="isSubmitting"
-            >
+            <Button v-else size="sm" @click="handleSaveImport">
               <Save class="mr-2 h-4 w-4" />
               保存
             </Button>
-            <Button variant="outline" size="sm" @click="handleClose">
-              关闭
-            </Button>
+            <Button variant="outline" size="sm" @click="handleClose">关闭</Button>
           </div>
         </div>
 
@@ -361,288 +325,307 @@ watch(() => editingQuestion.value?.q_type, (newType, oldType) => {
             <section class="border-b border-border/50 bg-background px-6 py-6 lg:border-b-0 lg:border-r lg:h-full lg:overflow-y-auto">
               <div class="mx-auto max-w-3xl space-y-6">
 
-              <!-- Question Type & Difficulty -->
-              <div class="grid grid-cols-2 gap-4">
-                <div class="space-y-2">
-                  <Label>题目类型</Label>
-                  <Select v-model="editingQuestion!.q_type">
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="single_choice">单选题</SelectItem>
-                      <SelectItem value="multiple_choice">多选题</SelectItem>
-                      <SelectItem value="true_false">判断题</SelectItem>
-                      <SelectItem value="fill_in_the_blank">填空题</SelectItem>
-                      <SelectItem value="free_response">解答题</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div class="space-y-2">
-                  <Label>状态</Label>
-                  <Select v-model="editingQuestion!.status">
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="draft">草稿</SelectItem>
-                      <SelectItem value="pending">待审核</SelectItem>
-                      <SelectItem value="published">已发布</SelectItem>
-                      <SelectItem value="archived">已归档</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div class="space-y-2">
-                  <Label>难度</Label>
-                  <Select v-model.number="editingQuestion!.difficulty">
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem :value="1">难度 1</SelectItem>
-                      <SelectItem :value="2">难度 2</SelectItem>
-                      <SelectItem :value="3">难度 3</SelectItem>
-                      <SelectItem :value="4">难度 4</SelectItem>
-                      <SelectItem :value="5">难度 5</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div class="space-y-2">
-                  <Label>父题目 ID (可选)</Label>
-                  <Input v-model.number="editingQuestion!.parent_id" type="number" placeholder="输入原题 ID" />
-                </div>
-              </div>
-
-              <!-- Source -->
-              <div class="space-y-2">
-                <Label>来源</Label>
-                <Input v-model="editingQuestion!.source" placeholder="输入题目来源" />
-              </div>
-
-              <!-- Knowledge Point Selection-->
-              <div class="space-y-2">
-                <Label>所属知识点</Label>
-                <div v-if="!editingQuestion?.subject_id" class="text-xs text-muted-foreground mb-1">
-                  请先选择学科以加载知识点
-                </div>
-                <KnowledgePointSelector
-                  :model-value="(editingQuestion?.knowledge_point_ids || []) as number[]"
-                  @update:model-value="(v) => {if(editingQuestion) editingQuestion.knowledge_point_ids = v}"
-                  :knowledge-points="availableKnowledgePoints"
-                  :disabled="!editingQuestion?.subject_id"
-                />
-              </div>
-
-              <!-- Tag Selection -->
-              <div class="space-y-2">
-                <Label>标签</Label>
-                <div class="flex flex-wrap gap-2 mb-2" v-if="selectedTags.length > 0">
-                  <Badge 
-                    v-for="tag in selectedTags" 
-                    :key="tag.id" 
-                    variant="secondary"
-                    :style="{ backgroundColor: tag.color + '20', color: tag.color, borderColor: tag.color }"
-                    class="border pl-2 pr-1 py-1 flex items-center gap-1"
-                  >
-                    {{ tag.name }}
-                    <button class="hover:bg-background/50 rounded-full p-0.5 transition-colors" @click.stop="toggleTag(tag.id)">
-                      <X class="h-3 w-3" />
-                    </button>
-                  </Badge>
-                </div>
-                <Popover v-model:open="openTagSelect">
-                  <PopoverTrigger as-child>
-                    <Button
-                      variant="outline"
-                      role="combobox"
-                      :aria-expanded="openTagSelect"
-                      class="w-full justify-between"
-                    >
-                      选择标签...
-                      <ChevronsUpDown class="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent class="w-[400px] p-0" align="start">
-                    <Command>
-                      <CommandInput placeholder="搜索标签..." />
-                      <CommandEmpty>未找到标签</CommandEmpty>
-                      <CommandList>
-                        <CommandGroup v-for="cat in tagCategories" :key="cat.slug" :heading="cat.name">
-                          <CommandItem
-                            v-for="tag in tags?.filter(t => t.category === cat.slug)"
-                            :key="tag.id"
-                            :value="tag.name"
-                            @select="toggleTag(tag.id)"
-                          >
-                            <Check
-                              :class="cn(
-                                'mr-2 h-4 w-4',
-                                editingQuestion?.tag_ids?.includes(tag.id) ? 'opacity-100' : 'opacity-0'
-                              )"
-                            />
-                            <div class="flex items-center gap-2">
-                                <div class="w-3 h-3 rounded-full" :style="{ backgroundColor: tag.color }"></div>
-                                {{ tag.name }}
-                            </div>
-                          </CommandItem>
-                        </CommandGroup>
-                         <CommandGroup heading="其他">
-                          <CommandItem
-                            v-for="tag in tags?.filter(t => !t.category || !tagCategories?.find(c => c.slug === t.category))"
-                            :key="tag.id"
-                            :value="tag.name"
-                            @select="toggleTag(tag.id)"
-                          >
-                            <Check
-                              :class="cn(
-                                'mr-2 h-4 w-4',
-                                editingQuestion?.tag_ids?.includes(tag.id) ? 'opacity-100' : 'opacity-0'
-                              )"
-                            />
-                            <div class="flex items-center gap-2">
-                                <div class="w-3 h-3 rounded-full" :style="{ backgroundColor: tag.color }"></div>
-                                {{ tag.name }}
-                            </div>
-                          </CommandItem>
-                        </CommandGroup>
-                      </CommandList>
-                    </Command>
-                  </PopoverContent>
-                </Popover>
-              </div>
-
-              <!-- Content -->
-              <div class="space-y-2">
-                <Label>题干</Label>
-                <div>
-                  <TiptapEditor v-model="editingQuestion!.content" />
-                </div>
-              </div>
-
-              <!-- Options (for choice questions) -->
-              <div v-if="editingQuestion!.q_type === 'single_choice' || editingQuestion!.q_type === 'multiple_choice'" class="space-y-2">
-                <Label>选项</Label>
-                <div class="grid grid-cols-1 gap-4">
-                  <div v-for="(opt, optIndex) in editingQuestion!.options" :key="optIndex" class="flex gap-2 items-start">
-                    <div class="w-8 h-9 flex items-center justify-center bg-muted rounded font-medium shrink-0 mt-0.5">
-                      {{ opt.label }}
-                    </div>
-                    <div class="flex-1">
-                      <TiptapEditor v-model="opt.content" min-height="min-h-[100px]" />
-                    </div>
-                    <Button variant="ghost" size="icon" class="h-8 w-8 mt-0.5" @click="removeOption(optIndex)">
-                      <Trash2 class="h-3 w-3" />
-                    </Button>
+                <!-- Type & Difficulty (+ db-only status/parent) -->
+                <div class="grid grid-cols-2 gap-4">
+                  <div class="space-y-2">
+                    <Label>题目类型</Label>
+                    <Select v-model="qType">
+                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="single_choice">单选题</SelectItem>
+                        <SelectItem value="multiple_choice">多选题</SelectItem>
+                        <SelectItem value="true_false">判断题</SelectItem>
+                        <SelectItem value="fill_in_the_blank">填空题</SelectItem>
+                        <SelectItem value="free_response">解答题</SelectItem>
+                      </SelectContent>
+                    </Select>
                   </div>
-                  <Button variant="outline" class="w-full border-dashed" @click="addOption">
-                    <Plus class="h-4 w-4 mr-2" /> 添加选项
-                  </Button>
+                  <div v-if="!isImportMode && draft" class="space-y-2">
+                    <Label>状态</Label>
+                    <Select v-model="draft.status">
+                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="draft">草稿</SelectItem>
+                        <SelectItem value="pending">待审核</SelectItem>
+                        <SelectItem value="published">已发布</SelectItem>
+                        <SelectItem value="archived">已归档</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div class="space-y-2">
+                    <Label>难度</Label>
+                    <Select v-model.number="difficulty">
+                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem :value="1">难度 1</SelectItem>
+                        <SelectItem :value="2">难度 2</SelectItem>
+                        <SelectItem :value="3">难度 3</SelectItem>
+                        <SelectItem :value="4">难度 4</SelectItem>
+                        <SelectItem :value="5">难度 5</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div v-if="!isImportMode && draft" class="space-y-2">
+                    <Label>父题目 ID (可选)</Label>
+                    <Input v-model.number="draft.parent_id" type="number" placeholder="输入原题 ID" />
+                  </div>
                 </div>
-              </div>
 
-              <!-- Answer & Analysis -->
-              <div class="space-y-2">
-                <AnswerEditor 
-                  v-model="editingQuestion!.answer" 
-                  :q-type="editingQuestion!.q_type" 
-                />
-              </div>
-
-              <div class="space-y-2">
-                <Label>分析</Label>
-                <div>
-                  <TiptapEditor v-model="editingQuestion!.thinking" />
+                <!-- Source (db only) -->
+                <div v-if="!isImportMode && draft" class="space-y-2">
+                  <Label>来源</Label>
+                  <Input v-model="draft.source" placeholder="输入题目来源" />
                 </div>
-              </div>
 
-              <div class="space-y-2">
-                <Label>解析</Label>
-                <div>
-                  <TiptapEditor v-model="editingQuestion!.analysis" />
+                <!-- Knowledge Points -->
+                <div class="space-y-2">
+                  <Label>所属知识点</Label>
+                  <div v-if="!activeSubjectId" class="text-xs text-muted-foreground mb-1">请先选择学科以加载知识点</div>
+                  <KnowledgePointSelector
+                    v-model="knowledgePointIds"
+                    :knowledge-points="availableKnowledgePoints"
+                    :disabled="!activeSubjectId"
+                  />
                 </div>
-              </div>
 
-              <div class="space-y-2">
-                <Label>总结</Label>
-                <div>
-                  <TiptapEditor v-model="editingQuestion!.summary" />
+                <!-- Tags (db only) -->
+                <div v-if="!isImportMode && draft" class="space-y-2">
+                  <Label>标签</Label>
+                  <div class="flex flex-wrap gap-2 mb-2" v-if="selectedTags.length > 0">
+                    <Badge
+                      v-for="tag in selectedTags"
+                      :key="tag.id"
+                      variant="secondary"
+                      :style="{ backgroundColor: tag.color + '20', color: tag.color, borderColor: tag.color }"
+                      class="border pl-2 pr-1 py-1 flex items-center gap-1"
+                    >
+                      {{ tag.name }}
+                      <button class="hover:bg-background/50 rounded-full p-0.5 transition-colors" @click.stop="toggleTag(tag.id)">
+                        <X class="h-3 w-3" />
+                      </button>
+                    </Badge>
+                  </div>
+                  <Popover v-model:open="openTagSelect">
+                    <PopoverTrigger as-child>
+                      <Button variant="outline" role="combobox" :aria-expanded="openTagSelect" class="w-full justify-between">
+                        选择标签...
+                        <ChevronsUpDown class="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent class="w-[400px] p-0" align="start">
+                      <Command>
+                        <CommandInput placeholder="搜索标签..." />
+                        <CommandEmpty>未找到标签</CommandEmpty>
+                        <CommandList>
+                          <CommandGroup v-for="cat in tagCategories" :key="cat.slug" :heading="cat.name">
+                            <CommandItem
+                              v-for="tag in tags?.filter(t => t.category === cat.slug)"
+                              :key="tag.id"
+                              :value="tag.name"
+                              @select="toggleTag(tag.id)"
+                            >
+                              <Check :class="cn('mr-2 h-4 w-4', draft.tag_ids.includes(tag.id) ? 'opacity-100' : 'opacity-0')" />
+                              <div class="flex items-center gap-2">
+                                <div class="w-3 h-3 rounded-full" :style="{ backgroundColor: tag.color }"></div>
+                                {{ tag.name }}
+                              </div>
+                            </CommandItem>
+                          </CommandGroup>
+                          <CommandGroup heading="其他">
+                            <CommandItem
+                              v-for="tag in tags?.filter(t => !t.category || !tagCategories?.find(c => c.slug === t.category))"
+                              :key="tag.id"
+                              :value="tag.name"
+                              @select="toggleTag(tag.id)"
+                            >
+                              <Check :class="cn('mr-2 h-4 w-4', draft.tag_ids.includes(tag.id) ? 'opacity-100' : 'opacity-0')" />
+                              <div class="flex items-center gap-2">
+                                <div class="w-3 h-3 rounded-full" :style="{ backgroundColor: tag.color }"></div>
+                                {{ tag.name }}
+                              </div>
+                            </CommandItem>
+                          </CommandGroup>
+                        </CommandList>
+                      </Command>
+                    </PopoverContent>
+                  </Popover>
                 </div>
+
+                <!-- ================= IMPORT (legacy) editors ================= -->
+                <template v-if="isImportMode && importItem">
+                  <div class="space-y-2">
+                    <Label>题干</Label>
+                    <TiptapEditor v-model="importItem.content" />
+                  </div>
+
+                  <div v-if="qType === 'single_choice' || qType === 'multiple_choice'" class="space-y-2">
+                    <Label>选项</Label>
+                    <div class="grid grid-cols-1 gap-4">
+                      <div v-for="(opt, optIndex) in importItem.options" :key="optIndex" class="flex gap-2 items-start">
+                        <div class="w-8 h-9 flex items-center justify-center bg-muted rounded font-medium shrink-0 mt-0.5">{{ opt.label }}</div>
+                        <div class="flex-1">
+                          <TiptapEditor v-model="opt.content" min-height="min-h-[100px]" />
+                        </div>
+                        <Button variant="ghost" size="icon" class="h-8 w-8 mt-0.5" @click="importRemoveOption(optIndex)">
+                          <Trash2 class="h-3 w-3" />
+                        </Button>
+                      </div>
+                      <Button variant="outline" class="w-full border-dashed" @click="importAddOption">
+                        <Plus class="h-4 w-4 mr-2" /> 添加选项
+                      </Button>
+                    </div>
+                  </div>
+
+                  <div class="space-y-2">
+                    <Label>答案</Label>
+                    <TiptapEditor v-model="importItem.answer" />
+                  </div>
+
+                  <div class="space-y-2">
+                    <Label>分析</Label>
+                    <TiptapEditor v-model="importItem.thinking" />
+                  </div>
+                  <div class="space-y-2">
+                    <Label>解析</Label>
+                    <TiptapEditor v-model="importItem.analysis" />
+                  </div>
+                </template>
+
+                <!-- ================= CREATE/EDIT (v2) editors ================= -->
+                <template v-else-if="draft">
+                  <div class="space-y-2">
+                    <Label>题干</Label>
+                    <RichEditor v-model="draft.content" :allow-blank="qType === 'fill_in_the_blank'" />
+                  </div>
+
+                  <div v-if="qType === 'single_choice' || qType === 'multiple_choice'" class="space-y-2">
+                    <Label>选项</Label>
+                    <div class="grid grid-cols-1 gap-4">
+                      <div v-for="(opt, optIndex) in draft.options" :key="opt.id" class="flex gap-2 items-start">
+                        <div class="w-8 h-9 flex items-center justify-center bg-muted rounded font-medium shrink-0 mt-0.5">{{ opt.label }}</div>
+                        <div class="flex-1">
+                          <RichEditor v-model="opt.content" placeholder="输入选项内容…" />
+                        </div>
+                        <Button variant="ghost" size="icon" class="h-8 w-8 mt-0.5" @click="draftRemoveOption(optIndex)">
+                          <Trash2 class="h-3 w-3" />
+                        </Button>
+                      </div>
+                      <Button variant="outline" class="w-full border-dashed" @click="draftAddOption">
+                        <Plus class="h-4 w-4 mr-2" /> 添加选项
+                      </Button>
+                    </div>
+                  </div>
+
+                  <AnswerEditor
+                    v-model="draft.answer"
+                    :q-type="draft.q_type"
+                    :options="draft.options"
+                    :stem="draft.content"
+                  />
+
+                  <div class="space-y-2">
+                    <Label>分析</Label>
+                    <RichEditor v-model="draft.thinking" />
+                  </div>
+                  <div class="space-y-2">
+                    <Label>解析</Label>
+                    <RichEditor v-model="draft.analysis" />
+                  </div>
+                  <div class="space-y-2">
+                    <Label>总结</Label>
+                    <RichEditor v-model="draft.summary" />
+                  </div>
+                </template>
               </div>
-            </div>
             </section>
 
             <!-- Preview (Right) -->
             <aside class="border-t border-border/50 bg-muted/20 px-6 py-6 lg:border-t-0 lg:border-l lg:h-full lg:overflow-y-auto">
               <div class="mx-auto max-w-3xl space-y-6">
-              <div class="space-y-2">
-                <h3 class="font-semibold text-sm text-gray-700">题目预览</h3>
-                <div class="prose prose-sm max-w-none dark:prose-invert bg-background p-4 rounded border border-border">
-                  <MarkdownPreview :content="editingQuestion!.content || '（空）'" />
-                </div>
-              </div>
 
-              <!-- Preview Options -->
-              <div v-if="(editingQuestion!.q_type === 'single_choice' || editingQuestion!.q_type === 'multiple_choice') && editingQuestion!.options && editingQuestion!.options.length > 0" class="space-y-2">
-                <h3 class="font-semibold text-sm text-gray-700">选项预览</h3>
-                <div class="space-y-2 bg-background p-4 rounded border border-border">
-                  <div v-for="opt in editingQuestion!.options" :key="opt.label" class="flex gap-2">
-                    <span class="font-bold text-gray-600 shrink-0">{{ opt.label }}.</span>
-                    <div class="flex-1 prose prose-sm [&_.prose]:my-0 [&_.prose>p]:my-0">
-                      <MarkdownPreview :content="opt.content" />
+                <!-- IMPORT preview: legacy Markdown -->
+                <template v-if="isImportMode && importItem">
+                  <div class="space-y-2">
+                    <h3 class="font-semibold text-sm text-muted-foreground">题目预览</h3>
+                    <div class="prose prose-sm max-w-none dark:prose-invert bg-background p-4 rounded border border-border">
+                      <MarkdownPreview :content="importItem.content || '（空）'" />
                     </div>
                   </div>
-                </div>
-              </div>
-
-              <!-- Preview Answer -->
-              <div class="space-y-2">
-                <h3 class="font-semibold text-sm text-gray-700">答案</h3>
-                <div class="prose prose-sm max-w-none dark:prose-invert bg-background p-4 rounded border border-border">
-                  <div v-if="editingQuestion!.q_type === 'fill_in_the_blank' && Array.isArray(editingQuestion!.answer)" class="flex flex-col gap-2">
-                    <div v-for="(blank, index) in editingQuestion!.answer" :key="index" class="flex items-start gap-2">
-                      <span v-if="editingQuestion!.answer.length > 1" class="font-mono text-gray-500 shrink-0 mt-1.5">{{ Number(index) + 1 }}.</span>
-                      <div class="flex flex-wrap gap-2 items-center">
-                        <template v-if="Array.isArray(blank)">
-                          <template v-for="(ans, ansIdx) in blank" :key="ansIdx">
-                            <div class="text-xs bg-background px-2 py-1 rounded border font-medium [&_.prose]:my-0 [&_.prose>p]:my-0 [&_.prose]:text-xs">
-                              <MarkdownPreview :content="ans" />
-                            </div>
-                            <span v-if="ansIdx < blank.length - 1" class="text-xs text-muted-foreground">或</span>
-                          </template>
-                        </template>
-                        <div v-else class="text-xs bg-background px-2 py-1 rounded border font-medium [&_.prose]:my-0 [&_.prose>p]:my-0 [&_.prose]:text-xs">
-                          <MarkdownPreview :content="blank" />
+                  <div v-if="(qType === 'single_choice' || qType === 'multiple_choice') && importItem.options.length > 0" class="space-y-2">
+                    <h3 class="font-semibold text-sm text-muted-foreground">选项预览</h3>
+                    <div class="space-y-2 bg-background p-4 rounded border border-border">
+                      <div v-for="opt in importItem.options" :key="opt.label" class="flex gap-2">
+                        <span class="font-bold text-muted-foreground shrink-0">{{ opt.label }}.</span>
+                        <div class="flex-1 prose prose-sm [&_.prose]:my-0 [&_.prose>p]:my-0">
+                          <MarkdownPreview :content="opt.content" />
                         </div>
                       </div>
                     </div>
                   </div>
-                  <MarkdownPreview v-else :content="editingQuestion!.answer || '（未填写）'" />
-                </div>
-              </div>
+                  <div class="space-y-2">
+                    <h3 class="font-semibold text-sm text-muted-foreground">答案</h3>
+                    <div class="prose prose-sm max-w-none dark:prose-invert bg-background p-4 rounded border border-border">
+                      <MarkdownPreview :content="importItem.answer || '（未填写）'" />
+                    </div>
+                  </div>
+                  <div v-if="importItem.thinking" class="space-y-2">
+                    <h3 class="font-semibold text-sm text-muted-foreground">分析</h3>
+                    <div class="prose prose-sm max-w-none dark:prose-invert bg-background p-4 rounded border border-border">
+                      <MarkdownPreview :content="importItem.thinking" />
+                    </div>
+                  </div>
+                  <div v-if="importItem.analysis" class="space-y-2">
+                    <h3 class="font-semibold text-sm text-muted-foreground">解析</h3>
+                    <div class="prose prose-sm max-w-none dark:prose-invert bg-background p-4 rounded border border-border">
+                      <MarkdownPreview :content="importItem.analysis" />
+                    </div>
+                  </div>
+                </template>
 
-              <!-- Preview Thinking -->
-              <div v-if="editingQuestion!.thinking" class="space-y-2">
-                <h3 class="font-semibold text-sm text-gray-700">分析</h3>
-                <div class="prose prose-sm max-w-none dark:prose-invert bg-background p-4 rounded border border-border">
-                  <MarkdownPreview :content="editingQuestion!.thinking" />
-                </div>
-              </div>
-
-              <!-- Preview Analysis -->
-              <div v-if="editingQuestion!.analysis" class="space-y-2">
-                <h3 class="font-semibold text-sm text-gray-700">解析</h3>
-                <div class="prose prose-sm max-w-none dark:prose-invert bg-background p-4 rounded border border-border">
-                  <MarkdownPreview :content="editingQuestion!.analysis" />
-                </div>
-              </div>
-
-              <!-- Preview Summary -->
-              <div v-if="editingQuestion!.summary" class="space-y-2">
-                <h3 class="font-semibold text-sm text-gray-700">总结</h3>
-                <div class="prose prose-sm max-w-none dark:prose-invert bg-background p-4 rounded border border-border">
-                  <MarkdownPreview :content="editingQuestion!.summary" />
-                </div>
-              </div>
+                <!-- CREATE/EDIT preview: v2 RichContent -->
+                <template v-else-if="draft">
+                  <div class="space-y-2">
+                    <h3 class="font-semibold text-sm text-muted-foreground">题目预览</h3>
+                    <div class="bg-background p-4 rounded border border-border">
+                      <RichContent :content="draft.content" empty-text="（空）" />
+                    </div>
+                  </div>
+                  <div v-if="(qType === 'single_choice' || qType === 'multiple_choice') && draft.options.length > 0" class="space-y-2">
+                    <h3 class="font-semibold text-sm text-muted-foreground">选项预览</h3>
+                    <div class="space-y-2 bg-background p-4 rounded border border-border">
+                      <div v-for="opt in draft.options" :key="opt.id" class="flex gap-2">
+                        <span class="font-bold text-muted-foreground shrink-0">{{ opt.label }}.</span>
+                        <div class="flex-1 [&_.prose]:my-0 [&_.prose>p]:my-0">
+                          <RichContent :content="opt.content" empty-text="（空选项）" />
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                  <div class="space-y-2">
+                    <h3 class="font-semibold text-sm text-muted-foreground">答案</h3>
+                    <div class="bg-background p-4 rounded border border-border">
+                      <AnswerDisplay :answer="draft.answer" :options="draft.options" empty-text="（未填写）" />
+                    </div>
+                  </div>
+                  <div v-if="draft.thinking" class="space-y-2">
+                    <h3 class="font-semibold text-sm text-muted-foreground">分析</h3>
+                    <div class="bg-background p-4 rounded border border-border">
+                      <RichContent :content="draft.thinking" />
+                    </div>
+                  </div>
+                  <div v-if="draft.analysis" class="space-y-2">
+                    <h3 class="font-semibold text-sm text-muted-foreground">解析</h3>
+                    <div class="bg-background p-4 rounded border border-border">
+                      <RichContent :content="draft.analysis" />
+                    </div>
+                  </div>
+                  <div v-if="draft.summary" class="space-y-2">
+                    <h3 class="font-semibold text-sm text-muted-foreground">总结</h3>
+                    <div class="bg-background p-4 rounded border border-border">
+                      <RichContent :content="draft.summary" />
+                    </div>
+                  </div>
+                </template>
               </div>
             </aside>
           </div>

@@ -1,8 +1,18 @@
-from sqlalchemy import Column, Integer, Text, ForeignKey, Table, Enum, DateTime, JSON, String
+from sqlalchemy import (
+    Column, Integer, SmallInteger, Boolean, Text, ForeignKey, Table, Enum,
+    DateTime, JSON, String, text,
+)
+from sqlalchemy.dialects.mysql import LONGTEXT
 from sqlalchemy.orm import relationship, backref
 from datetime import datetime
 import enum
 from .base import Base
+
+# v2 内容目标结构版本(存量未迁移行为 0,见 docs/development/question-model-v2.md §0)。
+SCHEMA_VERSION = 1
+
+# 富文本 / 判别联合 JSON 字符串列:MySQL 用 LONGTEXT,SQLite 退化为 TEXT。
+_RichTextColumn = LONGTEXT().with_variant(Text(), "sqlite")
 
 # 题目与标签的多对多关联表
 question_tags = Table(
@@ -38,16 +48,24 @@ class Question(Base):
     __tablename__ = 'questions'
 
     id = Column(Integer, primary_key=True, index=True)
-    content = Column(Text, nullable=False) # 题干 (支持 Markdown/HTML)
-    
-    # 选项: 存储 JSON 列表, 例如 [{"label": "A", "content": "选项内容"}, ...]
+    content = Column(_RichTextColumn, nullable=False) # 题干 RichDoc JSON 字符串
+
+    # 选项: 存储 JSON 列表, 例如 [{"id": "opt_x", "label": "A", "content": RichDoc}, ...]
     # 对于非选择题，此字段可为空
-    options = Column(JSON, nullable=True) 
-    
-    answer = Column(Text, nullable=True)  # 参考答案
-    thinking = Column(Text, nullable=True) # 分析
-    analysis = Column(Text, nullable=True) # 解析
-    summary = Column(Text, nullable=True)  # 总结
+    options = Column(JSON, nullable=True)
+
+    answer = Column(_RichTextColumn, nullable=True)   # AnswerSpec 判别联合 JSON 字符串
+    thinking = Column(_RichTextColumn, nullable=True) # 分析 RichDoc JSON 字符串
+    analysis = Column(_RichTextColumn, nullable=True) # 解析 RichDoc JSON 字符串
+    summary = Column(_RichTextColumn, nullable=True)  # 总结 RichDoc JSON 字符串
+
+    # v2 内容结构版本;运行时 ORM 新行为 SCHEMA_VERSION(存量未迁移行由迁移置 0)。
+    content_schema_version = Column(
+        SmallInteger, nullable=False, default=SCHEMA_VERSION, server_default=str(SCHEMA_VERSION)
+    )
+    # 迁移无法解析行的人工复核标记;不进入 API / pydantic schema。
+    needs_review = Column(Boolean, nullable=False, default=False, server_default=text("0"))
+
     deleted_at = Column(DateTime, nullable=True) # 软删除时间
     
     q_type = Column(Enum(QuestionType, values_callable=lambda obj: [e.value for e in obj]), nullable=False) # 题目类型

@@ -2,7 +2,7 @@
 import { computed } from 'vue'
 import { Button } from '@/components/ui/button'
 import { GripVertical, Eye, X } from '@lucide/vue'
-import MarkdownPreview from '@/components/MarkdownPreview.vue'
+import RichContent from '@/components/rich-editor/RichContent.vue'
 import type { PaperItem } from '~/types'
 
 const props = defineProps<{
@@ -56,7 +56,7 @@ const options = computed(() => props.item.question?.options || [])
       <div class="flex gap-2">
         <span class="font-medium text-foreground shrink-0">{{ number }}.</span>
         <div class="flex-1 min-w-0 leading-relaxed">
-          <MarkdownPreview v-if="item.question" :content="item.question.content" />
+          <RichContent v-if="item.question" :content="item.question.content" />
           <span v-else class="text-muted-foreground italic">题目已删除</span>
         </div>
       </div>
@@ -66,7 +66,7 @@ const options = computed(() => props.item.question?.options || [])
         <div v-for="opt in options" :key="opt.label" class="flex gap-2">
           <span class="font-medium text-foreground shrink-0">{{ opt.label }}.</span>
           <div class="flex-1 min-w-0 [&_.prose]:my-0 [&_.prose>p]:my-0">
-            <MarkdownPreview :content="opt.content" />
+            <RichContent :content="opt.content" />
           </div>
         </div>
       </div>

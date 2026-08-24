@@ -12,6 +12,15 @@ from app.crud.crud_system_setting import system_setting
 from app.models.ai_config import AIModel, AIProvider
 from app.models.tag import Tag
 from app.models.tag_category import TagCategory
+from app.services.question_legacy_adapter import (
+    LegacyQuestionError,
+    adapt_legacy_question,
+)
+from app.services.question_content import parse_json_field
+from app.services.question_render import (
+    answer_spec_to_plain_text,
+    rich_doc_to_plain_text,
+)
 from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 
@@ -230,7 +239,12 @@ async def search_questions(db: AsyncSession, args: Dict[str, Any]) -> str:
 
     results = []
     for q in questions:
-        results.append(f"ID: {q.id}\nType: {q.q_type}\nDifficulty: {q.difficulty}\nContent: {q.content[:200]}...\nAnswer: {q.answer}\n")
+        content_text = rich_doc_to_plain_text(parse_json_field(q.content))[:200]
+        answer_text = answer_spec_to_plain_text(q.answer, q.options)
+        results.append(
+            f"ID: {q.id}\nType: {q.q_type}\nDifficulty: {q.difficulty}\n"
+            f"Content: {content_text}...\nAnswer: {answer_text}\n"
+        )
 
     return "\n---\n".join(results)
 
@@ -434,14 +448,28 @@ async def propose_question_draft(db: AsyncSession, args: Dict[str, Any]) -> str:
         if args.get("tags"):
             tag_ids = await _resolve_tags(db, args.get("tags"))
 
+        # Legacy(AI 工具产出的旧字符串)→ 严格 v2 字段。
+        try:
+            v2_fields = adapt_legacy_question(
+                q_type=args.get("q_type"),
+                content=args.get("content"),
+                options=args.get("options"),
+                answer=args.get("answer"),
+                thinking=args.get("thinking"),
+                analysis=args.get("analysis"),
+                summary=args.get("summary"),
+            )
+        except LegacyQuestionError as adapt_err:
+            return f"Failed to create proposal: {adapt_err}"
+
         obj_in = QuestionCreate(
-            content=args.get("content"),
+            content=v2_fields["content"],
             q_type=args.get("q_type"),
-            options=args.get("options"),
-            answer=args.get("answer"),
-            thinking=args.get("thinking"),
-            analysis=args.get("analysis"),
-            summary=args.get("summary"),
+            options=v2_fields["options"],
+            answer=v2_fields["answer"],
+            thinking=v2_fields["thinking"],
+            analysis=v2_fields["analysis"],
+            summary=v2_fields["summary"],
             difficulty=args.get("difficulty", 1),
             status=QuestionStatus.DRAFT, # Use DRAFT status for proposals
             subject_id=subject_id,
@@ -494,15 +522,26 @@ async def propose_questions_batch(db: AsyncSession, args: Dict[str, Any]) -> str
 
         # Extract children
         children_data = q_data.get("children", [])
-        
-        obj_in = QuestionCreate(
-            content=q_data.get("content"),
+
+        # Legacy(AI 工具产出的旧字符串)→ 严格 v2 字段。无法解析答案时抛出,由调用方标失败。
+        v2_fields = adapt_legacy_question(
             q_type=q_data.get("q_type"),
+            content=q_data.get("content"),
             options=q_data.get("options"),
             answer=q_data.get("answer"),
             thinking=q_data.get("thinking"),
             analysis=q_data.get("analysis"),
             summary=q_data.get("summary"),
+        )
+
+        obj_in = QuestionCreate(
+            content=v2_fields["content"],
+            q_type=q_data.get("q_type"),
+            options=v2_fields["options"],
+            answer=v2_fields["answer"],
+            thinking=v2_fields["thinking"],
+            analysis=v2_fields["analysis"],
+            summary=v2_fields["summary"],
             difficulty=q_data.get("difficulty", 1),
             status=QuestionStatus.DRAFT, # Use DRAFT status for proposals
             subject_id=subject_id,

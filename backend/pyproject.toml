@@ -32,6 +32,8 @@ dependencies = [
     "weasyprint>=69.0",
     "python-docx>=1.2.0",
     "lxml>=6.1.2",
+    "markdown-it-py>=4.0.0",
+    "mdit-py-plugins>=0.6.1",
 ]
 
 [dependency-groups]
