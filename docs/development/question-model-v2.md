@@ -329,3 +329,350 @@ MD→Tiptap 转换器的**目标节点集必须 = 编辑器/渲染器 schema**(`
 - AI 导入:AI 产出 Markdown → 复用 §7 转换器入库。
 - Paper 导出:`RichDoc → LaTeX`(纯 Python 遍历,math 节点已带 `latex`)替换现有 `_md_to_latex`。
 - 判分引擎:基于 §6 的 `AnswerSpec` 做自动判分(选择/判断/填空)。
+
+
+
+---
+
+## 验收测试
+
+建议分成四层验证：自动测试、迁移演练、UI 手测、回滚验证。**不要先在唯一的生产数据库上试迁移**。
+
+**1. 自动验证**
+
+后端：
+
+```bash
+cd /home/rafi/code/for_mei/question-bank/backend
+
+uv run pytest -q
+uv run pytest tests/test_migrations.py -q
+uv run alembic heads
+```
+
+预期：
+
+- `125 passed`
+- 只有真实 MySQL 测试因未设置 `MYSQL_TEST_URL` 而跳过
+- Alembic 只有一个 head：`a7b8c9d0e1f2`
+
+前端：
+
+```bash
+cd /home/rafi/code/for_mei/question-bank/frontend
+
+pnpm test
+pnpm generate
+```
+
+预期：
+
+- `29 passed`
+- `pnpm generate` 成功生成 `.output/public`
+
+**2. 在测试数据库演练迁移**
+
+推荐新建独立 MySQL 数据库，例如 `question_bank_v2_test`，不要复用正式库。
+
+设置测试连接：
+
+```bash
+cd /home/rafi/code/for_mei/question-bank/backend
+
+export DB_URL='mysql+aiomysql://用户名:密码@127.0.0.1:3306/question_bank_v2_test'
+```
+
+先确认当前迁移状态：
+
+```bash
+uv run alembic current
+uv run alembic history --verbose
+```
+
+若测试从空库开始，先停在 v2 之前：
+
+```bash
+uv run alembic upgrade 326519e83a77
+```
+
+然后用 MySQL 客户端插入几条 v1 题目。至少准备：
+
+- 单选：答案 `A`
+- 多选：答案 `A、C`
+- 判断：答案 `对`
+- 填空：答案 `[["北京"], ["中国"]]`
+- 解答：Markdown 参考答案
+- 脏单选：答案 `见解析`
+
+示例：
+
+```sql
+INSERT INTO questions
+(content, options, answer, thinking, analysis, summary, q_type, status, difficulty)
+VALUES
+(
+  '下列哪项等于 **2**？',
+  JSON_ARRAY(
+    JSON_OBJECT('label', 'A', 'content', '1+1'),
+    JSON_OBJECT('label', 'B', 'content', '1+2')
+  ),
+  'A',
+  NULL,
+  '基础计算',
+  NULL,
+  'single_choice',
+  'published',
+  1
+);
+```
+
+执行完整升级：
+
+```bash
+uv run alembic upgrade head
+```
+
+检查结果：
+
+```sql
+SELECT
+    id,
+    q_type,
+    content_schema_version,
+    needs_review,
+    LEFT(content, 100) AS content_preview,
+    LEFT(answer, 100) AS answer_preview
+FROM questions
+ORDER BY id;
+
+SELECT question_id, content, answer, options
+FROM questions_content_archive_v1
+ORDER BY question_id;
+```
+
+验收标准：
+
+- 所有迁移行 `content_schema_version = 1`
+- 正常题目 `needs_review = 0`
+- 脏答案题目 `needs_review = 1`
+- `content` 是以 `{"type":"doc"...}` 开头的 JSON
+- `answer` 是包含 `kind` 的 AnswerSpec JSON
+- 选择题答案引用 `options[].id`，不再引用 `A/B`
+- 归档表行数与迁移前 v1 题目数一致
+- 归档表内容仍是原始 Markdown 和旧答案
+
+可执行：
+
+```sql
+SELECT COUNT(*) FROM questions_content_archive_v1;
+SELECT COUNT(*) FROM questions WHERE content_schema_version = 1;
+SELECT id, q_type FROM questions WHERE needs_review = 1;
+```
+
+**3. 验证迁移幂等和回滚**
+
+只回滚数据 revision，保留 v2 结构：
+
+```bash
+uv run alembic downgrade f1a2b3c4d5e6
+```
+
+检查：
+
+```sql
+SELECT
+    id,
+    content,
+    answer,
+    content_schema_version,
+    needs_review
+FROM questions;
+```
+
+预期：
+
+- 原始 Markdown 和旧答案恢复
+- `content_schema_version = 0`
+- `needs_review = 0`
+- `questions_content_archive_v1` 仍然存在
+
+重新升级：
+
+```bash
+uv run alembic upgrade head
+```
+
+确认第二次转换结果与第一次一致，归档表没有重复行。
+
+需要完整验证结构回滚时，可以在测试库运行：
+
+```bash
+uv run alembic downgrade 326519e83a77
+```
+
+确认新列被删除，原始字段仍已恢复。随后再次：
+
+```bash
+uv run alembic upgrade head
+```
+
+**4. 启动应用手动测试**
+
+后端：
+
+```bash
+cd /home/rafi/code/for_mei/question-bank/backend
+uv run fastapi dev app/main.py
+```
+
+前端：
+
+```bash
+cd /home/rafi/code/for_mei/question-bank/frontend
+pnpm dev
+```
+
+打开 [http://localhost:3000](http://localhost:3000)。
+
+当前前端开发服务器可能已经占用 `3000`。若提示端口冲突，可直接使用现有服务，或换端口：
+
+```bash
+pnpm dev --port 3001
+```
+
+**5. 五种题型 UI 清单**
+
+单选题：
+
+1. 新建单选题。
+2. 输入带粗体、公式和图片的题干。
+3. 填写至少两个选项。
+4. 选择一个正确答案。
+5. 保存并重新打开。
+6. 确认答案仍指向原选项。
+7. 删除已选中的选项，确认前端阻止无效保存或要求重新选择。
+
+多选题：
+
+1. 勾选两个以上答案。
+2. 保存并重新打开。
+3. 确认答案集合保持正确。
+4. 删除一个已选选项，确认答案引用被同步清理。
+
+判断题：
+
+1. 分别保存“正确”和“错误”。
+2. 确认请求中的 `correct` 是布尔值，而非字符串。
+3. 确认判断题没有 options。
+
+填空题：
+
+1. 在题干编辑器中点击“插入填空”。
+2. 插入两个空，确认答案区自动出现两个对应项。
+3. 为第一个空添加两个可接受答案。
+4. 输入公式答案。
+5. 删除题干中的一个 blank，确认答案区同步。
+6. 保存并重新打开，确认 `blankId` 顺序一致。
+
+解答题：
+
+1. 输入富文本参考答案。
+2. 加入公式、列表和图片。
+3. 保存并重新打开。
+4. 确认内容没有退化成 JSON 字符串或 Markdown 源码。
+
+**6. 富文本节点验证**
+
+至少测试：
+
+- 粗体、斜体
+- 上标、下标
+- 行内公式、块公式
+- 无序列表、有序列表
+- 图片上传
+- 表格
+- 填空节点
+- 空字段保存为 `null`
+
+重点检查：
+
+- 编辑器中正常显示
+- 列表页正常显示
+- 试卷题目页正常显示
+- 重新打开编辑器后结构没有丢失
+- 页面上不出现原始 `{"type":"doc"...}` JSON
+
+**7. 智能导入验证**
+
+在智能导入页准备两道题：
+
+- 一道答案明确，例如单选答案 `A`
+- 一道无法解析，例如答案 `见解析`
+
+提交后预期：
+
+- 明确题目成功导入
+- 无法解析题目被跳过并显示 warning
+- 不会创建 `legacy_unresolved` 新题目
+- 返回结果表现为部分成功
+- 数据库只增加成功题目
+
+接口是：
+
+```text
+POST /api/v1/questions/batch-legacy
+```
+
+**8. Paper 导出验证**
+
+创建包含五种题型的试卷，分别测试：
+
+- Markdown 导出
+- LaTeX/PDF 或现有支持的文档格式
+- 包含答案
+- 包含分析、解析、总结
+- 题干和答案含公式
+- 题干或选项含图片
+- 填空题含多个可接受答案
+
+重点确认：
+
+- 选择答案显示 `A/B`，而不是 `opt_xxx`
+- 判断答案显示“对/错”
+- RichDoc JSON 不会进入导出文件
+- 图片路径可正常解析
+- 表格至少不导致导出异常
+
+**9. 发布前数据库核对**
+
+```sql
+SELECT content_schema_version, COUNT(*)
+FROM questions
+GROUP BY content_schema_version;
+
+SELECT q_type, COUNT(*)
+FROM questions
+WHERE needs_review = 1
+GROUP BY q_type;
+
+SELECT COUNT(*) AS archive_count
+FROM questions_content_archive_v1;
+```
+
+发布前应满足：
+
+- 没有版本为 `0` 的题目
+- 所有 `needs_review=1` 行都有归档记录
+- 抽样确认归档原文能够恢复
+- 本发布不要删除归档表
+
+真实 MySQL 自动化验证可再运行：
+
+```bash
+cd /home/rafi/code/for_mei/question-bank/backend
+
+MYSQL_TEST_URL='mysql+aiomysql://用户名:密码@127.0.0.1:3306/question_bank_v2_test' \
+uv run pytest tests/test_migrations.py -q
+```
+
+这一步是发布前最重要的补充，因为本地自动测试目前只完整跑过 SQLite，MySQL 的 `LONGTEXT`、DDL 隐式提交和实际 downgrade 仍应在独立测试库验证。
