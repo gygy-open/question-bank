@@ -63,6 +63,8 @@ class Question(Base):
     content_schema_version = Column(
         SmallInteger, nullable=False, default=SCHEMA_VERSION, server_default=str(SCHEMA_VERSION)
     )
+    # 题干、选项、答案与解析等可发布内容变化时递增,供组稿检测引用是否过期。
+    content_revision = Column(Integer, nullable=False, default=1, server_default="1")
     # 迁移无法解析行的人工复核标记;不进入 API / pydantic schema。
     needs_review = Column(Boolean, nullable=False, default=False, server_default=text("0"))
 

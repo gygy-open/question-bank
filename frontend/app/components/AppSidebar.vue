@@ -26,7 +26,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import UserProfileDialog from '~/components/UserProfileDialog.vue'
 import ChangePasswordDialog from '~/components/ChangePasswordDialog.vue'
 import { useColorMode } from '@vueuse/core'
-import { BookOpen, ChevronsUpDown, ListTree, LogOut, Settings, Sparkles, User, Users, Tags, Library, HelpCircle, KeyRound, Activity, Layers, ClipboardList, Info, Moon, Sun, Bot } from '@lucide/vue'
+import { BookOpen, ChevronsUpDown, ListTree, LogOut, Settings, Sparkles, User, Users, Tags, Library, HelpCircle, KeyRound, Activity, Layers, ClipboardList, Info, Moon, Sun, Bot, FolderTree } from '@lucide/vue'
 
 const props = withDefaults(defineProps<SidebarProps>(), {
   collapsible: "icon",
@@ -107,10 +107,18 @@ const navActiveClass = 'border-l-2 border-transparent data-[active=true]:border-
                 </SidebarMenuButton>
               </SidebarMenuItem>
               <SidebarMenuItem>
+                <SidebarMenuButton as-child :is-active="route.path.startsWith('/compositions')" :class="navActiveClass">
+                  <NuxtLink to="/compositions/shared">
+                    <FolderTree />
+                    <span>组稿工作台</span>
+                  </NuxtLink>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+              <SidebarMenuItem>
                 <SidebarMenuButton as-child :is-active="route.path.startsWith('/papers')" :class="navActiveClass">
                   <NuxtLink to="/papers">
                     <ClipboardList />
-                    <span>我的试卷</span>
+                    <span>我的试卷（旧版）</span>
                   </NuxtLink>
                 </SidebarMenuButton>
               </SidebarMenuItem>

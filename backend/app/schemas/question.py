@@ -214,6 +214,7 @@ class Question(QuestionBase):
     id: int
     import_task_id: Optional[int] = None
     subject_id: Optional[int] = None
+    content_revision: int = 1
     knowledge_points: List[KnowledgePoint] = []
     created_at: datetime
     updated_at: datetime

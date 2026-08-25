@@ -11,3 +11,13 @@ from .system_setting import SystemSetting, SystemSettingCreate, SystemSettingUpd
 from .subject_prompt import SubjectPromptOut, SubjectPromptUpdate
 from .activity_log import ActivityLog, ActivityLogCreate, ActivityLogPage
 from .import_task import ImportTask, ImportTaskCreate, ImportTaskUpdate
+from .composition import (
+    FolderCreate, FolderUpdate, FolderRead,
+    FolderCreateRequest, FolderUpdateRequest,
+    CompositionCreate, CompositionUpdate, CompositionRead, CompositionDetail,
+    CompositionCreateRequest, CompositionMetaUpdateRequest,
+    CompositionBlockCreate, CompositionBlockRead,
+    CompositionBlockReplaceItem,
+    CompositionBlocksReplaceRequest, CompositionBlocksReplaceResponse,
+    CompositionVersionRead, CompositionEventRead,
+)

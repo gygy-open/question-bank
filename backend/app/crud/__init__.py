@@ -7,3 +7,4 @@ from .crud_system_setting import system_setting
 from .crud_subject_prompt import subject_prompt
 from .crud_activity_log import activity_log
 from .crud_paper import paper
+from .crud_composition import folder, composition

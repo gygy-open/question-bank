@@ -13,3 +13,13 @@ from .ai_config import AIProvider, AIModel
 from .chat import ChatSession, ChatMessage
 from .prompt import PromptTemplate
 from .paper import Paper, PaperQuestion
+from .composition import (
+    ScopeType,
+    CompositionStatus,
+    CompositionBlockType,
+    Folder,
+    Composition,
+    CompositionBlock,
+    CompositionVersion,
+    CompositionEvent,
+)

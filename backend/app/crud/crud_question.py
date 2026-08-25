@@ -387,6 +387,37 @@ class CRUDQuestion(CRUDBase[Question, QuestionCreate, QuestionUpdate]):
             partial=False,
         )
 
+        # content_revision 生命周期:仅当规范化后的题目内容(content/options/answer/
+        # thinking/analysis/summary/q_type)真正变化时 +1;metadata(tag/kp/status/
+        # difficulty/source/subject_id/parent_id)变化不递增。
+        before_thinking = parse_json_field(db_obj.thinking)
+        before_analysis = parse_json_field(db_obj.analysis)
+        before_summary = parse_json_field(db_obj.summary)
+        after_thinking = (
+            parse_json_field(update_data["thinking"])
+            if "thinking" in update_data
+            else before_thinking
+        )
+        after_analysis = (
+            parse_json_field(update_data["analysis"])
+            if "analysis" in update_data
+            else before_analysis
+        )
+        after_summary = (
+            parse_json_field(update_data["summary"])
+            if "summary" in update_data
+            else before_summary
+        )
+        content_changed = (
+            parse_json_field(db_obj.content) != merged_content
+            or parse_json_field(db_obj.answer) != merged_answer
+            or (db_obj.options or None) != (merged_options or None)
+            or db_obj.q_type != merged_q_type
+            or before_thinking != after_thinking
+            or before_analysis != after_analysis
+            or before_summary != after_summary
+        )
+
         db_obj.content = to_db_json(merged_content)
         db_obj.answer = to_db_json(merged_answer)
         db_obj.options = merged_options
@@ -397,6 +428,9 @@ class CRUDQuestion(CRUDBase[Question, QuestionCreate, QuestionUpdate]):
         for field in ("status", "difficulty", "source", "subject_id", "parent_id"):
             if field in update_data:
                 setattr(db_obj, field, update_data[field])
+
+        if content_changed:
+            db_obj.content_revision = (db_obj.content_revision or 1) + 1
 
         if user_id:
             db_obj.updated_by = user_id

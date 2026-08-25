@@ -257,3 +257,81 @@ async def test_tag_filter_matches_only_tagged_questions(db_session):
 
     assert len(tagged) == 1
     assert QuestionSchema.model_validate(tagged[0]).content == doc("带标签")
+
+
+# --------------------------------------------------------------------------- #
+# content_revision 生命周期
+# --------------------------------------------------------------------------- #
+async def test_content_revision_starts_at_one(db_session):
+    subject, _, _ = await _seed_taxonomy(db_session)
+    created = await crud_question.create_with_tags(
+        db_session, obj_in=_single_choice(subject_id=subject.id)
+    )
+    assert created.content_revision == 1
+
+
+async def test_content_change_bumps_content_revision(db_session):
+    subject, _, _ = await _seed_taxonomy(db_session)
+    created = await crud_question.create_with_tags(
+        db_session, obj_in=_single_choice(subject_id=subject.id)
+    )
+
+    updated = await crud_question.update_with_tags(
+        db_session, db_obj=created, obj_in=QuestionUpdate(content=doc("新题干"))
+    )
+
+    assert updated.content_revision == 2
+
+
+async def test_metadata_only_update_does_not_bump_content_revision(db_session):
+    subject, tag, kp = await _seed_taxonomy(db_session)
+    created = await crud_question.create_with_tags(
+        db_session, obj_in=_single_choice(subject_id=subject.id)
+    )
+
+    updated = await crud_question.update_with_tags(
+        db_session,
+        db_obj=created,
+        obj_in=QuestionUpdate(
+            status=QuestionStatus.PENDING,
+            difficulty=5,
+            source="来源",
+            tag_ids=[tag.id],
+            knowledge_point_ids=[kp.id],
+        ),
+    )
+
+    assert updated.content_revision == 1
+
+
+async def test_resubmitting_same_content_does_not_bump_content_revision(db_session):
+    subject, _, _ = await _seed_taxonomy(db_session)
+    created = await crud_question.create_with_tags(
+        db_session, obj_in=_single_choice(subject_id=subject.id)
+    )
+
+    updated = await crud_question.update_with_tags(
+        db_session,
+        db_obj=created,
+        obj_in=QuestionUpdate(
+            content=doc("题干"),
+            options=_options(),
+            answer={"kind": "single_choice", "correct": "opt_a"},
+        ),
+    )
+
+    assert updated.content_revision == 1
+
+
+async def test_content_revision_exposed_in_read_schema(db_session):
+    subject, _, _ = await _seed_taxonomy(db_session)
+    created = await crud_question.create_with_tags(
+        db_session, obj_in=_single_choice(subject_id=subject.id)
+    )
+    updated = await crud_question.update_with_tags(
+        db_session, db_obj=created, obj_in=QuestionUpdate(analysis=doc("解析"))
+    )
+
+    schema = QuestionSchema.model_validate(updated)
+    assert schema.content_revision == 2
+
