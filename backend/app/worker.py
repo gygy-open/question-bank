@@ -13,16 +13,12 @@ sys.path.append(str(Path(__file__).parent.parent))
 from app.db.session import SessionLocal
 from app.core.config import get_db_url, is_configured
 from app.models.import_task import ImportTask, ImportTaskStatus
-from app.models.question import QuestionStatus, QuestionType
+from app.models.question import QuestionStatus
 from app.models.user import User
-from app.schemas.question import QuestionCreate
 from app.services.doc_processor import doc_processor
 from app.services.embedding import reload_embedding_function
-from app.services.question_service import question_service
-from app.services.question_legacy_adapter import (
-    LegacyQuestionError,
-    adapt_legacy_question,
-)
+from app.services.importing.contracts import ImportDefaults
+from app.services.importing.normalize import question_importer
 
 logging.basicConfig(
     level=logging.INFO,
@@ -68,95 +64,32 @@ async def process_task(db: AsyncSession, task: ImportTask):
             result = await doc_processor.process_markdown(content, db=db, filename=task.original_filename, task_id=proc_task_id, mode=task.mode or "extract", subject_id=subject_id)
             
         if result:
-            # Save questions
+            # Save questions via the shared importer (same path as /questions/batch-legacy).
             questions_data = result.get("questions", [])
-            saved_count = 0
-            failed_count = 0
-            
-            creator_id = task.user_id
-            
-            for q_data in questions_data:
-                # Determine type enum
-                q_type_str = q_data.get("q_type", q_data.get("type", "single_choice")).lower()
-                q_type = QuestionType.SINGLE_CHOICE
-                
-                if "multiple" in q_type_str: 
-                    q_type = QuestionType.MULTIPLE_CHOICE
-                elif "true" in q_type_str or "false" in q_type_str: 
-                    q_type = QuestionType.TRUE_FALSE
-                elif "fill" in q_type_str or "blank" in q_type_str or "填空" in q_type_str: 
-                    q_type = QuestionType.FILL_IN_THE_BLANK
-                elif "free" in q_type_str or "response" in q_type_str or "essay" in q_type_str or "解答" in q_type_str or "short" in q_type_str: 
-                    q_type = QuestionType.FREE_RESPONSE
+            defaults = ImportDefaults(
+                subject_id=subject_id,
+                status=QuestionStatus.PENDING,
+                source=task.original_filename,
+            )
+            report = await question_importer.import_batch(
+                db,
+                questions_data,
+                user_id=task.user_id,
+                import_task_id=task.id,
+                defaults=defaults,
+            )
 
-                # Legacy(旧字符串)→ 严格 v2 字段。无法解析的答案在此处直接失败,
-                # 不静默写入 legacy_unresolved。
-                try:
-                    v2_fields = adapt_legacy_question(
-                        q_type=q_type,
-                        status=QuestionStatus.PENDING,
-                        content=q_data.get("content"),
-                        options=q_data.get("options"),
-                        answer=q_data.get("answer"),
-                        thinking=q_data.get("thinking"),
-                        analysis=q_data.get("analysis"),
-                        summary=q_data.get("summary"),
-                    )
-                except LegacyQuestionError as adapt_err:
-                    failed_count += 1
-                    logger.warning(
-                        f"Task {task.id}: skip un-adaptable legacy question: {adapt_err}"
-                    )
-                    continue
-
-                # Prepare AI suggested tags
-                ai_suggested_tags = {}
-                if q_data.get("tags"):
-                    ai_suggested_tags["ai_extracted"] = q_data.get("tags")
-
-
-                # Prepare Knowledge Point IDs
-                raw_kp_ids = q_data.get("knowledge_point_ids")
-                kp_ids = []
-                if raw_kp_ids:
-                    try:
-                        kp_ids = [int(i) for i in raw_kp_ids]
-                    except Exception:
-                        kp_ids = []
-
-                # Create Question Schema
-                question_in = QuestionCreate(
-                    content=v2_fields["content"],
-                    options=v2_fields["options"],
-                    answer=v2_fields["answer"],
-                    thinking=v2_fields["thinking"],
-                    analysis=v2_fields["analysis"],
-                    summary=v2_fields["summary"],
-                    q_type=q_type,
-                    status=QuestionStatus.PENDING,
-                    difficulty=q_data.get("difficulty", 1),
-                    subject_id=subject_id,
-                    knowledge_point_ids=kp_ids,
-                    ai_suggested_tags=ai_suggested_tags,
-                    source=task.original_filename
-                )
-
-                await question_service.create_question(
-                    db=db,
-                    question_in=question_in,
-                    user_id=creator_id,
-                    import_task_id=task.id
-                )
-
-                saved_count += 1
-            
             task.result_summary = json.dumps(
-                {"count": saved_count, "failed": failed_count, "proc_task_id": result.get("task_id")}
+                {
+                    "count": report.saved_count,
+                    "failed": report.failed_count,
+                    "proc_task_id": result.get("task_id"),
+                }
             )
             task.status = ImportTaskStatus.COMPLETED
             logger.info(
-                f"Task {task.id} completed. Saved {saved_count} questions, "
-                f"{failed_count} skipped (un-adaptable)."
+                f"Task {task.id} completed. Saved {report.saved_count} questions, "
+                f"{report.failed_count} skipped (un-adaptable)."
             )
         else:
             task.status = ImportTaskStatus.FAILED

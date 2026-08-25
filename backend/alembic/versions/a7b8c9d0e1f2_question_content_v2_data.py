@@ -5,7 +5,7 @@
 1. 建无 FK 归档表 ``questions_content_archive_v1``(不进 ORM),快照 v1 原文。
 2. 以 ``content_schema_version < 1`` 为幂等闸门,分批:
    - 把尚未归档的 v0 行原文写入归档表;
-   - 调 ``app.services.question_content_v1`` 把六个内容字段 + options 转成 v2 JSON,
+     - 调 ``app.services.question_content_converter`` 把六个内容字段 + options 转成 v2 JSON,
      置 ``content_schema_version = 1``、``needs_review`` 依转换结果;
    - ``legacy_unresolved`` 的选择/判断答案:原答案原文并入 ``analysis``(不覆盖原解析)。
 3. 末尾把 ``content_schema_version`` 的 server_default 从 0 改为 1(与 ORM 对齐)。
@@ -29,7 +29,7 @@ from alembic import op
 import sqlalchemy as sa
 from sqlalchemy.dialects.mysql import LONGTEXT
 
-from app.services.question_content_v1 import (
+from app.services.question_content_converter import (
     convert_answer,
     convert_options_with_review,
     markdown_to_rich_doc_with_review,

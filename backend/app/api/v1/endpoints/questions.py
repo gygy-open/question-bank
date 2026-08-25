@@ -8,7 +8,8 @@ from app.api import deps
 from app.models.question import QuestionType, Question, QuestionStatus
 from app.models.import_task import ImportTask, ImportTaskStatus
 from app.services.question_service import question_service
-from app.services.question_legacy_adapter import LegacyQuestionError, adapt_legacy_question
+from app.services.importing.contracts import ImportDefaults
+from app.services.importing.normalize import question_importer
 from app.services.activity_logger import log_activity
 
 router = APIRouter()
@@ -194,58 +195,27 @@ async def create_questions_batch_legacy(
     await db.commit()
     await db.refresh(import_task)
 
-    created: List[models.Question] = []
-    failed: List[schemas.LegacyBatchError] = []
-
-    for index, item in enumerate(batch_in.questions):
-        try:
-            v2_fields = adapt_legacy_question(
-                q_type=item.q_type,
-                status=item.status,
-                content=item.content,
-                options=item.options,
-                answer=item.answer,
-                thinking=item.thinking,
-                analysis=item.analysis,
-                summary=item.summary,
-            )
-        except LegacyQuestionError as adapt_err:
-            failed.append(schemas.LegacyBatchError(index=index, message=str(adapt_err)))
-            continue
-
-        subject_id = item.subject_id or current_user.last_active_subject_id or current_user.subject_id
-        question_in = schemas.QuestionCreate(
-            content=v2_fields["content"],
-            options=v2_fields["options"],
-            answer=v2_fields["answer"],
-            thinking=v2_fields["thinking"],
-            analysis=v2_fields["analysis"],
-            summary=v2_fields["summary"],
-            q_type=item.q_type,
-            status=item.status,
-            difficulty=item.difficulty,
-            subject_id=subject_id,
-            knowledge_point_ids=item.knowledge_point_ids,
-            tag_ids=item.tag_ids or [],
-            ai_suggested_tags=item.ai_suggested_tags,
-            source=item.source or batch_in.filename,
-        )
-        try:
-            question = await question_service.create_question(
-                db=db,
-                question_in=question_in,
-                user_id=current_user.id,
-                import_task_id=import_task.id,
-            )
-        except ValueError as create_err:
-            failed.append(schemas.LegacyBatchError(index=index, message=str(create_err)))
-            continue
-        created.append(question)
+    raws = [item.model_dump() for item in batch_in.questions]
+    defaults = ImportDefaults(
+        subject_id=current_user.last_active_subject_id or current_user.subject_id,
+        status=QuestionStatus.PENDING,
+        source=batch_in.filename,
+    )
+    report = await question_importer.import_batch(
+        db,
+        raws,
+        user_id=current_user.id,
+        import_task_id=import_task.id,
+        defaults=defaults,
+    )
 
     return schemas.LegacyBatchResult(
         import_task_id=import_task.id,
-        created=created,
-        failed=failed,
+        created=report.created,
+        failed=[
+            schemas.LegacyBatchError(index=f.index, message=f.message)
+            for f in report.failed
+        ],
     )
 
 @router.get("/{id}", response_model=schemas.Question)

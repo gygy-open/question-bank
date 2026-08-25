@@ -15,7 +15,7 @@ from alembic.script import ScriptDirectory
 from sqlalchemy import create_engine
 
 from app.db.migrations import _alembic_config
-from app.services.question_content_v1 import rich_doc_to_plain_text
+from app.services.question_content_converter import rich_doc_to_plain_text
 
 # Set by the CI MySQL job to a real server; skipped locally when unset.
 MYSQL_TEST_URL = os.getenv("MYSQL_TEST_URL")

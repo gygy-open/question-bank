@@ -16,7 +16,7 @@ from __future__ import annotations
 import re
 from typing import Any, Optional
 
-from app.services.question_content_v1 import (
+from app.services.question_content_converter import (
     convert_answer,
     make_option_id,
     markdown_to_rich_doc,

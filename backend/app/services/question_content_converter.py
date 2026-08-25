@@ -1,4 +1,6 @@
-"""题目内容 v1 → v2 转换器(纯 Python,供 Alembic data-migration 调用)。
+"""题目内容转换器:legacy/Markdown → `content_schema_version = 1` 的 RichDoc/AnswerSpec。
+
+纯 Python,供 Alembic data-migration 与运行时导入/渲染路径共用。
 
 职责:
 - 把存量 Markdown 字符串转成 Tiptap `RichDoc` JSON(`markdown_to_rich_doc`)。

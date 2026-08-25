@@ -2,7 +2,7 @@
 
 import json
 
-from app.services.question_content_v1 import (
+from app.services.question_content_converter import (
     convert_answer,
     convert_options,
     convert_options_with_review,

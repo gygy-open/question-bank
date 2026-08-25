@@ -17,7 +17,7 @@ import math
 from typing import Any, Optional
 
 from app.services.question_content import parse_json_field
-from app.services.question_content_v1 import rich_doc_to_plain_text
+from app.services.question_content_converter import rich_doc_to_plain_text
 
 __all__ = [
     "rich_doc_to_markdown",
