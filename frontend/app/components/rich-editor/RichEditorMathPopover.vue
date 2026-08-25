@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, watch, nextTick } from 'vue'
+import { computed, ref, watch, nextTick } from 'vue'
 import { MathfieldElement } from 'mathlive'
 import 'mathlive/static.css'
 import { Button } from '@/components/ui/button'
@@ -25,6 +25,9 @@ const emit = defineEmits<{
 
 const mathfieldRef = ref<HTMLElement | null>(null)
 const posStyle = ref<Record<string, string>>({})
+const teleportTarget = computed(
+    () => props.anchorEl?.closest<HTMLElement>('[role="dialog"]') ?? 'body',
+)
 
 function position() {
     const el = props.anchorEl
@@ -42,7 +45,7 @@ function position() {
         position: 'fixed',
         top: `${rect.bottom + 6}px`,
         left: `${left}px`,
-        zIndex: '50',
+        zIndex: '60',
     }
 }
 
@@ -86,7 +89,7 @@ watch(
 </script>
 
 <template>
-    <Teleport to="body">
+    <Teleport :to="teleportTarget">
         <div
             v-if="open"
             class="rich-math-popover w-80 rounded-md border border-border bg-popover p-2 shadow-md"
