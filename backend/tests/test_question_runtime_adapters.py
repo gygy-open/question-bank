@@ -26,7 +26,7 @@ from app.services.question_render import (
     rich_doc_to_markdown,
     rich_doc_to_plain_text,
 )
-from app.services import paper_generator as pg_module
+from app.schemas.paper import OutputFormat
 from app.services.paper_generator import PaperGenerator
 
 
@@ -351,7 +351,7 @@ def test_answer_formatter_accepts_json_string():
 
 
 # --------------------------------------------------------------------------- #
-# 6. Paper 导出最小路径(Markdown / LaTeX,mock pypandoc)
+# 6. Paper 导出:RichDoc → LaTeX / DOCX 直连(无 pandoc、无 JSON 泄漏)
 # --------------------------------------------------------------------------- #
 def _make_question(**overrides):
     q = types.SimpleNamespace(
@@ -374,19 +374,43 @@ def _make_question(**overrides):
     return q
 
 
-def test_paper_generate_markdown_renders_v2():
+def _read_zip_tex(path: str) -> str:
+    import zipfile
+
+    with zipfile.ZipFile(path) as zf:
+        name = next(n for n in zf.namelist() if n.endswith(".tex"))
+        return zf.read(name).decode("utf-8")
+
+
+def _read_docx_xml(path: str) -> str:
+    import zipfile
+
+    with zipfile.ZipFile(path) as zf:
+        return zf.read("word/document.xml").decode("utf-8")
+
+
+def test_paper_generate_latex_renders_v2():
+    import os
+
     gen = PaperGenerator()
     q = _make_question()
-    md = gen.generate_markdown("卷子", [q])
-    # 题干/选项/答案均已渲染,且没有 JSON 原文泄漏。
-    assert "题干 $x^2$" in md
-    assert "**甲**" in md
-    assert "**【答案】** B" in md
-    assert '"type": "doc"' not in md
-    assert '{"kind"' not in md
+    path = gen.generate_file("卷子", [q], OutputFormat.LATEX)
+    try:
+        tex = _read_zip_tex(path)
+    finally:
+        os.remove(path)
+    # 题干/选项/公式/答案均已渲染,无 JSON 原文泄漏,走 exam choices 环境。
+    assert "题干" in tex
+    assert "$x^2$" in tex
+    assert "\\begin{choices}" in tex
+    assert "【答案】" in tex and "B" in tex
+    assert '"type": "doc"' not in tex
+    assert '{"kind"' not in tex
 
 
-def test_paper_generate_markdown_fill_answer():
+def test_paper_generate_latex_fill_answer():
+    import os
+
     gen = PaperGenerator()
     answer = {
         "kind": "fill_in_the_blank",
@@ -398,26 +422,26 @@ def test_paper_generate_markdown_fill_answer():
         content=to_db_json(markdown_to_rich_doc("答案是___")),
         answer=to_db_json(answer),
     )
-    md = gen.generate_markdown("卷子", [q])
-    assert "**【答案】** 42" in md
+    path = gen.generate_file("卷子", [q], OutputFormat.LATEX)
+    try:
+        tex = _read_zip_tex(path)
+    finally:
+        os.remove(path)
+    assert "42" in tex
 
 
-def test_paper_generate_latex_uses_markdown_not_json(monkeypatch):
-    captured = []
+def test_paper_generate_docx_has_omml_and_no_json():
+    import os
 
-    def fake_convert(text, to, format=None, outputfile=None, extra_args=None):
-        captured.append(text)
-        return "TEX"
-
-    monkeypatch.setattr(pg_module.pypandoc, "convert_text", fake_convert)
     gen = PaperGenerator()
     q = _make_question()
-    result = gen.generate_latex_via_jinja("卷子", [q])
-    assert isinstance(result, str)
-    # 送进 pypandoc 的必须是渲染后的 Markdown,而非 JSON 原文。
-    assert captured, "pypandoc should have been called"
-    for text in captured:
-        assert '"type": "doc"' not in text
-        assert '{"kind"' not in text
-    joined = "\n".join(captured)
-    assert "题干 $x^2$" in joined
+    path = gen.generate_file("卷子", [q], OutputFormat.DOCX)
+    try:
+        xml = _read_docx_xml(path)
+    finally:
+        os.remove(path)
+    # 题干文本进 run、行内公式 $x^2$ 变成 OMML,绝无 JSON 原文泄漏。
+    assert "题干" in xml
+    assert "oMath" in xml
+    assert '"type": "doc"' not in xml
+    assert '{"kind"' not in xml
