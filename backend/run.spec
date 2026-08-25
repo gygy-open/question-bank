@@ -44,6 +44,7 @@ for pkg in [
     "aiomysql",
     "pystray",
     "PIL",
+    "latex2mathml",
 ]:
     try:
         d, b, h = collect_all(pkg)
