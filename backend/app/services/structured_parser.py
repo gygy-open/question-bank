@@ -8,6 +8,7 @@ Design: "【题目】切块 + 字段状态机 + 白名单行首标签 + 尽力�
 The output shape matches what the AI extraction path returns so it can flow
 through the same frontend review -> import pipeline.
 """
+import json
 import re
 from collections import defaultdict
 from typing import List, Dict, Optional, Tuple
@@ -23,7 +24,7 @@ TAG_ALIASES = {
     # answer
     "答案": "answer", "参考答案": "answer", "answer": "answer",
     # analysis
-    "解析": "analysis", "解答": "analysis", "analysis": "analysis",
+    "解析": "analysis", "详解": "analysis", "解答": "analysis", "analysis": "analysis",
     # thinking
     "思路": "thinking", "分析": "thinking", "thinking": "thinking",
     # summary
@@ -55,10 +56,30 @@ _TRUE_FALSE_ANSWERS = {
 # Optional leading numbering like "1." "1、" "(1)" before a tag, then a bracketed
 # tag using full-width 【】 or half-width [], then optional colon, then inline text.
 _TAG_RE = re.compile(
-    r'^\s*(?:\(?\d+\)?[\.、\．]?\s*)?[【\[]\s*([^\]】]+?)\s*[】\]]\s*[:：]?\s*(.*)$'
+    r'^\s*(?:\*\*)?(?:\(?\d+\)?[\.、\．]?\s*)?[【\[]\s*([^\]】]+?)\s*[】\]]'
+    r'(?:\*\*)?\s*[:：]?\s*(.*?)\s*(?:\*\*)?\s*$'
 )
 
 _OPTION_TAG_RE = re.compile(r'^(?:选项|option)\s*([A-Za-z])$', re.IGNORECASE)
+_BLOCKQUOTE_PREFIX_RE = re.compile(r'^\s*(?:>\s*)+')
+_BLANK_UNDERSCORE_RE = re.compile(r'(?:\\?_){3,}')
+_INLINE_ANALYSIS_TAG_RE = re.compile(
+    r'(?=[【\[]\s*(?:解析|详解|解答|analysis)\s*[】\]])',
+    re.IGNORECASE,
+)
+_SECTION_HEADING_RE = re.compile(
+    r'^\s*(?:\*\*)?(?:#{1,6}\s*)?'
+    r'(?:[一二三四五六七八九十百]+|\d+)\s*[、\.．]\s*'
+    r'(?:单选|多选|选择|填空|判断|解答|简答|综合).*题',
+)
+
+
+def _strip_blockquote_prefix(line: str) -> str:
+    return _BLOCKQUOTE_PREFIX_RE.sub('', line, count=1)
+
+
+def _is_section_heading(line: str) -> bool:
+    return bool(_SECTION_HEADING_RE.match(line))
 
 
 def _match_tag(line: str) -> Optional[Tuple[str, str, Optional[str]]]:
@@ -86,7 +107,7 @@ def _match_tag(line: str) -> Optional[Tuple[str, str, Optional[str]]]:
 
 def _split_option_block(text: str) -> List[str]:
     """Split a single 【选项】 block into ["A. ...", "B. ...", ...]."""
-    pattern = re.compile(r'([A-Za-z])\s*[\.、\)．]\s*')
+    pattern = re.compile(r'(?<!\S)([A-Za-z])\s*[\.、\)．]\s*')
     matches = list(pattern.finditer(text))
     if not matches:
         return []
@@ -103,7 +124,7 @@ def _split_option_block(text: str) -> List[str]:
 def _map_q_type(raw: str) -> Optional[str]:
     if not raw:
         return None
-    key = raw.strip()
+    key = raw.splitlines()[0].strip()
     return _Q_TYPE_MAP.get(key) or _Q_TYPE_MAP.get(key.lower())
 
 
@@ -116,7 +137,7 @@ def _infer_q_type(options: List[str], answer: str, content: str) -> str:
         return "single_choice"
     if a in _TRUE_FALSE_ANSWERS:
         return "true_false"
-    if "___" in content or "（）" in content or "（  ）" in content:
+    if _BLANK_UNDERSCORE_RE.search(content) or "（）" in content or "（  ）" in content:
         return "fill_in_the_blank"
     return "free_response"
 
@@ -153,6 +174,14 @@ def _build_question(fields: Dict[str, List[str]],
             difficulty = _CN_DIFFICULTY.get(difficulty_raw.strip(), 1)
 
     q_type = _map_q_type(q_type_raw) or _infer_q_type(options, answer, content)
+
+    if q_type == "fill_in_the_blank" and answer:
+        try:
+            parsed_answer = json.loads(answer)
+        except json.JSONDecodeError:
+            parsed_answer = None
+        if not isinstance(parsed_answer, list):
+            answer = json.dumps([[answer]], ensure_ascii=False)
 
     warnings: List[str] = []
     if not content:
@@ -203,6 +232,9 @@ def _parse_block(lines: List[str]) -> dict:
                 current_option = None
                 if inline.strip():
                     fields[field].append(inline)
+        elif _is_section_heading(line):
+            current_field = None
+            current_option = None
         else:
             if current_field == "option_item" and current_option is not None:
                 option_items[current_option].append(line)
@@ -221,7 +253,12 @@ def parse_structured(text: str) -> List[dict]:
     the corresponding field empty; per-question issues are collected into a
     "warnings" list instead of raising.
     """
-    lines = (text or "").splitlines()
+    lines = [
+        part
+        for line in (text or "").splitlines()
+        for part in _INLINE_ANALYSIS_TAG_RE.split(_strip_blockquote_prefix(line))
+        if part
+    ]
     blocks: List[List[str]] = []
     current: Optional[List[str]] = None
     preamble_count = 0

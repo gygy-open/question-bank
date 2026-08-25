@@ -1,16 +1,18 @@
-from fastapi import APIRouter, UploadFile, File, HTTPException, Depends, Body
-from pydantic import BaseModel
-from app.services.doc_processor import doc_processor
-from app.core.config import settings
-from app.api import deps
-import shutil
-from pathlib import Path
-import tempfile
-import os
-import uuid
 import asyncio
+import logging
+import shutil
+import uuid
+from pathlib import Path
+
+from fastapi import APIRouter, File, HTTPException, UploadFile
+from pydantic import BaseModel
+
+from app.api import deps
+from app.core.config import settings
+from app.services.doc_processor import doc_processor
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
 
 class MarkdownContentRequest(BaseModel):
     content: str
@@ -47,7 +49,14 @@ async def upload_docx(
         result["file_path"] = str(file_path)
         return result
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.exception(
+            "Failed to process DOCX: filename=%s mode=%s method=%s subject_id=%s",
+            file.filename,
+            mode,
+            method,
+            subject_id,
+        )
+        raise HTTPException(status_code=500, detail=str(e)) from e
 
 @router.post("/markdown")
 async def upload_markdown(
@@ -82,7 +91,14 @@ async def upload_markdown(
         result["file_path"] = str(file_path)
         return result
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.exception(
+            "Failed to process Markdown: filename=%s mode=%s method=%s subject_id=%s",
+            file.filename,
+            mode,
+            method,
+            subject_id,
+        )
+        raise HTTPException(status_code=500, detail=str(e)) from e
 
 @router.post("/markdown-text")
 async def upload_markdown_text(
@@ -94,7 +110,14 @@ async def upload_markdown_text(
         result = await doc_processor.process_markdown(request.content, db=db, filename=request.filename, mode=request.mode, method=request.method, subject_id=request.subject_id)
         return result
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.exception(
+            "Failed to process Markdown text: filename=%s mode=%s method=%s subject_id=%s",
+            request.filename,
+            request.mode,
+            request.method,
+            request.subject_id,
+        )
+        raise HTTPException(status_code=500, detail=str(e)) from e
 
 @router.post("/image-recognition")
 async def upload_image_recognition(
@@ -111,7 +134,13 @@ async def upload_image_recognition(
         result = await doc_processor.process_image(file.file, db=db, mode=mode, subject_id=subject_id)
         return result
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.exception(
+            "Failed to process image: filename=%s mode=%s subject_id=%s",
+            file.filename,
+            mode,
+            subject_id,
+        )
+        raise HTTPException(status_code=500, detail=str(e)) from e
 
 @router.post("/image")
 async def upload_image(file: UploadFile = File(...)):
