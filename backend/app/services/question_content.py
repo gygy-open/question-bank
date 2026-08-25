@@ -28,6 +28,11 @@ CHOICE_TYPES = {QuestionType.SINGLE_CHOICE, QuestionType.MULTIPLE_CHOICE}
 # ORM 中以 JSON 字符串存储的富文本 / AnswerSpec 列(options 是原生 JSON 列,不在此列)。
 JSON_STRING_FIELDS = ("content", "answer", "thinking", "analysis", "summary")
 
+# 填空节点可调整宽度(em)的合法区间;缺省时按默认宽度渲染。
+BLANK_WIDTH_MIN_EM = 2
+BLANK_WIDTH_MAX_EM = 30
+BLANK_WIDTH_DEFAULT_EM = 4
+
 
 # --------------------------------------------------------------------------- #
 # JSON 边界:解析(ORM string → object) / 序列化(object → ORM string)
@@ -101,6 +106,20 @@ def validate_rich_doc(doc: Any) -> Optional[RichDoc]:
                     raise ValueError(
                         f"image {name} must be a finite number between 0 and 20000 px"
                     )
+        if node.get("type") == "blank":
+            # widthEm 可选;缺省由渲染侧按默认宽度处理。给定时必须是 2..30 的有限数字。
+            value = (node.get("attrs") or {}).get("widthEm")
+            if value is not None and (
+                not isinstance(value, (int, float))
+                or isinstance(value, bool)
+                or not math.isfinite(float(value))
+                or float(value) < BLANK_WIDTH_MIN_EM
+                or float(value) > BLANK_WIDTH_MAX_EM
+            ):
+                raise ValueError(
+                    f"blank widthEm must be a finite number between "
+                    f"{BLANK_WIDTH_MIN_EM} and {BLANK_WIDTH_MAX_EM}"
+                )
         for child in node.get("content") or []:
             validate_node(child)
 

@@ -31,4 +31,13 @@ const html = computed(() => renderRichContentToHTML(props.content))
     max-width: 100%;
     height: auto;
 }
+
+.rich-content :deep(.rich-blank) {
+    display: inline-block;
+    min-width: 2em;
+    height: 1em;
+    margin: 0 0.15em;
+    border-bottom: 1px solid currentColor;
+    vertical-align: baseline;
+}
 </style>

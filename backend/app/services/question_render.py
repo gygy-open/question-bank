@@ -26,6 +26,21 @@ __all__ = [
     "answer_spec_to_markdown",
 ]
 
+# 填空占位在 Markdown/Pandoc 中用一段连续下划线表示,宽度随 widthEm 线性缩放
+# (1 em ≈ 1 个下划线),默认 4;越界或非法值回退默认,保证导出稳定。
+_BLANK_WIDTH_MIN_EM = 2
+_BLANK_WIDTH_MAX_EM = 30
+_BLANK_WIDTH_DEFAULT_EM = 4
+
+
+def _blank_underscores(node: dict[str, Any]) -> str:
+    value = (node.get("attrs") or {}).get("widthEm")
+    if isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(float(value)):
+        width = _BLANK_WIDTH_DEFAULT_EM
+    else:
+        width = min(_BLANK_WIDTH_MAX_EM, max(_BLANK_WIDTH_MIN_EM, float(value)))
+    return "_" * round(width)
+
 
 # --------------------------------------------------------------------------- #
 # RichDoc → Markdown(保真)
@@ -112,8 +127,8 @@ def _inline_node_to_md(node: dict[str, Any]) -> str:
         return _image_md(node)
 
     if t == "blank":
-        # 填空占位:渲染为可见下划线,保留题干可读性。
-        return "____"
+        # 填空占位:渲染为可见下划线,长度随 widthEm 变化,保留题干可读性。
+        return _blank_underscores(node)
 
     # 未知/未来行内节点:递归 content 或退化为文本。
     if node.get("content"):

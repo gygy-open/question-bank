@@ -222,7 +222,7 @@ MD→Tiptap 转换器的**目标节点集必须 = 编辑器/渲染器 schema**(`
 | `image`(attr `src`,`alt`,`title`,`width`,`height`) | `![alt](url)` + Pandoc 尺寸属性 | 已有;尺寸可编辑 |
 | `textAlign`(paragraph 属性) | 无 md 对应,保持默认 | 已有 |
 | `table` / `tableRow` / `tableCell` | `\| a \| b \|` | **需补扩展** |
-| `blank`(attr `blankId`) | 无 md 对应(填空新节点) | **需新增** |
+| `blank`(attr `blankId`,`widthEm`) | 无 md 对应(填空新节点) | 已有;长度可调整 |
 
 ### 7.2 转换决策(已定稿)
 
@@ -240,6 +240,7 @@ MD→Tiptap 转换器的**目标节点集必须 = 编辑器/渲染器 schema**(`
 - 编辑器使用 Tiptap Image 原生四角缩放,默认锁定宽高比,最小 `32px`;拖拽完成后直接更新节点的数值 `width/height`。只读 Web 渲染保留目标宽度并用 `max-width:100%;height:auto` 防止窄屏溢出和变形。
 - 上/下标源为 HTML `<sup>` / `<sub>`(旧编辑器产出)→ 对应 mark。
 - 列表 / 加粗 / 斜体按标准 CommonMark 语义映射。
+- 填空节点 `widthEm` 为可选的有限数值,单位为 `em`,范围 `[2, 30]`,缺省按 `4` 渲染。编辑器可调整该值;Web 用相对字号宽度展示,RichDoc → Markdown/Pandoc 导出时按该值生成对应长度的下划线。旧节点无须迁移。
 - 降级项按 §7.2 处理。
 
 > 实现约束:存量迁移的 MD→Tiptap 使用 **Python 转换器**,由 Alembic data revision 直接调用,确保桌面无人值守迁移不依赖 Node.js。前端使用共享 fixtures 验证转换结果与 Tiptap schema 兼容。

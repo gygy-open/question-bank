@@ -23,8 +23,26 @@ declare module '@tiptap/core' {
         blank: {
             /** 在当前光标处插入一个填空节点；不传 id 时自动生成。 */
             insertBlank: (blankId?: string) => ReturnType
+            /** 设置指定位置填空节点的显示宽度（em）。 */
+            setBlankWidth: (pos: number, widthEm: number) => ReturnType
+            /** 删除指定位置的填空节点。 */
+            removeBlank: (pos: number) => ReturnType
         }
     }
+}
+
+/** 填空节点可调整宽度（em）的合法区间与默认值，与后端 question_content 对齐。 */
+export const BLANK_WIDTH_MIN_EM = 2
+export const BLANK_WIDTH_MAX_EM = 30
+export const BLANK_WIDTH_DEFAULT_EM = 4
+
+/** 把任意输入规整为 [2, 30] 的整数 em；非法/缺省回退默认宽度。 */
+export function clampBlankWidthEm(value: unknown): number {
+    const n = typeof value === 'number' ? value : Number(value)
+    if (!Number.isFinite(n)) {
+        return BLANK_WIDTH_DEFAULT_EM
+    }
+    return Math.min(BLANK_WIDTH_MAX_EM, Math.max(BLANK_WIDTH_MIN_EM, Math.round(n)))
 }
 
 /**
@@ -47,6 +65,17 @@ export const Blank = Node.create({
                 renderHTML: (attrs) =>
                     attrs.blankId ? { 'data-blank-id': attrs.blankId } : {},
             },
+            widthEm: {
+                default: BLANK_WIDTH_DEFAULT_EM,
+                parseHTML: (el) => {
+                    const raw = el.getAttribute('data-width-em')
+                    return raw == null ? BLANK_WIDTH_DEFAULT_EM : clampBlankWidthEm(raw)
+                },
+                renderHTML: (attrs) => {
+                    const width = clampBlankWidthEm(attrs.widthEm)
+                    return { 'data-width-em': String(width), style: `width:${width}em` }
+                },
+            },
         }
     },
 
@@ -63,7 +92,6 @@ export const Blank = Node.create({
                 role: 'img',
                 'aria-label': '填空',
             }),
-            '\u2003\u2003\u2003\u2003',
         ]
     },
 
@@ -76,6 +104,33 @@ export const Blank = Node.create({
                         type: this.name,
                         attrs: { blankId: blankId ?? generateBlankId() },
                     }),
+            setBlankWidth:
+                (pos: number, widthEm: number) =>
+                ({ tr, dispatch }) => {
+                    const node = tr.doc.nodeAt(pos)
+                    if (!node || node.type.name !== this.name) {
+                        return false
+                    }
+                    if (dispatch) {
+                        tr.setNodeMarkup(pos, undefined, {
+                            ...node.attrs,
+                            widthEm: clampBlankWidthEm(widthEm),
+                        })
+                    }
+                    return true
+                },
+            removeBlank:
+                (pos: number) =>
+                ({ tr, dispatch }) => {
+                    const node = tr.doc.nodeAt(pos)
+                    if (!node || node.type.name !== this.name) {
+                        return false
+                    }
+                    if (dispatch) {
+                        tr.delete(pos, pos + node.nodeSize)
+                    }
+                    return true
+                },
         }
     },
 })

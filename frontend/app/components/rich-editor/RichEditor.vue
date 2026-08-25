@@ -9,11 +9,14 @@ import { SlashCommand } from './SlashCommand'
 import RichEditorToolbar from './RichEditorToolbar.vue'
 import RichEditorBubbleMenu from './RichEditorBubbleMenu.vue'
 import RichEditorMathPopover from './RichEditorMathPopover.vue'
+import RichEditorBlankPopover from './RichEditorBlankPopover.vue'
 import { useImageUpload } from './useImageUpload'
 import { getSchemaExtensions } from './schemaExtensions'
 import { ResetFormatOnEnter } from './resetFormatExtension'
 import { createMathNodeView } from './mathFieldExtensions'
+import { createBlankNodeView } from './blankNodeView'
 import { MATH_EDITOR_KEY, type OpenMathEditorParams } from './mathEditorKey'
+import { BLANK_EDITOR_KEY, type OpenBlankEditorParams } from './blankEditorKey'
 import { isEmptyRichDoc } from './richDoc'
 import type { RichDoc } from '@/types'
 
@@ -147,6 +150,42 @@ function cancelMath() {
     }
 }
 
+// 填空长度调整浮层：nodeView 点击时打开，脱离 ProseMirror 定位，适配 modal。
+const blankEditOpen = ref(false)
+const blankEditPos = ref<number | null>(null)
+const blankEditWidth = ref(4)
+const blankEditAnchor = ref<HTMLElement | null>(null)
+
+function openBlankEditor(params: OpenBlankEditorParams) {
+    blankEditPos.value = params.pos
+    blankEditWidth.value = params.widthEm
+    blankEditAnchor.value = params.anchorEl
+    blankEditOpen.value = true
+}
+
+provide(BLANK_EDITOR_KEY, openBlankEditor)
+
+function updateBlankWidth(widthEm: number) {
+    const pos = blankEditPos.value
+    if (pos == null) {
+        return
+    }
+    blankEditWidth.value = widthEm
+    editor.value?.chain().setBlankWidth(pos, widthEm).run()
+}
+
+function removeBlank() {
+    const pos = blankEditPos.value
+    blankEditOpen.value = false
+    if (pos != null) {
+        editor.value?.chain().focus().removeBlank(pos).run()
+    }
+}
+
+function closeBlankEditor() {
+    blankEditOpen.value = false
+}
+
 function insertBlank() {
     editor.value?.chain().focus().insertBlank().run()
 }
@@ -164,6 +203,7 @@ const editor = useEditor({
     extensions: [
         ...getSchemaExtensions({
             mathNodeView: createMathNodeView(),
+            blankNodeView: createBlankNodeView(),
             imageResizable: true,
         }),
         ResetFormatOnEnter,
@@ -265,6 +305,15 @@ watch(model, (value) => {
             @cancel="cancelMath"
         />
 
+        <RichEditorBlankPopover
+            :open="blankEditOpen"
+            :width-em="blankEditWidth"
+            :anchor-el="blankEditAnchor"
+            @update="updateBlankWidth"
+            @delete="removeBlank"
+            @close="closeBlankEditor"
+        />
+
         <input
             ref="fileInputRef"
             type="file"
@@ -315,6 +364,21 @@ watch(model, (value) => {
 
 :deep(.ProseMirror .ProseMirror-selectednode) {
     outline: 2px solid var(--primary);
+}
+
+:deep(.ProseMirror .rich-blank) {
+    display: inline-block;
+    min-width: 2em;
+    height: 1em;
+    margin: 0 0.15em;
+    border-bottom: 1px solid currentColor;
+    vertical-align: baseline;
+    cursor: pointer;
+}
+
+:deep(.ProseMirror .rich-blank:hover) {
+    border-bottom-color: var(--primary);
+    background-color: var(--accent);
 }
 
 /* prose 默认给列表项和其内段落留了较大间距，题库字段里收紧一些 */

@@ -269,6 +269,47 @@ def test_rich_doc_to_markdown_unknown_node_does_not_crash():
 
 
 # --------------------------------------------------------------------------- #
+# 4b. 填空节点 widthEm:校验 + 变长导出
+# --------------------------------------------------------------------------- #
+def _blank_doc(width):
+    attrs = {"blankId": "blk_1"}
+    if width is not None:
+        attrs["widthEm"] = width
+    return {
+        "type": "doc",
+        "content": [
+            {"type": "paragraph", "content": [
+                {"type": "text", "text": "填入 "},
+                {"type": "blank", "attrs": attrs},
+                {"type": "text", "text": " 处"},
+            ]},
+        ],
+    }
+
+
+def test_blank_width_em_validation_accepts_range_and_default():
+    assert validate_rich_doc(_blank_doc(None)) is not None
+    for width in (2, 4, 30, 12.5):
+        doc = _blank_doc(width)
+        assert validate_rich_doc(doc) is doc
+
+
+def test_blank_width_em_validation_rejects_out_of_range():
+    for invalid in (1, 31, 0, -1, float("inf"), "4", True):
+        with pytest.raises(ValueError, match="blank widthEm"):
+            validate_rich_doc(_blank_doc(invalid))
+
+
+def test_blank_export_length_scales_with_width_em():
+    # 缺省宽度回退默认 4,与旧数据一致。
+    assert rich_doc_to_markdown(_blank_doc(None)) == "填入 ____ 处"
+    # 宽度线性缩放为下划线数量。
+    assert rich_doc_to_markdown(_blank_doc(2)) == "填入 __ 处"
+    assert rich_doc_to_markdown(_blank_doc(8)) == "填入 ________ 处"
+    assert rich_doc_to_markdown(_blank_doc(30)) == "填入 " + "_" * 30 + " 处"
+
+
+# --------------------------------------------------------------------------- #
 # 5. answer formatter
 # --------------------------------------------------------------------------- #
 def test_answer_formatter_choice_shows_label():
