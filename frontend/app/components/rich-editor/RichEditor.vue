@@ -17,6 +17,8 @@ import { MATH_EDITOR_KEY, type OpenMathEditorParams } from './mathEditorKey'
 import { isEmptyRichDoc } from './richDoc'
 import type { RichDoc } from '@/types'
 
+const WORD_MATH_HTML_RE = /<\s*m:oMath|<\s*math[\s/>]/i
+
 const model = defineModel<RichDoc>({ default: null })
 const props = withDefaults(
     defineProps<{ placeholder?: string; allowBlank?: boolean }>(),
@@ -49,6 +51,28 @@ function onFileChange(event: Event) {
         insertImageFile(file)
     }
     target.value = ''
+}
+
+/**
+ * 处理含 Word 公式（OMML / MathML）的粘贴：转换器按需异步加载，
+ * 因此在粘贴发生时先锁定插入区间（from/to），转换完成后按该区间插入，
+ * 而非依赖异步返回后的当前光标位置。
+ */
+async function handleMathPaste(html: string, from: number, to: number) {
+    try {
+        const { wordHtmlToTiptapHtml } = await import('./wordMathPaste')
+        const converted = wordHtmlToTiptapHtml(html)
+        const size = editor.value?.state.doc.content.size ?? 0
+        const start = Math.min(from, size)
+        const end = Math.min(to, size)
+        editor.value
+            ?.chain()
+            .focus()
+            .insertContentAt({ from: start, to: end }, converted)
+            .run()
+    } catch (error) {
+        console.error(error)
+    }
 }
 
 // 插入空公式节点，nodeView 挂载后会自动弹出 MathLive 编辑浮层。
@@ -168,7 +192,16 @@ const editor = useEditor({
             }
             return false
         },
-        handlePaste(_view: EditorView, event: ClipboardEvent) {
+        handlePaste(view: EditorView, event: ClipboardEvent) {
+            // 先处理 Word 公式：若剪贴板 HTML 含 OMML/MathML，整次粘贴交由公式转换，
+            // 避免下方 image 分支抢占（Word 常同时带公式图片与 HTML）。
+            const html = event.clipboardData?.getData('text/html')
+            if (html && WORD_MATH_HTML_RE.test(html)) {
+                event.preventDefault()
+                const { from, to } = view.state.selection
+                handleMathPaste(html, from, to)
+                return true
+            }
             const items = event.clipboardData?.items
             if (items) {
                 for (const item of items) {

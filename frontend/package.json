@@ -47,6 +47,7 @@
     "markdown-it": "^14.1.0",
     "markdown-it-texmath": "^1.0.0",
     "mathlive": "^0.110.0",
+    "mathml-to-latex": "^1.8.0",
     "nuxt": "^4.2.1",
     "reka-ui": "^2.6.1",
     "shadcn-nuxt": "2.4.2",
