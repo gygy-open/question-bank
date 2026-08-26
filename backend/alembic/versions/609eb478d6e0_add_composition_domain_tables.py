@@ -79,31 +79,43 @@ def upgrade() -> None:
         batch_op.create_index(batch_op.f('ix_compositions_subject_id'), ['subject_id'], unique=False)
         batch_op.create_index('ix_compositions_subject_scope_owner', ['subject_id', 'scope_type', 'owner_id'], unique=False)
 
-    op.create_table('composition_blocks',
-    sa.Column('id', sa.BigInteger().with_variant(sa.Integer(), 'sqlite'), nullable=False),
+    op.create_table('composition_nodes',
+    sa.Column('id', sa.String(length=36), nullable=False),
     sa.Column('composition_id', sa.Integer(), nullable=False),
-    sa.Column('sequence', sa.Integer(), nullable=False),
-    sa.Column('block_type', sa.Enum('rich_text', 'heading', 'question', 'page_break', 'answer_summary', name='compositionblocktype'), nullable=False),
+    sa.Column('parent_id', sa.String(length=36), nullable=True),
+    sa.Column('slot', sa.String(length=32), nullable=True),
+    sa.Column('position', sa.Integer(), nullable=False),
+    sa.Column('node_kind', sa.Enum('block', 'module', 'reference', name='compositionnodekind'), nullable=False),
+    sa.Column('node_type', sa.String(length=64), nullable=False),
     sa.Column('content', sa.JSON(), nullable=True),
     sa.Column('props', sa.JSON(), nullable=True),
     sa.Column('schema_version', sa.Integer(), nullable=False),
     sa.Column('question_id', sa.Integer(), nullable=True),
     sa.Column('question_revision', sa.Integer(), nullable=True),
+    sa.Column('source_question_node_id', sa.String(length=36), nullable=True),
+    sa.Column('anchor_before_node_id', sa.String(length=36), nullable=True),
     sa.Column('created_at', sa.DateTime(), nullable=False),
     sa.Column('updated_at', sa.DateTime(), nullable=False),
     sa.Column('created_by', sa.Integer(), nullable=True),
     sa.Column('updated_by', sa.Integer(), nullable=True),
-    sa.CheckConstraint("(block_type = 'question' AND question_id IS NOT NULL AND question_revision IS NOT NULL) OR (block_type <> 'question' AND question_id IS NULL AND question_revision IS NULL)", name=op.f('ck_composition_blocks_question_ref_matches_type')),
-    sa.ForeignKeyConstraint(['composition_id'], ['compositions.id'], name=op.f('fk_composition_blocks_composition_id_compositions'), ondelete='CASCADE'),
-    sa.ForeignKeyConstraint(['created_by'], ['user.id'], name=op.f('fk_composition_blocks_created_by_user')),
-    sa.ForeignKeyConstraint(['question_id'], ['questions.id'], name=op.f('fk_composition_blocks_question_id_questions')),
-    sa.ForeignKeyConstraint(['updated_by'], ['user.id'], name=op.f('fk_composition_blocks_updated_by_user')),
-    sa.PrimaryKeyConstraint('id', name=op.f('pk_composition_blocks'))
+    sa.CheckConstraint("anchor_before_node_id IS NULL OR (parent_id IS NOT NULL AND node_type IN ('heading', 'rich_text'))", name=op.f('ck_composition_nodes_anchor_matches_type')),
+    sa.CheckConstraint("(node_kind = 'block' AND node_type IN ('rich_text', 'heading', 'question', 'page_break')) OR (node_kind = 'module' AND node_type = 'question_details') OR (node_kind = 'reference' AND node_type = 'answer_item')", name=op.f('ck_composition_nodes_kind_matches_type')),
+    sa.CheckConstraint("(parent_id IS NULL AND slot IS NULL) OR (parent_id IS NOT NULL AND slot = 'body')", name=op.f('ck_composition_nodes_parent_slot_matches')),
+    sa.CheckConstraint('position >= 0', name=op.f('ck_composition_nodes_position_non_negative')),
+    sa.CheckConstraint("(node_type = 'question' AND question_id IS NOT NULL AND question_revision IS NOT NULL AND content IS NOT NULL) OR (node_type <> 'question' AND question_id IS NULL AND question_revision IS NULL)", name=op.f('ck_composition_nodes_question_ref_matches_type')),
+    sa.CheckConstraint("(node_type = 'answer_item' AND source_question_node_id IS NOT NULL AND parent_id IS NOT NULL) OR (node_type <> 'answer_item' AND source_question_node_id IS NULL)", name=op.f('ck_composition_nodes_source_ref_matches_type')),
+    sa.ForeignKeyConstraint(['composition_id'], ['compositions.id'], name=op.f('fk_composition_nodes_composition_id_compositions'), ondelete='CASCADE'),
+    sa.ForeignKeyConstraint(['created_by'], ['user.id'], name=op.f('fk_composition_nodes_created_by_user')),
+    sa.ForeignKeyConstraint(['parent_id'], ['composition_nodes.id'], name=op.f('fk_composition_nodes_parent_id_composition_nodes'), ondelete='CASCADE'),
+    sa.ForeignKeyConstraint(['question_id'], ['questions.id'], name=op.f('fk_composition_nodes_question_id_questions')),
+    sa.ForeignKeyConstraint(['updated_by'], ['user.id'], name=op.f('fk_composition_nodes_updated_by_user')),
+    sa.PrimaryKeyConstraint('id', name=op.f('pk_composition_nodes'))
     )
-    with op.batch_alter_table('composition_blocks', schema=None) as batch_op:
-        batch_op.create_index('ix_composition_blocks_comp_seq', ['composition_id', 'sequence'], unique=False)
-        batch_op.create_index(batch_op.f('ix_composition_blocks_composition_id'), ['composition_id'], unique=False)
-        batch_op.create_index(batch_op.f('ix_composition_blocks_question_id'), ['question_id'], unique=False)
+    with op.batch_alter_table('composition_nodes', schema=None) as batch_op:
+        batch_op.create_index('ix_composition_nodes_comp_parent_slot_pos', ['composition_id', 'parent_id', 'slot', 'position'], unique=False)
+        batch_op.create_index(batch_op.f('ix_composition_nodes_composition_id'), ['composition_id'], unique=False)
+        batch_op.create_index(batch_op.f('ix_composition_nodes_parent_id'), ['parent_id'], unique=False)
+        batch_op.create_index(batch_op.f('ix_composition_nodes_question_id'), ['question_id'], unique=False)
 
     op.create_table('composition_events',
     sa.Column('id', sa.BigInteger().with_variant(sa.Integer(), 'sqlite'), nullable=False),
@@ -153,41 +165,11 @@ def upgrade() -> None:
 
 def downgrade() -> None:
     """Downgrade schema."""
+    op.drop_table('composition_versions')
+    op.drop_table('composition_events')
+    op.drop_table('composition_nodes')
+    op.drop_table('compositions')
+    op.drop_table('folders')
+
     with op.batch_alter_table('questions', schema=None) as batch_op:
         batch_op.drop_column('content_revision')
-
-    with op.batch_alter_table('composition_versions', schema=None) as batch_op:
-        batch_op.drop_index(batch_op.f('ix_composition_versions_id'))
-        batch_op.drop_index(batch_op.f('ix_composition_versions_composition_id'))
-
-    op.drop_table('composition_versions')
-    with op.batch_alter_table('composition_events', schema=None) as batch_op:
-        batch_op.drop_index(batch_op.f('ix_composition_events_composition_id'))
-        batch_op.drop_index('ix_composition_events_comp_id')
-        batch_op.drop_index('ix_composition_events_actor_created')
-
-    op.drop_table('composition_events')
-    with op.batch_alter_table('composition_blocks', schema=None) as batch_op:
-        batch_op.drop_index(batch_op.f('ix_composition_blocks_question_id'))
-        batch_op.drop_index(batch_op.f('ix_composition_blocks_composition_id'))
-        batch_op.drop_index('ix_composition_blocks_comp_seq')
-
-    op.drop_table('composition_blocks')
-    with op.batch_alter_table('compositions', schema=None) as batch_op:
-        batch_op.drop_index('ix_compositions_subject_scope_owner')
-        batch_op.drop_index(batch_op.f('ix_compositions_subject_id'))
-        batch_op.drop_index(batch_op.f('ix_compositions_owner_id'))
-        batch_op.drop_index(batch_op.f('ix_compositions_id'))
-        batch_op.drop_index(batch_op.f('ix_compositions_folder_id'))
-        batch_op.drop_index(batch_op.f('ix_compositions_deleted_at'))
-
-    op.drop_table('compositions')
-    with op.batch_alter_table('folders', schema=None) as batch_op:
-        batch_op.drop_index('ix_folders_subject_scope_owner')
-        batch_op.drop_index(batch_op.f('ix_folders_subject_id'))
-        batch_op.drop_index(batch_op.f('ix_folders_parent_id'))
-        batch_op.drop_index(batch_op.f('ix_folders_owner_id'))
-        batch_op.drop_index(batch_op.f('ix_folders_id'))
-        batch_op.drop_index(batch_op.f('ix_folders_deleted_at'))
-
-    op.drop_table('folders')

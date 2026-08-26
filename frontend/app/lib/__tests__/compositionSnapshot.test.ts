@@ -1,24 +1,30 @@
 import { describe, it, expect } from 'vitest'
+import {
+  buildSnapshotTree,
+  effectiveAnswerFields,
+  resolveModuleAnswerItems,
+  snapshotQuestionNodeMap,
+} from '@/lib/compositionSnapshot'
 import type {
-  CompositionSnapshotV1,
+  CompositionSnapshotV2,
   QuestionSnapshot,
-  SnapshotAnswerSummaryBlock,
-  SnapshotBlock,
+  SnapshotAnswerItemNode,
+  SnapshotNode,
+  SnapshotQuestionDetailsNode,
 } from '@/types/composition'
-import { snapshotQuestionMap, resolveSummaryQuestions } from '@/lib/compositionSnapshot'
 
 function richDoc(text: string) {
   return { type: 'doc' as const, content: [{ type: 'paragraph', content: [{ type: 'text', text }] }] }
 }
 
-function qsnap(id: number, stem = `Q${id}`): QuestionSnapshot {
+function qsnap(id: number): QuestionSnapshot {
   return {
     id,
     content_revision: 1,
     content_schema_version: 2,
     q_type: 'single_choice',
-    content: richDoc(stem),
-    options: [{ id: 'opt_a', label: 'A', content: richDoc('2') }],
+    content: richDoc(`Q${id}`),
+    options: [{ id: 'opt_a', label: 'A', content: richDoc('A') }],
     answer: { kind: 'single_choice', correct: 'opt_a' },
     thinking: null,
     analysis: richDoc(`解析${id}`),
@@ -28,85 +34,130 @@ function qsnap(id: number, stem = `Q${id}`): QuestionSnapshot {
   }
 }
 
-function snapshot(blocks: SnapshotBlock[]): CompositionSnapshotV1 {
+function questionNode(nodeId: string, position: number, q: QuestionSnapshot): SnapshotNode {
   return {
+    id: nodeId,
+    parent_id: null,
+    slot: null,
+    position,
     schema_version: 1,
+    node_kind: 'block',
+    node_type: 'question',
+    question_id: q.id,
+    question_revision: q.content_revision,
+    question: q,
+  }
+}
+
+function moduleNode(
+  nodeId: string,
+  position: number,
+  fields: SnapshotQuestionDetailsNode['props']['fields'],
+): SnapshotNode {
+  return {
+    id: nodeId,
+    parent_id: null,
+    slot: null,
+    position,
+    schema_version: 1,
+    node_kind: 'module',
+    node_type: 'question_details',
+    props: { scope: 'all', fields },
+  }
+}
+
+function answerItem(
+  nodeId: string,
+  parentId: string,
+  position: number,
+  sourceId: string,
+  props: SnapshotAnswerItemNode['props'],
+): SnapshotNode {
+  return {
+    id: nodeId,
+    parent_id: parentId,
+    slot: 'body',
+    position,
+    schema_version: 1,
+    node_kind: 'reference',
+    node_type: 'answer_item',
+    source_question_node_id: sourceId,
+    props,
+  }
+}
+
+function snapshot(nodes: SnapshotNode[]): CompositionSnapshotV2 {
+  return {
+    schema_version: 2,
     composition_id: 1,
     source_revision: 2,
     title: '稿件',
     subject_id: 1,
     finalized_at: '2026-01-01T00:00:00Z',
-    blocks,
+    nodes,
   }
 }
 
-function questionBlock(q: QuestionSnapshot): SnapshotBlock {
-  return { block_type: 'question', question_id: q.id, question_revision: q.content_revision, question: q }
-}
-
-function summaryBlock(mode: 'all' | 'before', ids: number[]): SnapshotAnswerSummaryBlock {
-  return { block_type: 'answer_summary', props: { mode }, resolved_question_ids: ids }
-}
-
-describe('snapshotQuestionMap', () => {
-  it('按 question_id 收录内嵌题目，重复保留首个', () => {
-    const q1 = qsnap(1, '首个')
-    const q1b = qsnap(1, '重复')
-    const q2 = qsnap(2)
-    const map = snapshotQuestionMap(
-      snapshot([questionBlock(q1), questionBlock(q2), questionBlock(q1b)]),
-    )
-    expect([...map.keys()]).toEqual([1, 2])
-    expect(map.get(1)!.content).toEqual(richDoc('首个'))
-  })
-
-  it('跳过内容缺失（question=null）的 question block', () => {
-    const map = snapshotQuestionMap(
-      snapshot([
-        { block_type: 'question', question_id: 9, question_revision: 1, question: null },
-        questionBlock(qsnap(2)),
-      ]),
-    )
-    expect([...map.keys()]).toEqual([2])
+describe('buildSnapshotTree', () => {
+  it('按 position 排序并把 module 子节点挂到 children，root 层不含子节点', () => {
+    const snap = snapshot([
+      answerItem('ai1', 'm1', 0, 'q1', { included: true, overrides: { answer: null, thinking: null, analysis: null, summary: null } }),
+      moduleNode('m1', 1, { answer: true, thinking: false, analysis: false, summary: false }),
+      questionNode('q1', 0, qsnap(1)),
+    ])
+    const tree = buildSnapshotTree(snap)
+    expect(tree.map((n) => n.id)).toEqual(['q1', 'm1'])
+    expect(tree.every((n) => n.parent_id == null)).toBe(true)
+    const mod = tree.find((n) => n.id === 'm1')!
+    expect(mod.children.map((c) => c.id)).toEqual(['ai1'])
   })
 })
 
-describe('resolveSummaryQuestions', () => {
-  const q1 = qsnap(1)
-  const q2 = qsnap(2)
-  const q3 = qsnap(3)
-  // 顺序对应后端去重保序：q1 出现两次，被后端去重为 [q1, q2, q3]。
-  const snap = snapshot([
-    questionBlock(q1),
-    summaryBlock('before', [1]),
-    questionBlock(q2),
-    questionBlock(q1),
-    questionBlock(q3),
-    summaryBlock('all', [1, 2, 3]),
-    summaryBlock('before', [1, 2, 3]),
-  ])
+describe('effectiveAnswerFields', () => {
+  const mod = moduleNode('m1', 0, { answer: true, thinking: false, analysis: true, summary: false }) as SnapshotQuestionDetailsNode
 
-  it('mode=before：按 resolved ids 顺序解析该块之前的题目', () => {
-    const before = snap.blocks[1] as SnapshotAnswerSummaryBlock
-    expect(resolveSummaryQuestions(snap, before).map((q) => q.id)).toEqual([1])
+  it('override=null 继承 module 全局开关', () => {
+    const ai = answerItem('ai', 'm1', 0, 'q1', { included: true, overrides: { answer: null, thinking: null, analysis: null, summary: null } }) as SnapshotAnswerItemNode
+    expect(effectiveAnswerFields(mod, ai)).toEqual({ answer: true, thinking: false, analysis: true, summary: false })
   })
 
-  it('mode=all：按 resolved ids 顺序解析全篇题目', () => {
-    const all = snap.blocks[5] as SnapshotAnswerSummaryBlock
-    expect(resolveSummaryQuestions(snap, all).map((q) => q.id)).toEqual([1, 2, 3])
+  it('override 显式覆盖全局', () => {
+    const ai = answerItem('ai', 'm1', 0, 'q1', { included: true, overrides: { answer: false, thinking: true, analysis: null, summary: null } }) as SnapshotAnswerItemNode
+    expect(effectiveAnswerFields(mod, ai)).toEqual({ answer: false, thinking: true, analysis: true, summary: false })
   })
 
-  it('保持 resolved ids 顺序而非快照出现顺序', () => {
-    const reordered = summaryBlock('all', [3, 1, 2])
-    expect(resolveSummaryQuestions(snap, reordered).map((q) => q.id)).toEqual([3, 1, 2])
+  it('included=false 时全部字段不可见', () => {
+    const ai = answerItem('ai', 'm1', 0, 'q1', { included: false, overrides: { answer: true, thinking: true, analysis: true, summary: true } }) as SnapshotAnswerItemNode
+    expect(effectiveAnswerFields(mod, ai)).toEqual({ answer: false, thinking: false, analysis: false, summary: false })
+  })
+})
+
+describe('resolveModuleAnswerItems', () => {
+  it('按 source 节点解析题目并计算有效字段与可见性', () => {
+    const snap = snapshot([
+      questionNode('q1', 0, qsnap(1)),
+      questionNode('q2', 1, qsnap(2)),
+      moduleNode('m1', 2, { answer: true, thinking: false, analysis: false, summary: false }),
+      answerItem('ai1', 'm1', 0, 'q1', { included: true, overrides: { answer: null, thinking: null, analysis: null, summary: null } }),
+      answerItem('ai2', 'm1', 1, 'q2', { included: false, overrides: { answer: null, thinking: null, analysis: null, summary: null } }),
+    ])
+    const tree = buildSnapshotTree(snap)
+    const map = snapshotQuestionNodeMap(snap)
+    const mod = tree.find((n) => n.id === 'm1')!
+    const resolved = resolveModuleAnswerItems(mod, map)
+    expect(resolved.map((r) => r.question?.id)).toEqual([1, 2])
+    expect(resolved[0]!.anyVisible).toBe(true)
+    expect(resolved[1]!.anyVisible).toBe(false)
   })
 
-  it('缺失内容的 id 被跳过', () => {
-    const withMissing = summaryBlock('all', [1, 99, 2])
-    expect(resolveSummaryQuestions(snap, withMissing).map((q) => q.id)).toEqual([1, 2])
-  })
-
-  it('空 resolved ids 返回空数组', () => {
-    expect(resolveSummaryQuestions(snap, summaryBlock('all', []))).toEqual([])
+  it('source 题目缺失时 question 为 null', () => {
+    const snap = snapshot([
+      moduleNode('m1', 0, { answer: true, thinking: false, analysis: false, summary: false }),
+      answerItem('ai1', 'm1', 0, 'missing', { included: true, overrides: { answer: null, thinking: null, analysis: null, summary: null } }),
+    ])
+    const tree = buildSnapshotTree(snap)
+    const mod = tree.find((n) => n.id === 'm1')!
+    const resolved = resolveModuleAnswerItems(mod, snapshotQuestionNodeMap(snap))
+    expect(resolved[0]!.question).toBeNull()
   })
 })

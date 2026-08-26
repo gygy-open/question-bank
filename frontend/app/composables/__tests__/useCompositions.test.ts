@@ -71,20 +71,38 @@ describe('useCompositions 请求构建', () => {
     expect(calls[0]!.opts.query).toEqual({ scope: 'personal', expected_revision: 2 })
   })
 
-  it('replaceBlocks PUT 到 blocks 路径，带 scope 与 body', async () => {
+  it('replaceNodes PUT 到 nodes 路径，带 scope 与 body', async () => {
     const api = useCompositions()
     const payload = {
       expected_revision: 4,
       batch_id: 'b-1',
-      blocks: [
-        { temp_id: 't1', block_type: 'rich_text' as const, content: { type: 'doc' as const, content: [] } },
-        { id: 7, block_type: 'page_break' as const },
+      nodes: [
+        { id: 'n1', node_kind: 'block' as const, node_type: 'rich_text' as const, content: { type: 'doc' as const, content: [] } },
+        { id: 'n2', node_kind: 'block' as const, node_type: 'page_break' as const },
       ],
     }
-    await api.replaceBlocks(3, 'shared', 9, payload)
-    expect(calls[0]!.url).toBe('/subjects/3/compositions/9/blocks')
+    await api.replaceNodes(3, 'shared', 9, payload)
+    expect(calls[0]!.url).toBe('/subjects/3/compositions/9/nodes')
     expect(calls[0]!.opts.method).toBe('PUT')
     expect(calls[0]!.opts.query).toEqual({ scope: 'shared' })
+    expect(calls[0]!.opts.body).toBe(payload)
+  })
+
+  it('getQuestionRevisions GET 题目版本状态路径，仅带 scope', async () => {
+    const api = useCompositions()
+    await api.getQuestionRevisions(3, 'shared', 9)
+    expect(calls[0]!.url).toBe('/subjects/3/compositions/9/question-revisions')
+    expect(calls[0]!.opts.method).toBeUndefined()
+    expect(calls[0]!.opts.query).toEqual({ scope: 'shared' })
+  })
+
+  it('syncQuestionNodes POST 同步路径，带 scope 与 body', async () => {
+    const api = useCompositions()
+    const payload = { expected_revision: 4, node_ids: ['n7', 'n8'] }
+    await api.syncQuestionNodes(3, 'personal', 9, payload)
+    expect(calls[0]!.url).toBe('/subjects/3/compositions/9/question-nodes/sync')
+    expect(calls[0]!.opts.method).toBe('POST')
+    expect(calls[0]!.opts.query).toEqual({ scope: 'personal' })
     expect(calls[0]!.opts.body).toBe(payload)
   })
 })
@@ -108,12 +126,21 @@ describe('409 冲突映射', () => {
     })
   })
 
-  it('replaceBlocks 的 revision 409 被翻译为可识别冲突', async () => {
+  it('replaceNodes 的 revision 409 被翻译为可识别冲突', async () => {
     apiImpl = () =>
       Promise.reject({ status: 409, data: { detail: 'Composition revision mismatch' } })
     const api = useCompositions()
     await expect(
-      api.replaceBlocks(1, 'shared', 1, { expected_revision: 1, blocks: [] }),
+      api.replaceNodes(1, 'shared', 1, { expected_revision: 1, nodes: [] }),
+    ).rejects.toMatchObject({ name: 'CompositionConflictError', kind: 'revision' })
+  })
+
+  it('syncQuestionNodes 的 revision 409 被翻译为可识别冲突', async () => {
+    apiImpl = () =>
+      Promise.reject({ status: 409, data: { detail: 'Composition revision mismatch' } })
+    const api = useCompositions()
+    await expect(
+      api.syncQuestionNodes(1, 'shared', 1, { expected_revision: 1, node_ids: ['n2'] }),
     ).rejects.toMatchObject({ name: 'CompositionConflictError', kind: 'revision' })
   })
 

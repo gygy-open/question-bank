@@ -1,46 +1,97 @@
-// 组稿版本 snapshot 只读纯函数：仅消费冻结快照，不查询当前题库。
-// 与后端 _build_snapshot 语义对齐；answer_summary 的 resolved_question_ids 已由服务端
-// 按 sequence 去重保序固化（all/before 语义），前端只按该顺序映射到快照题目。
+// 组稿版本 snapshot v2 只读纯函数：仅消费不可变快照，绝不查询当前题库。
+// 与后端 _build_snapshot 语义对齐：节点前序展平（root 按 position，module 子节点紧随其后）；
+// answer_item 通过同一 snapshot 内 source question 节点解析答案，并按「有效字段」渲染
+// （effective = included && (override ?? module.fields[field]))。
 
 import type {
-  CompositionSnapshotV1,
+  AnswerFieldKey,
+  CompositionSnapshotV2,
   QuestionSnapshot,
-  SnapshotAnswerSummaryBlock,
-  SnapshotQuestionBlock,
+  SnapshotAnswerItemNode,
+  SnapshotNode,
+  SnapshotQuestionDetailsNode,
+  SnapshotQuestionNode,
 } from '@/types/composition'
+import { ANSWER_FIELD_KEYS } from '@/types/composition'
 
-/**
- * 建立 question_id → QuestionSnapshot 映射，仅收录含内嵌 question 的 question block。
- * 同一 question_id 多次出现时保留首个（与去重保序一致）。
- */
-export function snapshotQuestionMap(
-  snapshot: CompositionSnapshotV1,
-): Map<number, QuestionSnapshot> {
-  const map = new Map<number, QuestionSnapshot>()
-  for (const block of snapshot.blocks) {
-    if (block.block_type !== 'question') continue
-    const q = (block as SnapshotQuestionBlock).question
-    if (q && !map.has(q.id)) {
-      map.set(q.id, q)
+/** 带 module 子节点的树节点（仅 question_details 携带非空 children）。 */
+export type SnapshotTreeNode = SnapshotNode & { children: SnapshotNode[] }
+
+/** 把前序展平的 snapshot 节点折叠为「root + module 子树」，供渲染时避免重复遍历子节点。 */
+export function buildSnapshotTree(snapshot: CompositionSnapshotV2): SnapshotTreeNode[] {
+  const childrenByParent = new Map<string, SnapshotNode[]>()
+  const roots: SnapshotNode[] = []
+  for (const node of snapshot.nodes) {
+    if (node.parent_id == null) {
+      roots.push(node)
+    } else {
+      const arr = childrenByParent.get(node.parent_id) ?? []
+      arr.push(node)
+      childrenByParent.set(node.parent_id, arr)
     }
+  }
+  const byPos = (list: SnapshotNode[]) =>
+    [...list].sort((a, b) => a.position - b.position || a.id.localeCompare(b.id))
+
+  return byPos(roots).map((node) => ({
+    ...node,
+    children: node.node_type === 'question_details' ? byPos(childrenByParent.get(node.id) ?? []) : [],
+  }))
+}
+
+/** 建立 question 节点 UUID → SnapshotQuestionNode 映射（answer_item.source_question_node_id 解析用）。 */
+export function snapshotQuestionNodeMap(
+  snapshot: CompositionSnapshotV2,
+): Map<string, SnapshotQuestionNode> {
+  const map = new Map<string, SnapshotQuestionNode>()
+  for (const node of snapshot.nodes) {
+    if (node.node_type === 'question') map.set(node.id, node)
   }
   return map
 }
 
-/**
- * 按 answer_summary 的 resolved_question_ids 顺序，从同一 snapshot 的 question 映射解析题目。
- * 缺失内容（题目在定稿时已删除）的 id 被跳过；顺序严格保持 resolved ids 的顺序。
- */
-export function resolveSummaryQuestions(
-  snapshot: CompositionSnapshotV1,
-  block: SnapshotAnswerSummaryBlock,
-  questionMap?: Map<number, QuestionSnapshot>,
-): QuestionSnapshot[] {
-  const map = questionMap ?? snapshotQuestionMap(snapshot)
-  const out: QuestionSnapshot[] = []
-  for (const id of block.resolved_question_ids) {
-    const q = map.get(id)
-    if (q) out.push(q)
+/** 计算 answer_item 相对 module 全局开关的「有效字段」：included && (override ?? module 全局)。 */
+export function effectiveAnswerFields(
+  moduleNode: SnapshotQuestionDetailsNode,
+  answerItem: SnapshotAnswerItemNode,
+): Record<AnswerFieldKey, boolean> {
+  const global = moduleNode.props.fields
+  const overrides = answerItem.props.overrides
+  const included = answerItem.props.included
+  const out = {} as Record<AnswerFieldKey, boolean>
+  for (const key of ANSWER_FIELD_KEYS) {
+    const override = overrides[key]
+    const base = override == null ? Boolean(global[key]) : override
+    out[key] = included && base
+  }
+  return out
+}
+
+/** 已解析的 answer_item：source 题目快照 + 有效字段 + 是否有任一字段可见。 */
+export interface ResolvedAnswerItem {
+  answerItem: SnapshotAnswerItemNode
+  question: QuestionSnapshot | null
+  fields: Record<AnswerFieldKey, boolean>
+  anyVisible: boolean
+}
+
+/** 解析单个 module 的 answer_item 子节点为可渲染投影（缺失 source/题目时 question 为 null）。 */
+export function resolveModuleAnswerItems(
+  moduleNode: SnapshotTreeNode,
+  questionNodeMap: Map<string, SnapshotQuestionNode>,
+): ResolvedAnswerItem[] {
+  if (moduleNode.node_type !== 'question_details') return []
+  const out: ResolvedAnswerItem[] = []
+  for (const child of moduleNode.children) {
+    if (child.node_type !== 'answer_item') continue
+    const source = questionNodeMap.get(child.source_question_node_id)
+    const fields = effectiveAnswerFields(moduleNode, child)
+    out.push({
+      answerItem: child,
+      question: source?.question ?? null,
+      fields,
+      anyVisible: ANSWER_FIELD_KEYS.some((k) => fields[k]),
+    })
   }
   return out
 }

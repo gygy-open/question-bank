@@ -6,8 +6,9 @@
 
 - 当前学科上下文中的共享组稿与个人组稿。
 - 任意层级文件夹与软删除。
-- 线性 Block 画布。
-- `rich_text`、`heading`、`question`、`page_break`、`answer_summary` 五类 Block。
+- 基础节点与 Module 并列的 CompositionNode AST 画布。
+- `rich_text`、`heading`、`question`、`page_break` 基础节点。
+- `question_details` 模块及“参考答案”“答案与解析”预设。
 - Composition revision 乐观锁与操作时间线。
 - 题目内容版本检测。
 - 不可变定稿版本与只读快照预览。
@@ -22,8 +23,8 @@
 
 1. 从任意 CompositionVersion 导出 DOCX。
 2. 从任意 CompositionVersion 导出 LaTeX ZIP。
-3. 正确渲染五类 Block。
-4. `answer_summary` 使用定稿时冻结的 `resolved_question_ids`，不得重新查询当前题库。
+3. 正确渲染基础节点、Module 及其具名 slot 子节点。
+4. `question_details` 使用定稿时冻结的 `answer_item.source_question_node_id` 解析源 Question 节点，不得重新查询当前题库。
 5. 导出过程不得依赖实时 Question 数据。
 6. 前端版本预览页提供导出入口和完整状态反馈。
 7. 建立 Paper 到 Composition 的数据迁移程序、校验报告和回滚方案。
@@ -48,7 +49,7 @@
 
 - 从草稿直接导出。
 - 导出时重新读取 Question 表。
-- 根据当前画布重新计算答案汇总范围。
+- 根据当前草稿重新计算历史版本中的模块题目范围或字段配置。
 - 因题库更新而改变旧版本导出结果。
 
 ### 3.2 中间表示
@@ -65,23 +66,24 @@ ExportDocument
 DOCXRenderer / LaTeXRenderer
 ```
 
-`CompositionAssembler` 负责解释 Block 语义，Renderer 只负责格式输出。
+`CompositionAssembler` 负责解释节点与 Module 语义，Renderer 只负责格式输出。
 
 不得把 Composition Snapshot 解析逻辑分别复制到 DOCX 与 LaTeX Renderer。
 
-### 3.3 渲染注册表
+### 3.3 节点与模块注册表
 
-每类 Block 对应一个明确的 assembler handler：
+基础节点和 Module 分别对应明确的 assembler handler：
 
-| Block | 输出语义 |
+| 类型 | 输出语义 |
 |---|---|
 | `rich_text` | RichDoc 内容 |
 | `heading` | 指定级别的标题 |
 | `question` | 冻结的题干、选项及可选编号 |
 | `page_break` | 强制分页 |
-| `answer_summary` | 按冻结 ID 顺序输出答案和解析 |
+| `question_details` | 按 body slot 顺序展开自定义内容与 answer_item |
+| `answer_item` | 从同一 Snapshot 的源 Question 节点输出生效字段 |
 
-未知 Block Type 必须返回可定位的导出错误，不允许静默丢弃。
+未知 Node/Module Type 必须返回可定位的导出错误，不允许静默丢弃。
 
 ## 4. 后端实施任务
 
@@ -120,10 +122,11 @@ backend/app/services/exporting/composition_assemble.py
 职责：
 
 - 校验 Snapshot `schema_version`。
-- 按 Block 顺序构造格式无关的 `ExportDocument`。
+- 按冻结 AST 顺序构造格式无关的 `ExportDocument`。
 - 为题目生成稳定题号。
-- 将 `answer_summary.resolved_question_ids` 映射到同一 Snapshot 内嵌题目。
-- 返回包含 Block 位置的错误信息。
+- 将 `answer_item.source_question_node_id` 映射到同一 Snapshot 内嵌的 Question 节点。
+- 解析“题目级 override > module 全局字段”的最终显示规则。
+- 返回包含 Node UUID、slot 和位置的错误信息。
 
 ### 4.3 扩展导出中间结构
 
@@ -140,7 +143,7 @@ backend/app/services/exporting/composition_assemble.py
 - `ExportRichText`
 - `ExportQuestion`
 - `ExportPageBreak`
-- `ExportAnswerSummary`
+- `ExportQuestionDetails`
 
 应复用现有 RichDoc、公式、表格、图片、题目选项、答案和解析渲染能力。
 
@@ -150,9 +153,9 @@ backend/app/services/exporting/composition_assemble.py
 
 ```json
 {
-  "detail": "Unsupported snapshot block",
-  "block_index": 7,
-  "block_type": "unknown",
+        "detail": "Unsupported snapshot node",
+        "node_id": "00000000-0000-4000-8000-000000000000",
+        "node_type": "unknown",
   "version_no": 3
 }
 ```
@@ -167,9 +170,10 @@ backend/app/services/exporting/composition_assemble.py
 - H1-H4 标题。
 - 选择题、填空题和主观题。
 - 分页。
-- `answer_summary: all`。
-- `answer_summary: before`。
-- 同一题目重复出现时答案汇总按冻结 ID 去重。
+- `question_details: all` 与 `before`。
+- 模块全局四字段开关、题目级覆盖和排除。
+- 模块内自定义标题、富文本、图片和公式。
+- 同一题目重复出现时按不同 Question 节点 UUID 分别输出。
 - 题库内容更新后旧版本导出不变。
 - 题目软删除后旧版本仍可导出。
 - 相同版本重复导出的语义内容一致。
@@ -209,7 +213,7 @@ backend/app/services/exporting/composition_assemble.py
 
 - 相同标题层级。
 - 相同题目顺序。
-- 相同答案汇总范围。
+- 相同模块子节点、字段配置和源题引用。
 - 相同分页位置。
 
 可允许样式差异，不允许内容差异。
@@ -230,9 +234,9 @@ backend/app/services/exporting/composition_assemble.py
 
 `paper_questions` 按 `sequence` 转换：
 
-- `section_title` 非空且与前一项不同：插入 `heading` Block。
-- 每条关联插入一个 `question` Block。
-- `score` 放入 Question Block 中性展示属性；如果当前 Block Schema 尚未支持分值，应先补充 `props.score` 契约。
+- `section_title` 非空且与前一项不同：插入 `heading` 节点。
+- 每条关联插入一个 `question` 节点，并在迁移脚本中生成 UUID。
+- `score` 放入 Question 节点中性展示属性；如果当前 Node Schema 尚未支持分值，应先补充 `props.score` 契约。
 
 ### 6.2 迁移策略
 
@@ -260,7 +264,7 @@ backend/app/services/exporting/composition_assemble.py
 ## 7. 建议实施顺序
 
 1. 定义 `ExportDocument` 扩展和 CompositionAssembler 单元测试。
-2. 实现五类 Block 到中间结构的转换。
+2. 实现基础节点与 Module registry 到中间结构的转换。
 3. 接入 DOCX Renderer。
 4. 接入 LaTeX Renderer。
 5. 增加版本导出 API 和权限测试。

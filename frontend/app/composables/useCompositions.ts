@@ -1,22 +1,27 @@
 import type {
   Composition,
   CompositionCreatePayload,
-  CompositionBlocksReplaceRequest,
-  CompositionBlocksReplaceResponse,
+  CompositionNodesReplaceRequest,
+  CompositionNodesReplaceResponse,
   CompositionDetail,
   CompositionFolder,
   CompositionMetaUpdatePayload,
+  CompositionQuestionNodesSyncRequest,
+  CompositionQuestionNodesSyncResponse,
   CompositionScope,
   CompositionVersionCreatePayload,
   CompositionVersionDetail,
   CompositionVersionSummary,
   FolderCreatePayload,
   FolderUpdatePayload,
+  QuestionRevisionStatus,
 } from '@/types/composition'
 import {
-  compositionBlocksPath,
+  compositionNodesPath,
   compositionItemPath,
   compositionListQuery,
+  compositionQuestionNodesSyncPath,
+  compositionQuestionRevisionsPath,
   compositionRestorePath,
   compositionVersionItemPath,
   compositionVersionsPath,
@@ -182,17 +187,44 @@ export function useCompositions() {
       query: { scope, expected_revision: expectedRevision },
     }).catch(mapConflict)
 
-  // 画布：整段替换 blocks。乐观锁经 expected_revision；409 复用冲突映射。
-  const replaceBlocks = (
+  // 画布：整棵 AST 节点整体替换。乐观锁经 expected_revision；409 复用冲突映射。
+  const replaceNodes = (
     subjectId: number,
     scope: CompositionScope,
     compositionId: number,
-    payload: CompositionBlocksReplaceRequest,
+    payload: CompositionNodesReplaceRequest,
   ) =>
-    $api<CompositionBlocksReplaceResponse>(
-      compositionBlocksPath(subjectId, compositionId),
+    $api<CompositionNodesReplaceResponse>(
+      compositionNodesPath(subjectId, compositionId),
       {
         method: 'PUT',
+        query: { scope },
+        body: payload,
+      },
+    ).catch(mapConflict)
+
+  // 题目版本状态：批量返回稿件内每 question_id 的当前 revision 与可用性（不含题目内容）。
+  const getQuestionRevisions = (
+    subjectId: number,
+    scope: CompositionScope,
+    compositionId: number,
+  ) =>
+    $api<QuestionRevisionStatus[]>(
+      compositionQuestionRevisionsPath(subjectId, compositionId),
+      { query: { scope } },
+    )
+
+  // 同步 question 节点：刷新冻结快照并立即落库。乐观锁经 expected_revision；409 复用冲突映射。
+  const syncQuestionNodes = (
+    subjectId: number,
+    scope: CompositionScope,
+    compositionId: number,
+    payload: CompositionQuestionNodesSyncRequest,
+  ) =>
+    $api<CompositionQuestionNodesSyncResponse>(
+      compositionQuestionNodesSyncPath(subjectId, compositionId),
+      {
+        method: 'POST',
         query: { scope },
         body: payload,
       },
@@ -249,7 +281,9 @@ export function useCompositions() {
     updateComposition,
     deleteComposition,
     restoreComposition,
-    replaceBlocks,
+    replaceNodes,
+    getQuestionRevisions,
+    syncQuestionNodes,
     finalizeVersion,
     listVersions,
     getVersion,

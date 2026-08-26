@@ -13,11 +13,13 @@ from app.api import deps
 from app.crud import crud_composition
 from app.models.composition import ScopeType
 from app.schemas.composition import (
-    CompositionBlocksReplaceRequest,
-    CompositionBlocksReplaceResponse,
     CompositionCreateRequest,
     CompositionDetail,
     CompositionMetaUpdateRequest,
+    CompositionNodesReplaceRequest,
+    CompositionNodesReplaceResponse,
+    CompositionQuestionNodesSyncRequest,
+    CompositionQuestionNodesSyncResponse,
     CompositionRead,
     CompositionVersionCreateRequest,
     CompositionVersionRead,
@@ -25,6 +27,7 @@ from app.schemas.composition import (
     FolderCreateRequest,
     FolderRead,
     FolderUpdateRequest,
+    QuestionRevisionStatus,
 )
 from app.services import composition_service
 
@@ -208,7 +211,7 @@ async def get_composition(
         scope_type=scope_type,
         owner_id=owner_id,
         include_deleted=include_deleted,
-        with_blocks=True,
+        with_nodes=True,
     )
     if comp is None:
         raise HTTPException(status_code=404, detail="Composition not found")
@@ -249,13 +252,13 @@ async def update_composition(
 
 
 @router.put(
-    "/{subject_id}/compositions/{composition_id}/blocks",
-    response_model=CompositionBlocksReplaceResponse,
+    "/{subject_id}/compositions/{composition_id}/nodes",
+    response_model=CompositionNodesReplaceResponse,
 )
-async def replace_composition_blocks(
+async def replace_composition_nodes(
     subject_id: int,
     composition_id: int,
-    payload: CompositionBlocksReplaceRequest,
+    payload: CompositionNodesReplaceRequest,
     db: deps.SessionDep,
     scope: ScopeType = Query(...),
     current_user: models.User = Depends(deps.get_current_active_user),
@@ -271,15 +274,73 @@ async def replace_composition_blocks(
     )
     if comp is None:
         raise HTTPException(status_code=404, detail="Composition not found")
-    revision, id_map, blocks = await composition_service.replace_blocks(
+    revision, nodes = await composition_service.replace_nodes(
         db,
         comp=comp,
         actor=current_user,
         expected_revision=payload.expected_revision,
         batch_id=payload.batch_id,
-        items=payload.blocks,
+        items=payload.nodes,
     )
-    return CompositionBlocksReplaceResponse(revision=revision, id_map=id_map, blocks=blocks)
+    return CompositionNodesReplaceResponse(revision=revision, nodes=nodes)
+
+
+@router.get(
+    "/{subject_id}/compositions/{composition_id}/question-revisions",
+    response_model=List[QuestionRevisionStatus],
+)
+async def get_question_revisions(
+    subject_id: int,
+    composition_id: int,
+    db: deps.SessionDep,
+    scope: ScopeType = Query(...),
+    current_user: models.User = Depends(deps.get_current_active_user),
+) -> Any:
+    await _ensure_subject(db, subject_id)
+    scope_type, owner_id = _resolve_scope(scope, current_user)
+    comp = await crud_composition.composition.get_scoped(
+        db,
+        composition_id=composition_id,
+        subject_id=subject_id,
+        scope_type=scope_type,
+        owner_id=owner_id,
+    )
+    if comp is None:
+        raise HTTPException(status_code=404, detail="Composition not found")
+    return await composition_service.question_revision_status(db, comp=comp)
+
+
+@router.post(
+    "/{subject_id}/compositions/{composition_id}/question-nodes/sync",
+    response_model=CompositionQuestionNodesSyncResponse,
+)
+async def sync_question_nodes(
+    subject_id: int,
+    composition_id: int,
+    payload: CompositionQuestionNodesSyncRequest,
+    db: deps.SessionDep,
+    scope: ScopeType = Query(...),
+    current_user: models.User = Depends(deps.get_current_active_user),
+) -> Any:
+    await _ensure_subject(db, subject_id)
+    scope_type, owner_id = _resolve_scope(scope, current_user)
+    comp = await crud_composition.composition.get_scoped(
+        db,
+        composition_id=composition_id,
+        subject_id=subject_id,
+        scope_type=scope_type,
+        owner_id=owner_id,
+    )
+    if comp is None:
+        raise HTTPException(status_code=404, detail="Composition not found")
+    revision, nodes = await composition_service.sync_question_nodes(
+        db,
+        comp=comp,
+        actor=current_user,
+        expected_revision=payload.expected_revision,
+        node_ids=payload.node_ids,
+    )
+    return CompositionQuestionNodesSyncResponse(revision=revision, nodes=nodes)
 
 
 @router.delete(

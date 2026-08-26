@@ -20,11 +20,11 @@ import CompositionVersionsSheet from '~/components/manager/composition/Compositi
 import { useCompositions, CompositionConflictError } from '~/composables/useCompositions'
 import { normalizeScope } from '~/lib/compositions'
 import {
-  blocksToReplaceRequest, collectBlockIssues, editorBlocksFromDetail,
-  reconcileAfterSave, snapshotBlocks,
-} from '~/lib/compositionCanvas'
-import type { EditorBlock } from '~/lib/compositionCanvas'
-import type { CompositionDetail, CompositionScope } from '~/types'
+  collectDocumentIssues, collectStaleQuestionNodeIds, documentFromNodes,
+  documentToReplaceRequest, snapshotDocument,
+} from '~/lib/compositionDocument'
+import type { EditorDocument } from '~/lib/compositionDocument'
+import type { CompositionDetail, CompositionScope, QuestionRevisionStatus } from '~/types'
 
 const route = useRoute()
 const router = useRouter()
@@ -37,15 +37,19 @@ const compositionId = computed(() => Number(route.params.id))
 const composition = ref<CompositionDetail | null>(null)
 const loading = ref(true)
 const savingMeta = ref(false)
-const savingBlocks = ref(false)
+const savingNodes = ref(false)
 const title = ref('')
 const description = ref('')
 
-const blocks = ref<EditorBlock[]>([])
+const document = ref<EditorDocument>({ nodes: [] })
 const savedSnapshot = ref('')
-const blockConflict = ref(false)
+const editConflict = ref(false)
 
-const saving = computed(() => savingMeta.value || savingBlocks.value)
+// 题目版本状态（question_id → 实时 revision/可用性），只用于 stale/deleted 标记，不渲染内容。
+const questionStatus = ref<Map<number, QuestionRevisionStatus>>(new Map())
+const syncingNodes = ref(false)
+
+const saving = computed(() => savingMeta.value || savingNodes.value)
 
 const metaDirty = computed(
   () =>
@@ -53,8 +57,12 @@ const metaDirty = computed(
     (title.value.trim() !== (composition.value.title ?? '') ||
       (description.value.trim() || '') !== (composition.value.description ?? '')),
 )
-const blocksDirty = computed(() => snapshotBlocks(blocks.value) !== savedSnapshot.value)
-const dirty = computed(() => metaDirty.value || blocksDirty.value)
+const nodesDirty = computed(() => snapshotDocument(document.value) !== savedSnapshot.value)
+const dirty = computed(() => metaDirty.value || nodesDirty.value)
+// 存在过期题目（题库有更新但稿件仍是定格旧内容）。定稿不被阻止，仅提示。
+const hasStaleQuestions = computed(
+  () => collectStaleQuestionNodeIds(document.value, questionStatus.value).length > 0,
+)
 
 async function load() {
   if (!currentSubjectId.value) {
@@ -67,14 +75,30 @@ async function load() {
     composition.value = data
     title.value = data.title
     description.value = data.description ?? ''
-    blocks.value = editorBlocksFromDetail(data.blocks ?? [])
-    savedSnapshot.value = snapshotBlocks(blocks.value)
-    blockConflict.value = false
+    document.value = documentFromNodes(data.nodes ?? [])
+    savedSnapshot.value = snapshotDocument(document.value)
+    editConflict.value = false
+    await loadQuestionStatus()
   } catch {
     toast.error('加载组稿失败')
     router.push(`/compositions/${scope.value}`)
   } finally {
     loading.value = false
+  }
+}
+
+// 拉取题目版本状态（stale/deleted 标记）；失败静默降级为无状态。
+async function loadQuestionStatus() {
+  if (!currentSubjectId.value || !composition.value) return
+  try {
+    const list = await api.getQuestionRevisions(
+      currentSubjectId.value,
+      scope.value,
+      composition.value.id,
+    )
+    questionStatus.value = new Map(list.map((s) => [s.question_id, s]))
+  } catch {
+    // 状态获取失败时保持空 Map（不显示过期/删除标记，不影响冻结快照渲染）。
   }
 }
 
@@ -107,7 +131,7 @@ async function saveMeta() {
   } catch (err) {
     if (err instanceof CompositionConflictError && err.kind === 'revision') {
       // 与内容保存冲突采用同一策略：保留全部本地修改，由用户决定何时放弃并重载。
-      blockConflict.value = true
+      editConflict.value = true
       toast.error('组稿已被他人更新，你的本地修改尚未保存')
     } else {
       toast.error('保存失败')
@@ -117,38 +141,68 @@ async function saveMeta() {
   }
 }
 
-async function saveBlocks() {
+async function saveNodes() {
   if (!currentSubjectId.value || !composition.value || saving.value) return
-  const issues = collectBlockIssues(blocks.value)
+  const issues = collectDocumentIssues(document.value)
   if (issues.length) {
     toast.error(`存在无法保存的块：${issues[0]}`)
     return
   }
-  savingBlocks.value = true
+  savingNodes.value = true
   try {
     const batchId = globalThis.crypto?.randomUUID?.()
-    const payload = blocksToReplaceRequest(blocks.value, composition.value.revision, batchId)
-    const resp = await api.replaceBlocks(
+    const payload = documentToReplaceRequest(document.value, composition.value.revision, batchId)
+    const resp = await api.replaceNodes(
       currentSubjectId.value,
       scope.value,
       composition.value.id,
       payload,
     )
-    blocks.value = reconcileAfterSave(blocks.value, resp)
+    document.value = documentFromNodes(resp.nodes)
     composition.value = { ...composition.value, revision: resp.revision }
-    savedSnapshot.value = snapshotBlocks(blocks.value)
-    blockConflict.value = false
+    savedSnapshot.value = snapshotDocument(document.value)
+    editConflict.value = false
     toast.success('已保存内容')
+    await loadQuestionStatus()
   } catch (err) {
     if (err instanceof CompositionConflictError && err.kind === 'revision') {
       // 不静默覆盖本地改动：显示冲突条，由用户决定是否放弃本地重新加载。
-      blockConflict.value = true
+      editConflict.value = true
       toast.error('内容已被他人更新，你的本地修改尚未保存')
     } else {
       toast.error('保存内容失败')
     }
   } finally {
-    savingBlocks.value = false
+    savingNodes.value = false
+  }
+}
+
+// 同步 question 节点：刷新冻结快照并立即落库。dirty 时禁止（画布已把按钮禁用）。
+async function syncNodes(nodeIds: string[]) {
+  if (!currentSubjectId.value || !composition.value || syncingNodes.value) return
+  if (dirty.value || !nodeIds.length) return
+  syncingNodes.value = true
+  try {
+    const resp = await api.syncQuestionNodes(
+      currentSubjectId.value,
+      scope.value,
+      composition.value.id,
+      { expected_revision: composition.value.revision, node_ids: nodeIds },
+    )
+    document.value = documentFromNodes(resp.nodes)
+    composition.value = { ...composition.value, revision: resp.revision }
+    savedSnapshot.value = snapshotDocument(document.value)
+    toast.success(`已同步 ${nodeIds.length} 道题目`)
+    await loadQuestionStatus()
+  } catch (err) {
+    if (err instanceof CompositionConflictError && err.kind === 'revision') {
+      editConflict.value = true
+      toast.error('组稿已被他人更新，同步失败；你的本地修改仍保留')
+    } else {
+      toast.error('同步题目失败')
+    }
+  } finally {
+    syncingNodes.value = false
   }
 }
 
@@ -293,7 +347,7 @@ onBeforeRouteLeave(() => {
 
       <!-- 冲突条 -->
       <div
-        v-if="blockConflict"
+        v-if="editConflict"
         class="flex items-center gap-3 rounded-md border border-amber-400 bg-amber-50 px-4 py-3 text-sm dark:border-amber-700 dark:bg-amber-900/20"
       >
         <AlertTriangle class="h-4 w-4 shrink-0 text-amber-600 dark:text-amber-400" />
@@ -306,14 +360,21 @@ onBeforeRouteLeave(() => {
       <!-- 画布 -->
       <div class="flex items-center justify-between">
         <h2 class="text-sm font-medium text-muted-foreground">内容画布</h2>
-        <Button size="sm" :disabled="saving || !blocksDirty" @click="saveBlocks">
-          <Loader2 v-if="savingBlocks" class="mr-2 h-4 w-4 animate-spin" />
+        <Button size="sm" :disabled="saving || !nodesDirty" @click="saveNodes">
+          <Loader2 v-if="savingNodes" class="mr-2 h-4 w-4 animate-spin" />
           <Save v-else class="mr-2 h-4 w-4" />
           保存内容
         </Button>
       </div>
 
-      <CompositionCanvas v-model:blocks="blocks" :subject-id="currentSubjectId" />
+      <CompositionCanvas
+        v-model:document="document"
+        :subject-id="currentSubjectId"
+        :question-status="questionStatus"
+        :sync-disabled="dirty"
+        :syncing="syncingNodes"
+        @sync="syncNodes"
+      />
 
       <p class="text-xs text-muted-foreground">
         科目：{{ currentSubject?.name || '—' }} · 修订版本 r{{ composition.revision }}
@@ -335,6 +396,13 @@ onBeforeRouteLeave(() => {
       <div class="space-y-2">
         <Label>版本备注（可选）</Label>
         <Input v-model="finalizeLabel" placeholder="例如：期中卷终稿" maxlength="200" />
+      </div>
+      <div
+        v-if="hasStaleQuestions"
+        class="flex items-start gap-2 rounded-md border border-amber-400 bg-amber-50 px-3 py-2 text-xs dark:border-amber-700 dark:bg-amber-900/20"
+      >
+        <AlertTriangle class="mt-0.5 h-3.5 w-3.5 shrink-0 text-amber-600 dark:text-amber-400" />
+        <span>部分题目在题库中已更新，本次将冻结当前显示的旧版本内容。如需最新内容，请先取消并“同步全部”。</span>
       </div>
       <DialogFooter>
         <Button variant="outline" :disabled="finalizing" @click="finalizeOpen = false">取消</Button>

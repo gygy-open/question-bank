@@ -38,8 +38,25 @@ export function compositionRestorePath(subjectId: number, compositionId: number)
   return `${compositionItemPath(subjectId, compositionId)}/restore`
 }
 
-export function compositionBlocksPath(subjectId: number, compositionId: number): string {
-  return `${compositionItemPath(subjectId, compositionId)}/blocks`
+/** 整棵 AST 节点整体替换路径。 */
+export function compositionNodesPath(subjectId: number, compositionId: number): string {
+  return `${compositionItemPath(subjectId, compositionId)}/nodes`
+}
+
+/** question 节点版本状态路径（只读 stale/deleted 检测，不含题目内容）。 */
+export function compositionQuestionRevisionsPath(
+  subjectId: number,
+  compositionId: number,
+): string {
+  return `${compositionItemPath(subjectId, compositionId)}/question-revisions`
+}
+
+/** question 节点同步路径（刷新冻结快照）。 */
+export function compositionQuestionNodesSyncPath(
+  subjectId: number,
+  compositionId: number,
+): string {
+  return `${compositionItemPath(subjectId, compositionId)}/question-nodes/sync`
 }
 
 /** /subjects/{id}/compositions/{cid}/versions 版本集合路径（定稿/列表）。 */

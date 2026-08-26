@@ -27,32 +27,46 @@ export type {
   CompositionCreatePayload,
   CompositionMetaUpdatePayload,
   CompositionFolderNode,
-  CompositionBlockType,
+  CompositionNodeKind,
+  CompositionNodeType,
   HeadingLevel,
   HeadingProps,
-  AnswerSummaryMode,
-  AnswerSummaryProps,
-  RichTextBlock,
-  HeadingBlock,
-  QuestionBlock,
-  PageBreakBlock,
-  AnswerSummaryBlock,
-  CompositionBlock,
+  AnswerFieldKey,
+  DetailScope,
+  QuestionDetailsProps,
+  AnswerItemOverride,
+  AnswerItemProps,
+  QuestionContentSnapshot,
+  RichTextNode,
+  HeadingNode,
+  QuestionNode,
+  PageBreakNode,
+  QuestionDetailsNode,
+  AnswerItemNode,
+  CompositionNode,
   CompositionDetail,
-  CompositionBlockReplaceItem,
-  CompositionBlocksReplaceRequest,
-  CompositionBlocksReplaceResponse,
+  CompositionNodeInput,
+  CompositionNodesReplaceRequest,
+  CompositionNodesReplaceResponse,
+  QuestionRevisionStatus,
+  CompositionQuestionNodesSyncRequest,
+  CompositionQuestionNodesSyncResponse,
   CompositionVersionCreatePayload,
   CompositionVersionSummary,
   CompositionVersionDetail,
-  CompositionSnapshotV1,
+  CompositionSnapshotV2,
   QuestionSnapshot,
-  SnapshotBlock,
-  SnapshotRichTextBlock,
-  SnapshotHeadingBlock,
-  SnapshotQuestionBlock,
-  SnapshotPageBreakBlock,
-  SnapshotAnswerSummaryBlock,
+  SnapshotNode,
+  SnapshotRichTextNode,
+  SnapshotHeadingNode,
+  SnapshotQuestionNode,
+  SnapshotPageBreakNode,
+  SnapshotQuestionDetailsNode,
+  SnapshotAnswerItemNode,
+} from './composition'
+export {
+  ANSWER_FIELD_KEYS,
+  BODY_SLOT,
 } from './composition'
 
 import type { RichDoc } from './richContent'
@@ -189,6 +203,8 @@ export interface ImportTask {
 
 export interface Question {
   id: number
+  content_revision: number
+  content_schema_version: number
   content: RichDoc
   options?: OptionSpec[] | null
   answer?: AnswerSpec | null

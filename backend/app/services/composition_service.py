@@ -1,40 +1,55 @@
-"""组稿 (Composition) 域的领域服务 —— 第二阶段。
+"""组稿 (Composition) 域的领域服务 —— AST 阶段。
 
 职责边界(与 crud_composition 划分):
 - crud 负责 scoped 读取(强制 subject/scope/owner)。
 - 本模块负责 **写路径的领域不变量与事务**:父目录一致性、自引用/祖先环检测、
-  软删除非空拦截、组稿乐观锁(条件 UPDATE),以及与业务变更 **同事务** 写 CompositionEvent。
+  软删除非空拦截、组稿乐观锁(条件 UPDATE),AST 全量校验/规范化,以及与业务变更
+  **同事务** 写 CompositionEvent。
 
 错误约定(与仓库 FastAPI 风格一致):
 - 跨 scope/subject/owner 不可见 → 404(防枚举)。
 - 版本冲突 / 删除非空目录 → 409。
-- 结构非法(自引用父、祖先环)→ 400。
+- 结构非法(自引用父、祖先环、AST 违规)→ 400。
+- 引用题目缺失/跨学科 → 422。
 """
+from collections import defaultdict
 from datetime import datetime
 from typing import Any, Dict, List, Optional
 import uuid
 
 from fastapi import HTTPException, status
-from sqlalchemy import select, update
+from pydantic import ValidationError
+from sqlalchemy import delete, select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.crud import crud_composition
 from app.models.composition import (
+    BODY_SLOT,
     Composition,
-    CompositionBlock,
-    CompositionBlockType,
     CompositionEvent,
+    CompositionNode,
+    CompositionNodeKind,
     CompositionVersion,
     Folder,
+    NODE_TYPE_ANSWER_ITEM,
+    NODE_TYPE_HEADING,
+    NODE_TYPE_QUESTION,
+    NODE_TYPE_QUESTION_DETAILS,
+    NODE_TYPE_RICH_TEXT,
     ScopeType,
 )
 from app.models.question import Question, QuestionType
 from app.models.user import User
-from app.schemas.composition import CompositionBlockReplaceItem, QuestionSnapshot
+from app.schemas.composition import (
+    ANSWER_FIELD_KEYS,
+    CompositionNodeInput,
+    QuestionContentSnapshot,
+    QuestionSnapshot,
+)
 from app.services.question_content import parse_json_field
 
-SNAPSHOT_SCHEMA_VERSION = 1
+SNAPSHOT_SCHEMA_VERSION = 2
 
 
 # --------------------------------------------------------------------------- #
@@ -459,149 +474,12 @@ async def restore_composition(
 
 
 # --------------------------------------------------------------------------- #
-# CompositionBlock 批量替换(画布契约)
+# 题目内容快照(冻结)
 # --------------------------------------------------------------------------- #
-async def _resolve_question_ref(
-    db: AsyncSession,
-    *,
-    question_id: int,
-    subject_id: int,
-) -> int:
-    """校验 question block 引用并返回服务端钉住的 content_revision。
-
-    缺失 / 软删除 / 跨学科统一 422(不信任客户端传入的 revision)。
-    """
-    result = await db.execute(
-        select(Question).where(
-            Question.id == question_id,
-            Question.deleted_at.is_(None),
-        )
-    )
-    question = result.scalars().first()
-    if question is None:
-        raise _unprocessable(f"question {question_id} not found or deleted")
-    if question.subject_id != subject_id:
-        raise _unprocessable(f"question {question_id} belongs to a different subject")
-    return int(question.content_revision or 1)
-
-
-async def replace_blocks(
-    db: AsyncSession,
-    *,
-    comp: Composition,
-    actor: User,
-    expected_revision: int,
-    batch_id: Optional[str],
-    items: List[CompositionBlockReplaceItem],
-) -> tuple[int, dict, List[CompositionBlock]]:
-    """一次事务内整体替换 composition 的 block 序列。
-
-    数组顺序即 sequence;已有 block 按 id 原地更新并保留身份,未出现的旧 block 删除,
-    带 temp_id 的新 block 插入并回填 id_map。question block 的 revision 由服务端钉住。
-    任何校验失败不产生部分更改;组稿乐观锁冲突 409。
-    """
-    existing = await crud_composition.composition.list_blocks(db, composition_id=comp.id)
-    existing_by_id = {block.id: block for block in existing}
-
-    # 1) 全量校验(不产生任何写入):已有 id 必须属于该 composition;question 引用合法。
-    referenced_ids: set[int] = set()
-    pinned_revisions: dict[int, int] = {}
-    for idx, item in enumerate(items):
-        if item.id is not None:
-            if item.id not in existing_by_id:
-                raise _not_found("Block")
-            referenced_ids.add(item.id)
-        if item.block_type == CompositionBlockType.QUESTION:
-            assert item.question_id is not None  # schema 已保证
-            pinned_revisions[idx] = await _resolve_question_ref(
-                db,
-                question_id=item.question_id,
-                subject_id=comp.subject_id,
-            )
-
-    # 2) 乐观锁:先条件自增 revision;冲突则 409 且此时尚未改动任何 block。
-    new_revision = await _guarded_write(
-        db,
-        composition_id=comp.id,
-        expected_revision=expected_revision,
-        values={"updated_by": actor.id, "updated_at": datetime.utcnow()},
-        require_deleted=False,
-    )
-
-    # 3) 应用变更:删除缺席、原地更新、插入新增,并重排 sequence。
-    removed_ids = [bid for bid in existing_by_id if bid not in referenced_ids]
-    for bid in removed_ids:
-        await db.delete(existing_by_id[bid])
-
-    id_map: dict[str, int] = {}
-    added = 0
-    updated = 0
-    for idx, item in enumerate(items):
-        question_revision = pinned_revisions.get(idx)
-        if item.id is not None:
-            block = existing_by_id[item.id]
-            block.sequence = idx
-            block.block_type = item.block_type
-            block.content = item.content
-            block.props = item.props
-            block.schema_version = item.schema_version
-            block.question_id = item.question_id
-            block.question_revision = question_revision
-            block.updated_by = actor.id
-            db.add(block)
-            updated += 1
-        else:
-            block = CompositionBlock(
-                composition_id=comp.id,
-                sequence=idx,
-                block_type=item.block_type,
-                content=item.content,
-                props=item.props,
-                schema_version=item.schema_version,
-                question_id=item.question_id,
-                question_revision=question_revision,
-                created_by=actor.id,
-                updated_by=actor.id,
-            )
-            db.add(block)
-            await db.flush()
-            assert item.temp_id is not None
-            id_map[item.temp_id] = block.id
-            added += 1
-
-    # 4) 与业务变更同事务写一条时间线事件。
-    resolved_batch_id = batch_id or uuid.uuid4().hex
-    await _add_event(
-        db,
-        composition_id=comp.id,
-        composition_revision=new_revision,
-        event_type="blocks_replaced",
-        summary=f"Replaced blocks (+{added}/~{updated}/-{len(removed_ids)})",
-        actor_id=actor.id,
-        batch_id=resolved_batch_id,
-        payload={
-            "added": added,
-            "updated": updated,
-            "removed": len(removed_ids),
-            "removed_ids": removed_ids,
-        },
-    )
-
-    await db.commit()
-
-    refreshed = await crud_composition.composition.list_blocks(db, composition_id=comp.id)
-    return new_revision, id_map, refreshed
-
-
-# --------------------------------------------------------------------------- #
-# 定稿 (Composition Version) —— 不可变 snapshot
-# --------------------------------------------------------------------------- #
-def _build_question_snapshot(question: Question) -> Dict[str, Any]:
-    """冻结单个题目为原生 JSON 投影(经 Pydantic 结构化,不直接序列化 ORM)。"""
+def _build_question_content_snapshot(question: Question) -> Dict[str, Any]:
+    """把实时题目冻结为 question 节点的内容快照(不含 id/revision)。"""
     q_type = question.q_type.value if isinstance(question.q_type, QuestionType) else question.q_type
-    snapshot = QuestionSnapshot(
-        id=question.id,
-        content_revision=int(question.content_revision or 1),
+    snapshot = QuestionContentSnapshot(
         content_schema_version=int(question.content_schema_version or 0),
         q_type=q_type,
         content=parse_json_field(question.content),
@@ -616,69 +494,540 @@ def _build_question_snapshot(question: Question) -> Dict[str, Any]:
     return snapshot.model_dump()
 
 
+async def _load_scoped_question(
+    db: AsyncSession,
+    *,
+    question_id: int,
+    subject_id: int,
+) -> Question:
+    """校验 question 节点引用并返回实时题目。
+
+    缺失 / 软删除 / 跨学科统一 422(不信任客户端传入的 revision/快照)。
+    """
+    result = await db.execute(
+        select(Question).where(
+            Question.id == question_id,
+            Question.deleted_at.is_(None),
+        )
+    )
+    question = result.scalars().first()
+    if question is None:
+        raise _unprocessable(f"question {question_id} not found or deleted")
+    if question.subject_id != subject_id:
+        raise _unprocessable(f"question {question_id} belongs to a different subject")
+    return question
+
+
+# --------------------------------------------------------------------------- #
+# CompositionNode 整体替换(AST 契约)
+# --------------------------------------------------------------------------- #
+def _default_answer_item_props() -> Dict[str, Any]:
+    return {"included": True, "overrides": {key: None for key in ANSWER_FIELD_KEYS}}
+
+
+def _validate_ast(items: List[CompositionNodeInput]) -> None:
+    """全量内存校验 AST(不产生任何写入)。
+
+    每个节点单体规则已由 schema 保证;这里补齐跨节点不变量:父存在且为同稿
+    question_details module、reference source 指向同稿 root 层 question 节点、
+    自定义节点 anchor 指向同 module 内 answer_item。
+    """
+    by_id = {it.id: it for it in items}
+    for it in items:
+        if it.parent_id is not None:
+            parent = by_id.get(it.parent_id)
+            if parent is None:
+                raise _bad_request(f"node {it.id} references a missing parent")
+            if parent.node_type != NODE_TYPE_QUESTION_DETAILS:
+                raise _bad_request(
+                    f"node {it.id} parent must be a question_details module"
+                )
+        if it.node_type == NODE_TYPE_ANSWER_ITEM:
+            src = by_id.get(it.source_question_node_id)
+            if src is None or src.node_type != NODE_TYPE_QUESTION or src.parent_id is not None:
+                raise _bad_request(
+                    f"answer_item {it.id} source must point to a root-level question node"
+                )
+        if it.anchor_before_node_id is not None:
+            target = by_id.get(it.anchor_before_node_id)
+            if (
+                target is None
+                or target.node_type != NODE_TYPE_ANSWER_ITEM
+                or target.parent_id != it.parent_id
+            ):
+                raise _bad_request(
+                    f"node {it.id} anchor must point to an answer_item in the same module"
+                )
+
+
+def _normalize_module_children(
+    module: CompositionNodeInput,
+    *,
+    root_question_items: List[CompositionNodeInput],
+    module_root_index: int,
+    root_index_by_id: Dict[str, int],
+    children: List[CompositionNodeInput],
+) -> List[Dict[str, Any]]:
+    """按 module scope 规范化 question_details 的子节点顺序与 answer_item 集合。
+
+    - scope=all → 整稿全部 root 层 question 节点;scope=before → module 之前的。
+    - 每个范围内 question 节点产出一条 answer_item(重复 question_id 因节点不同而各自保留)。
+    - answer_item 相对顺序跟随正文(题序)。
+    - 尽量复用客户端传入的 answer_item(按 source_question_node_id 顺序消费)以保留
+      id / included / overrides;不足则服务端生成新 UUID + 默认 props。
+    - 自定义 heading/rich_text 按 anchor_before_node_id 混排,悬空锚点落到末尾(保序)。
+
+    返回子节点规范化描述列表(dict),position 由列表下标决定。
+    """
+    scope = (module.props or {}).get("scope")
+    if scope == "all":
+        scoped_questions = list(root_question_items)
+    else:  # before
+        scoped_questions = [
+            q for q in root_question_items
+            if root_index_by_id[q.id] < module_root_index
+        ]
+
+    # 客户端 answer_item 按 source 分组,保留请求顺序以支持重复消费。
+    client_ai_by_source: Dict[str, List[CompositionNodeInput]] = defaultdict(list)
+    for child in children:
+        if child.node_type == NODE_TYPE_ANSWER_ITEM:
+            client_ai_by_source[child.source_question_node_id].append(child)
+
+    answer_items: List[Dict[str, Any]] = []
+    for q in scoped_questions:
+        pool = client_ai_by_source.get(q.id)
+        if pool:
+            reused = pool.pop(0)
+            answer_items.append(
+                {
+                    "id": reused.id,
+                    "source_question_node_id": q.id,
+                    "props": reused.props or _default_answer_item_props(),
+                    "schema_version": reused.schema_version,
+                }
+            )
+        else:
+            answer_items.append(
+                {
+                    "id": str(uuid.uuid4()),
+                    "source_question_node_id": q.id,
+                    "props": _default_answer_item_props(),
+                    "schema_version": 1,
+                }
+            )
+
+    final_ai_ids = {ai["id"] for ai in answer_items}
+    custom = [c for c in children if c.node_type in (NODE_TYPE_HEADING, NODE_TYPE_RICH_TEXT)]
+    anchored: Dict[str, List[CompositionNodeInput]] = defaultdict(list)
+    trailing: List[CompositionNodeInput] = []
+    for c in custom:
+        if c.anchor_before_node_id in final_ai_ids:
+            anchored[c.anchor_before_node_id].append(c)
+        else:
+            trailing.append(c)
+
+    ordered: List[Dict[str, Any]] = []
+    for ai in answer_items:
+        for c in anchored.get(ai["id"], []):
+            ordered.append({"kind": "custom", "item": c})
+        ordered.append({"kind": "answer_item", **ai})
+    for c in trailing:
+        ordered.append({"kind": "custom", "item": c})
+    return ordered
+
+
+async def replace_nodes(
+    db: AsyncSession,
+    *,
+    comp: Composition,
+    actor: User,
+    expected_revision: int,
+    batch_id: Optional[str],
+    items: List[CompositionNodeInput],
+) -> tuple[int, List[CompositionNode]]:
+    """一次事务内整体替换 composition 的节点 AST。
+
+    流程:全量内存校验 → 冻结 question 快照 → 乐观锁自增 revision → 删旧建新
+    (root 先、module 子后,满足自引用 FK)→ 规范化 module 的 answer_item → 写事件。
+    任何校验失败不产生部分更改;组稿乐观锁冲突 409。
+    """
+    # 1) 全量 AST 校验(纯内存)。
+    _validate_ast(items)
+
+    existing = await crud_composition.composition.list_nodes(db, composition_id=comp.id)
+    existing_by_id = {n.id: n for n in existing}
+
+    # 2) 冻结 question 快照计划:新建 / question_id 变化 → 读实时题目;否则保留 DB 快照。
+    question_plan: Dict[str, Optional[tuple[int, Dict[str, Any]]]] = {}
+    for it in items:
+        if it.node_type != NODE_TYPE_QUESTION:
+            continue
+        assert it.question_id is not None  # schema 已保证
+        prev = existing_by_id.get(it.id)
+        if (
+            prev is not None
+            and prev.node_type == NODE_TYPE_QUESTION
+            and prev.question_id == it.question_id
+            and prev.content is not None
+        ):
+            question_plan[it.id] = None  # 保留 DB 快照与 revision
+        else:
+            question = await _load_scoped_question(
+                db, question_id=it.question_id, subject_id=comp.subject_id
+            )
+            question_plan[it.id] = (
+                int(question.content_revision or 1),
+                _build_question_content_snapshot(question),
+            )
+
+    # 3) 乐观锁:先条件自增 revision;冲突则 409 且此时尚未改动任何节点。
+    new_revision = await _guarded_write(
+        db,
+        composition_id=comp.id,
+        expected_revision=expected_revision,
+        values={"updated_by": actor.id, "updated_at": datetime.utcnow()},
+        require_deleted=False,
+    )
+
+    # 4) 计算新 AST 布局。
+    root_items = [it for it in items if it.parent_id is None]
+    root_index_by_id = {it.id: idx for idx, it in enumerate(root_items)}
+    root_question_items = [it for it in root_items if it.node_type == NODE_TYPE_QUESTION]
+    children_by_parent: Dict[str, List[CompositionNodeInput]] = defaultdict(list)
+    for it in items:
+        if it.parent_id is not None:
+            children_by_parent[it.parent_id].append(it)
+
+    def _new_node(**kwargs: Any) -> CompositionNode:
+        return CompositionNode(
+            composition_id=comp.id,
+            created_by=actor.id,
+            updated_by=actor.id,
+            **kwargs,
+        )
+
+    root_nodes: List[CompositionNode] = []
+    child_nodes: List[CompositionNode] = []
+
+    for root_idx, it in enumerate(root_items):
+        if it.node_type == NODE_TYPE_QUESTION:
+            plan = question_plan[it.id]
+            if plan is None:
+                prev = existing_by_id[it.id]
+                content = prev.content
+                revision = prev.question_revision
+            else:
+                revision, content = plan
+            root_nodes.append(
+                _new_node(
+                    id=it.id,
+                    parent_id=None,
+                    slot=None,
+                    position=root_idx,
+                    node_kind=CompositionNodeKind.BLOCK,
+                    node_type=NODE_TYPE_QUESTION,
+                    content=content,
+                    props=None,
+                    schema_version=it.schema_version,
+                    question_id=it.question_id,
+                    question_revision=revision,
+                )
+            )
+        else:
+            root_nodes.append(
+                _new_node(
+                    id=it.id,
+                    parent_id=None,
+                    slot=None,
+                    position=root_idx,
+                    node_kind=it.node_kind,
+                    node_type=it.node_type,
+                    content=it.content,
+                    props=it.props,
+                    schema_version=it.schema_version,
+                )
+            )
+
+    for it in root_items:
+        if it.node_type != NODE_TYPE_QUESTION_DETAILS:
+            continue
+        ordered = _normalize_module_children(
+            it,
+            root_question_items=root_question_items,
+            module_root_index=root_index_by_id[it.id],
+            root_index_by_id=root_index_by_id,
+            children=children_by_parent.get(it.id, []),
+        )
+        for pos, entry in enumerate(ordered):
+            if entry["kind"] == "answer_item":
+                child_nodes.append(
+                    _new_node(
+                        id=entry["id"],
+                        parent_id=it.id,
+                        slot=BODY_SLOT,
+                        position=pos,
+                        node_kind=CompositionNodeKind.REFERENCE,
+                        node_type=NODE_TYPE_ANSWER_ITEM,
+                        content=None,
+                        props=entry["props"],
+                        schema_version=entry["schema_version"],
+                        source_question_node_id=entry["source_question_node_id"],
+                    )
+                )
+            else:
+                c = entry["item"]
+                child_nodes.append(
+                    _new_node(
+                        id=c.id,
+                        parent_id=it.id,
+                        slot=BODY_SLOT,
+                        position=pos,
+                        node_kind=c.node_kind,
+                        node_type=c.node_type,
+                        content=c.content,
+                        props=c.props,
+                        schema_version=c.schema_version,
+                        anchor_before_node_id=c.anchor_before_node_id,
+                    )
+                )
+
+    # 5) 应用:detach 旧节点 → 删旧行(子先父后,防自引用 FK)→ 建新(root 先 flush、子后)。
+    for n in existing:
+        db.expunge(n)
+    await db.execute(
+        delete(CompositionNode).where(
+            CompositionNode.composition_id == comp.id,
+            CompositionNode.parent_id.is_not(None),
+        )
+    )
+    await db.execute(
+        delete(CompositionNode).where(
+            CompositionNode.composition_id == comp.id,
+            CompositionNode.parent_id.is_(None),
+        )
+    )
+    db.add_all(root_nodes)
+    await db.flush()
+    db.add_all(child_nodes)
+    await db.flush()
+
+    # 6) 与业务变更同事务写一条时间线事件。
+    resolved_batch_id = batch_id or uuid.uuid4().hex
+    await _add_event(
+        db,
+        composition_id=comp.id,
+        composition_revision=new_revision,
+        event_type="nodes_replaced",
+        summary=f"Replaced nodes ({len(root_nodes)} root / {len(child_nodes)} child)",
+        actor_id=actor.id,
+        batch_id=resolved_batch_id,
+        payload={"root": len(root_nodes), "child": len(child_nodes)},
+    )
+
+    await db.commit()
+    refreshed = await crud_composition.composition.list_nodes(db, composition_id=comp.id)
+    return new_revision, refreshed
+
+
+# --------------------------------------------------------------------------- #
+# Question node 版本状态 / 同步(冻结快照刷新)
+# --------------------------------------------------------------------------- #
+async def question_revision_status(
+    db: AsyncSession,
+    *,
+    comp: Composition,
+) -> List[Dict[str, Any]]:
+    """基于稿件 question 节点批量查实时题目,只返回每 question_id 的当前 revision 与可用性。
+
+    软删除 / 缺失题目视为 unavailable(current_revision 为 None);不返回任何题目内容。
+    """
+    nodes = await crud_composition.composition.list_nodes(db, composition_id=comp.id)
+    unique_ids: List[int] = []
+    seen: set[int] = set()
+    for node in nodes:
+        if node.node_type == NODE_TYPE_QUESTION and node.question_id is not None:
+            if node.question_id not in seen:
+                seen.add(node.question_id)
+                unique_ids.append(node.question_id)
+    if not unique_ids:
+        return []
+
+    result = await db.execute(
+        select(Question.id, Question.content_revision, Question.deleted_at).where(
+            Question.id.in_(unique_ids)
+        )
+    )
+    rows = {row[0]: row for row in result.all()}
+
+    statuses: List[Dict[str, Any]] = []
+    for qid in unique_ids:
+        row = rows.get(qid)
+        if row is None or row[2] is not None:
+            statuses.append({"question_id": qid, "current_revision": None, "available": False})
+        else:
+            statuses.append(
+                {"question_id": qid, "current_revision": int(row[1] or 1), "available": True}
+            )
+    return statuses
+
+
+async def sync_question_nodes(
+    db: AsyncSession,
+    *,
+    comp: Composition,
+    actor: User,
+    expected_revision: int,
+    node_ids: List[str],
+) -> tuple[int, List[CompositionNode]]:
+    """把指定 question 节点刷新为引用题目的最新冻结快照(一次事务,失败全回滚)。
+
+    "同步此题" 与 "同步全部" 共用:前者传单个 id,后者传全部 question 节点 id。
+    校验节点属于稿件且为 question 类型,并批量查同学科未软删的实时题目;
+    组稿 revision 一次 +1,并写一条 question_nodes_synced 事件。
+    """
+    existing = await crud_composition.composition.list_nodes(db, composition_id=comp.id)
+    existing_by_id = {n.id: n for n in existing}
+
+    targets: List[CompositionNode] = []
+    for nid in node_ids:
+        node = existing_by_id.get(nid)
+        if node is None:
+            raise _not_found("Node")
+        if node.node_type != NODE_TYPE_QUESTION:
+            raise _unprocessable(f"node {nid} is not a question node")
+        targets.append(node)
+
+    question_ids = {n.question_id for n in targets if n.question_id is not None}
+    result = await db.execute(
+        select(Question).where(
+            Question.id.in_(question_ids),
+            Question.deleted_at.is_(None),
+        )
+    )
+    questions_by_id = {q.id: q for q in result.scalars().all()}
+    for node in targets:
+        question = questions_by_id.get(node.question_id) if node.question_id else None
+        if question is None:
+            raise _unprocessable(f"question {node.question_id} not found or deleted")
+        if question.subject_id != comp.subject_id:
+            raise _unprocessable(
+                f"question {node.question_id} belongs to a different subject"
+            )
+
+    new_revision = await _guarded_write(
+        db,
+        composition_id=comp.id,
+        expected_revision=expected_revision,
+        values={"updated_by": actor.id, "updated_at": datetime.utcnow()},
+        require_deleted=False,
+    )
+
+    for node in targets:
+        question = questions_by_id[node.question_id]
+        node.content = _build_question_content_snapshot(question)
+        node.question_revision = int(question.content_revision or 1)
+        node.updated_by = actor.id
+        db.add(node)
+
+    await _add_event(
+        db,
+        composition_id=comp.id,
+        composition_revision=new_revision,
+        event_type="question_nodes_synced",
+        summary=f"Synced {len(targets)} question node(s)",
+        actor_id=actor.id,
+        payload={"node_ids": list(node_ids), "synced": len(targets)},
+    )
+
+    await db.commit()
+    refreshed = await crud_composition.composition.list_nodes(db, composition_id=comp.id)
+    return new_revision, refreshed
+
+
+# --------------------------------------------------------------------------- #
+# 定稿 (Composition Version) —— 不可变 snapshot v2
+# --------------------------------------------------------------------------- #
+def _build_question_snapshot_from_node(node: CompositionNode) -> Dict[str, Any]:
+    """从 question 节点冻结内容合成定稿题目投影;损坏/缺失快照 422(带 node id)。
+
+    完全不查询实时 Question:id 取 node.question_id、revision 取 node.question_revision,
+    其余字段来自 node.content(QuestionContentSnapshot)。
+    """
+    content = node.content
+    if not isinstance(content, dict):
+        raise _unprocessable(f"question node {node.id} has no frozen content")
+    try:
+        snapshot = QuestionSnapshot(
+            id=node.question_id,
+            content_revision=node.question_revision,
+            **content,
+        )
+    except (ValidationError, TypeError) as exc:
+        raise _unprocessable(f"question node {node.id} has a corrupt snapshot") from exc
+    return snapshot.model_dump()
+
+
+def _node_snapshot(node: CompositionNode) -> Dict[str, Any]:
+    """把单个规范化节点冻结为 snapshot 投影(保留完整结构 + 配置)。"""
+    kind = node.node_kind.value if isinstance(node.node_kind, CompositionNodeKind) else node.node_kind
+    snap: Dict[str, Any] = {
+        "id": node.id,
+        "parent_id": node.parent_id,
+        "slot": node.slot,
+        "position": node.position,
+        "node_kind": kind,
+        "node_type": node.node_type,
+        "schema_version": node.schema_version,
+    }
+    nt = node.node_type
+    if nt == NODE_TYPE_RICH_TEXT:
+        snap["content"] = node.content
+    elif nt == NODE_TYPE_HEADING:
+        snap["content"] = node.content
+        snap["props"] = node.props
+    elif nt == NODE_TYPE_QUESTION:
+        snap["question_id"] = node.question_id
+        snap["question_revision"] = node.question_revision
+        snap["question"] = _build_question_snapshot_from_node(node)
+    elif nt == NODE_TYPE_QUESTION_DETAILS:
+        snap["props"] = node.props
+    elif nt == NODE_TYPE_ANSWER_ITEM:
+        snap["source_question_node_id"] = node.source_question_node_id
+        snap["props"] = node.props
+    if node.anchor_before_node_id is not None:
+        snap["anchor_before_node_id"] = node.anchor_before_node_id
+    return snap
+
+
+def _ordered_nodes(nodes: List[CompositionNode]) -> List[CompositionNode]:
+    """按文档前序(root 按 position;module 子节点紧随其后按 position)展平。"""
+    roots = sorted(
+        [n for n in nodes if n.parent_id is None], key=lambda n: (n.position, n.id)
+    )
+    children_by_parent: Dict[str, List[CompositionNode]] = defaultdict(list)
+    for n in nodes:
+        if n.parent_id is not None:
+            children_by_parent[n.parent_id].append(n)
+    ordered: List[CompositionNode] = []
+    for root in roots:
+        ordered.append(root)
+        for child in sorted(children_by_parent.get(root.id, []), key=lambda n: (n.position, n.id)):
+            ordered.append(child)
+    return ordered
+
+
 def _build_snapshot(
     comp: Composition,
-    blocks: List[CompositionBlock],
-    questions_by_id: Dict[int, Question],
+    nodes: List[CompositionNode],
     finalized_at: datetime,
 ) -> Dict[str, Any]:
-    """组装 snapshot v1:顶层元数据 + 按 sequence 的 block 投影。
+    """组装 snapshot v2:顶层元数据 + 前序展平的规范化节点。
 
-    answer_summary 的 resolved_question_ids 使用 question_id(按 ADR),按 sequence 去重保序:
-    mode=all → 整稿全部 question block IDs;mode=before → 该 summary 之前的 question block IDs。
+    question 节点携带冻结题目投影;answer_item 保留配置(included/overrides + source),
+    可由同 snapshot 内 source question 节点解析出答案,定稿完全不查询实时题库。
     """
-    ordered = sorted(blocks, key=lambda b: b.sequence)
-
-    # 整稿全部 question_id(按 sequence 去重保序),供 mode=all 使用。
-    all_ids: List[int] = []
-    all_seen: set[int] = set()
-    for block in ordered:
-        if block.block_type == CompositionBlockType.QUESTION and block.question_id is not None:
-            if block.question_id not in all_seen:
-                all_seen.add(block.question_id)
-                all_ids.append(block.question_id)
-
-    block_snaps: List[Dict[str, Any]] = []
-    before_ids: List[int] = []
-    before_seen: set[int] = set()
-    for block in ordered:
-        bt = block.block_type
-        if bt == CompositionBlockType.RICH_TEXT:
-            block_snaps.append({"block_type": "rich_text", "content": block.content})
-        elif bt == CompositionBlockType.HEADING:
-            block_snaps.append(
-                {
-                    "block_type": "heading",
-                    "content": block.content,
-                    "props": {"level": (block.props or {}).get("level")},
-                }
-            )
-        elif bt == CompositionBlockType.PAGE_BREAK:
-            block_snaps.append({"block_type": "page_break"})
-        elif bt == CompositionBlockType.QUESTION:
-            question = questions_by_id.get(block.question_id) if block.question_id else None
-            block_snaps.append(
-                {
-                    "block_type": "question",
-                    "question_id": block.question_id,
-                    "question_revision": block.question_revision,
-                    "question": _build_question_snapshot(question) if question else None,
-                }
-            )
-            if block.question_id is not None and block.question_id not in before_seen:
-                before_seen.add(block.question_id)
-                before_ids.append(block.question_id)
-        elif bt == CompositionBlockType.ANSWER_SUMMARY:
-            mode = (block.props or {}).get("mode")
-            resolved = list(all_ids) if mode == "all" else list(before_ids)
-            block_snaps.append(
-                {
-                    "block_type": "answer_summary",
-                    "props": {"mode": mode},
-                    "resolved_question_ids": resolved,
-                }
-            )
-
+    ordered = _ordered_nodes(nodes)
     return {
         "schema_version": SNAPSHOT_SCHEMA_VERSION,
         "composition_id": comp.id,
@@ -686,7 +1035,7 @@ def _build_snapshot(
         "title": comp.title,
         "subject_id": comp.subject_id,
         "finalized_at": finalized_at.isoformat(),
-        "blocks": block_snaps,
+        "nodes": [_node_snapshot(n) for n in ordered],
     }
 
 
@@ -710,19 +1059,9 @@ async def finalize_version(
     if comp.revision != expected_revision:
         raise _conflict("Composition revision mismatch")
 
-    blocks = await crud_composition.composition.list_blocks(db, composition_id=comp.id)
-    question_ids = {
-        block.question_id
-        for block in blocks
-        if block.block_type == CompositionBlockType.QUESTION and block.question_id is not None
-    }
-    questions_by_id: Dict[int, Question] = {}
-    if question_ids:
-        result = await db.execute(select(Question).where(Question.id.in_(question_ids)))
-        questions_by_id = {q.id: q for q in result.scalars().all()}
-
+    nodes = await crud_composition.composition.list_nodes(db, composition_id=comp.id)
     finalized_at = datetime.utcnow()
-    snapshot = _build_snapshot(comp, blocks, questions_by_id, finalized_at)
+    snapshot = _build_snapshot(comp, nodes, finalized_at)
 
     comp_id = comp.id
     comp_revision = comp.revision

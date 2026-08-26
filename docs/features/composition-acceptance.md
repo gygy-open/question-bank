@@ -19,10 +19,13 @@
 | 共享组稿与个人组稿 | 已实现 |
 | 任意层级文件夹 | 已实现 |
 | 组稿元数据 | 已实现 |
-| 线性 Block 画布 | 已实现 |
-| 富文本、标题、题目、分页、答案汇总 Block | 已实现 |
+| 基础节点与模块并列的文档画布 | 已实现 |
+| 富文本、标题、题目、分页基础节点 | 已实现 |
+| 参考答案 / 答案与解析模块 | 已实现 |
 | 乐观锁冲突保护 | 已实现 |
-| 题目内容版本检测 | 已实现 |
+| 题目内容冻结快照（Question Block） | 已实现 |
+| 题目版本状态检测（stale/deleted，不拉取内容） | 已实现 |
+| 题目手动同步（同步此题 / 同步全部） | 已实现 |
 | 定稿与不可变 Snapshot | 已实现 |
 | 版本列表与只读预览 | 已实现 |
 | DOCX/LaTeX 导出 | 下一阶段 |
@@ -69,8 +72,8 @@ pnpm generate
 
 当前基线：
 
-- 后端：`227 passed, 1 skipped`。跳过项为未配置 `MYSQL_TEST_URL` 的真实 MySQL 测试。
-- 前端：`109 passed`。
+- 后端：`240 passed, 1 skipped`。跳过项为未配置 `MYSQL_TEST_URL` 的真实 MySQL 测试。
+- 前端：`114 passed`。
 - Nuxt 静态生成成功。
 
 正式发布前必须补跑真实 MySQL 迁移测试。
@@ -164,7 +167,7 @@ P0 任一失败即阻止发布。
 - 恢复后重新出现在原目录。
 - 不允许移动到其他 Subject 或其他 Scope 的文件夹。
 
-### AC-005 五类 Block 编辑
+### AC-005 基础节点与模块编辑
 
 **步骤**
 
@@ -175,26 +178,29 @@ P0 任一失败即阻止发布。
 3. 数学题目 Q1。
 4. 分页。
 5. 数学题目 Q2。
-6. `answer_summary: before`。
-7. `answer_summary: all`。
+6. “参考答案”模块，范围选择“此前题目”。
+7. “答案与解析”模块，范围选择“全篇题目”。
 
 然后执行：
 
-- 上移和下移 Block。
-- 删除一个普通 Block。
+- 上移和下移根节点。
+- 删除一个普通节点。
+- 修改模块预设标题，并在某道题前及模块尾部插入富文本，其中至少一处包含图片。
+- 修改模块全局字段开关，并对一题设置字段覆盖和排除。
 - 保存内容。
 - 刷新页面。
 
 **预期**
 
-- 页面刷新后 Block 顺序、内容和类型保持一致。
-- 服务端 sequence 连续为 `0..n-1`。
-- 已有 Block 保存后 ID 保持稳定。
-- 新 Block 得到服务端 ID。
+- 页面刷新后根节点、模块子节点、内容和配置保持一致。
+- 节点 UUID 在保存前后保持稳定；同一 `parent_id + slot` 下的 position 连续为 `0..n-1`。
+- “参考答案”和“答案与解析”是同一 `question_details` 模块的不同初始预设，插入后均可自由编辑。
+- 画布直接显示模块的真实答案内容，不出现“定稿时生成”的占位提示。
+- 模块内答案项始终跟随正文题序，自定义标题/富文本通过锚点保持在指定题目前或模块尾部。
 - 一次整批保存只增加一次 Composition revision。
 - 一次保存只产生一条 `blocks_replaced` 时间线事件。
 
-### AC-006 Block 校验
+### AC-006 节点与模块校验
 
 **步骤与预期**
 
@@ -204,8 +210,11 @@ P0 任一失败即阻止发布。
 | 保存空 Heading | 前端阻止 |
 | Heading level 设置为 5 | 后端返回 422 |
 | PageBreak 携带 content | 后端返回 422 |
-| AnswerSummary mode 为其他值 | 后端返回 422 |
-| Question Block 不带 question_id | 后端返回 422 |
+| `question_details.scope` 为其他值 | 后端返回 422 |
+| 模块字段开关不是布尔值 | 后端返回 422 |
+| `answer_item` 引用非 Question 节点或其他模块 | 后端拒绝，事务不产生部分变更 |
+| 模块嵌套模块 | 后端返回 422 |
+| Question 节点不带 question_id | 后端返回 422 |
 | 插入物理题目到数学组稿 | 后端拒绝，事务不产生部分变更 |
 
 ### AC-007 乐观锁冲突
@@ -224,22 +233,25 @@ P0 任一失败即阻止发布。
 - 用户选择“重新加载”后才放弃本地修改。
 - 数据库中不存在用户 B 的部分 Block 更新。
 
-### AC-008 题目内容版本
+### AC-008 题目内容冻结与版本检测
 
 **步骤**
 
 1. 将数学题目 Q1 插入组稿并保存。
-2. 记录 Question Block 的 `question_revision`。
+2. 记录 Question Block 的 `question_revision` 与画布上显示的题干内容。
 3. 修改 Q1 的题干或答案。
 4. 重新打开组稿。
-5. 再次保存组稿内容。
+5. 在 Block 上点击“同步此题”（或画布顶部“同步全部”）。
 
 **预期**
 
-- 修改题干或答案后 `Question.content_revision + 1`。
-- 仅修改标签、状态、来源或难度不增加 `content_revision`。
-- 组稿显示题目有更新。
-- 保存 Block 后服务端重新钉住当前题目 revision。
+- 插入并保存后，Block 冻结当前题目内容快照；画布始终渲染该快照，不再向 `/questions` 拉取实时题目内容。
+- 修改题干或答案后 `Question.content_revision + 1`；仅修改标签、状态、来源或难度不增加 `content_revision`。
+- 重新打开后，状态接口 `GET .../question-revisions` 标记该题“题库有更新”，但画布仍显示旧的冻结内容。
+- 普通“保存内容”不会隐式刷新已有题目的快照（题号未变时保留数据库中的快照与 `question_revision`）。
+- 点击“同步此题/同步全部”后，Block 内容与 `question_revision` 更新为题库最新值，组稿 revision +1，并写入一条 `question_blocks_synced` 时间线事件。
+- 有未保存修改时同步按钮不可用（避免覆盖本地内容）。
+- 题目被软删除后，状态接口标记该题“题库已删除”，但已冻结的 Block 内容仍可正常显示。
 
 ### AC-009 定稿
 
@@ -253,6 +265,9 @@ P0 任一失败即阻止发布。
 **预期**
 
 - 有未保存修改时定稿按钮不可用。
+- 存在“题库有更新”的题目时仍可定稿；对话框提示本次将冻结当前显示的旧版本内容，但不阻止定稿。
+- 定稿完全不查询实时题库，直接从 Block 冻结快照合成版本 Snapshot。
+- 若某 Question Block 缺失或快照损坏，定稿返回 422 并指明 block id 与 sequence。
 - 第一次生成 v1，第二次生成 v2。
 - 两个版本允许拥有相同 `source_revision`。
 - 定稿不增加 Composition revision。
@@ -265,32 +280,35 @@ P0 任一失败即阻止发布。
 1. 打开 v1 版本预览，记录 Q1 题干、答案和解析。
 2. 回到题库修改 Q1 的题干、答案和解析。
 3. 再次打开 v1。
-4. 对草稿重新保存并定稿为 v3。
+4. 对草稿“同步全部”并重新保存，再定稿为 v3。
 
 **预期**
 
 - v1 内容完全不变。
-- v3 包含修改后的题目内容。
+- v3 包含修改后的题目内容（因先同步再定稿）。
 - 版本预览不向实时题目详情接口发起查询。
-- 题目被软删除后，v1 仍可完整预览。
+- 题目被软删除后，v1 仍可完整预览；软删除的实时题目也不阻止定稿（定稿只读 Block 快照）。
 
-### AC-011 答案汇总冻结
+### AC-011 题目详情模块冻结
 
 使用以下顺序：
 
 ```text
 Q1
-答案汇总 before
+参考答案模块（before）
 Q2
-答案汇总 all
+Q1（再次插入）
+答案与解析模块（all）
 ```
 
 **预期**
 
-- `before` 只展示 Q1。
-- `all` 按顺序展示 Q1、Q2。
-- 答案和解析来自 Snapshot 内嵌题目。
-- 空汇总范围显示“无可汇总的题目”，不报错。
+- `before` 只展示第一个 Q1 节点。
+- `all` 按正文顺序展示 Q1、Q2、Q1；重复题按不同 Question 节点 UUID 分别保留，不按 `question_id` 去重。
+- 全局字段开关与单题覆盖、排除在定稿预览中保持一致。
+- 模块标题、题间/尾部富文本和图片按编辑顺序冻结。
+- 答案、思路、解析和总结来自 Snapshot 内嵌的源 Question 节点，不查询实时题库。
+- 空题目范围仍显示用户编辑的模块内容，不报错。
 
 ### AC-012 版本权限与不可变性
 
@@ -365,14 +383,16 @@ P1 缺陷通常不阻止数据模型上线，但必须在正式替换旧 Paper �
 
 ### AC-104 大组稿
 
-准备至少 100 个 Block，其中至少 30 个题目 Block。
+准备至少 100 个节点，其中至少 30 个 Question 节点和 2 个题目详情模块。
 
 预期：
 
 - 首次加载可完成。
-- 题目使用批量查询，不产生逐 Block N+1 请求。
+- 画布和模块使用 Question 节点冻结快照，完全不向 `/questions` 发起逐节点或批量的实时内容查询。
+- 题目版本状态用一次批量 `GET .../question-revisions` 获取（不返回题目内容），不产生逐节点 N+1 请求。
+- “同步全部”只发一次 `POST .../question-nodes/sync` 批量请求。
 - 上下移动和编辑无明显布局抖动。
-- 保存请求只有一次 Block Replace。
+- 保存请求只有一次完整 Document Node Replace。
 
 ## 6. P0 下一阶段导出验收
 
@@ -384,7 +404,8 @@ P1 缺陷通常不阻止数据模型上线，但必须在正式替换旧 Paper �
 
 预期：
 
-- 标题、RichText、Heading、题目、分页和答案汇总顺序正确。
+- 基础节点、模块及模块子节点顺序正确。
+- 题目详情模块正确输出全局字段、单题覆盖、排除和自定义图文。
 - 公式、表格和图片可见。
 - 下载文件可被 Microsoft Word 或 LibreOffice 打开。
 - 文件名包含组稿标题和版本号。
@@ -415,12 +436,12 @@ P1 缺陷通常不阻止数据模型上线，但必须在正式替换旧 Paper �
 
 ### AC-204 损坏快照
 
-构造未知 Block Type 或缺失题目快照的测试数据。
+构造未知 Node Type、非法 Module Type、悬空 reference 或缺失题目快照的测试数据。
 
 预期：
 
 - 后端返回 422。
-- 错误包含版本号、Block Index 和 Block Type。
+- 错误包含版本号、Node UUID/位置和 Node Type。
 - 不生成看似成功但缺内容的文件。
 
 ## 7. P0 下一阶段迁移验收
@@ -499,7 +520,7 @@ Verify 报告逐卷比较：
 - Shared 资源对所有已登录用户可编辑。
 - 客户端提交 `owner_id` 不影响实际 Owner。
 - 已软删除 Folder 不可作为新父目录。
-- 已软删除 Composition 不可修改 Block 或创建定稿。
+- 已软删除 Composition 不可修改文档节点或创建定稿。
 
 ## 9. 数据库检查
 
@@ -509,9 +530,11 @@ Verify 报告逐卷比较：
 SELECT id, subject_id, scope_type, owner_id, revision, deleted_at
 FROM compositions;
 
-SELECT composition_id, sequence, block_type, question_id, question_revision
-FROM composition_blocks
-ORDER BY composition_id, sequence;
+SELECT id, composition_id, parent_id, slot, position, node_kind, node_type,
+       question_id, question_revision, source_question_node_id,
+       anchor_before_node_id, (content IS NOT NULL) AS has_content
+FROM composition_nodes
+ORDER BY composition_id, parent_id, slot, position;
 
 SELECT composition_id, version_no, source_revision, label, finalized_at
 FROM composition_versions
@@ -526,11 +549,15 @@ ORDER BY composition_id, id;
 
 - Shared 行 `owner_id IS NULL`。
 - Personal 行 `owner_id IS NOT NULL`。
-- Block sequence 连续。
-- Question Block 有完整引用。
-- 其他 Block 没有 Question 引用。
+- 节点 ID 为合法 UUID；同一 `parent_id + slot` 下 position 连续。
+- 根节点 `parent_id/slot IS NULL`；模块子节点 `slot = 'body'`。
+- Question 节点有完整引用（`question_id`、`question_revision` 非空）且 `content IS NOT NULL`（冻结快照）。
+- 非 Question 节点没有 `question_id`；`answer_item.source_question_node_id` 指向同稿根层 Question 节点。
+- `question_details` 位于根层，首期不存在 Module 嵌套；其子节点只包含 heading、rich_text 和 answer_item。
+- 每个题目详情模块的 answer_item 按源 Question 节点 UUID 与范围一一对应，重复 `question_id` 不合并。
 - 版本号在每个 Composition 内连续递增。
 - 定稿事件 revision 等于其 source revision。
+- 同步事件 `question_blocks_synced` 的 revision 等于同步后的组稿 revision。
 
 ## 10. 验收记录模板
 

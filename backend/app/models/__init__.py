@@ -16,10 +16,10 @@ from .paper import Paper, PaperQuestion
 from .composition import (
     ScopeType,
     CompositionStatus,
-    CompositionBlockType,
+    CompositionNodeKind,
     Folder,
     Composition,
-    CompositionBlock,
+    CompositionNode,
     CompositionVersion,
     CompositionEvent,
 )

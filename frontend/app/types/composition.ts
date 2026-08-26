@@ -1,7 +1,7 @@
-// 组稿 (Composition) 领域类型 —— 前端第一阶段。
-// 与后端 app/schemas/composition.py 严格对齐。
+// 组稿 (Composition) 领域类型 —— CompositionNode AST 阶段。
+// 与后端 app/schemas/composition.py 严格对齐（node 契约 + snapshot v2）。
 
-import type { RichDoc, RichDocNode } from './richContent'
+import type { RichDocNode } from './richContent'
 import type { AnswerSpec, OptionSpec, QuestionType } from './question'
 
 export type CompositionScope = 'shared' | 'personal'
@@ -67,14 +67,20 @@ export interface CompositionFolderNode extends CompositionFolder {
   children: CompositionFolderNode[]
 }
 
-// --- Block 判别联合（与后端 CompositionBlockType 一一对应） --- //
+// --- Node 判别联合（与后端 CompositionNode* 对齐） --- //
 
-export type CompositionBlockType =
+export type CompositionNodeKind = 'block' | 'module' | 'reference'
+
+export type CompositionNodeType =
   | 'rich_text'
   | 'heading'
   | 'question'
   | 'page_break'
-  | 'answer_summary'
+  | 'question_details'
+  | 'answer_item'
+
+// module 子节点唯一 slot 名（与后端 BODY_SLOT 对齐）。
+export const BODY_SLOT = 'body'
 
 export type HeadingLevel = 1 | 2 | 3 | 4
 
@@ -82,103 +88,190 @@ export interface HeadingProps {
   level: HeadingLevel
 }
 
-export type AnswerSummaryMode = 'all' | 'before'
+// question_details / answer_item 覆盖涉及的四个可发布字段。
+export type AnswerFieldKey = 'answer' | 'thinking' | 'analysis' | 'summary'
 
-export interface AnswerSummaryProps {
-  mode: AnswerSummaryMode
+export const ANSWER_FIELD_KEYS: readonly AnswerFieldKey[] = [
+  'answer',
+  'thinking',
+  'analysis',
+  'summary',
+]
+
+export type DetailScope = 'before' | 'all'
+
+/** question_details module 属性：范围 + 四字段全局开关。 */
+export interface QuestionDetailsProps {
+  scope: DetailScope
+  fields: Record<AnswerFieldKey, boolean>
 }
 
-interface CompositionBlockCommon {
-  id: number
+/** answer_item 覆盖：null=继承 module 全局开关，true/false=显式显示/隐藏。 */
+export type AnswerItemOverride = boolean | null
+
+export interface AnswerItemProps {
+  included: boolean
+  overrides: Record<AnswerFieldKey, AnswerItemOverride>
+}
+
+/**
+ * 冻结在 question 节点上的题目内容快照（不含 id/revision）。
+ * 与后端 QuestionContentSnapshot 严格对齐；id 由 question_id、revision 由 question_revision 承载。
+ */
+export interface QuestionContentSnapshot {
+  content_schema_version: number
+  q_type: QuestionType
+  content: RichDocNode | null
+  options: OptionSpec[] | null
+  answer: AnswerSpec | null
+  thinking: RichDocNode | null
+  analysis: RichDocNode | null
+  summary: RichDocNode | null
+  difficulty: number
+  source: string | null
+}
+
+interface CompositionNodeCommon {
+  id: string
   composition_id: number
-  sequence: number
+  parent_id: string | null
+  slot: string | null
+  position: number
   schema_version: number
 }
 
-export interface RichTextBlock extends CompositionBlockCommon {
-  block_type: 'rich_text'
+export interface RichTextNode extends CompositionNodeCommon {
+  node_kind: 'block'
+  node_type: 'rich_text'
   content: RichDocNode
   props: null
   question_id: null
   question_revision: null
+  source_question_node_id: null
+  anchor_before_node_id: string | null
 }
 
-export interface HeadingBlock extends CompositionBlockCommon {
-  block_type: 'heading'
+export interface HeadingNode extends CompositionNodeCommon {
+  node_kind: 'block'
+  node_type: 'heading'
   content: RichDocNode
   props: HeadingProps
   question_id: null
   question_revision: null
+  source_question_node_id: null
+  anchor_before_node_id: string | null
 }
 
-export interface QuestionBlock extends CompositionBlockCommon {
-  block_type: 'question'
-  content: null
+export interface QuestionNode extends CompositionNodeCommon {
+  node_kind: 'block'
+  node_type: 'question'
+  content: QuestionContentSnapshot | null
   props: null
   question_id: number
   question_revision: number
+  source_question_node_id: null
+  anchor_before_node_id: null
 }
 
-export interface PageBreakBlock extends CompositionBlockCommon {
-  block_type: 'page_break'
+export interface PageBreakNode extends CompositionNodeCommon {
+  node_kind: 'block'
+  node_type: 'page_break'
   content: null
   props: null
   question_id: null
   question_revision: null
+  source_question_node_id: null
+  anchor_before_node_id: null
 }
 
-export interface AnswerSummaryBlock extends CompositionBlockCommon {
-  block_type: 'answer_summary'
+export interface QuestionDetailsNode extends CompositionNodeCommon {
+  node_kind: 'module'
+  node_type: 'question_details'
   content: null
-  props: AnswerSummaryProps
+  props: QuestionDetailsProps
   question_id: null
   question_revision: null
+  source_question_node_id: null
+  anchor_before_node_id: null
 }
 
-/** 服务端返回的 block 判别联合（GET detail / replace 响应共用）。 */
-export type CompositionBlock =
-  | RichTextBlock
-  | HeadingBlock
-  | QuestionBlock
-  | PageBreakBlock
-  | AnswerSummaryBlock
+export interface AnswerItemNode extends CompositionNodeCommon {
+  node_kind: 'reference'
+  node_type: 'answer_item'
+  content: null
+  props: AnswerItemProps
+  question_id: null
+  question_revision: null
+  source_question_node_id: string
+  anchor_before_node_id: null
+}
 
-/** GET composition detail：元数据 + 有序 blocks。 */
+/** 服务端返回的 node 判别联合（GET detail / replace / sync 响应共用）。 */
+export type CompositionNode =
+  | RichTextNode
+  | HeadingNode
+  | QuestionNode
+  | PageBreakNode
+  | QuestionDetailsNode
+  | AnswerItemNode
+
+/** GET composition detail：元数据 + 有序 nodes（含 module 子节点）。 */
 export interface CompositionDetail extends Composition {
-  blocks: CompositionBlock[]
+  nodes: CompositionNode[]
 }
 
-// --- 批量替换请求/响应契约 --- //
-// 每个 item 携带 id（已有 block）或 temp_id（新 block），二者恰有其一；顺序即 sequence。
-// question block 的 question_revision 由服务端钉住，客户端传值被忽略。
+// --- 整体替换请求/响应契约（AST 契约） --- //
+// 每个 node 携带客户端生成的 UUID id；position 不由客户端传入，由服务端按 (parent, slot) 顺序规范化。
+// question 节点的 content / question_revision 由服务端冻结/钉住，客户端传值被忽略。
 
-export interface CompositionBlockReplaceItem {
-  id?: number
-  temp_id?: string
-  block_type: CompositionBlockType
+export interface CompositionNodeInput {
+  id: string
+  parent_id?: string | null
+  slot?: string | null
+  node_kind: CompositionNodeKind
+  node_type: CompositionNodeType
   content?: RichDocNode | null
   props?: Record<string, unknown> | null
   schema_version?: number
   question_id?: number | null
-  question_revision?: number | null
+  source_question_node_id?: string | null
+  anchor_before_node_id?: string | null
 }
 
-export interface CompositionBlocksReplaceRequest {
+export interface CompositionNodesReplaceRequest {
   expected_revision: number
   batch_id?: string
-  blocks: CompositionBlockReplaceItem[]
+  nodes: CompositionNodeInput[]
 }
 
-export interface CompositionBlocksReplaceResponse {
+export interface CompositionNodesReplaceResponse {
   revision: number
-  // temp_id → 新建 block 的真实服务端 id。
-  id_map: Record<string, number>
-  blocks: CompositionBlock[]
+  nodes: CompositionNode[]
+}
+
+// --- Question node 版本状态 / 同步契约 --- //
+
+/** 稿件内某 question_id 的实时状态（仅状态，不含题目内容）。 */
+export interface QuestionRevisionStatus {
+  question_id: number
+  // available=false（软删/缺失）时为 null。
+  current_revision: number | null
+  available: boolean
+}
+
+/** 同步请求：expected_revision 乐观校验；node_ids 唯一非空（"同步此题"传一个，"同步全部"传全部）。 */
+export interface CompositionQuestionNodesSyncRequest {
+  expected_revision: number
+  node_ids: string[]
+}
+
+/** 同步响应：自增后的 revision + 刷新后的完整 node 序列。 */
+export interface CompositionQuestionNodesSyncResponse {
+  revision: number
+  nodes: CompositionNode[]
 }
 
 // --- 定稿 (Version) 契约 --- //
-// 与后端 CompositionVersionCreateRequest / CompositionVersionSummary /
-// CompositionVersionRead 及 snapshot v1 构件严格对齐。
 
 /** 定稿请求体：expected_revision 乐观校验（不修改 revision），label 可选备注。 */
 export interface CompositionVersionCreatePayload {
@@ -200,7 +293,7 @@ export interface CompositionVersionSummary {
 }
 
 /**
- * 定稿时冻结的题目内容投影（snapshot v1）。
+ * 定稿时冻结的题目内容投影（snapshot v2 内 question 节点携带）。
  * 只含可发布内容，排除关系（标签/知识点/创建人）、权限与审核字段。
  */
 export interface QuestionSnapshot {
@@ -208,64 +301,83 @@ export interface QuestionSnapshot {
   content_revision: number
   content_schema_version: number
   q_type: QuestionType
-  content: RichDoc
+  content: RichDocNode | null
   options: OptionSpec[] | null
   answer: AnswerSpec | null
-  thinking: RichDoc
-  analysis: RichDoc
-  summary: RichDoc
+  thinking: RichDocNode | null
+  analysis: RichDocNode | null
+  summary: RichDocNode | null
   difficulty: number
   source: string | null
 }
 
-// --- snapshot block 判别联合（只读，仅消费快照，不查询当前题库） --- //
+// --- snapshot v2 node 判别联合（只读，仅消费快照，不查询当前题库） --- //
 
-export interface SnapshotRichTextBlock {
-  block_type: 'rich_text'
+interface SnapshotNodeCommon {
+  id: string
+  parent_id: string | null
+  slot: string | null
+  position: number
+  schema_version: number
+  anchor_before_node_id?: string
+}
+
+export interface SnapshotRichTextNode extends SnapshotNodeCommon {
+  node_kind: 'block'
+  node_type: 'rich_text'
   content: RichDocNode
 }
 
-export interface SnapshotHeadingBlock {
-  block_type: 'heading'
+export interface SnapshotHeadingNode extends SnapshotNodeCommon {
+  node_kind: 'block'
+  node_type: 'heading'
   content: RichDocNode
-  props: { level: HeadingLevel }
+  props: HeadingProps
 }
 
-export interface SnapshotQuestionBlock {
-  block_type: 'question'
+export interface SnapshotQuestionNode extends SnapshotNodeCommon {
+  node_kind: 'block'
+  node_type: 'question'
   question_id: number
   question_revision: number
-  // 定稿时题目已删除则为 null（历史上不可再恢复内容）。
-  question: QuestionSnapshot | null
+  question: QuestionSnapshot
 }
 
-export interface SnapshotPageBreakBlock {
-  block_type: 'page_break'
+export interface SnapshotPageBreakNode extends SnapshotNodeCommon {
+  node_kind: 'block'
+  node_type: 'page_break'
 }
 
-export interface SnapshotAnswerSummaryBlock {
-  block_type: 'answer_summary'
-  props: { mode: AnswerSummaryMode }
-  // 服务端按 sequence 去重保序解析出的 question_id 列表（all/before 语义在服务端固化）。
-  resolved_question_ids: number[]
+export interface SnapshotQuestionDetailsNode extends SnapshotNodeCommon {
+  node_kind: 'module'
+  node_type: 'question_details'
+  props: QuestionDetailsProps
 }
 
-export type SnapshotBlock =
-  | SnapshotRichTextBlock
-  | SnapshotHeadingBlock
-  | SnapshotQuestionBlock
-  | SnapshotPageBreakBlock
-  | SnapshotAnswerSummaryBlock
+export interface SnapshotAnswerItemNode extends SnapshotNodeCommon {
+  node_kind: 'reference'
+  node_type: 'answer_item'
+  source_question_node_id: string
+  props: AnswerItemProps
+}
 
-/** snapshot v1：顶层元数据 + 按 sequence 的 block 投影。 */
-export interface CompositionSnapshotV1 {
-  schema_version: 1
+export type SnapshotNode =
+  | SnapshotRichTextNode
+  | SnapshotHeadingNode
+  | SnapshotQuestionNode
+  | SnapshotPageBreakNode
+  | SnapshotQuestionDetailsNode
+  | SnapshotAnswerItemNode
+
+/** snapshot v2：顶层元数据 + 前序展平的规范化节点（root 按 position，module 子节点紧随其后）。 */
+export interface CompositionSnapshotV2 {
+  schema_version: 2
   composition_id: number
   source_revision: number
   title: string
   subject_id: number
   finalized_at: string
-  blocks: SnapshotBlock[]
+  nodes: SnapshotNode[]
 }
 
 /** GET version detail：版本元数据 + 不可变 snapshot。 */
@@ -276,7 +388,7 @@ export interface CompositionVersionDetail {
   source_revision: number
   title: string
   subject_id: number
-  snapshot: CompositionSnapshotV1
+  snapshot: CompositionSnapshotV2
   label: string | null
   finalized_at: string
   finalized_by: number

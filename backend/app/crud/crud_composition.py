@@ -16,7 +16,7 @@ from sqlalchemy.orm import selectinload
 from app.crud.base import CRUDBase
 from app.models.composition import (
     Composition,
-    CompositionBlock,
+    CompositionNode,
     CompositionVersion,
     Folder,
     ScopeType,
@@ -101,7 +101,7 @@ class CRUDComposition(CRUDBase[Composition, CompositionCreate, CompositionUpdate
         scope_type: ScopeType,
         owner_id: Optional[int],
         include_deleted: bool = False,
-        with_blocks: bool = False,
+        with_nodes: bool = False,
     ) -> Optional[Composition]:
         query = select(Composition).where(
             Composition.id == composition_id,
@@ -109,23 +109,23 @@ class CRUDComposition(CRUDBase[Composition, CompositionCreate, CompositionUpdate
             Composition.scope_type == scope_type,
             Composition.owner_id == owner_id,
         )
-        if with_blocks:
-            query = query.options(selectinload(Composition.blocks))
+        if with_nodes:
+            query = query.options(selectinload(Composition.nodes))
         if not include_deleted:
             query = query.where(Composition.deleted_at.is_(None))
         result = await db.execute(query)
         return result.scalars().first()
 
-    async def list_blocks(
+    async def list_nodes(
         self,
         db: AsyncSession,
         *,
         composition_id: int,
-    ) -> List[CompositionBlock]:
+    ) -> List[CompositionNode]:
         query = (
-            select(CompositionBlock)
-            .where(CompositionBlock.composition_id == composition_id)
-            .order_by(CompositionBlock.sequence)
+            select(CompositionNode)
+            .where(CompositionNode.composition_id == composition_id)
+            .order_by(CompositionNode.position, CompositionNode.id)
         )
         result = await db.execute(query)
         return list(result.scalars().all())
