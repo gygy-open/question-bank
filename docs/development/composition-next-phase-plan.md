@@ -1,4 +1,4 @@
-# 组稿系统下一阶段实施计划
+# 组稿系统导出与 Paper 迁移实施计划
 
 ## 1. 背景
 
@@ -15,7 +15,7 @@
 
 当前旧版 Paper 与新版 Composition 暂时并存。新版定稿已经能够冻结完整题目内容，但 DOCX/LaTeX 导出仍只支持旧版 Paper。
 
-下一阶段目标是让 `CompositionVersion.snapshot` 成为正式发布和导出的唯一输入，并为旧 Paper 一次性迁移做好准备。
+下一阶段目标是让 `CompositionVersion.snapshot` 成为正式发布和导出的唯一输入，并完成旧 Paper 的一次性迁移准备。当前 AST 与模块契约视为本阶段的稳定输入，不在导出实现中重新设计。
 
 ## 2. 阶段目标
 
@@ -41,7 +41,22 @@
 
 ## 3. 架构原则
 
-### 3.1 版本驱动
+### 3.1 已落地的输入架构
+
+导出实现必须建立在以下事实之上：
+
+- `CompositionNode` 使用客户端生成的 UUID 标识，`node_kind` 为 `block | module | reference`。
+- 根层包含 `rich_text`、`heading`、`question`、`page_break` 与 `question_details`；模块子节点统一位于 `body` slot。
+- 首期 AST 只有 root 与 module body 两层，Module 不允许嵌套。
+- `question` 节点保存 `question_id`、`question_revision` 和服务端冻结的题目内容。
+- `question_details` 保存 `scope` 与完整的四字段全局开关。
+- `answer_item` 通过 `source_question_node_id` 指向同一文档中的根层 Question Node，并保存 `included` 与完整的四字段 nullable override。
+- 保存 AST 时，服务端已经根据 `before | all` 规范化 `answer_item` 集合和题序；自定义 Heading/RichText 通过 `anchor_before_node_id` 固定在某答案项之前或模块尾部。
+- Snapshot schema version 为 `2`，`nodes` 按前序展平：每个 root node 后紧跟其按 position 排序的 module children。
+
+导出层不得把 `question_details.scope` 当作重新生成答案项的指令；它只能消费 Snapshot 中已经冻结的 `answer_item` 与自定义子节点。
+
+### 3.2 版本驱动
 
 导出接口只接受 `composition_id + version_no`，读取对应的不可变 Snapshot。
 
@@ -52,7 +67,7 @@
 - 根据当前草稿重新计算历史版本中的模块题目范围或字段配置。
 - 因题库更新而改变旧版本导出结果。
 
-### 3.2 中间表示
+### 3.3 中间表示
 
 新增与来源无关的导出中间结构，例如：
 
@@ -70,7 +85,7 @@ DOCXRenderer / LaTeXRenderer
 
 不得把 Composition Snapshot 解析逻辑分别复制到 DOCX 与 LaTeX Renderer。
 
-### 3.3 节点与模块注册表
+### 3.4 节点与模块注册表
 
 基础节点和 Module 分别对应明确的 assembler handler：
 
@@ -80,7 +95,7 @@ DOCXRenderer / LaTeXRenderer
 | `heading` | 指定级别的标题 |
 | `question` | 冻结的题干、选项及可选编号 |
 | `page_break` | 强制分页 |
-| `question_details` | 按 body slot 顺序展开自定义内容与 answer_item |
+| `question_details` | 按 Snapshot 中已冻结的 body slot 顺序展开自定义内容与 answer_item |
 | `answer_item` | 从同一 Snapshot 的源 Question 节点输出生效字段 |
 
 未知 Node/Module Type 必须返回可定位的导出错误，不允许静默丢弃。
@@ -122,11 +137,13 @@ backend/app/services/exporting/composition_assemble.py
 职责：
 
 - 校验 Snapshot `schema_version`。
+- 从前序展平的 `nodes` 重建 root/module body 关系，并校验 parent、slot 和 position。
 - 按冻结 AST 顺序构造格式无关的 `ExportDocument`。
 - 为题目生成稳定题号。
 - 将 `answer_item.source_question_node_id` 映射到同一 Snapshot 内嵌的 Question 节点。
 - 解析“题目级 override > module 全局字段”的最终显示规则。
-- 返回包含 Node UUID、slot 和位置的错误信息。
+- 按持久化的 `answer_item` 顺序输出，不根据 module scope 重算题目范围。
+- 校验锚点、引用和父子归属，返回包含 Node UUID、slot 和 position 的错误信息。
 
 ### 4.3 扩展导出中间结构
 
@@ -177,7 +194,7 @@ backend/app/services/exporting/composition_assemble.py
 - 题库内容更新后旧版本导出不变。
 - 题目软删除后旧版本仍可导出。
 - 相同版本重复导出的语义内容一致。
-- 100+ Block 长组稿。
+- 100+ Node 长组稿。
 
 ## 5. 前端实施任务
 
@@ -196,7 +213,7 @@ backend/app/services/exporting/composition_assemble.py
 
 - 请求中状态。
 - 下载成功反馈。
-- 422 Block 定位错误。
+- 422 Node 定位错误。
 - 404 权限或版本不存在提示。
 - 文件名清理和浏览器下载。
 
@@ -295,5 +312,5 @@ backend/app/services/exporting/composition_assemble.py
 | 图片资源失效 | 定稿时验证资源可访问；后续考虑资源归档 |
 | 迁移产生重复数据 | 幂等来源映射与 verify 报告 |
 | Paper 一次性下线无法回滚 | 旧表保留一个发布周期，写入口先关闭 |
-| 未知 Block 被忽略 | assembler 显式报错并返回 block index |
+| 未知 Node/Module 被忽略 | assembler 显式报错并返回 node UUID、slot 与 position |
 | 大组稿导出超时 | 压测后超过阈值转后台任务，不提前引入复杂队列 |
