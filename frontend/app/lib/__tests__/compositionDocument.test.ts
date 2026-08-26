@@ -12,7 +12,10 @@ import {
   detailPropsOf,
   documentFromNodes,
   documentToReplaceRequest,
+  effectiveQuestionField,
   generateNodeId,
+  hasAnyQuestionNumber,
+  applyQuestionNumbers,
   headingDocToText,
   headingHasRichInline,
   headingTextToDoc,
@@ -22,7 +25,13 @@ import {
   normalizeDocument,
   patchNode,
   questionNodeStatus,
+  questionNumberOf,
+  questionOptionLayoutOf,
+  questionPropsWithOptionLayout,
+  questionPropsWithShow,
+  questionShowOverride,
   removeRootNode,
+  resolveOptionColumns,
   snapshotDocument,
 } from '@/lib/compositionDocument'
 import type { EditorDocument, EditorNode } from '@/lib/compositionDocument'
@@ -88,17 +97,12 @@ describe('根节点工厂与预设', () => {
     expect(q.questionContent?.q_type).toBe('single_choice')
   })
 
-  it('参考答案预设仅答案；答案解析预设含答案与解析', () => {
-    const reference = DETAIL_PRESETS.reference()
-    const analysis = DETAIL_PRESETS.analysis()
-    expect(detailPropsOf(reference).fields).toEqual({
+  it('汇总模块预设：默认仅答案、标题「参考答案」', () => {
+    const summary = DETAIL_PRESETS.summary()
+    expect(detailPropsOf(summary).fields).toEqual({
       answer: true, thinking: false, analysis: false, summary: false,
     })
-    expect(detailPropsOf(analysis).fields).toEqual({
-      answer: true, thinking: false, analysis: true, summary: false,
-    })
-    expect(headingDocToText(reference.children[0]!.content)).toBe('参考答案')
-    expect(headingDocToText(analysis.children[0]!.content)).toBe('答案与解析')
+    expect(headingDocToText(summary.children[0]!.content)).toBe('参考答案')
   })
 })
 
@@ -173,6 +177,21 @@ describe('规范化 answer_item（scope=all / before）', () => {
     expect(children[0]!.nodeType).toBe('rich_text')
     expect(children[0]!.anchorBeforeNodeId).toBeNull()
   })
+
+  it('未锚定且位于 answer_item 之前的自定义节点置顶', () => {
+    const q1 = createQuestionNode(fakeQuestion(1))
+    const q2 = createQuestionNode(fakeQuestion(2))
+    const mod = createQuestionDetailsModule('all')
+    const heading = createHeadingNode(2)
+    heading.content = richDoc('参考答案')
+    // 预设写法：标题作为模块首个子节点、无锚点。
+    mod.children = [heading]
+    const d = doc([q1, q2, mod])
+    const kids = d.nodes.find((n) => n.id === mod.id)!.children
+    expect(kids[0]!.nodeType).toBe('heading')
+    expect(kids[0]!.anchorBeforeNodeId).toBeNull()
+    expect(kids.slice(1).every((c) => c.nodeType === 'answer_item')).toBe(true)
+  })
 })
 
 describe('序列化 documentToReplaceRequest', () => {
@@ -199,6 +218,93 @@ describe('序列化 documentToReplaceRequest', () => {
   it('无 batchId 时不带 batch_id', () => {
     const req = documentToReplaceRequest(doc([createPageBreakNode()]), 1)
     expect(req.batch_id).toBeUndefined()
+  })
+})
+
+describe('题号填充 applyQuestionNumbers / hasAnyQuestionNumber', () => {
+  it('global 模式按顺序 1,2,3…（跳过非题目节点）', () => {
+    const q1 = createQuestionNode(fakeQuestion(1))
+    const q2 = createQuestionNode(fakeQuestion(2))
+    const q3 = createQuestionNode(fakeQuestion(3))
+    const d = doc([q1, createHeadingNode(2), q2, createPageBreakNode(), q3])
+    const out = applyQuestionNumbers(d, 'global')
+    const numbers = out.nodes.filter((n) => n.nodeType === 'question').map(questionNumberOf)
+    expect(numbers).toEqual(['1', '2', '3'])
+  })
+
+  it('heading 模式以 H2 分组，组内 g.n；H1 不分组，首个 H2 前归第 1 组', () => {
+    const h1 = createHeadingNode(1)
+    const q1 = createQuestionNode(fakeQuestion(1))
+    const h2a = createHeadingNode(2)
+    const q2 = createQuestionNode(fakeQuestion(2))
+    const q3 = createQuestionNode(fakeQuestion(3))
+    const h2b = createHeadingNode(2)
+    const q4 = createQuestionNode(fakeQuestion(4))
+    const d = doc([h1, q1, h2a, q2, q3, h2b, q4])
+    const out = applyQuestionNumbers(d, 'heading')
+    const numbers = out.nodes.filter((n) => n.nodeType === 'question').map(questionNumberOf)
+    expect(numbers).toEqual(['1.1', '2.1', '2.2', '3.1'])
+  })
+
+  it('heading 模式跳过空组（连续 H2 无题目）', () => {
+    const q1 = createQuestionNode(fakeQuestion(1))
+    const q2 = createQuestionNode(fakeQuestion(2))
+    const d = doc([q1, createHeadingNode(2), createHeadingNode(2), q2])
+    const out = applyQuestionNumbers(d, 'heading')
+    const numbers = out.nodes.filter((n) => n.nodeType === 'question').map(questionNumberOf)
+    expect(numbers).toEqual(['1.1', '2.1'])
+  })
+
+  it('填充结果覆盖已有，且 hasAnyQuestionNumber 反映状态', () => {
+    const q1 = createQuestionNode(fakeQuestion(1))
+    const d = doc([q1])
+    expect(hasAnyQuestionNumber(d)).toBe(false)
+    const filled = applyQuestionNumbers(d, 'global')
+    expect(hasAnyQuestionNumber(filled)).toBe(true)
+    expect(questionNumberOf(filled.nodes[0]!)).toBe('1')
+  })
+
+  it('题号随 question 节点序列化进 props', () => {
+    const q1 = createQuestionNode(fakeQuestion(1))
+    const filled = applyQuestionNumbers(doc([q1]), 'global')
+    const req = documentToReplaceRequest(filled, 1)
+    const qNode = req.nodes.find((n) => n.node_type === 'question')
+    expect(qNode!.props).toEqual({ number: '1' })
+  })
+})
+
+describe('题目字段显隐（全局 + 题目级覆盖）', () => {
+  const global = { answer: true, thinking: false, analysis: false, summary: false }
+
+  it('无覆盖时跟随全局；override 优先', () => {
+    const q = createQuestionNode(fakeQuestion(1))
+    expect(effectiveQuestionField(q, global, 'answer')).toBe(true)
+    expect(effectiveQuestionField(q, global, 'analysis')).toBe(false)
+    expect(questionShowOverride(q, 'answer')).toBeNull()
+
+    const hidden = { ...q, props: questionPropsWithShow(q, 'answer', false) }
+    expect(questionShowOverride(hidden, 'answer')).toBe(false)
+    expect(effectiveQuestionField(hidden, global, 'answer')).toBe(false)
+
+    const shown = { ...q, props: questionPropsWithShow(q, 'analysis', true) }
+    expect(effectiveQuestionField(shown, global, 'analysis')).toBe(true)
+  })
+
+  it('questionPropsWithShow 保留 number，继承时清除覆盖', () => {
+    const q = createQuestionNode(fakeQuestion(1))
+    q.props = { number: '3' }
+    const withHide = questionPropsWithShow(q, 'answer', false)
+    expect(withHide).toEqual({ number: '3', show: { answer: false } })
+    const back = questionPropsWithShow({ ...q, props: withHide }, 'answer', null)
+    expect(back).toEqual({ number: '3' })
+  })
+
+  it('show 覆盖序列化进 props.show（只包含显式布尔）', () => {
+    const q = createQuestionNode(fakeQuestion(1))
+    q.props = questionPropsWithShow(q, 'thinking', true)
+    const req = documentToReplaceRequest(doc([q]), 1)
+    const qNode = req.nodes.find((n) => n.node_type === 'question')
+    expect(qNode!.props).toEqual({ show: { thinking: true } })
   })
 })
 
@@ -314,5 +420,35 @@ describe('heading 富文本转换', () => {
     const withMath = { type: 'doc' as const, content: [{ type: 'paragraph', content: [{ type: 'inlineMath', attrs: { latex: 'x^2' } }] }] }
     expect(headingHasRichInline(withMath)).toBe(true)
     expect(headingHasRichInline(richDoc('纯文本'))).toBe(false)
+  })
+})
+
+describe('选项排版', () => {
+  const opts = (...texts: string[]) => texts.map((t, i) => ({ id: `opt_${i}`, label: String(i), content: richDoc(t) }))
+
+  it('auto 按最长选项文本长度选列数', () => {
+    expect(resolveOptionColumns(opts('12', '11', '8', '6'), 'auto')).toBe(4)
+    expect(resolveOptionColumns(opts('十二个字的选项', 'B', 'C', 'D'), 'auto')).toBe(2)
+    expect(resolveOptionColumns(opts('这是一个非常长的选项文本足够超过阈值了', 'B'), 'auto')).toBe(1)
+  })
+
+  it('auto 含图片/表格/块公式强制单列', () => {
+    const withImage = [{ id: 'a', label: 'A', content: { type: 'doc' as const, content: [{ type: 'image', attrs: { src: 'x' } }] } }, { id: 'b', label: 'B', content: richDoc('B') }]
+    expect(resolveOptionColumns(withImage, 'auto')).toBe(1)
+  })
+
+  it('固定列数按选项数收窄', () => {
+    expect(resolveOptionColumns(opts('A', 'B', 'C', 'D'), 2)).toBe(2)
+    expect(resolveOptionColumns(opts('A', 'B'), 4)).toBe(2)
+    expect(resolveOptionColumns([], 4)).toBe(1)
+  })
+
+  it('questionOptionLayoutOf 读取与写入 props', () => {
+    const node = createQuestionNode(fakeQuestion(1))
+    expect(questionOptionLayoutOf(node)).toBe('auto')
+    node.props = questionPropsWithOptionLayout(node, 4)
+    expect(questionOptionLayoutOf(node)).toBe(4)
+    node.props = questionPropsWithOptionLayout(node, 'auto')
+    expect(questionOptionLayoutOf(node)).toBe('auto')
   })
 })

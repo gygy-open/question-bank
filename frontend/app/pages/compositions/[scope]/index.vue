@@ -392,7 +392,7 @@ function openComposition(comp: Composition) {
         size="sm"
         @click="openCreateComposition"
       >
-        <Plus class="mr-2 h-4 w-4" /> 新建组稿
+        <Plus class="mr-2 h-4 w-4" /> 新建稿件
       </Button>
     </template>
   </PageHeader>
@@ -587,7 +587,7 @@ function openComposition(comp: Composition) {
               <FileText class="h-8 w-8 opacity-50" />
               <p class="text-sm">当前文件夹还没有组稿</p>
               <Button size="sm" @click="openCreateComposition">
-                <Plus class="mr-2 h-4 w-4" /> 新建组稿
+                <Plus class="mr-2 h-4 w-4" /> 新建稿件
               </Button>
             </div>
           </template>
@@ -653,7 +653,7 @@ function openComposition(comp: Composition) {
   <Dialog v-model:open="createDialog">
     <DialogContent class="sm:max-w-[460px]">
       <DialogHeader>
-        <DialogTitle>新建组稿</DialogTitle>
+        <DialogTitle>新建稿件</DialogTitle>
         <DialogDescription>{{ scopeHint }}</DialogDescription>
       </DialogHeader>
       <div class="space-y-4 py-2">

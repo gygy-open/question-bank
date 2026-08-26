@@ -22,6 +22,7 @@ from datetime import datetime
 from sqlalchemy import (
     JSON,
     BigInteger,
+    Boolean,
     CheckConstraint,
     Column,
     DateTime,
@@ -32,6 +33,7 @@ from sqlalchemy import (
     String,
     Text,
     UniqueConstraint,
+    false,
 )
 from sqlalchemy.orm import relationship
 
@@ -141,6 +143,10 @@ class Composition(Base):
     description = Column(Text, nullable=True)
     status = Column(String(20), default=CompositionStatus.DRAFT.value, nullable=False)
     revision = Column(Integer, default=1, nullable=False)
+    # 题号开关:关闭仅隐藏显示,题号仍保留在 question 节点 props.number 上。
+    numbering_enabled = Column(Boolean, nullable=False, default=False, server_default=false())
+    # 画布题目全局显示字段(answer/thinking/analysis/summary);NULL 视为全部隐藏。
+    question_display = Column(JSON, nullable=True)
 
     scope_type = Column(_enum_col(ScopeType), nullable=False)
     owner_id = Column(Integer, ForeignKey("user.id"), nullable=True, index=True)

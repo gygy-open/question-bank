@@ -11,10 +11,12 @@ import { questionTypeLabel } from '@/lib/answerFormat'
 import {
   buildSnapshotTree, effectiveAnswerFields, snapshotQuestionNodeMap,
 } from '@/lib/compositionSnapshot'
+import { headingClassFor, questionOptionLayoutOf, resolveOptionColumns } from '@/lib/compositionDocument'
 import type { SnapshotTreeNode } from '@/lib/compositionSnapshot'
 import { ANSWER_FIELD_KEYS } from '@/types/composition'
 import type {
   AnswerFieldKey, CompositionSnapshotV2, SnapshotAnswerItemNode, SnapshotQuestionDetailsNode,
+  SnapshotQuestionNode,
 } from '@/types/composition'
 
 const props = defineProps<{
@@ -31,17 +33,18 @@ const FIELD_LABELS: Record<AnswerFieldKey, string> = {
   summary: '小结',
 }
 
-const HEADING_CLASS: Record<number, string> = {
-  1: 'text-2xl font-bold',
-  2: 'text-xl font-semibold',
-  3: 'text-lg font-semibold',
-  4: 'text-base font-medium',
-}
-
 function headingClass(level: number): string {
-  return HEADING_CLASS[level] ?? HEADING_CLASS[2]!
+  return headingClassFor(level)
 }
 
+// 快照冻结的选项排版覆盖；旧快照无 props 时回退 auto。
+function optionColumnsOf(node: SnapshotQuestionNode): number {
+  const layout = node.props?.optionLayout
+  return resolveOptionColumns(
+    node.question.options,
+    layout === 1 || layout === 2 || layout === 4 ? layout : 'auto',
+  )
+}
 function moduleFieldsVisible(
   moduleNode: SnapshotTreeNode,
   child: SnapshotAnswerItemNode,
@@ -79,10 +82,14 @@ function anyVisible(moduleNode: SnapshotTreeNode, child: SnapshotAnswerItemNode)
             <span class="text-xs text-muted-foreground">#{{ node.question.id }} · 版本 r{{ node.question_revision }}</span>
           </div>
           <RichContent :content="node.question.content" empty-text="（无题干）" />
-          <ul v-if="node.question.options?.length" class="space-y-1">
-            <li v-for="opt in node.question.options" :key="opt.id" class="flex gap-2 text-sm">
+          <ul
+            v-if="node.question.options?.length"
+            class="grid gap-x-6 gap-y-1"
+            :style="{ gridTemplateColumns: `repeat(${optionColumnsOf(node)}, minmax(0, 1fr))` }"
+          >
+            <li v-for="opt in node.question.options" :key="opt.id" class="flex items-baseline gap-2 text-sm">
               <span class="font-medium text-muted-foreground">{{ opt.label }}.</span>
-              <RichContent :content="opt.content" class="[&_.prose]:my-0" />
+              <RichContent :content="opt.content" class="min-w-0 [&_p]:my-0" />
             </li>
           </ul>
         </div>

@@ -128,6 +128,7 @@ onBeforeUnmount(() => {
         <div
             v-if="open"
             ref="popoverRef"
+            data-rich-overlay
             class="rich-blank-popover w-[260px] rounded-md border border-border bg-popover p-3 shadow-md"
             :style="posStyle"
         >

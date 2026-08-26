@@ -92,6 +92,7 @@ watch(
     <Teleport :to="teleportTarget">
         <div
             v-if="open"
+            data-rich-overlay
             class="rich-math-popover w-80 rounded-md border border-border bg-popover p-2 shadow-md"
             :style="posStyle"
         >

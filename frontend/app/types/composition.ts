@@ -25,6 +25,8 @@ export interface Composition {
   description: string | null
   status: CompositionStatus
   revision: number
+  numbering_enabled: boolean
+  question_display: Record<AnswerFieldKey, boolean>
   scope_type: CompositionScope
   owner_id: number | null
   subject_id: number
@@ -60,6 +62,8 @@ export interface CompositionMetaUpdatePayload {
   status?: CompositionStatus
   // 显式传 null 表示移出目录（根）。
   folder_id?: number | null
+  numbering_enabled?: boolean
+  question_display?: Record<AnswerFieldKey, boolean>
 }
 
 // 折叠成树后的目录节点。
@@ -86,6 +90,18 @@ export type HeadingLevel = 1 | 2 | 3 | 4
 
 export interface HeadingProps {
   level: HeadingLevel
+}
+
+/** 选项排版：auto=按内容长度自适应列数，或固定 1/2/4 列。缺省视为 auto。 */
+export type OptionLayout = 'auto' | 1 | 2 | 4
+
+/** question 节点可选题号（纠数字或 1.1 形式），存于 node.props。 */
+export interface QuestionProps {
+  number?: string | null
+  // 题目级字段显隐覆盖：true=显示、false=隐藏、缺省/null=继承全局。
+  show?: Partial<Record<AnswerFieldKey, boolean | null>>
+  // 选项排版覆盖（每卷生效）；缺省/'auto' 由内容长度自适应。
+  optionLayout?: OptionLayout
 }
 
 // question_details / answer_item 覆盖涉及的四个可发布字段。
@@ -341,6 +357,8 @@ export interface SnapshotQuestionNode extends SnapshotNodeCommon {
   question_id: number
   question_revision: number
   question: QuestionSnapshot
+  // 冻结的表现层覆盖（选项排版等）；旧快照无此字段时按缺省处理。
+  props?: QuestionProps | null
 }
 
 export interface SnapshotPageBreakNode extends SnapshotNodeCommon {

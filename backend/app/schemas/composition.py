@@ -10,7 +10,7 @@ from datetime import datetime
 from typing import Any, Dict, List, Optional
 import uuid
 
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from app.models.composition import (
     BLOCK_NODE_TYPES,
@@ -162,6 +162,31 @@ def _validate_question_details_props(props: Optional[Dict[str, Any]]) -> None:
             raise ValueError(f"question_details props.fields.{key} must be a boolean")
 
 
+def _validate_question_props(props: Optional[Dict[str, Any]]) -> None:
+    if not props:
+        return
+    if set(props.keys()) - {"number", "show", "optionLayout"}:
+        raise ValueError("question props may only contain 'number', 'show' and 'optionLayout'")
+    number = props.get("number")
+    if number is not None:
+        if not isinstance(number, str):
+            raise ValueError("question props.number must be a string")
+        if len(number) > 16:
+            raise ValueError("question props.number must be at most 16 characters")
+    show = props.get("show")
+    if show is not None:
+        if not isinstance(show, dict):
+            raise ValueError("question props.show must be an object")
+        if set(show.keys()) - set(ANSWER_FIELD_KEYS):
+            raise ValueError(f"question props.show keys must be within {ANSWER_FIELD_KEYS}")
+        for key, value in show.items():
+            if value is not None and not isinstance(value, bool):
+                raise ValueError(f"question props.show.{key} must be boolean or null")
+    layout = props.get("optionLayout")
+    if layout is not None and (isinstance(layout, bool) or layout not in ("auto", 1, 2, 4)):
+        raise ValueError("question props.optionLayout must be one of 'auto', 1, 2, 4")
+
+
 def _validate_answer_item_props(props: Optional[Dict[str, Any]]) -> None:
     props = props or {}
     if set(props.keys()) - {"included", "overrides"}:
@@ -254,8 +279,7 @@ class CompositionNodeInput(BaseModel):
         elif nt == NODE_TYPE_QUESTION:
             if self.content is not None:
                 raise ValueError("question node content must be null (frozen by server)")
-            if self.props:
-                raise ValueError("question node props must be empty")
+            _validate_question_props(self.props)
             if self.question_id is None:
                 raise ValueError("question node requires question_id")
         elif nt == NODE_TYPE_PAGE_BREAK:
@@ -385,6 +409,8 @@ class CompositionMetaUpdateRequest(BaseModel):
     description: Optional[str] = None
     status: Optional[CompositionStatus] = None
     folder_id: Optional[int] = None
+    numbering_enabled: Optional[bool] = None
+    question_display: Optional[Dict[str, bool]] = None
 
 
 class CompositionRead(BaseModel):
@@ -395,6 +421,8 @@ class CompositionRead(BaseModel):
     description: Optional[str] = None
     status: str
     revision: int
+    numbering_enabled: bool = False
+    question_display: Dict[str, bool] = Field(default_factory=lambda: {k: False for k in ANSWER_FIELD_KEYS})
     scope_type: ScopeType
     owner_id: Optional[int] = None
     subject_id: int
@@ -402,6 +430,12 @@ class CompositionRead(BaseModel):
     created_at: datetime
     updated_at: datetime
     deleted_at: Optional[datetime] = None
+
+    @field_validator("question_display", mode="before")
+    @classmethod
+    def _normalize_question_display(cls, v: Any) -> Dict[str, bool]:
+        # NULL / 部分 map 均补全为四字段（缺省 false）。
+        return {k: bool(v.get(k, False)) if isinstance(v, dict) else False for k in ANSWER_FIELD_KEYS}
 
 
 class CompositionDetail(CompositionRead):

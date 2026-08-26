@@ -16,15 +16,17 @@ import {
 } from '@lucide/vue'
 import { toast } from 'vue-sonner'
 import CompositionCanvas from '~/components/manager/composition/CompositionCanvas.vue'
+import CompositionNumberingPanel from '~/components/manager/composition/CompositionNumberingPanel.vue'
+import CompositionQuestionDisplayPanel from '~/components/manager/composition/CompositionQuestionDisplayPanel.vue'
 import CompositionVersionsSheet from '~/components/manager/composition/CompositionVersionsSheet.vue'
 import { useCompositions, CompositionConflictError } from '~/composables/useCompositions'
 import { normalizeScope } from '~/lib/compositions'
 import {
-  collectDocumentIssues, collectStaleQuestionNodeIds, documentFromNodes,
-  documentToReplaceRequest, snapshotDocument,
+  applyQuestionNumbers, collectDocumentIssues, collectStaleQuestionNodeIds, documentFromNodes,
+  documentToReplaceRequest, hasAnyQuestionNumber, snapshotDocument,
 } from '~/lib/compositionDocument'
-import type { EditorDocument } from '~/lib/compositionDocument'
-import type { CompositionDetail, CompositionScope, QuestionRevisionStatus } from '~/types'
+import type { EditorDocument, NumberingMode } from '~/lib/compositionDocument'
+import type { AnswerFieldKey, CompositionDetail, CompositionScope, QuestionRevisionStatus } from '~/types'
 
 const route = useRoute()
 const router = useRouter()
@@ -62,6 +64,10 @@ const dirty = computed(() => metaDirty.value || nodesDirty.value)
 // 存在过期题目（题库有更新但稿件仍是定格旧内容）。定稿不被阻止，仅提示。
 const hasStaleQuestions = computed(
   () => collectStaleQuestionNodeIds(document.value, questionStatus.value).length > 0,
+)
+const numberingEnabled = computed(() => composition.value?.numbering_enabled ?? false)
+const questionDisplay = computed<Record<AnswerFieldKey, boolean>>(
+  () => composition.value?.question_display ?? { answer: false, thinking: false, analysis: false, summary: false },
 )
 
 async function load() {
@@ -210,6 +216,72 @@ function reloadFromServer() {
   load()
 }
 
+// 题号开关：即时持久化（bump revision）；开启且无题号时本地按全局顺序预填，待“保存内容”落库。
+async function toggleNumbering(value: boolean) {
+  if (!currentSubjectId.value || !composition.value || saving.value) return
+  savingMeta.value = true
+  try {
+    const updated = await api.updateComposition(
+      currentSubjectId.value,
+      scope.value,
+      composition.value.id,
+      { expected_revision: composition.value.revision, numbering_enabled: value },
+    )
+    composition.value = { ...composition.value, ...updated }
+    if (value && !hasAnyQuestionNumber(document.value)) {
+      document.value = applyQuestionNumbers(document.value, 'global')
+    }
+  } catch (err) {
+    if (err instanceof CompositionConflictError && err.kind === 'revision') {
+      editConflict.value = true
+      toast.error('组稿已被他人更新，你的本地修改尚未保存')
+    } else {
+      toast.error('保存失败')
+    }
+  } finally {
+    savingMeta.value = false
+  }
+}
+
+// 题目显示：全局字段开关即时持久化（bump revision）。
+async function toggleDisplayField(key: AnswerFieldKey, value: boolean) {
+  if (!currentSubjectId.value || !composition.value || saving.value) return
+  savingMeta.value = true
+  try {
+    const updated = await api.updateComposition(
+      currentSubjectId.value,
+      scope.value,
+      composition.value.id,
+      {
+        expected_revision: composition.value.revision,
+        question_display: { ...questionDisplay.value, [key]: value },
+      },
+    )
+    composition.value = { ...composition.value, ...updated }
+  } catch (err) {
+    if (err instanceof CompositionConflictError && err.kind === 'revision') {
+      editConflict.value = true
+      toast.error('组稿已被他人更新，你的本地修改尚未保存')
+    } else {
+      toast.error('保存失败')
+    }
+  } finally {
+    savingMeta.value = false
+  }
+}
+
+// 自动填充题号（一次性，覆盖已有）：仅改本地文档，经“保存内容”落库。
+function autofillNumbers(mode: NumberingMode) {
+  if (!composition.value) return
+  if (
+    hasAnyQuestionNumber(document.value) &&
+    !window.confirm('自动填充将覆盖所有已有题号，确定继续？')
+  ) {
+    return
+  }
+  document.value = applyQuestionNumbers(document.value, mode)
+}
+
 // --- 定稿（冻结当前 revision 为不可变版本） ---
 const finalizeOpen = ref(false)
 const finalizeLabel = ref('')
@@ -325,7 +397,7 @@ onBeforeRouteLeave(() => {
       <Loader2 class="h-6 w-6 animate-spin text-muted-foreground" />
     </div>
 
-    <div v-else-if="composition" class="mx-auto flex w-full max-w-4xl flex-col gap-6">
+    <div v-else-if="composition" class="mx-auto flex w-full max-w-6xl flex-col gap-6">
       <!-- 元数据 -->
       <div class="flex flex-col gap-4 sm:flex-row sm:items-end">
         <div class="flex-1 space-y-2">
@@ -357,28 +429,48 @@ onBeforeRouteLeave(() => {
         </Button>
       </div>
 
-      <!-- 画布 -->
-      <div class="flex items-center justify-between">
-        <h2 class="text-sm font-medium text-muted-foreground">内容画布</h2>
-        <Button size="sm" :disabled="saving || !nodesDirty" @click="saveNodes">
-          <Loader2 v-if="savingNodes" class="mr-2 h-4 w-4 animate-spin" />
-          <Save v-else class="mr-2 h-4 w-4" />
-          保存内容
-        </Button>
+      <!-- 画布 + 题号面板 -->
+      <div class="flex flex-col gap-6 lg:flex-row lg:items-start">
+        <div class="flex min-w-0 flex-1 flex-col gap-6">
+          <div class="flex items-center justify-between">
+            <h2 class="text-sm font-medium text-muted-foreground">内容画布</h2>
+            <Button size="sm" :disabled="saving || !nodesDirty" @click="saveNodes">
+              <Loader2 v-if="savingNodes" class="mr-2 h-4 w-4 animate-spin" />
+              <Save v-else class="mr-2 h-4 w-4" />
+              保存内容
+            </Button>
+          </div>
+
+          <CompositionCanvas
+            v-model:document="document"
+            :subject-id="currentSubjectId"
+            :question-status="questionStatus"
+            :sync-disabled="dirty"
+            :syncing="syncingNodes"
+            :numbering-enabled="numberingEnabled"
+            :global-display-fields="questionDisplay"
+            @sync="syncNodes"
+          />
+
+          <p class="text-xs text-muted-foreground">
+            科目：{{ currentSubject?.name || '—' }} · 修订版本 r{{ composition.revision }}
+          </p>
+        </div>
+
+        <aside class="flex flex-col gap-4 lg:sticky lg:top-6 lg:w-72 lg:shrink-0">
+          <CompositionNumberingPanel
+            :enabled="numberingEnabled"
+            :disabled="saving"
+            @update:enabled="toggleNumbering"
+            @autofill="autofillNumbers"
+          />
+          <CompositionQuestionDisplayPanel
+            :fields="questionDisplay"
+            :disabled="saving"
+            @toggle="toggleDisplayField"
+          />
+        </aside>
       </div>
-
-      <CompositionCanvas
-        v-model:document="document"
-        :subject-id="currentSubjectId"
-        :question-status="questionStatus"
-        :sync-disabled="dirty"
-        :syncing="syncingNodes"
-        @sync="syncNodes"
-      />
-
-      <p class="text-xs text-muted-foreground">
-        科目：{{ currentSubject?.name || '—' }} · 修订版本 r{{ composition.revision }}
-      </p>
     </div>
   </div>
 

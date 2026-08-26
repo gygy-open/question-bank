@@ -256,6 +256,68 @@ async def test_question_node_cross_subject_rejected(client, ctx, db_session):
     assert r.status_code == 422, r.text
 
 
+async def test_question_node_accepts_and_persists_number(client, ctx, db_session):
+    sid = ctx["subject"].id
+    h = _auth(ctx["user"])
+    comp = await _create_shared_composition(client, sid, h)
+    q = await _seed_question(db_session, subject_id=sid, content_revision=1)
+
+    node = {**_question(q.id), "props": {"number": "1.1"}}
+    r = await _put_nodes(client, sid, comp["id"], h, expected_revision=1, nodes=[node])
+    assert r.status_code == 200, r.text
+    assert _roots(r.json()["nodes"])[0]["props"] == {"number": "1.1"}
+
+
+@pytest.mark.parametrize(
+    "bad_props",
+    [
+        {"number": 1},
+        {"number": "x" * 17},
+        {"label": "1"},
+    ],
+)
+async def test_question_node_invalid_number_rejected(client, ctx, db_session, bad_props):
+    sid = ctx["subject"].id
+    h = _auth(ctx["user"])
+    comp = await _create_shared_composition(client, sid, h)
+    q = await _seed_question(db_session, subject_id=sid, content_revision=1)
+
+    node = {**_question(q.id), "props": bad_props}
+    r = await _put_nodes(client, sid, comp["id"], h, expected_revision=1, nodes=[node])
+    assert r.status_code == 422, r.text
+
+
+async def test_question_node_accepts_show_overrides(client, ctx, db_session):
+    sid = ctx["subject"].id
+    h = _auth(ctx["user"])
+    comp = await _create_shared_composition(client, sid, h)
+    q = await _seed_question(db_session, subject_id=sid, content_revision=1)
+
+    node = {**_question(q.id), "props": {"show": {"answer": True, "analysis": False}}}
+    r = await _put_nodes(client, sid, comp["id"], h, expected_revision=1, nodes=[node])
+    assert r.status_code == 200, r.text
+    assert _roots(r.json()["nodes"])[0]["props"] == {"show": {"answer": True, "analysis": False}}
+
+
+@pytest.mark.parametrize(
+    "bad_show",
+    [
+        {"answer": "yes"},
+        {"unknown": True},
+        "nope",
+    ],
+)
+async def test_question_node_invalid_show_rejected(client, ctx, db_session, bad_show):
+    sid = ctx["subject"].id
+    h = _auth(ctx["user"])
+    comp = await _create_shared_composition(client, sid, h)
+    q = await _seed_question(db_session, subject_id=sid, content_revision=1)
+
+    node = {**_question(q.id), "props": {"show": bad_show}}
+    r = await _put_nodes(client, sid, comp["id"], h, expected_revision=1, nodes=[node])
+    assert r.status_code == 422, r.text
+
+
 # --------------------------------------------------------------------------- #
 # 非 owner personal → 404
 # --------------------------------------------------------------------------- #
@@ -456,3 +518,29 @@ async def test_module_interleaves_custom_by_anchor(client, ctx, db_session):
     # 自定义标题锚定在 answer_item 之前。
     assert [c["id"] for c in children] == [custom, ai]
     assert [c["position"] for c in children] == [0, 1]
+
+
+async def test_module_unanchored_custom_before_answer_items_leads(client, ctx, db_session):
+    sid = ctx["subject"].id
+    h = _auth(ctx["user"])
+    comp = await _create_shared_composition(client, sid, h)
+    q1 = await _seed_question(db_session, subject_id=sid)
+
+    qn1, mod, title = _uid(), _uid(), _uid()
+    # 无 anchor 的标题作为模块首个子节点 → 规范化后应置顶。
+    title_heading = {
+        "id": title, "parent_id": mod, "slot": "body", "node_kind": "block",
+        "node_type": "heading", "content": _rich_doc("参考答案"), "props": {"level": 2},
+    }
+    r = await _put_nodes(
+        client, sid, comp["id"], h, expected_revision=1,
+        nodes=[
+            _question(q1.id, qn1),
+            _module("all", {}, mod),
+            title_heading,
+        ],
+    )
+    assert r.status_code == 200, r.text
+    children = _children(r.json()["nodes"], mod)
+    assert [c["node_type"] for c in children] == ["heading", "answer_item"]
+    assert children[0]["id"] == title

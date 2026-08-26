@@ -16,20 +16,22 @@ import type {
   DetailScope,
   HeadingLevel,
   HeadingProps,
+  OptionLayout,
   QuestionContentSnapshot,
   QuestionDetailsProps,
+  QuestionProps,
   QuestionRevisionStatus,
 } from '@/types/composition'
 import { ANSWER_FIELD_KEYS, BODY_SLOT } from '@/types/composition'
 import type { Question, RichDocNode, RichNode } from '@/types'
-import { isEmptyRichDoc } from '@/components/rich-editor/richDoc'
+import { isEmptyRichDoc, richDocToPlainText } from '@/components/rich-editor/richDoc'
 
 /** 编辑态节点：id 为客户端生成的稳定 UUID（同时用作渲染 key）。children 仅 module 使用。 */
 export interface EditorNode {
   id: string
   nodeType: CompositionNodeType
   content: RichDocNode | null
-  props: HeadingProps | QuestionDetailsProps | AnswerItemProps | null
+  props: HeadingProps | QuestionDetailsProps | AnswerItemProps | QuestionProps | null
   // question 节点：questionId 引用题库题目；questionRevision/questionContent 由服务端冻结。
   questionId: number | null
   questionRevision: number | null
@@ -140,9 +142,9 @@ export function createQuestionDetailsModule(
   return node
 }
 
-/** 汇总模块预设：参考答案（仅答案）与答案解析（答案 + 解析）。 */
+/** 汇总模块预设：默认仅答案、标题「参考答案」；解析等其余字段由用户在模块内自行勾选。 */
 export const DETAIL_PRESETS = {
-  reference: (scope: DetailScope = 'all'): EditorNode => {
+  summary: (scope: DetailScope = 'all'): EditorNode => {
     const moduleNode = createQuestionDetailsModule(scope, {
       answer: true,
       thinking: false,
@@ -151,18 +153,6 @@ export const DETAIL_PRESETS = {
     })
     const heading = createHeadingNode(2)
     heading.content = headingTextToDoc('参考答案')
-    moduleNode.children = [heading]
-    return moduleNode
-  },
-  analysis: (scope: DetailScope = 'all'): EditorNode => {
-    const moduleNode = createQuestionDetailsModule(scope, {
-      answer: true,
-      thinking: false,
-      analysis: true,
-      summary: false,
-    })
-    const heading = createHeadingNode(2)
-    heading.content = headingTextToDoc('答案与解析')
     moduleNode.children = [heading]
     return moduleNode
   },
@@ -192,6 +182,93 @@ export function createModuleCustomNode(
 
 export function headingLevelOf(node: EditorNode): HeadingLevel {
   return (node.props as HeadingProps | null)?.level ?? 2
+}
+
+export function questionNumberOf(node: EditorNode): string {
+  const n = (node.props as QuestionProps | null)?.number
+  return typeof n === 'string' ? n : ''
+}
+
+/** 题目级字段显隐覆盖：true/false=显式，null=继承全局。 */
+export function questionShowOverride(node: EditorNode, key: AnswerFieldKey): boolean | null {
+  const v = (node.props as QuestionProps | null)?.show?.[key]
+  return typeof v === 'boolean' ? v : null
+}
+
+/** 有效可见：题目级覆盖 ?? 全局开关。 */
+export function effectiveQuestionField(
+  node: EditorNode,
+  globalFields: Record<AnswerFieldKey, boolean>,
+  key: AnswerFieldKey,
+): boolean {
+  const override = questionShowOverride(node, key)
+  return override == null ? Boolean(globalFields[key]) : override
+}
+
+/** 合并出新的 question props（保留 number/optionLayout，写入/清除某字段的 show 覆盖）。 */
+export function questionPropsWithShow(
+  node: EditorNode,
+  key: AnswerFieldKey,
+  value: boolean | null,
+): QuestionProps {
+  const cur = (node.props as QuestionProps | null) ?? {}
+  const show: Partial<Record<AnswerFieldKey, boolean | null>> = { ...(cur.show ?? {}) }
+  if (value == null) delete show[key]
+  else show[key] = value
+  const next: QuestionProps = {}
+  if (cur.number) next.number = cur.number
+  if (Object.keys(show).length) next.show = show
+  if (cur.optionLayout && cur.optionLayout !== 'auto') next.optionLayout = cur.optionLayout
+  return next
+}
+
+/** 读取选项排版覆盖；缺省/非法值视为 'auto'。 */
+export function questionOptionLayoutOf(node: EditorNode): OptionLayout {
+  const v = (node.props as QuestionProps | null)?.optionLayout
+  return v === 1 || v === 2 || v === 4 ? v : 'auto'
+}
+
+/** 合并出新的 question props（保留 number/show，写入选项排版；'auto' 表示清除）。 */
+export function questionPropsWithOptionLayout(node: EditorNode, layout: OptionLayout): QuestionProps {
+  const cur = (node.props as QuestionProps | null) ?? {}
+  const next: QuestionProps = {}
+  if (cur.number) next.number = cur.number
+  if (cur.show && Object.keys(cur.show).length) next.show = { ...cur.show }
+  if (layout !== 'auto') next.optionLayout = layout
+  return next
+}
+
+// 选项含图片/表格/块公式时视为“宽内容”，auto 模式强制单列。
+function optionHasWideContent(doc: RichDocNode | null | undefined): boolean {
+  if (!doc) return false
+  let found = false
+  const walk = (n: RichNode): void => {
+    if (found) return
+    if (n.type === 'image' || n.type === 'table' || n.type === 'blockMath') {
+      found = true
+      return
+    }
+    for (const c of n.content ?? []) walk(c)
+  }
+  for (const n of doc.content ?? []) walk(n)
+  return found
+}
+
+/** 计算选项渲染列数：手动固定 1/2/4（按选项数收窄），auto 按最长选项文本长度自适应。 */
+export function resolveOptionColumns(
+  options: ReadonlyArray<{ content: RichDocNode | null }> | null | undefined,
+  layout: OptionLayout,
+): number {
+  const count = options?.length ?? 0
+  if (count === 0) return 1
+  if (layout === 1 || layout === 2 || layout === 4) return Math.min(layout, count)
+  let maxLen = 0
+  for (const opt of options ?? []) {
+    if (optionHasWideContent(opt.content)) return 1
+    maxLen = Math.max(maxLen, richDocToPlainText(opt.content).length)
+  }
+  const desired = maxLen <= 4 ? 4 : maxLen <= 12 ? 2 : 1
+  return Math.min(desired, count)
 }
 
 export function detailPropsOf(node: EditorNode): QuestionDetailsProps {
@@ -267,7 +344,8 @@ function rootQuestionNodes(doc: EditorDocument): EditorNode[] {
  * - scope=all → 整稿全部 root question 节点；before → module 之前的 root question 节点。
  * - 每个范围内 question 节点产出一条 answer_item（按 question 节点 UUID 归属，重复 question_id 各自保留）。
  * - 尽量复用现有 answer_item（按 sourceQuestionNodeId 顺序消费）以保留 id / included / overrides。
- * - 自定义 heading/rich_text 按 anchorBeforeNodeId 混排，悬空锚点落到末尾（保序）。
+ * - 自定义 heading/rich_text 按 anchorBeforeNodeId 混排；未锚定者按其相对首个 answer_item 的位置
+ *   落到置顶（leading）或置尾（trailing），悬空锚点同此规则（保序）。
  */
 function normalizeSingleModule(
   moduleNode: EditorNode,
@@ -302,19 +380,28 @@ function normalizeSingleModule(
 
   const finalIds = new Set(answerItems.map((ai) => ai.id))
   const anchored = new Map<string, EditorNode[]>()
+  const leading: EditorNode[] = []
   const trailing: EditorNode[] = []
+  // 未锚定的自定义节点：位于首个 answer_item 之前 → 置顶（leading），之后 → 置尾。
+  let seenAnswerItem = false
   for (const child of moduleNode.children) {
+    if (child.nodeType === 'answer_item') {
+      seenAnswerItem = true
+      continue
+    }
     if (child.nodeType !== 'heading' && child.nodeType !== 'rich_text') continue
     if (child.anchorBeforeNodeId && finalIds.has(child.anchorBeforeNodeId)) {
       const arr = anchored.get(child.anchorBeforeNodeId) ?? []
       arr.push(child)
       anchored.set(child.anchorBeforeNodeId, arr)
+    } else if (!seenAnswerItem) {
+      leading.push({ ...child, anchorBeforeNodeId: null })
     } else {
       trailing.push({ ...child, anchorBeforeNodeId: null })
     }
   }
 
-  const ordered: EditorNode[] = []
+  const ordered: EditorNode[] = [...leading]
   for (const ai of answerItems) {
     for (const custom of anchored.get(ai.id) ?? []) ordered.push(custom)
     ordered.push(ai)
@@ -344,8 +431,75 @@ export function normalizeDocument(doc: EditorDocument): EditorDocument {
 }
 
 // --------------------------------------------------------------------------- //
+// 题号：一次性填充所有 root question 节点（覆盖已有）
+// --------------------------------------------------------------------------- //
+
+export type NumberingMode = 'global' | 'heading'
+
+/** 是否已有任意 root question 节点带题号。 */
+export function hasAnyQuestionNumber(doc: EditorDocument): boolean {
+  return doc.nodes.some((n) => n.nodeType === 'question' && questionNumberOf(n) !== '')
+}
+
+/**
+ * 填充所有 root question 节点的题号（覆盖已有）。
+ * - global：按顺序 1,2,3…
+ * - heading：以 H2 标题为分组边界（H1 不分组），组内 g.n；首个 H2 前的题目归第 1 组，空组跳过。
+ */
+export function applyQuestionNumbers(doc: EditorDocument, mode: NumberingMode): EditorDocument {
+  let global = 0
+  let group = 0
+  let inGroup = 0
+  let pendingNewGroup = false
+  const nodes = doc.nodes.map((node) => {
+    if (node.nodeType === 'heading' && headingLevelOf(node) === 2) {
+      if (group > 0) pendingNewGroup = true
+      return node
+    }
+    if (node.nodeType !== 'question') return node
+    let number: string
+    if (mode === 'global') {
+      global += 1
+      number = String(global)
+    } else {
+      if (group === 0) {
+        group = 1
+        inGroup = 0
+      } else if (pendingNewGroup) {
+        group += 1
+        inGroup = 0
+        pendingNewGroup = false
+      }
+      inGroup += 1
+      number = `${group}.${inGroup}`
+    }
+    return { ...node, props: { number } }
+  })
+  return { nodes }
+}
+
+// --------------------------------------------------------------------------- //
 // 序列化为 PUT .../nodes 载荷
 // --------------------------------------------------------------------------- //
+
+/** 组装 question 节点上送的 props（number + 有效的 show 覆盖）；无内容时返回 undefined。 */
+function questionInputProps(node: EditorNode): Record<string, unknown> | undefined {
+  const props = node.props as QuestionProps | null
+  const out: Record<string, unknown> = {}
+  const number = questionNumberOf(node)
+  if (number) out.number = number
+  if (props?.show) {
+    const show: Record<string, boolean> = {}
+    for (const key of ANSWER_FIELD_KEYS) {
+      const v = props.show[key]
+      if (typeof v === 'boolean') show[key] = v
+    }
+    if (Object.keys(show).length) out.show = show
+  }
+  const layout = questionOptionLayoutOf(node)
+  if (layout !== 'auto') out.optionLayout = layout
+  return Object.keys(out).length ? out : undefined
+}
 
 function nodeToInput(node: EditorNode, parentId: string | null): CompositionNodeInput {
   const slot = parentId == null ? undefined : BODY_SLOT
@@ -355,7 +509,13 @@ function nodeToInput(node: EditorNode, parentId: string | null): CompositionNode
     case 'heading':
       return { id: node.id, parent_id: parentId, slot, node_kind: 'block', node_type: 'heading', content: node.content, props: { level: headingLevelOf(node) }, ...(node.anchorBeforeNodeId ? { anchor_before_node_id: node.anchorBeforeNodeId } : {}) }
     case 'question':
-      return { id: node.id, node_kind: 'block', node_type: 'question', question_id: node.questionId }
+      return {
+        id: node.id,
+        node_kind: 'block',
+        node_type: 'question',
+        question_id: node.questionId,
+        ...(questionInputProps(node) ? { props: questionInputProps(node) } : {}),
+      }
     case 'page_break':
       return { id: node.id, node_kind: 'block', node_type: 'page_break' }
     case 'question_details': {
@@ -537,8 +697,9 @@ function snapNode(node: EditorNode): Record<string, unknown> {
       base.p = { level: headingLevelOf(node) }
       break
     case 'question':
-      // 忽略 questionRevision / questionContent（服务端钉住，同步时才变）。
+      // 忽略 questionRevision / questionContent（服务端钉住，同步时才变）；props 参与脏检测。
       base.q = node.questionId
+      base.p = questionInputProps(node) ?? null
       break
     case 'question_details': {
       const props = detailPropsOf(node)
@@ -632,9 +793,33 @@ export function headingDocToText(doc: RichDocNode | null | undefined): string {
   return parts.join('')
 }
 
-export function headingTextToDoc(text: string): RichDocNode {
-  if (!text) return emptyParagraphDoc()
-  return { type: 'doc', content: [{ type: 'paragraph', content: [{ type: 'text', text }] }] }
+export type HeadingAlign = 'left' | 'center' | 'right' | 'justify'
+
+/** 读取 heading 段落的对齐方式；缺省或 left 视为左对齐。 */
+export function headingAlignOf(doc: RichDocNode | null | undefined): HeadingAlign {
+  if (!doc || doc.type !== 'doc') return 'left'
+  const first = (doc.content ?? [])[0]
+  const align = (first?.attrs as { textAlign?: unknown } | undefined)?.textAlign
+  return align === 'center' || align === 'right' || align === 'justify' ? align : 'left'
+}
+
+export function headingTextToDoc(text: string, align: HeadingAlign = 'left'): RichDocNode {
+  const paragraph: RichNode = { type: 'paragraph' }
+  if (align !== 'left') paragraph.attrs = { textAlign: align }
+  if (text) paragraph.content = [{ type: 'text', text }]
+  return { type: 'doc', content: [paragraph] }
+}
+
+/** 保留 heading 段落原内容，仅设置对齐；left 归为默认并移除 textAlign。 */
+export function setHeadingAlign(doc: RichDocNode | null | undefined, align: HeadingAlign): RichDocNode {
+  const first = doc && doc.type === 'doc' ? (doc.content ?? [])[0] : undefined
+  const paragraph: RichNode = first && first.type === 'paragraph' ? { ...first } : { type: 'paragraph' }
+  const attrs: Record<string, unknown> = { ...(paragraph.attrs ?? {}) }
+  if (align === 'left') delete attrs.textAlign
+  else attrs.textAlign = align
+  if (Object.keys(attrs).length) paragraph.attrs = attrs
+  else delete paragraph.attrs
+  return { type: 'doc', content: [paragraph] }
 }
 
 export function headingHasRichInline(doc: RichDocNode | null | undefined): boolean {
@@ -642,4 +827,17 @@ export function headingHasRichInline(doc: RichDocNode | null | undefined): boole
   const first = (doc.content ?? [])[0]
   if (!first || first.type !== 'paragraph') return false
   return (first.content ?? []).some((node: RichNode) => node.type !== 'text')
+}
+
+// 渲染态标题按层级的排版字号（H1–H4），供画布/快照只读渲染共用。
+// 字号作用到内部 .prose 元素，特异性高于 prose-sm 的基准字号，否则会被压平。
+const HEADING_CLASS: Record<number, string> = {
+  1: '[&_.prose]:text-2xl [&_.prose]:font-bold',
+  2: '[&_.prose]:text-xl [&_.prose]:font-semibold',
+  3: '[&_.prose]:text-lg [&_.prose]:font-semibold',
+  4: '[&_.prose]:text-base [&_.prose]:font-medium',
+}
+
+export function headingClassFor(level: number): string {
+  return HEADING_CLASS[level] ?? HEADING_CLASS[2]!
 }

@@ -356,6 +356,8 @@ async def update_composition(
     status_value: Optional[str] = None,
     folder_id: Optional[int] = None,
     folder_id_provided: bool = False,
+    numbering_enabled: Optional[bool] = None,
+    question_display: Optional[Dict[str, bool]] = None,
 ) -> Composition:
     values: dict = {"updated_by": actor.id, "updated_at": datetime.utcnow()}
     moved = False
@@ -365,6 +367,12 @@ async def update_composition(
         values["description"] = description
     if status_value is not None:
         values["status"] = status_value
+    if numbering_enabled is not None:
+        values["numbering_enabled"] = numbering_enabled
+    if question_display is not None:
+        values["question_display"] = {
+            k: bool(question_display.get(k, False)) for k in ANSWER_FIELD_KEYS
+        }
     if folder_id_provided:
         if folder_id is not None:
             await _validate_folder_ref(
@@ -575,7 +583,8 @@ def _normalize_module_children(
     - answer_item 相对顺序跟随正文(题序)。
     - 尽量复用客户端传入的 answer_item(按 source_question_node_id 顺序消费)以保留
       id / included / overrides;不足则服务端生成新 UUID + 默认 props。
-    - 自定义 heading/rich_text 按 anchor_before_node_id 混排,悬空锚点落到末尾(保序)。
+    - 自定义 heading/rich_text 按 anchor_before_node_id 混排;未锚定者按其相对首个 answer_item
+      的位置置顶(leading)或置尾(trailing),悬空锚点同此规则(保序)。
 
     返回子节点规范化描述列表(dict),position 由列表下标决定。
     """
@@ -618,16 +627,27 @@ def _normalize_module_children(
             )
 
     final_ai_ids = {ai["id"] for ai in answer_items}
-    custom = [c for c in children if c.node_type in (NODE_TYPE_HEADING, NODE_TYPE_RICH_TEXT)]
+    # 未锚定的自定义节点:位于首个 answer_item 之前 → 置顶(leading),之后 → 置尾(trailing)。
     anchored: Dict[str, List[CompositionNodeInput]] = defaultdict(list)
+    leading: List[CompositionNodeInput] = []
     trailing: List[CompositionNodeInput] = []
-    for c in custom:
+    seen_answer_item = False
+    for c in children:
+        if c.node_type == NODE_TYPE_ANSWER_ITEM:
+            seen_answer_item = True
+            continue
+        if c.node_type not in (NODE_TYPE_HEADING, NODE_TYPE_RICH_TEXT):
+            continue
         if c.anchor_before_node_id in final_ai_ids:
             anchored[c.anchor_before_node_id].append(c)
+        elif not seen_answer_item:
+            leading.append(c)
         else:
             trailing.append(c)
 
     ordered: List[Dict[str, Any]] = []
+    for c in leading:
+        ordered.append({"kind": "custom", "item": c})
     for ai in answer_items:
         for c in anchored.get(ai["id"], []):
             ordered.append({"kind": "custom", "item": c})
@@ -728,7 +748,7 @@ async def replace_nodes(
                     node_kind=CompositionNodeKind.BLOCK,
                     node_type=NODE_TYPE_QUESTION,
                     content=content,
-                    props=None,
+                    props=it.props,
                     schema_version=it.schema_version,
                     question_id=it.question_id,
                     question_revision=revision,
@@ -990,6 +1010,8 @@ def _node_snapshot(node: CompositionNode) -> Dict[str, Any]:
         snap["question_id"] = node.question_id
         snap["question_revision"] = node.question_revision
         snap["question"] = _build_question_snapshot_from_node(node)
+        if node.props:
+            snap["props"] = node.props
     elif nt == NODE_TYPE_QUESTION_DETAILS:
         snap["props"] = node.props
     elif nt == NODE_TYPE_ANSWER_ITEM:

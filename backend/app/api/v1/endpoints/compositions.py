@@ -248,6 +248,8 @@ async def update_composition(
         status_value=payload.status.value if payload.status is not None else None,
         folder_id=payload.folder_id,
         folder_id_provided="folder_id" in payload.model_fields_set,
+        numbering_enabled=payload.numbering_enabled,
+        question_display=payload.question_display,
     )
 
 

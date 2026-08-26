@@ -1,14 +1,10 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
+import { onKeyStroke, useEventListener } from '@vueuse/core'
 import { Button } from '@/components/ui/button'
-import {
-  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel,
-  DropdownMenuSeparator, DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu'
-import {
-  Plus, Type, Heading, FileQuestion, SeparatorHorizontal, ListChecks, RefreshCw, Loader2,
-} from '@lucide/vue'
+import { Plus, RefreshCw, Loader2 } from '@lucide/vue'
 import BlockItem from './BlockItem.vue'
+import CompositionAddBlockMenu from './CompositionAddBlockMenu.vue'
 import QuestionDetailsModuleEditor from './QuestionDetailsModuleEditor.vue'
 import QuestionPicker from './QuestionPicker.vue'
 import {
@@ -18,7 +14,7 @@ import {
   removeModuleCustomChild, removeRootNode,
 } from '@/lib/compositionDocument'
 import type { EditorDocument, EditorNode } from '@/lib/compositionDocument'
-import type { QuestionRevisionStatus } from '@/types/composition'
+import type { AnswerFieldKey, QuestionRevisionStatus } from '@/types/composition'
 import type { Question } from '@/types'
 
 const props = defineProps<{
@@ -29,6 +25,10 @@ const props = defineProps<{
   // 有未保存修改时禁止同步，避免覆盖本地内容。
   syncDisabled?: boolean
   syncing?: boolean
+  // 题号开关：开启时 question 块展示可编辑题号前缀。
+  numberingEnabled?: boolean
+  // 全局题目显示字段（answer/thinking/analysis/summary）。
+  globalDisplayFields?: Record<AnswerFieldKey, boolean>
 }>()
 
 const emit = defineEmits<{
@@ -38,6 +38,36 @@ const emit = defineEmits<{
 }>()
 
 const pickerOpen = ref(false)
+// 题目选择器的插入位置（insertRootNodeAfter 的 at 语义），缺省末尾。
+const pendingInsertAt = ref<number>(-1)
+
+// 当前处于编辑态的节点 UUID；null 表示全部渲染态。单节点激活，聚焦稿件式编辑。
+const activeNodeId = ref<string | null>(null)
+
+function setActive(id: string) {
+  activeNodeId.value = id
+}
+
+function clearActive() {
+  activeNodeId.value = null
+}
+
+// Esc 退回渲染态（仅有激活节点时拦截）。
+onKeyStroke('Escape', (e) => {
+  if (activeNodeId.value == null) return
+  e.preventDefault()
+  clearActive()
+})
+
+// 点击任意「非卡片、非编辑浮层」区域（含画布外的页面空白）退回渲染态。
+// 卡片自身 @click 负责激活/切换；reka-ui 传送层与富文本浮层用属性标记豁免。
+useEventListener(document, 'pointerdown', (e: PointerEvent) => {
+  if (activeNodeId.value == null) return
+  const target = e.target as Element | null
+  if (!target || !target.isConnected) return
+  if (target.closest('[data-composition-block],[data-reka-popper-content-wrapper],[role="dialog"],[data-rich-overlay]')) return
+  clearActive()
+})
 
 function setDocument(next: EditorDocument) {
   emit('update:document', next)
@@ -52,11 +82,13 @@ const questionNodeMap = computed(() => {
   return map
 })
 
-type AddKind = 'rich_text' | 'heading' | 'question' | 'page_break' | 'module_reference' | 'module_analysis'
+type AddKind = 'rich_text' | 'heading' | 'question' | 'page_break' | 'module_summary'
 
-function addNode(kind: AddKind) {
-  const at = props.document.nodes.length - 1
+// at 为 insertRootNodeAfter 语义：在第 at 个节点之后插入，缺省为末尾。
+function addNode(kind: AddKind, at?: number) {
+  const insertAt = at ?? props.document.nodes.length - 1
   if (kind === 'question') {
+    pendingInsertAt.value = insertAt
     pickerOpen.value = true
     return
   }
@@ -64,13 +96,16 @@ function addNode(kind: AddKind) {
   if (kind === 'rich_text') node = createRichTextNode()
   else if (kind === 'heading') node = createHeadingNode()
   else if (kind === 'page_break') node = createPageBreakNode()
-  else if (kind === 'module_reference') node = DETAIL_PRESETS.reference()
-  else node = DETAIL_PRESETS.analysis()
-  setDocument(insertRootNodeAfter(props.document, at, node))
+  else node = DETAIL_PRESETS.summary()
+  setDocument(insertRootNodeAfter(props.document, insertAt, node))
+  // 新增即进入编辑态。
+  setActive(node.id)
 }
 
 function onQuestionSelected(question: Question) {
-  setDocument(insertRootNodeAfter(props.document, props.document.nodes.length - 1, createQuestionNode(question)))
+  const node = createQuestionNode(question)
+  setDocument(insertRootNodeAfter(props.document, pendingInsertAt.value, node))
+  setActive(node.id)
 }
 
 // --- root 层操作 ---
@@ -159,34 +194,34 @@ defineExpose({ hasStale })
     </div>
 
     <div v-if="document.nodes.length === 0" class="rounded-lg border border-dashed py-16 text-center">
-      <p class="mb-4 text-sm text-muted-foreground">画布还是空的，添加第一个块开始编辑。</p>
-      <DropdownMenu>
-        <DropdownMenuTrigger as-child>
-          <Button variant="outline">
-            <Plus class="mr-2 h-4 w-4" /> 添加块
-          </Button>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent align="center">
-          <DropdownMenuItem @click="addNode('rich_text')"><Type class="mr-2 h-4 w-4" /> 文本</DropdownMenuItem>
-          <DropdownMenuItem @click="addNode('heading')"><Heading class="mr-2 h-4 w-4" /> 标题</DropdownMenuItem>
-          <DropdownMenuItem @click="addNode('question')"><FileQuestion class="mr-2 h-4 w-4" /> 题目</DropdownMenuItem>
-          <DropdownMenuItem @click="addNode('page_break')"><SeparatorHorizontal class="mr-2 h-4 w-4" /> 分页</DropdownMenuItem>
-          <DropdownMenuSeparator />
-          <DropdownMenuLabel class="text-xs">答案汇总模块</DropdownMenuLabel>
-          <DropdownMenuItem @click="addNode('module_reference')"><ListChecks class="mr-2 h-4 w-4" /> 参考答案</DropdownMenuItem>
-          <DropdownMenuItem @click="addNode('module_analysis')"><ListChecks class="mr-2 h-4 w-4" /> 答案与解析</DropdownMenuItem>
-        </DropdownMenuContent>
-      </DropdownMenu>
+      <p class="mb-4 text-sm text-muted-foreground">画布还是空的，添加第一个节点开始编辑。</p>
+      <CompositionAddBlockMenu align="center" @add="addNode($event)">
+        <Button variant="outline">
+          <Plus class="mr-2 h-4 w-4" /> 添加节点
+        </Button>
+      </CompositionAddBlockMenu>
     </div>
 
     <template v-else>
-      <template v-for="(node, index) in document.nodes" :key="node.id">
+      <div v-for="(node, index) in document.nodes" :key="node.id" class="group/ins relative">
+        <!-- 悬浮插入：在本节点之前插入新节点（顶部间隙居中） -->
+        <div class="pointer-events-none absolute inset-x-0 -top-3 z-10 flex justify-center opacity-0 transition-opacity group-hover/ins:opacity-100 focus-within:opacity-100">
+          <CompositionAddBlockMenu align="center" @add="addNode($event, index - 1)">
+            <Button variant="outline" size="icon" class="pointer-events-auto h-6 w-6 rounded-full shadow-sm">
+              <Plus class="h-3.5 w-3.5" />
+            </Button>
+          </CompositionAddBlockMenu>
+        </div>
+
         <QuestionDetailsModuleEditor
           v-if="node.nodeType === 'question_details'"
           :node="node"
           :index="index"
           :total="document.nodes.length"
           :question-node-map="questionNodeMap"
+          :numbering-enabled="numberingEnabled"
+          :active="activeNodeId === node.id"
+          @activate="setActive(node.id)"
           @patch="onPatch(node.id, $event)"
           @move="onMove(index, $event)"
           @remove="onRemove(node.id)"
@@ -203,31 +238,19 @@ defineExpose({ hasStale })
           :stale="isStale(node)"
           :deleted="isDeleted(node)"
           :sync-disabled="syncDisabled || syncing"
+          :numbering-enabled="numberingEnabled"
+          :global-display-fields="globalDisplayFields"
+          :active="activeNodeId === node.id"
+          @activate="setActive(node.id)"
           @patch="onPatch(node.id, $event)"
           @move="onMove(index, $event)"
           @remove="onRemove(node.id)"
           @sync="syncOne(node)"
         />
-      </template>
+      </div>
 
       <div class="flex justify-center pt-1">
-        <DropdownMenu>
-          <DropdownMenuTrigger as-child>
-            <Button variant="outline" size="sm">
-              <Plus class="mr-2 h-4 w-4" /> 添加块
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="center">
-            <DropdownMenuItem @click="addNode('rich_text')"><Type class="mr-2 h-4 w-4" /> 文本</DropdownMenuItem>
-            <DropdownMenuItem @click="addNode('heading')"><Heading class="mr-2 h-4 w-4" /> 标题</DropdownMenuItem>
-            <DropdownMenuItem @click="addNode('question')"><FileQuestion class="mr-2 h-4 w-4" /> 题目</DropdownMenuItem>
-            <DropdownMenuItem @click="addNode('page_break')"><SeparatorHorizontal class="mr-2 h-4 w-4" /> 分页</DropdownMenuItem>
-            <DropdownMenuSeparator />
-            <DropdownMenuLabel class="text-xs">答案汇总模块</DropdownMenuLabel>
-            <DropdownMenuItem @click="addNode('module_reference')"><ListChecks class="mr-2 h-4 w-4" /> 参考答案</DropdownMenuItem>
-            <DropdownMenuItem @click="addNode('module_analysis')"><ListChecks class="mr-2 h-4 w-4" /> 答案与解析</DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
+        <CompositionAddBlockMenu align="center" @add="addNode($event)" />
       </div>
     </template>
 

@@ -317,6 +317,59 @@ async def test_revision_conflict_and_bump(client, ctx):
     assert r.json()["title"] == "新标题"
 
 
+async def test_numbering_enabled_defaults_false_and_toggles(client, ctx):
+    sid = ctx["subject"].id
+    h = _auth(ctx["user"])
+
+    comp = (await client.post(
+        f"{API}/subjects/{sid}/compositions?scope=shared", json={"title": "题号"}, headers=h
+    )).json()
+    assert comp["numbering_enabled"] is False
+
+    r = await client.patch(
+        f"{API}/subjects/{sid}/compositions/{comp['id']}?scope=shared",
+        json={"expected_revision": 1, "numbering_enabled": True},
+        headers=h,
+    )
+    assert r.status_code == 200
+    assert r.json()["numbering_enabled"] is True
+    assert r.json()["revision"] == 2
+
+    got = (await client.get(
+        f"{API}/subjects/{sid}/compositions/{comp['id']}?scope=shared", headers=h
+    )).json()
+    assert got["numbering_enabled"] is True
+
+
+async def test_question_display_defaults_and_updates(client, ctx):
+    sid = ctx["subject"].id
+    h = _auth(ctx["user"])
+
+    comp = (await client.post(
+        f"{API}/subjects/{sid}/compositions?scope=shared", json={"title": "显示"}, headers=h
+    )).json()
+    assert comp["question_display"] == {
+        "answer": False, "thinking": False, "analysis": False, "summary": False,
+    }
+
+    r = await client.patch(
+        f"{API}/subjects/{sid}/compositions/{comp['id']}?scope=shared",
+        json={"expected_revision": 1, "question_display": {"answer": True, "analysis": True}},
+        headers=h,
+    )
+    assert r.status_code == 200, r.text
+    # 部分 map 被补全为四字段。
+    assert r.json()["question_display"] == {
+        "answer": True, "thinking": False, "analysis": True, "summary": False,
+    }
+
+    got = (await client.get(
+        f"{API}/subjects/{sid}/compositions/{comp['id']}?scope=shared", headers=h
+    )).json()
+    assert got["question_display"]["answer"] is True
+    assert got["question_display"]["analysis"] is True
+
+
 async def test_delete_restore_with_revision(client, ctx):
     sid = ctx["subject"].id
     h = _auth(ctx["user"])

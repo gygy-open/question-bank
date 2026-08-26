@@ -49,6 +49,7 @@ defineExpose({ onKeyDown })
 
 <template>
     <div
+        data-rich-overlay
         class="z-50 max-h-80 w-56 overflow-y-auto rounded-md border border-border bg-popover p-1 text-popover-foreground shadow-md"
     >
         <template v-if="items.length">
