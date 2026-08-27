@@ -145,6 +145,8 @@ class Composition(Base):
     revision = Column(Integer, default=1, nullable=False)
     # 题号开关:关闭仅隐藏显示,题号仍保留在 question 节点 props.number 上。
     numbering_enabled = Column(Boolean, nullable=False, default=False, server_default=false())
+    # 赋分开关:仅在 numbering_enabled 为真时可开启;关闭仅隐藏显示,分值仍保留在 question 节点 props.score 上。
+    scoring_enabled = Column(Boolean, nullable=False, default=False, server_default=false())
     # 画布题目全局显示字段(answer/thinking/analysis/summary);NULL 视为全部隐藏。
     question_display = Column(JSON, nullable=True)
 

@@ -249,6 +249,7 @@ async def update_composition(
         folder_id=payload.folder_id,
         folder_id_provided="folder_id" in payload.model_fields_set,
         numbering_enabled=payload.numbering_enabled,
+        scoring_enabled=payload.scoring_enabled,
         question_display=payload.question_display,
     )
 

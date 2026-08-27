@@ -22,12 +22,12 @@ import { questionTypeLabel } from '@/lib/answerFormat'
 import {
   effectiveQuestionField, headingAlignOf, headingClassFor, headingDocToText, headingHasRichInline,
   headingLevelOf, headingTextToDoc, questionNumberOf, questionOptionLayoutOf,
-  questionPropsWithOptionLayout, questionPropsWithShow, questionShowOverride, resolveOptionColumns,
-  setHeadingAlign,
+  questionPropsWithNumber, questionPropsWithOptionLayout, questionPropsWithScore, questionPropsWithShow,
+  questionScoreOf, questionShowOverride, resolveOptionColumns, setHeadingAlign,
 } from '@/lib/compositionDocument'
 import type { EditorNode, HeadingAlign } from '@/lib/compositionDocument'
 import { ANSWER_FIELD_KEYS } from '@/types/composition'
-import type { AnswerFieldKey, HeadingLevel, OptionLayout, QuestionProps } from '@/types/composition'
+import type { AnswerFieldKey, HeadingLevel, OptionLayout } from '@/types/composition'
 import type { RichDoc } from '@/types'
 
 const props = defineProps<{
@@ -41,6 +41,8 @@ const props = defineProps<{
   syncDisabled?: boolean
   // 题号开关：开启时 question 块展示可编辑题号。
   numberingEnabled?: boolean
+  // 赋分开关：开启时 question 块展示可编辑分值。
+  scoringEnabled?: boolean
   // 全局题目显示字段（answer/thinking/analysis/summary）。
   globalDisplayFields?: Record<AnswerFieldKey, boolean>
   // 激活态：true 显示编辑控件；false 以渲染态（只读排版）展示。
@@ -117,11 +119,16 @@ const headingLevel = computed<string>({
 const questionNumber = computed<string>({
   get: () => questionNumberOf(props.node),
   set: (v) => {
-    const cur = (props.node.props as QuestionProps | null) ?? {}
-    const next: QuestionProps = {}
-    if (v) next.number = v
-    if (cur.show && Object.keys(cur.show).length) next.show = cur.show
-    if (cur.optionLayout && cur.optionLayout !== 'auto') next.optionLayout = cur.optionLayout
+    const next = questionPropsWithNumber(props.node, v)
+    emit('patch', { props: Object.keys(next).length ? next : null })
+  },
+})
+
+// --- question 分值 ---
+const questionScore = computed<number | null>({
+  get: () => questionScoreOf(props.node),
+  set: (v) => {
+    const next = questionPropsWithScore(props.node, v)
     emit('patch', { props: Object.keys(next).length ? next : null })
   },
 })
@@ -338,6 +345,14 @@ function setShow(key: AnswerFieldKey, value: string) {
               class="h-6 w-16 text-xs"
               @update:model-value="questionNumber = String($event)"
             />
+            <Input
+              v-if="scoringEnabled"
+              type="number" min="0" max="1000" step="0.5"
+              :model-value="questionScore ?? ''"
+              placeholder="分值"
+              class="h-6 w-16 text-xs"
+              @update:model-value="questionScore = $event === '' ? null : Number($event)"
+            />
             <Badge variant="secondary" class="text-xs">{{ questionTypeLabel(node.questionContent.q_type) }}</Badge>
             <span class="text-xs text-muted-foreground">#{{ node.questionId }} · 版本 r{{ node.questionRevision }}</span>
             <div class="ml-auto flex items-center gap-2">
@@ -377,7 +392,11 @@ function setShow(key: AnswerFieldKey, value: string) {
               v-if="numberingEnabled && questionNumber"
               class="shrink-0 font-medium text-muted-foreground"
             >{{ questionNumber }}.</span>
-            <RichContent :content="node.questionContent.content" empty-text="（无题干）" class="min-w-0 flex-1" />
+            <RichContent :content="node.questionContent.content" empty-text="（无题干）" class="min-w-0 flex-1 [&_p]:my-0" />
+            <span
+              v-if="scoringEnabled && questionScore != null"
+              class="shrink-0 text-sm text-muted-foreground"
+            >（{{ questionScore }} 分）</span>
           </div>
           <ul
             v-if="node.questionContent.options?.length"

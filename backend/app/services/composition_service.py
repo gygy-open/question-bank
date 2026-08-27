@@ -357,6 +357,7 @@ async def update_composition(
     folder_id: Optional[int] = None,
     folder_id_provided: bool = False,
     numbering_enabled: Optional[bool] = None,
+    scoring_enabled: Optional[bool] = None,
     question_display: Optional[Dict[str, bool]] = None,
 ) -> Composition:
     values: dict = {"updated_by": actor.id, "updated_at": datetime.utcnow()}
@@ -369,6 +370,16 @@ async def update_composition(
         values["status"] = status_value
     if numbering_enabled is not None:
         values["numbering_enabled"] = numbering_enabled
+    # 赋分依赖题号:开启赋分要求(生效后的)题号为真;题号被关闭时级联关闭赋分。
+    effective_numbering = numbering_enabled if numbering_enabled is not None else comp.numbering_enabled
+    if scoring_enabled:
+        if not effective_numbering:
+            raise _bad_request("scoring_enabled requires numbering_enabled")
+        values["scoring_enabled"] = True
+    elif scoring_enabled is False:
+        values["scoring_enabled"] = False
+    elif not effective_numbering and comp.scoring_enabled:
+        values["scoring_enabled"] = False
     if question_display is not None:
         values["question_display"] = {
             k: bool(question_display.get(k, False)) for k in ANSWER_FIELD_KEYS

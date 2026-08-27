@@ -27,6 +27,8 @@ const props = defineProps<{
   syncing?: boolean
   // 题号开关：开启时 question 块展示可编辑题号前缀。
   numberingEnabled?: boolean
+  // 赋分开关：开启时 question 块展示可编辑分值（依赖题号已开启）。
+  scoringEnabled?: boolean
   // 全局题目显示字段（answer/thinking/analysis/summary）。
   globalDisplayFields?: Record<AnswerFieldKey, boolean>
 }>()
@@ -239,6 +241,7 @@ defineExpose({ hasStale })
           :deleted="isDeleted(node)"
           :sync-disabled="syncDisabled || syncing"
           :numbering-enabled="numberingEnabled"
+          :scoring-enabled="scoringEnabled"
           :global-display-fields="globalDisplayFields"
           :active="activeNodeId === node.id"
           @activate="setActive(node.id)"

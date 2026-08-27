@@ -299,6 +299,33 @@ async def test_question_node_accepts_show_overrides(client, ctx, db_session):
     assert _roots(r.json()["nodes"])[0]["props"] == {"show": {"answer": True, "analysis": False}}
 
 
+async def test_question_node_accepts_and_persists_score(client, ctx, db_session):
+    sid = ctx["subject"].id
+    h = _auth(ctx["user"])
+    comp = await _create_shared_composition(client, sid, h)
+    q = await _seed_question(db_session, subject_id=sid, content_revision=1)
+
+    node = {**_question(q.id), "props": {"number": "1", "score": 2.5}}
+    r = await _put_nodes(client, sid, comp["id"], h, expected_revision=1, nodes=[node])
+    assert r.status_code == 200, r.text
+    assert _roots(r.json()["nodes"])[0]["props"] == {"number": "1", "score": 2.5}
+
+
+@pytest.mark.parametrize(
+    "bad_score",
+    [-1, 1001, "5", True],
+)
+async def test_question_node_invalid_score_rejected(client, ctx, db_session, bad_score):
+    sid = ctx["subject"].id
+    h = _auth(ctx["user"])
+    comp = await _create_shared_composition(client, sid, h)
+    q = await _seed_question(db_session, subject_id=sid, content_revision=1)
+
+    node = {**_question(q.id), "props": {"score": bad_score}}
+    r = await _put_nodes(client, sid, comp["id"], h, expected_revision=1, nodes=[node])
+    assert r.status_code == 422, r.text
+
+
 @pytest.mark.parametrize(
     "bad_show",
     [

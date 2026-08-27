@@ -189,6 +189,34 @@ export function questionNumberOf(node: EditorNode): string {
   return typeof n === 'string' ? n : ''
 }
 
+/** 合并出新的 question props（保留 show/optionLayout/score，写入/清除题号）。 */
+export function questionPropsWithNumber(node: EditorNode, number: string): QuestionProps {
+  const cur = (node.props as QuestionProps | null) ?? {}
+  const next: QuestionProps = {}
+  if (number) next.number = number
+  if (cur.show && Object.keys(cur.show).length) next.show = cur.show
+  if (cur.optionLayout && cur.optionLayout !== 'auto') next.optionLayout = cur.optionLayout
+  if (cur.score != null) next.score = cur.score
+  return next
+}
+
+/** 题目分值（null 表示未填）。 */
+export function questionScoreOf(node: EditorNode): number | null {
+  const s = (node.props as QuestionProps | null)?.score
+  return typeof s === 'number' ? s : null
+}
+
+/** 合并出新的 question props（保留 number/show/optionLayout，写入/清除分值）。 */
+export function questionPropsWithScore(node: EditorNode, score: number | null): QuestionProps {
+  const cur = (node.props as QuestionProps | null) ?? {}
+  const next: QuestionProps = {}
+  if (cur.number) next.number = cur.number
+  if (cur.show && Object.keys(cur.show).length) next.show = cur.show
+  if (cur.optionLayout && cur.optionLayout !== 'auto') next.optionLayout = cur.optionLayout
+  if (score != null) next.score = score
+  return next
+}
+
 /** 题目级字段显隐覆盖：true/false=显式，null=继承全局。 */
 export function questionShowOverride(node: EditorNode, key: AnswerFieldKey): boolean | null {
   const v = (node.props as QuestionProps | null)?.show?.[key]
@@ -219,6 +247,7 @@ export function questionPropsWithShow(
   if (cur.number) next.number = cur.number
   if (Object.keys(show).length) next.show = show
   if (cur.optionLayout && cur.optionLayout !== 'auto') next.optionLayout = cur.optionLayout
+  if (cur.score != null) next.score = cur.score
   return next
 }
 
@@ -235,6 +264,7 @@ export function questionPropsWithOptionLayout(node: EditorNode, layout: OptionLa
   if (cur.number) next.number = cur.number
   if (cur.show && Object.keys(cur.show).length) next.show = { ...cur.show }
   if (layout !== 'auto') next.optionLayout = layout
+  if (cur.score != null) next.score = cur.score
   return next
 }
 
@@ -473,9 +503,27 @@ export function applyQuestionNumbers(doc: EditorDocument, mode: NumberingMode): 
       inGroup += 1
       number = `${group}.${inGroup}`
     }
-    return { ...node, props: { number } }
+    return { ...node, props: questionPropsWithNumber(node, number) }
   })
   return { nodes }
+}
+
+/** 按文档顺序列出可赋分的 root question 节点（题号 + 分值），供分数分布卡片渲染。 */
+export function orderedScorableQuestions(
+  doc: EditorDocument,
+): { nodeId: string; number: string; score: number | null }[] {
+  return doc.nodes
+    .filter((n) => n.nodeType === 'question')
+    .map((n) => ({ nodeId: n.id, number: questionNumberOf(n), score: questionScoreOf(n) }))
+}
+
+/** 已填分值之和（未填不计入）。 */
+export function totalScore(doc: EditorDocument): number {
+  return doc.nodes.reduce((sum, n) => {
+    if (n.nodeType !== 'question') return sum
+    const s = questionScoreOf(n)
+    return s == null ? sum : sum + s
+  }, 0)
 }
 
 // --------------------------------------------------------------------------- //
@@ -498,6 +546,8 @@ function questionInputProps(node: EditorNode): Record<string, unknown> | undefin
   }
   const layout = questionOptionLayoutOf(node)
   if (layout !== 'auto') out.optionLayout = layout
+  const score = questionScoreOf(node)
+  if (score != null) out.score = score
   return Object.keys(out).length ? out : undefined
 }
 

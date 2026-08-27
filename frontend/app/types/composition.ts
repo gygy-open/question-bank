@@ -26,6 +26,7 @@ export interface Composition {
   status: CompositionStatus
   revision: number
   numbering_enabled: boolean
+  scoring_enabled: boolean
   question_display: Record<AnswerFieldKey, boolean>
   scope_type: CompositionScope
   owner_id: number | null
@@ -63,6 +64,7 @@ export interface CompositionMetaUpdatePayload {
   // 显式传 null 表示移出目录（根）。
   folder_id?: number | null
   numbering_enabled?: boolean
+  scoring_enabled?: boolean
   question_display?: Record<AnswerFieldKey, boolean>
 }
 
@@ -102,6 +104,8 @@ export interface QuestionProps {
   show?: Partial<Record<AnswerFieldKey, boolean | null>>
   // 选项排版覆盖（每卷生效）；缺省/'auto' 由内容长度自适应。
   optionLayout?: OptionLayout
+  // 题目分值（0~1000，允许 0.5 步进小数）；仅在组稿 scoring_enabled 为真时展示/可编辑。
+  score?: number | null
 }
 
 // question_details / answer_item 覆盖涉及的四个可发布字段。

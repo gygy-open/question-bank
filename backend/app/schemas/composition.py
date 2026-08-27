@@ -165,8 +165,8 @@ def _validate_question_details_props(props: Optional[Dict[str, Any]]) -> None:
 def _validate_question_props(props: Optional[Dict[str, Any]]) -> None:
     if not props:
         return
-    if set(props.keys()) - {"number", "show", "optionLayout"}:
-        raise ValueError("question props may only contain 'number', 'show' and 'optionLayout'")
+    if set(props.keys()) - {"number", "show", "optionLayout", "score"}:
+        raise ValueError("question props may only contain 'number', 'show', 'optionLayout' and 'score'")
     number = props.get("number")
     if number is not None:
         if not isinstance(number, str):
@@ -185,6 +185,12 @@ def _validate_question_props(props: Optional[Dict[str, Any]]) -> None:
     layout = props.get("optionLayout")
     if layout is not None and (isinstance(layout, bool) or layout not in ("auto", 1, 2, 4)):
         raise ValueError("question props.optionLayout must be one of 'auto', 1, 2, 4")
+    score = props.get("score")
+    if score is not None:
+        if isinstance(score, bool) or not isinstance(score, (int, float)):
+            raise ValueError("question props.score must be a number")
+        if not (0 <= score <= 1000):
+            raise ValueError("question props.score must be between 0 and 1000")
 
 
 def _validate_answer_item_props(props: Optional[Dict[str, Any]]) -> None:
@@ -410,6 +416,7 @@ class CompositionMetaUpdateRequest(BaseModel):
     status: Optional[CompositionStatus] = None
     folder_id: Optional[int] = None
     numbering_enabled: Optional[bool] = None
+    scoring_enabled: Optional[bool] = None
     question_display: Optional[Dict[str, bool]] = None
 
 
@@ -422,6 +429,7 @@ class CompositionRead(BaseModel):
     status: str
     revision: int
     numbering_enabled: bool = False
+    scoring_enabled: bool = False
     question_display: Dict[str, bool] = Field(default_factory=lambda: {k: False for k in ANSWER_FIELD_KEYS})
     scope_type: ScopeType
     owner_id: Optional[int] = None

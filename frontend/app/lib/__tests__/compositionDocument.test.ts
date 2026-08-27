@@ -27,12 +27,17 @@ import {
   questionNodeStatus,
   questionNumberOf,
   questionOptionLayoutOf,
+  questionPropsWithNumber,
   questionPropsWithOptionLayout,
+  questionPropsWithScore,
   questionPropsWithShow,
+  questionScoreOf,
   questionShowOverride,
   removeRootNode,
   resolveOptionColumns,
   snapshotDocument,
+  orderedScorableQuestions,
+  totalScore,
 } from '@/lib/compositionDocument'
 import type { EditorDocument, EditorNode } from '@/lib/compositionDocument'
 import type { CompositionNode, QuestionRevisionStatus } from '@/types/composition'
@@ -270,6 +275,71 @@ describe('题号填充 applyQuestionNumbers / hasAnyQuestionNumber', () => {
     const req = documentToReplaceRequest(filled, 1)
     const qNode = req.nodes.find((n) => n.node_type === 'question')
     expect(qNode!.props).toEqual({ number: '1' })
+  })
+
+  it('自动填充题号时保留已有分值，不被覆盖清空', () => {
+    const q1 = createQuestionNode(fakeQuestion(1))
+    q1.props = questionPropsWithScore(q1, 5)
+    const filled = applyQuestionNumbers(doc([q1]), 'global')
+    expect(questionNumberOf(filled.nodes[0]!)).toBe('1')
+    expect(questionScoreOf(filled.nodes[0]!)).toBe(5)
+  })
+})
+
+describe('赋分 questionScoreOf / questionPropsWithScore', () => {
+  it('未设置时为 null，可写入并读取分值', () => {
+    const q = createQuestionNode(fakeQuestion(1))
+    expect(questionScoreOf(q)).toBeNull()
+    q.props = questionPropsWithScore(q, 2.5)
+    expect(questionScoreOf(q)).toBe(2.5)
+  })
+
+  it('写入分值时保留已有题号', () => {
+    const q = createQuestionNode(fakeQuestion(1))
+    q.props = questionPropsWithNumber(q, '1.1')
+    q.props = questionPropsWithScore(q, 10)
+    expect(questionNumberOf(q)).toBe('1.1')
+    expect(questionScoreOf(q)).toBe(10)
+  })
+
+  it('清除分值（传 null）后题号仍保留', () => {
+    const q = createQuestionNode(fakeQuestion(1))
+    q.props = questionPropsWithScore(q, 10)
+    q.props = questionPropsWithNumber(q, '1')
+    q.props = questionPropsWithScore(q, null)
+    expect(questionScoreOf(q)).toBeNull()
+    expect(questionNumberOf(q)).toBe('1')
+  })
+
+  it('分值随 question 节点序列化进 props', () => {
+    const q1 = createQuestionNode(fakeQuestion(1))
+    q1.props = questionPropsWithScore(q1, 3)
+    const req = documentToReplaceRequest(doc([q1]), 1)
+    const qNode = req.nodes.find((n) => n.node_type === 'question')
+    expect(qNode!.props).toEqual({ score: 3 })
+  })
+})
+
+describe('分数分布 orderedScorableQuestions / totalScore', () => {
+  it('按文档顺序列出 root question 节点的题号与分值', () => {
+    const q1 = createQuestionNode(fakeQuestion(1))
+    q1.props = { number: '1', score: 5 }
+    const q2 = createQuestionNode(fakeQuestion(2))
+    q2.props = { number: '2' }
+    const d = doc([q1, createHeadingNode(2), q2])
+    expect(orderedScorableQuestions(d)).toEqual([
+      { nodeId: q1.id, number: '1', score: 5 },
+      { nodeId: q2.id, number: '2', score: null },
+    ])
+  })
+
+  it('合计仅累加已填分值', () => {
+    const q1 = createQuestionNode(fakeQuestion(1))
+    q1.props = { score: 5 }
+    const q2 = createQuestionNode(fakeQuestion(2))
+    q2.props = { score: 2.5 }
+    const q3 = createQuestionNode(fakeQuestion(3))
+    expect(totalScore(doc([q1, q2, q3]))).toBe(7.5)
   })
 })
 

@@ -17,13 +17,15 @@ import {
 import { toast } from 'vue-sonner'
 import CompositionCanvas from '~/components/composition/CompositionCanvas.vue'
 import CompositionNumberingPanel from '~/components/composition/CompositionNumberingPanel.vue'
+import CompositionScoringPanel from '~/components/composition/CompositionScoringPanel.vue'
 import CompositionQuestionDisplayPanel from '~/components/composition/CompositionQuestionDisplayPanel.vue'
 import CompositionVersionsSheet from '~/components/composition/CompositionVersionsSheet.vue'
 import { useCompositions, CompositionConflictError } from '~/composables/useCompositions'
 import { normalizeScope } from '~/lib/compositions'
 import {
   applyQuestionNumbers, collectDocumentIssues, collectStaleQuestionNodeIds, documentFromNodes,
-  documentToReplaceRequest, hasAnyQuestionNumber, snapshotDocument,
+  documentToReplaceRequest, hasAnyQuestionNumber, orderedScorableQuestions, patchNode,
+  questionPropsWithScore, snapshotDocument, totalScore,
 } from '~/lib/compositionDocument'
 import type { EditorDocument, NumberingMode } from '~/lib/compositionDocument'
 import type { AnswerFieldKey, CompositionDetail, CompositionScope, QuestionRevisionStatus } from '~/types'
@@ -66,9 +68,12 @@ const hasStaleQuestions = computed(
   () => collectStaleQuestionNodeIds(document.value, questionStatus.value).length > 0,
 )
 const numberingEnabled = computed(() => composition.value?.numbering_enabled ?? false)
+const scoringEnabled = computed(() => composition.value?.scoring_enabled ?? false)
 const questionDisplay = computed<Record<AnswerFieldKey, boolean>>(
   () => composition.value?.question_display ?? { answer: false, thinking: false, analysis: false, summary: false },
 )
+const scorableQuestions = computed(() => orderedScorableQuestions(document.value))
+const totalScoreValue = computed(() => totalScore(document.value))
 
 async function load() {
   if (!currentSubjectId.value) {
@@ -217,6 +222,7 @@ function reloadFromServer() {
 }
 
 // 题号开关：即时持久化（bump revision）；开启且无题号时本地按全局顺序预填，待“保存内容”落库。
+// 关闭题号时若赋分已开启，一并级联关闭（后端同样强制该不变量，此处仅为前端即时反馈）。
 async function toggleNumbering(value: boolean) {
   if (!currentSubjectId.value || !composition.value || saving.value) return
   savingMeta.value = true
@@ -225,7 +231,11 @@ async function toggleNumbering(value: boolean) {
       currentSubjectId.value,
       scope.value,
       composition.value.id,
-      { expected_revision: composition.value.revision, numbering_enabled: value },
+      {
+        expected_revision: composition.value.revision,
+        numbering_enabled: value,
+        ...(!value && scoringEnabled.value ? { scoring_enabled: false } : {}),
+      },
     )
     composition.value = { ...composition.value, ...updated }
     if (value && !hasAnyQuestionNumber(document.value)) {
@@ -241,6 +251,41 @@ async function toggleNumbering(value: boolean) {
   } finally {
     savingMeta.value = false
   }
+}
+
+// 赋分开关：即时持久化（bump revision）；要求题号已开启，否则前端直接拦截不发请求。
+async function toggleScoring(value: boolean) {
+  if (!currentSubjectId.value || !composition.value || saving.value) return
+  if (value && !numberingEnabled.value) {
+    toast.error('请先开启题号')
+    return
+  }
+  savingMeta.value = true
+  try {
+    const updated = await api.updateComposition(
+      currentSubjectId.value,
+      scope.value,
+      composition.value.id,
+      { expected_revision: composition.value.revision, scoring_enabled: value },
+    )
+    composition.value = { ...composition.value, ...updated }
+  } catch (err) {
+    if (err instanceof CompositionConflictError && err.kind === 'revision') {
+      editConflict.value = true
+      toast.error('组稿已被他人更新，你的本地修改尚未保存')
+    } else {
+      toast.error('保存失败')
+    }
+  } finally {
+    savingMeta.value = false
+  }
+}
+
+// 单题分值：仅改本地文档 props.score，经“保存内容”落库（与题号同一持久化路径）。
+function updateQuestionScore(nodeId: string, score: number | null) {
+  const node = document.value.nodes.find((n) => n.id === nodeId)
+  if (!node) return
+  document.value = patchNode(document.value, nodeId, { props: questionPropsWithScore(node, score) })
 }
 
 // 题目显示：全局字段开关即时持久化（bump revision）。
@@ -448,12 +493,14 @@ onBeforeRouteLeave(() => {
             :sync-disabled="dirty"
             :syncing="syncingNodes"
             :numbering-enabled="numberingEnabled"
+            :scoring-enabled="scoringEnabled"
             :global-display-fields="questionDisplay"
             @sync="syncNodes"
           />
 
           <p class="text-xs text-muted-foreground">
             科目：{{ currentSubject?.name || '—' }} · 修订版本 r{{ composition.revision }}
+            <template v-if="scoringEnabled"> · 总分 {{ totalScoreValue }} 分</template>
           </p>
         </div>
 
@@ -463,6 +510,14 @@ onBeforeRouteLeave(() => {
             :disabled="saving"
             @update:enabled="toggleNumbering"
             @autofill="autofillNumbers"
+          />
+          <CompositionScoringPanel
+            :enabled="scoringEnabled"
+            :numbering-enabled="numberingEnabled"
+            :disabled="saving"
+            :items="scorableQuestions"
+            @update:enabled="toggleScoring"
+            @update-score="updateQuestionScore"
           />
           <CompositionQuestionDisplayPanel
             :fields="questionDisplay"

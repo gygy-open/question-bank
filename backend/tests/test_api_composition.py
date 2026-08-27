@@ -341,7 +341,45 @@ async def test_numbering_enabled_defaults_false_and_toggles(client, ctx):
     assert got["numbering_enabled"] is True
 
 
-async def test_question_display_defaults_and_updates(client, ctx):
+async def test_scoring_enabled_requires_numbering_and_cascades_off(client, ctx):
+    sid = ctx["subject"].id
+    h = _auth(ctx["user"])
+
+    comp = (await client.post(
+        f"{API}/subjects/{sid}/compositions?scope=shared", json={"title": "赋分"}, headers=h
+    )).json()
+    assert comp["scoring_enabled"] is False
+
+    # 题号未开启时开启赋分 → 400。
+    r = await client.patch(
+        f"{API}/subjects/{sid}/compositions/{comp['id']}?scope=shared",
+        json={"expected_revision": 1, "scoring_enabled": True},
+        headers=h,
+    )
+    assert r.status_code == 400
+
+    # 同一请求内一并开启题号与赋分 → 成功。
+    r = await client.patch(
+        f"{API}/subjects/{sid}/compositions/{comp['id']}?scope=shared",
+        json={"expected_revision": 1, "numbering_enabled": True, "scoring_enabled": True},
+        headers=h,
+    )
+    assert r.status_code == 200, r.text
+    assert r.json()["numbering_enabled"] is True
+    assert r.json()["scoring_enabled"] is True
+
+    # 仅关闭题号(未显式提及赋分) → 赋分级联关闭。
+    r = await client.patch(
+        f"{API}/subjects/{sid}/compositions/{comp['id']}?scope=shared",
+        json={"expected_revision": 2, "numbering_enabled": False},
+        headers=h,
+    )
+    assert r.status_code == 200, r.text
+    assert r.json()["numbering_enabled"] is False
+    assert r.json()["scoring_enabled"] is False
+
+
+
     sid = ctx["subject"].id
     h = _auth(ctx["user"])
 
