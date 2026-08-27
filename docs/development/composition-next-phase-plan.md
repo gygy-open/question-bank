@@ -1,4 +1,4 @@
-# 组稿系统导出与 Paper 迁移实施计划
+# 组稿系统导出实施计划
 
 ## 1. 背景
 
@@ -17,7 +17,9 @@
 
 本计划撰写后，草稿态编辑体验又新增了题号、赋分、题目级字段显隐覆盖、选项排版等能力（详见 3.1 末尾“待补口径”），这些能力目前只影响画布编辑，尚未在 `finalize_version`/Snapshot 中被完整冻结，导出实现启动前必须先补齐。
 
-下一阶段目标是让 `CompositionVersion.snapshot` 成为正式发布和导出的唯一输入，并完成旧 Paper 的一次性迁移准备。当前 AST 与模块契约视为本阶段的稳定输入，不在导出实现中重新设计。
+下一阶段目标是让 `CompositionVersion.snapshot` 成为正式发布和导出的唯一输入。当前 AST 与模块契约视为本阶段的稳定输入，不在导出实现中重新设计。
+
+旧版 Paper 不再规划自动化数据迁移：已决定不编写 Paper→Composition 的迁移脚本，改为在 Paper 相关页面直接提示用户该功能即将停用，引导其手动将内容迁移到组稿工作台（详见第 6 节）。
 
 ## 2. 阶段目标
 
@@ -29,7 +31,7 @@
 4. `question_details` 使用定稿时冻结的 `answer_item.source_question_node_id` 解析源 Question 节点，不得重新查询当前题库。
 5. 导出过程不得依赖实时 Question 数据。
 6. 前端版本预览页提供导出入口和完整状态反馈。
-7. 建立 Paper 到 Composition 的数据迁移程序、校验报告和回滚方案。
+7. 在 Paper 列表页、编辑页及题库“加入试卷”相关入口，展示旧版试卷即将停用的提示，并引导用户前往组稿工作台。
 
 ### 2.2 本阶段不做
 
@@ -40,6 +42,7 @@
 - 多栏布局。
 - PDF 原生渲染。
 - 模板市场。
+- Paper 到 Composition 的自动化数据迁移（已决定放弃，改为提示用户手动迁移，见第 6 节）。
 
 ## 3. 架构原则
 
@@ -246,48 +249,31 @@ backend/app/services/exporting/composition_assemble.py
 
 可允许样式差异，不允许内容差异。截至目前，只读版本预览用的 `SnapshotRenderer.vue` 尚未渲染题号（`props.number`）、分值（`props.score`）以及题目级内联 `show` 字段——这些是画布编辑器新增的能力，早于 Snapshot 顶层口径问题（见 3.1）被引入。在实现 CompositionAssembler/Renderer 之前，应先补齐 `SnapshotRenderer` 对这些字段的渲染，作为导出实现的可视化基线；两者应共用同一套 effective show/layout 解析逻辑（如 `frontend/app/lib/compositionDocument.ts` 中的 `effectiveQuestionField`/`resolveOptionColumns`），避免各自重复实现产生偏差。
 
-## 6. Paper 迁移计划
+## 6. Paper 停用提示计划
 
-### 6.1 迁移规则
+### 6.1 决策
 
-每个 Paper 转为一个 Personal Composition：
+不再为旧版 Paper 编写自动化数据迁移脚本（不做 audit/migrate/verify）。原因：Paper 数据结构简单、存量有限，由用户手动在组稿工作台重建成本可控，维护一套一次性迁移/回滚工具链的成本更高。
 
-| Paper 字段 | Composition 字段 |
-|---|---|
-| `owner_id` | `owner_id` |
-| `subject_id` | `subject_id` |
-| `title` | `title` |
-| `description` | `description` |
-| `status` | `status` |
+改为在旧版 Paper 相关页面直接展示停用提示，引导用户尽快手动迁移，避免后续下线后数据不可访问。
 
-`paper_questions` 按 `sequence` 转换：
+### 6.2 提示范围
 
-- `section_title` 非空且与前一项不同：插入 `heading` 节点。
-- 每条关联插入一个 `question` 节点，并在迁移脚本中生成 UUID。
-- `score` 放入 Question 节点中性展示属性；如果当前 Node Schema 尚未支持分值，应先补充 `props.score` 契约。
+以下位置需要展示统一措辞的停用提示（“试卷（旧版）功能即将停用，请尽快……迁移到组稿工作台，以免更新后无法使用”），并提供跳转到 `/compositions/personal` 的入口：
 
-### 6.2 迁移策略
+- `frontend/app/pages/papers/index.vue`（试卷列表页顶部）。
+- `frontend/app/pages/papers/[id]/edit.vue`（试卷编辑页顶部）。
+- `frontend/app/components/PaperQuickSelector.vue`（题库“加入试卷”快捷面板）。
+- `frontend/app/components/PaperFullSelector.vue`（题库“加入试卷”完整对话框）。
 
-迁移分三步运行：
+侧边栏导航项已标注为“我的试卷（旧版）”。
 
-1. `audit`：只检查，不写数据。
-2. `migrate`：事务式批量迁移并记录 Paper 与 Composition 映射。
-3. `verify`：逐条比较标题、学科、Owner、题目数量、顺序、大题标题和分值。
+### 6.3 后续下线步骤
 
-迁移脚本必须可重复运行，不得重复创建 Composition。建议建立临时映射表或为 Composition 增加仅迁移使用的来源标识；具体方案在编码前通过 ADR 确认。
-
-### 6.3 切换顺序
-
-1. 完成并验证 Composition 导出。
-2. 在测试环境运行 Paper 审计与迁移。
-3. 前端题库“加入试卷”入口替换为“插入组稿”。
-4. 生产环境备份数据库。
-5. 运行迁移和 verify。
-6. 隐藏旧 Paper 导航和写入口。
-7. 保留旧表一个发布周期，仅只读回滚使用。
-8. 验收通过后再创建删除旧表的独立迁移。
-
-不得在同一迁移中同时迁移数据并删除 Paper 表。
+1. 完成并验证 Composition 导出（第 1-5 节）。
+2. 上线本节的停用提示，观察一个发布周期，视需要跟进公告或站内信提醒仍有存量 Paper 的用户。
+3. 确认活跃 Paper 数据清零或用户已知情后，评估隐藏旧 Paper 导航和写入口。
+4. 保留旧表至少一个发布周期只读，不在本阶段创建删除旧表的迁移。
 
 ## 7. 建议实施顺序
 
@@ -298,9 +284,7 @@ backend/app/services/exporting/composition_assemble.py
 5. 增加版本导出 API 和权限测试。
 6. 增加前端导出入口。
 7. 执行跨格式金丝雀测试。
-8. 编写 Paper audit/migrate/verify 脚本。
-9. 在副本数据库演练迁移和回滚。
-10. 切换题库入口及旧 Paper 导航。
+8. 在 Paper 列表页、编辑页及“加入试卷”入口上线停用提示（见第 6 节）。
 
 ## 8. 完成定义
 
@@ -310,7 +294,7 @@ backend/app/services/exporting/composition_assemble.py
 - 导出过程中没有实时 Question 查询。
 - 旧版本在题库修改或删除后仍能复现。
 - SnapshotRenderer 与两个导出格式的内容语义一致。
-- Paper 迁移审计、迁移、验证和回滚均在数据库副本演练通过。
+- Paper 停用提示已在列表页、编辑页及“加入试卷”入口上线。
 - 后端全套测试、前端全套测试、静态生成及 MySQL 迁移测试通过。
 - 验收文档中的 P0 与 P1 用例全部通过。
 
@@ -321,7 +305,6 @@ backend/app/services/exporting/composition_assemble.py
 | Snapshot JSON 体积较大 | 版本列表禁止返回 snapshot；只在详情和导出读取 |
 | DOCX 与 LaTeX 内容不一致 | 共用 CompositionAssembler 与 ExportDocument |
 | 图片资源失效 | 定稿时验证资源可访问；后续考虑资源归档 |
-| 迁移产生重复数据 | 幂等来源映射与 verify 报告 |
-| Paper 一次性下线无法回滚 | 旧表保留一个发布周期，写入口先关闭 |
+| 用户未及时手动迁移 Paper 内容 | 停用提示常驻列表页/编辑页/加入试卷入口；下线前至少保留一个发布周期 |
 | 未知 Node/Module 被忽略 | assembler 显式报错并返回 node UUID、slot 与 position |
 | 大组稿导出超时 | 压测后超过阈值转后台任务，不提前引入复杂队列 |

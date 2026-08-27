@@ -7,7 +7,7 @@ import { ScrollArea } from '@/components/ui/scroll-area'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { Search, Check, Plus, Loader2 } from '@lucide/vue'
+import { Search, Check, Plus, Loader2, TriangleAlert } from '@lucide/vue'
 import { toast } from 'vue-sonner'
 import { usePapers } from '@/composables/usePapers'
 import { formatRelativeTime } from '@/lib/utils'
@@ -101,6 +101,11 @@ const createNewPaper = async () => {
           将 {{ questionIds.length }} 道题加入试卷
         </DialogDescription>
       </DialogHeader>
+
+      <div class="flex items-start gap-1.5 rounded-md bg-muted/50 px-3 py-2 text-xs text-muted-foreground">
+        <TriangleAlert class="h-3.5 w-3.5 mt-0.5 flex-shrink-0" />
+        <span>试卷（旧版）即将停用，建议改用组稿工作台。</span>
+      </div>
 
       <div class="relative">
         <Search class="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />

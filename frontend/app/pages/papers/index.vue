@@ -17,8 +17,9 @@ import {
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
+import { Alert, AlertDescription } from '@/components/ui/alert'
 import {
-  Plus, MoreVertical, Pencil, Copy, Archive, ArchiveRestore, Trash2, FileText, Clock, Edit, Loader2,
+  Plus, MoreVertical, Pencil, Copy, Archive, ArchiveRestore, Trash2, FileText, Clock, Edit, Loader2, TriangleAlert,
 } from '@lucide/vue'
 import { toast } from 'vue-sonner'
 import { usePapers } from '~/composables/usePapers'
@@ -152,6 +153,16 @@ const deletePaper = async (paper: Paper) => {
   </PageHeader>
 
   <div class="flex flex-1 flex-col px-4 py-6 space-y-6">
+    <Alert class="items-center [&>svg]:translate-y-0">
+      <TriangleAlert class="h-4 w-4" />
+      <AlertDescription class="flex items-center justify-between gap-2 flex-wrap">
+        <span class="text-sm">试卷（旧版）功能即将停用，请尽快将试卷手动迁移到组稿工作台，以免更新后无法使用。</span>
+        <Button size="sm" variant="outline" as-child>
+          <NuxtLink to="/compositions/personal">前往组稿工作台</NuxtLink>
+        </Button>
+      </AlertDescription>
+    </Alert>
+
     <div class="flex items-center justify-between gap-4 flex-wrap">
       <Tabs :model-value="activeTab" @update:model-value="onTabChange">
         <TabsList>

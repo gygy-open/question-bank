@@ -18,8 +18,9 @@ import {
 import { Checkbox } from '@/components/ui/checkbox'
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
 import {
-  ArrowLeft, Download, Loader2, CheckCircle, Plus, FileDown, Trash2, Heading2, GripVertical,
+  ArrowLeft, Download, Loader2, CheckCircle, Plus, FileDown, Trash2, Heading2, GripVertical, TriangleAlert,
 } from '@lucide/vue'
+import { Alert, AlertDescription } from '@/components/ui/alert'
 import { toast } from 'vue-sonner'
 import PaperQuestionCard from '@/components/PaperQuestionCard.vue'
 import PaperQuestionDetailSheet from '@/components/PaperQuestionDetailSheet.vue'
@@ -354,6 +355,16 @@ watch(
         </div>
       </div>
     </div>
+
+    <Alert class="rounded-none border-x-0 border-t-0 items-center [&>svg]:translate-y-0">
+      <TriangleAlert class="h-4 w-4" />
+      <AlertDescription class="flex items-center justify-between gap-2 flex-wrap px-4">
+        <span class="text-sm">试卷（旧版）功能即将停用，请尽快将本试卷手动迁移到组稿工作台，以免更新后无法使用。</span>
+        <Button size="sm" variant="outline" as-child>
+          <NuxtLink to="/compositions/personal">前往组稿工作台</NuxtLink>
+        </Button>
+      </AlertDescription>
+    </Alert>
 
     <!-- Main -->
     <div class="flex flex-1 overflow-hidden">

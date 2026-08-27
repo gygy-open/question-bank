@@ -96,21 +96,13 @@ const navActiveClass = 'border-l-2 border-transparent data-[active=true]:border-
       <SidebarGroup>
         <SidebarGroupContent class="flex flex-col gap-3">
           <div>
-            <SidebarGroupLabel>内容</SidebarGroupLabel>
+            <SidebarGroupLabel>素材</SidebarGroupLabel>
             <SidebarMenu>
               <SidebarMenuItem>
                 <SidebarMenuButton as-child :is-active="route.path === '/questions'" :class="navActiveClass">
                   <NuxtLink to="/questions">
                     <BookOpen />
                     <span>题目管理</span>
-                  </NuxtLink>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-              <SidebarMenuItem>
-                <SidebarMenuButton as-child :is-active="route.path.startsWith('/papers')" :class="navActiveClass">
-                  <NuxtLink to="/papers">
-                    <ClipboardList />
-                    <span>我的试卷（旧版）</span>
                   </NuxtLink>
                 </SidebarMenuButton>
               </SidebarMenuItem>
@@ -141,6 +133,15 @@ const navActiveClass = 'border-l-2 border-transparent data-[active=true]:border-
                   <NuxtLink to="/compositions/personal">
                     <Lock />
                     <span>个人空间</span>
+                  </NuxtLink>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+
+              <SidebarMenuItem>
+                <SidebarMenuButton as-child :is-active="route.path.startsWith('/papers')" :class="navActiveClass">
+                  <NuxtLink to="/papers">
+                    <ClipboardList />
+                    <span>我的试卷（旧版）</span>
                   </NuxtLink>
                 </SidebarMenuButton>
               </SidebarMenuItem>

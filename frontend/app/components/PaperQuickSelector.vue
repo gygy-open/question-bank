@@ -3,7 +3,7 @@ import { ref } from 'vue'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { ShoppingBasket, Clock, Plus, List, Loader2, CheckCircle } from '@lucide/vue'
+import { ShoppingBasket, Clock, Plus, List, Loader2, CheckCircle, TriangleAlert } from '@lucide/vue'
 import { toast } from 'vue-sonner'
 import { usePapers } from '@/composables/usePapers'
 import type { Paper } from '~/types'
@@ -94,6 +94,10 @@ const onKey = (e: KeyboardEvent) => {
       </div>
 
       <div v-else class="divide-y">
+        <div class="px-3 py-2 text-xs text-muted-foreground bg-muted/50 flex items-start gap-1.5">
+          <TriangleAlert class="h-3.5 w-3.5 mt-0.5 flex-shrink-0" />
+          <span>试卷（旧版）即将停用，建议改用组稿工作台。</span>
+        </div>
         <div class="p-2 space-y-1">
           <div class="px-2 py-1 text-xs font-medium text-muted-foreground flex items-center gap-1">
             <Clock class="h-3 w-3" />
