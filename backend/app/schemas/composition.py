@@ -27,6 +27,8 @@ from app.models.composition import (
     REFERENCE_NODE_TYPES,
     ScopeType,
 )
+from app.schemas.paper import OutputFormat
+from app.schemas.user import User
 from app.services.question_content import validate_rich_doc
 
 # question_details 汇总 / answer_item override 涉及的四个可发布字段。
@@ -497,6 +499,12 @@ class CompositionVersionCreateRequest(BaseModel):
     label: Optional[str] = None
 
 
+class CompositionExportRequest(BaseModel):
+    """版本导出请求体:format 决定渲染器,title 可选覆盖导出文件里的标题。"""
+    format: OutputFormat
+    title: Optional[str] = None
+
+
 # --------------------------------------------------------------------------- #
 # Version / Event (只读投影)
 # --------------------------------------------------------------------------- #
@@ -543,4 +551,10 @@ class CompositionEventRead(BaseModel):
     payload: Optional[Dict[str, Any]] = None
     batch_id: Optional[str] = None
     actor_id: int
+    actor: Optional[User] = None
     created_at: datetime
+
+
+class CompositionEventPage(BaseModel):
+    items: List[CompositionEventRead]
+    has_more: bool

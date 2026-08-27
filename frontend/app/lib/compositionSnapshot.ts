@@ -95,3 +95,27 @@ export function resolveModuleAnswerItems(
   }
   return out
 }
+
+/** 题号：仅当定稿时刻冻结的 numbering_enabled 为真才输出;旧快照缺失该字段视为关闭。 */
+export function resolvedQuestionNumber(node: SnapshotQuestionNode, snapshot: CompositionSnapshotV2): string {
+  if (!snapshot.numbering_enabled) return ''
+  return node.props?.number ?? ''
+}
+
+/** 分值：仅当定稿时刻冻结的 scoring_enabled 为真才输出;旧快照缺失该字段视为关闭。 */
+export function resolvedQuestionScore(node: SnapshotQuestionNode, snapshot: CompositionSnapshotV2): number | null {
+  if (!snapshot.scoring_enabled) return null
+  const s = node.props?.score
+  return typeof s === 'number' ? s : null
+}
+
+/** 题目级 show 覆盖 ?? 定稿时刻冻结的全局默认;旧快照缺失 question_display 视为全局默认全部隐藏。 */
+export function effectiveQuestionDisplay(
+  node: SnapshotQuestionNode,
+  snapshot: CompositionSnapshotV2,
+  key: AnswerFieldKey,
+): boolean {
+  const override = node.props?.show?.[key]
+  if (typeof override === 'boolean') return override
+  return Boolean(snapshot.question_display?.[key])
+}

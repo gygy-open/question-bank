@@ -73,6 +73,20 @@ export function compositionVersionItemPath(
   return `${compositionVersionsPath(subjectId, compositionId)}/${versionNo}`
 }
 
+/** 版本导出路径（DOCX/LaTeX）。 */
+export function compositionVersionExportPath(
+  subjectId: number,
+  compositionId: number,
+  versionNo: number,
+): string {
+  return `${compositionVersionItemPath(subjectId, compositionId, versionNo)}/export`
+}
+
+/** /subjects/{id}/compositions/{cid}/events 时间线路径。 */
+export function compositionEventsPath(subjectId: number, compositionId: number): string {
+  return `${compositionItemPath(subjectId, compositionId)}/events`
+}
+
 /** 把顶层过滤器渲染为组稿列表的 query（省略空值）。 */
 export function compositionListQuery(params: {
   scope: CompositionScope

@@ -9,6 +9,7 @@ import {
   compositionRestorePath,
   compositionVersionsPath,
   compositionVersionItemPath,
+  compositionEventsPath,
   compositionListQuery,
   buildFolderTree,
   folderBreadcrumb,
@@ -58,6 +59,10 @@ describe('URL 构建', () => {
   it('版本集合与单版本路径', () => {
     expect(compositionVersionsPath(7, 9)).toBe('/subjects/7/compositions/9/versions')
     expect(compositionVersionItemPath(7, 9, 3)).toBe('/subjects/7/compositions/9/versions/3')
+  })
+
+  it('时间线路径', () => {
+    expect(compositionEventsPath(7, 9)).toBe('/subjects/7/compositions/9/events')
   })
 })
 

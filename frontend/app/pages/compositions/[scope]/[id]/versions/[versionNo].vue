@@ -4,16 +4,18 @@ import { ref, computed, onMounted, watch } from 'vue'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Separator } from '@/components/ui/separator'
-import { ArrowLeft, Loader2, Users, Lock, AlertTriangle } from '@lucide/vue'
+import { ArrowLeft, Download, Loader2, Users, Lock, AlertTriangle } from '@lucide/vue'
 import { toast } from 'vue-sonner'
 import SnapshotRenderer from '~/components/composition/SnapshotRenderer.vue'
+import { useCompositionExport } from '~/composables/useCompositionExport'
 import { useCompositions } from '~/composables/useCompositions'
 import { normalizeScope } from '~/lib/compositions'
-import type { CompositionScope, CompositionVersionDetail } from '~/types'
+import type { CompositionExportFormat, CompositionScope, CompositionVersionDetail } from '~/types'
 
 const route = useRoute()
 const router = useRouter()
 const api = useCompositions()
+const exportApi = useCompositionExport()
 const { currentSubjectId } = useSubjectContext()
 
 const scope = computed<CompositionScope>(() => normalizeScope(route.params.scope))
@@ -58,6 +60,19 @@ watch([currentSubjectId, scope, compositionId, versionNo], load)
 function backToEditor() {
   router.push(editorPath.value)
 }
+
+function doExport(format: CompositionExportFormat) {
+  if (!version.value || !currentSubjectId.value) return
+  exportApi.downloadVersion({
+    subjectId: currentSubjectId.value,
+    scope: scope.value,
+    compositionId: compositionId.value,
+    versionNo: versionNo.value,
+    title: version.value.title,
+    format,
+    onNotFound: () => router.push(editorPath.value),
+  })
+}
 </script>
 
 <template>
@@ -75,6 +90,24 @@ function backToEditor() {
       <component :is="scope === 'shared' ? Users : Lock" class="h-3 w-3" />
       {{ scope === 'shared' ? '共享' : '个人' }}
     </Badge>
+    <Button
+      v-if="version" size="sm" variant="outline"
+      :disabled="exportApi.isExporting(compositionId, versionNo, 'docx') || exportApi.isExporting(compositionId, versionNo, 'latex')"
+      @click="doExport('docx')"
+    >
+      <Loader2 v-if="exportApi.isExporting(compositionId, versionNo, 'docx')" class="mr-2 h-4 w-4 animate-spin" />
+      <Download v-else class="mr-2 h-4 w-4" />
+      导出 Word
+    </Button>
+    <Button
+      v-if="version" size="sm" variant="outline"
+      :disabled="exportApi.isExporting(compositionId, versionNo, 'docx') || exportApi.isExporting(compositionId, versionNo, 'latex')"
+      @click="doExport('latex')"
+    >
+      <Loader2 v-if="exportApi.isExporting(compositionId, versionNo, 'latex')" class="mr-2 h-4 w-4 animate-spin" />
+      <Download v-else class="mr-2 h-4 w-4" />
+      导出 LaTeX
+    </Button>
   </header>
 
   <div class="flex flex-1 flex-col px-4 py-6">
@@ -90,6 +123,9 @@ function backToEditor() {
           <Badge variant="secondary">只读版本</Badge>
         </div>
         <p v-if="version.label" class="text-sm text-muted-foreground">{{ version.label }}</p>
+        <p class="text-xs text-muted-foreground">
+          以下内容是定稿时刻冻结的快照，可能不含之后对草稿的修改；如需最新内容请回到编辑页重新定稿。
+        </p>
         <div class="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
           <span>版本号 v{{ version.version_no }}</span>
           <span>定稿时间 {{ formatTime(version.finalized_at) }}</span>

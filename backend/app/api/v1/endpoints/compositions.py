@@ -4,9 +4,12 @@
 范围经 query 参数 scope=shared|personal 选择。所有取用/修改都通过 scoped 查询强制
 subject/scope/owner,personal 强制 owner_id=current_user.id;不做 Block patch / 定稿。
 """
+import os
 from typing import Any, List, Optional, Tuple
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi.responses import FileResponse
+from starlette.background import BackgroundTask
 
 from app import crud, models
 from app.api import deps
@@ -15,6 +18,8 @@ from app.models.composition import ScopeType
 from app.schemas.composition import (
     CompositionCreateRequest,
     CompositionDetail,
+    CompositionEventPage,
+    CompositionExportRequest,
     CompositionMetaUpdateRequest,
     CompositionNodesReplaceRequest,
     CompositionNodesReplaceResponse,
@@ -29,7 +34,10 @@ from app.schemas.composition import (
     FolderUpdateRequest,
     QuestionRevisionStatus,
 )
+from app.schemas.paper import OutputFormat
 from app.services import composition_service
+from app.services.exporting.composition_assemble import CompositionAssembler, CompositionExportError
+from app.services.exporting.composition_registry import composition_renderer_for
 
 router = APIRouter()
 
@@ -510,3 +518,83 @@ async def get_composition_version(
     if version is None:
         raise HTTPException(status_code=404, detail="Version not found")
     return version
+
+
+@router.post("/{subject_id}/compositions/{composition_id}/versions/{version_no}/export")
+async def export_composition_version(
+    subject_id: int,
+    composition_id: int,
+    version_no: int,
+    payload: CompositionExportRequest,
+    db: deps.SessionDep,
+    scope: ScopeType = Query(...),
+    current_user: models.User = Depends(deps.get_current_active_user),
+) -> Any:
+    await _scoped_composition_for_versions(
+        db,
+        subject_id=subject_id,
+        composition_id=composition_id,
+        scope=scope,
+        current_user=current_user,
+    )
+    version = await crud_composition.composition.get_version(
+        db, composition_id=composition_id, version_no=version_no
+    )
+    if version is None:
+        raise HTTPException(status_code=404, detail="Version not found")
+
+    try:
+        export_doc = CompositionAssembler().assemble(version.snapshot)
+    except CompositionExportError as exc:
+        raise HTTPException(
+            status_code=422,
+            detail={
+                "detail": exc.detail,
+                "node_id": exc.node_id,
+                "node_type": exc.node_type,
+                "version_no": version_no,
+            },
+        ) from exc
+
+    if payload.title:
+        export_doc.title = payload.title
+
+    file_path = composition_renderer_for(payload.format).render(export_doc)
+    suffix = "-latex.zip" if payload.format == OutputFormat.LATEX else f".{payload.format.value}"
+    filename = f"{export_doc.title}-v{version_no}{suffix}"
+
+    def cleanup() -> None:
+        if os.path.exists(file_path):
+            os.remove(file_path)
+
+    return FileResponse(path=file_path, filename=filename, background=BackgroundTask(cleanup))
+
+
+# --------------------------------------------------------------------------- #
+# Composition Events (时间线)
+# --------------------------------------------------------------------------- #
+@router.get(
+    "/{subject_id}/compositions/{composition_id}/events",
+    response_model=CompositionEventPage,
+)
+async def list_composition_events(
+    subject_id: int,
+    composition_id: int,
+    db: deps.SessionDep,
+    scope: ScopeType = Query(...),
+    before_id: Optional[int] = None,
+    limit: int = Query(30, ge=1, le=100),
+    current_user: models.User = Depends(deps.get_current_active_user),
+) -> Any:
+    """时间线只读查询;可见性与版本历史一致(含软删除稿),游标翻页按 id 倒序。"""
+    await _scoped_composition_for_versions(
+        db,
+        subject_id=subject_id,
+        composition_id=composition_id,
+        scope=scope,
+        current_user=current_user,
+    )
+    events, has_more = await crud_composition.composition.list_events(
+        db, composition_id=composition_id, before_id=before_id, limit=limit
+    )
+    return CompositionEventPage(items=events, has_more=has_more)

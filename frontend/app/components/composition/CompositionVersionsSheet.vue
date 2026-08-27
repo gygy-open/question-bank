@@ -6,10 +6,14 @@ import {
 } from '@/components/ui/sheet'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
+import {
+  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
-import { Loader2, History, RefreshCw, ChevronRight, AlertTriangle } from '@lucide/vue'
+import { Download, Loader2, History, RefreshCw, ChevronRight, AlertTriangle } from '@lucide/vue'
+import { useCompositionExport } from '~/composables/useCompositionExport'
 import { useCompositions } from '~/composables/useCompositions'
-import type { CompositionScope, CompositionVersionSummary } from '~/types'
+import type { CompositionExportFormat, CompositionScope, CompositionVersionSummary } from '~/types'
 
 const props = defineProps<{
   subjectId: number
@@ -20,10 +24,27 @@ const props = defineProps<{
 const open = defineModel<boolean>('open', { default: false })
 
 const api = useCompositions()
+const exportApi = useCompositionExport()
 const loading = ref(false)
 const error = ref(false)
 const versions = ref<CompositionVersionSummary[]>([])
 const loaded = ref(false)
+
+function isRowExporting(versionNo: number): boolean {
+  return exportApi.isExporting(props.compositionId, versionNo, 'docx')
+    || exportApi.isExporting(props.compositionId, versionNo, 'latex')
+}
+
+function download(v: CompositionVersionSummary, format: CompositionExportFormat) {
+  exportApi.downloadVersion({
+    subjectId: props.subjectId,
+    scope: props.scope,
+    compositionId: props.compositionId,
+    versionNo: v.version_no,
+    title: v.title,
+    format,
+  })
+}
 
 async function load() {
   loading.value = true
@@ -59,7 +80,7 @@ function formatTime(iso: string): string {
         <SheetTitle class="flex items-center gap-2">
           <History class="h-4 w-4" /> 版本历史
         </SheetTitle>
-        <SheetDescription>定稿后冻结的不可变版本，点击可打开只读预览。</SheetDescription>
+        <SheetDescription>定稿后冻结的不可变版本，内容为定稿时刻的快照，可能不含之后的草稿改动。</SheetDescription>
       </SheetHeader>
 
       <div class="flex-1 overflow-y-auto px-4 pb-4">
@@ -90,10 +111,10 @@ function formatTime(iso: string): string {
 
         <!-- 列表（安静列表，非卡片墙） -->
         <ul v-else class="divide-y">
-          <li v-for="v in versions" :key="v.id">
+          <li v-for="v in versions" :key="v.id" class="flex items-center gap-1">
             <NuxtLink
               :to="`/compositions/${scope}/${compositionId}/versions/${v.version_no}`"
-              class="flex items-center gap-3 py-3 transition-colors hover:bg-muted/50"
+              class="flex min-w-0 flex-1 items-center gap-3 rounded-md py-3 transition-colors hover:bg-muted/50"
             >
               <Badge variant="outline" class="shrink-0 font-mono">v{{ v.version_no }}</Badge>
               <div class="min-w-0 flex-1">
@@ -114,6 +135,18 @@ function formatTime(iso: string): string {
               </TooltipProvider>
               <ChevronRight class="h-4 w-4 shrink-0 text-muted-foreground" />
             </NuxtLink>
+            <DropdownMenu>
+              <DropdownMenuTrigger as-child>
+                <Button variant="ghost" size="icon" class="h-8 w-8 shrink-0" :disabled="isRowExporting(v.version_no)">
+                  <Loader2 v-if="isRowExporting(v.version_no)" class="h-4 w-4 animate-spin" />
+                  <Download v-else class="h-4 w-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem @click="download(v, 'docx')">下载 Word</DropdownMenuItem>
+                <DropdownMenuItem @click="download(v, 'latex')">下载 LaTeX</DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </li>
         </ul>
       </div>

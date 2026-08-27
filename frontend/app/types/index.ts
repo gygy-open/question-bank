@@ -54,6 +54,8 @@ export type {
   CompositionVersionCreatePayload,
   CompositionVersionSummary,
   CompositionVersionDetail,
+  CompositionExportFormat,
+  CompositionExportPayload,
   CompositionSnapshotV2,
   QuestionSnapshot,
   SnapshotNode,
@@ -63,6 +65,10 @@ export type {
   SnapshotPageBreakNode,
   SnapshotQuestionDetailsNode,
   SnapshotAnswerItemNode,
+  CompositionEventType,
+  CompositionEventActor,
+  CompositionEvent,
+  CompositionEventPage,
 } from './composition'
 export {
   ANSWER_FIELD_KEYS,

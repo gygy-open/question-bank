@@ -1,6 +1,8 @@
 import type {
   Composition,
   CompositionCreatePayload,
+  CompositionEventPage,
+  CompositionExportPayload,
   CompositionNodesReplaceRequest,
   CompositionNodesReplaceResponse,
   CompositionDetail,
@@ -17,12 +19,14 @@ import type {
   QuestionRevisionStatus,
 } from '@/types/composition'
 import {
+  compositionEventsPath,
   compositionNodesPath,
   compositionItemPath,
   compositionListQuery,
   compositionQuestionNodesSyncPath,
   compositionQuestionRevisionsPath,
   compositionRestorePath,
+  compositionVersionExportPath,
   compositionVersionItemPath,
   compositionVersionsPath,
   folderItemPath,
@@ -270,6 +274,38 @@ export function useCompositions() {
       { query: { scope } },
     )
 
+  // 版本导出（DOCX/LaTeX）：返回二进制 Blob，调用方负责触发浏览器下载。
+  const exportVersion = (
+    subjectId: number,
+    scope: CompositionScope,
+    compositionId: number,
+    versionNo: number,
+    payload: CompositionExportPayload,
+  ) =>
+    $api<Blob>(
+      compositionVersionExportPath(subjectId, compositionId, versionNo),
+      { method: 'POST', query: { scope }, body: payload, responseType: 'blob' },
+    )
+
+  // ---------------------------------------------------------------- Events //
+  // 时间线：游标分页（beforeId + limit），按 id 倒序（最新在前）。
+  const listEvents = (
+    subjectId: number,
+    scope: CompositionScope,
+    compositionId: number,
+    params?: { beforeId?: number; limit?: number },
+  ) =>
+    $api<CompositionEventPage>(
+      compositionEventsPath(subjectId, compositionId),
+      {
+        query: {
+          scope,
+          before_id: params?.beforeId,
+          limit: params?.limit,
+        },
+      },
+    )
+
   return {
     listFolders,
     createFolder,
@@ -287,5 +323,7 @@ export function useCompositions() {
     finalizeVersion,
     listVersions,
     getVersion,
+    exportVersion,
+    listEvents,
   }
 }

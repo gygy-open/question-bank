@@ -9,7 +9,8 @@ import { Badge } from '@/components/ui/badge'
 import { FileQuestion, ListChecks, AlertTriangle } from '@lucide/vue'
 import { questionTypeLabel } from '@/lib/answerFormat'
 import {
-  buildSnapshotTree, effectiveAnswerFields, snapshotQuestionNodeMap,
+  buildSnapshotTree, effectiveAnswerFields, effectiveQuestionDisplay,
+  resolvedQuestionNumber, resolvedQuestionScore, snapshotQuestionNodeMap,
 } from '@/lib/compositionSnapshot'
 import { headingClassFor, questionOptionLayoutOf, resolveOptionColumns } from '@/lib/compositionDocument'
 import type { SnapshotTreeNode } from '@/lib/compositionSnapshot'
@@ -45,6 +46,10 @@ function optionColumnsOf(node: SnapshotQuestionNode): number {
     layout === 1 || layout === 2 || layout === 4 ? layout : 'auto',
   )
 }
+
+function anyQuestionFieldVisible(node: SnapshotQuestionNode): boolean {
+  return ANSWER_FIELD_KEYS.some((k) => effectiveQuestionDisplay(node, props.snapshot, k))
+}
 function moduleFieldsVisible(
   moduleNode: SnapshotTreeNode,
   child: SnapshotAnswerItemNode,
@@ -78,8 +83,10 @@ function anyVisible(moduleNode: SnapshotTreeNode, child: SnapshotAnswerItemNode)
         <div class="space-y-3">
           <div class="flex items-center gap-2">
             <FileQuestion class="h-3.5 w-3.5 text-muted-foreground" />
+            <span v-if="resolvedQuestionNumber(node, props.snapshot)" class="text-xs font-medium">{{ resolvedQuestionNumber(node, props.snapshot) }}.</span>
             <Badge variant="secondary" class="text-xs">{{ questionTypeLabel(node.question.q_type) }}</Badge>
             <span class="text-xs text-muted-foreground">#{{ node.question.id }} · 版本 r{{ node.question_revision }}</span>
+            <span v-if="resolvedQuestionScore(node, props.snapshot) != null" class="ml-auto text-xs text-muted-foreground">（{{ resolvedQuestionScore(node, props.snapshot) }} 分）</span>
           </div>
           <RichContent :content="node.question.content" empty-text="（无题干）" />
           <ul
@@ -92,6 +99,19 @@ function anyVisible(moduleNode: SnapshotTreeNode, child: SnapshotAnswerItemNode)
               <RichContent :content="opt.content" class="min-w-0 [&_p]:my-0" />
             </li>
           </ul>
+          <div v-if="anyQuestionFieldVisible(node)" class="space-y-2 border-t pt-2">
+            <template v-for="key in ANSWER_FIELD_KEYS" :key="key">
+              <div v-if="effectiveQuestionDisplay(node, props.snapshot, key)" class="flex flex-col gap-0.5">
+                <span class="text-xs font-medium text-muted-foreground">{{ FIELD_LABELS[key] }}</span>
+                <AnswerDisplay
+                  v-if="key === 'answer'"
+                  :answer="node.question.answer"
+                  :options="node.question.options"
+                />
+                <RichContent v-else :content="node.question[key]" class="[&_.prose]:my-0" empty-text="（空）" />
+              </div>
+            </template>
+          </div>
         </div>
       </div>
 

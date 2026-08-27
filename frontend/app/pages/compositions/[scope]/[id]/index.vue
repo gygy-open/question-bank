@@ -11,9 +11,13 @@ import { Separator } from '@/components/ui/separator'
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter,
 } from '@/components/ui/dialog'
+import {
+  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import {
-  Loader2, Users, Lock, AlertTriangle, RefreshCw, History, CheckCircle2,
+  Download, Loader2, Users, Lock, AlertTriangle, RefreshCw, History, CheckCircle2, Clock,
 } from '@lucide/vue'
 import { toast } from 'vue-sonner'
 import CompositionCanvas from '~/components/composition/CompositionCanvas.vue'
@@ -22,6 +26,8 @@ import CompositionNumberingPanel from '~/components/composition/CompositionNumbe
 import CompositionScoringPanel from '~/components/composition/CompositionScoringPanel.vue'
 import CompositionQuestionDisplayPanel from '~/components/composition/CompositionQuestionDisplayPanel.vue'
 import CompositionVersionsSheet from '~/components/composition/CompositionVersionsSheet.vue'
+import CompositionTimelineSheet from '~/components/composition/CompositionTimelineSheet.vue'
+import { useCompositionExport } from '~/composables/useCompositionExport'
 import { useCompositions, CompositionConflictError } from '~/composables/useCompositions'
 import { folderBreadcrumb, normalizeScope } from '~/lib/compositions'
 import {
@@ -31,12 +37,14 @@ import {
 } from '~/lib/compositionDocument'
 import type { EditorDocument, NumberingMode } from '~/lib/compositionDocument'
 import type {
-  AnswerFieldKey, CompositionDetail, CompositionFolder, CompositionScope, QuestionRevisionStatus,
+  AnswerFieldKey, CompositionDetail, CompositionExportFormat, CompositionFolder, CompositionScope,
+  CompositionVersionSummary, QuestionRevisionStatus,
 } from '~/types'
 
 const route = useRoute()
 const router = useRouter()
 const api = useCompositions()
+const exportApi = useCompositionExport()
 const { currentSubjectId, currentSubject } = useSubjectContext()
 
 const scope = computed<CompositionScope>(() => normalizeScope(route.params.scope))
@@ -378,6 +386,55 @@ const finalizeLabel = ref('')
 const finalizing = ref(false)
 const versionsOpen = ref(false)
 const versionsSheet = ref<InstanceType<typeof CompositionVersionsSheet> | null>(null)
+const timelineOpen = ref(false)
+
+// --- 头部快捷下载：懒加载最新定稿版本摘要（不含 snapshot），避免为下载多拉一份完整快照 ---
+const downloadMenuOpen = ref(false)
+const latestVersion = ref<CompositionVersionSummary | null>(null)
+const latestVersionLoading = ref(false)
+const latestVersionLoaded = ref(false)
+
+async function loadLatestVersion() {
+  if (!currentSubjectId.value || !composition.value) return
+  latestVersionLoading.value = true
+  try {
+    const list = await api.listVersions(currentSubjectId.value, scope.value, composition.value.id)
+    latestVersion.value = list.length ? list[list.length - 1]! : null
+    latestVersionLoaded.value = true
+  } catch {
+    latestVersion.value = null
+  } finally {
+    latestVersionLoading.value = false
+  }
+}
+
+watch(downloadMenuOpen, (isOpen) => {
+  if (isOpen && !latestVersionLoaded.value) loadLatestVersion()
+})
+
+// 草稿是否已经领先于最新定稿版本（有未保存改动，或已保存但还没重新定稿）——
+// 提醒用户："下载"拿到的是冻结的旧内容，不是当前看到的草稿。
+const draftAheadOfLatestVersion = computed(() => {
+  if (!composition.value || !latestVersion.value) return false
+  return dirty.value || composition.value.revision !== latestVersion.value.source_revision
+})
+
+function quickDownload(format: CompositionExportFormat) {
+  if (!currentSubjectId.value || !latestVersion.value) return
+  exportApi.downloadVersion({
+    subjectId: currentSubjectId.value,
+    scope: scope.value,
+    compositionId: latestVersion.value.composition_id,
+    versionNo: latestVersion.value.version_no,
+    title: latestVersion.value.title,
+    format,
+  })
+}
+
+function goFinalizeFromDownloadMenu() {
+  downloadMenuOpen.value = false
+  openFinalize()
+}
 
 function openFinalize() {
   if (dirty.value) {
@@ -401,9 +458,26 @@ async function doFinalize() {
         label: finalizeLabel.value.trim() || null,
       },
     )
-    // 定稿不改动本地 revision；仅提示并刷新版本列表。
+    // 定稿不改动本地 revision；仅提示并刷新版本列表、失效头部快捷下载缓存。
     finalizeOpen.value = false
-    toast.success(`已定稿为版本 v${version.version_no}`)
+    latestVersionLoaded.value = false
+    const quickFormat = exportApi.lastFormat()
+    toast.success(`已定稿为版本 v${version.version_no}`, {
+      action: {
+        label: quickFormat === 'latex' ? '下载 LaTeX' : '下载 Word',
+        onClick: () => {
+          if (!currentSubjectId.value || !composition.value) return
+          exportApi.downloadVersion({
+            subjectId: currentSubjectId.value,
+            scope: scope.value,
+            compositionId: composition.value.id,
+            versionNo: version.version_no,
+            title: version.title,
+            format: quickFormat,
+          })
+        },
+      },
+    })
     versionsOpen.value = true
     versionsSheet.value?.refresh()
   } catch (err) {
@@ -480,6 +554,63 @@ onBeforeRouteLeave(() => {
         <TooltipContent>版本历史</TooltipContent>
       </Tooltip>
     </TooltipProvider>
+    <TooltipProvider :delay-duration="300">
+      <Tooltip>
+        <TooltipTrigger as-child>
+          <Button variant="ghost" size="icon" class="h-8 w-8" :disabled="!composition" @click="timelineOpen = true">
+            <Clock class="h-4 w-4" />
+          </Button>
+        </TooltipTrigger>
+        <TooltipContent>时间线</TooltipContent>
+      </Tooltip>
+    </TooltipProvider>
+    <DropdownMenu v-model:open="downloadMenuOpen">
+      <DropdownMenuTrigger as-child>
+        <Button size="sm" variant="outline" :disabled="!composition">
+          <Download class="mr-2 h-4 w-4" /> 下载
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end">
+        <DropdownMenuLabel v-if="latestVersionLoading" class="text-xs text-muted-foreground">加载中…</DropdownMenuLabel>
+        <template v-else-if="latestVersion">
+          <DropdownMenuLabel class="text-xs text-muted-foreground">已定稿版本 v{{ latestVersion.version_no }}</DropdownMenuLabel>
+          <div
+            v-if="draftAheadOfLatestVersion"
+            class="flex items-start gap-1.5 px-2 py-1.5 text-xs text-amber-600 dark:text-amber-400"
+          >
+            <AlertTriangle class="mt-0.5 h-3.5 w-3.5 shrink-0" />
+            <span>草稿有更新的改动未定稿，下载的仍是旧内容</span>
+          </div>
+          <DropdownMenuItem
+            :disabled="exportApi.isExporting(latestVersion.composition_id, latestVersion.version_no, 'docx')"
+            @click="quickDownload('docx')"
+          >
+            <Loader2
+              v-if="exportApi.isExporting(latestVersion.composition_id, latestVersion.version_no, 'docx')"
+              class="mr-2 h-4 w-4 animate-spin"
+            />
+            下载 Word
+          </DropdownMenuItem>
+          <DropdownMenuItem
+            :disabled="exportApi.isExporting(latestVersion.composition_id, latestVersion.version_no, 'latex')"
+            @click="quickDownload('latex')"
+          >
+            <Loader2
+              v-if="exportApi.isExporting(latestVersion.composition_id, latestVersion.version_no, 'latex')"
+              class="mr-2 h-4 w-4 animate-spin"
+            />
+            下载 LaTeX
+          </DropdownMenuItem>
+          <template v-if="draftAheadOfLatestVersion">
+            <DropdownMenuSeparator />
+            <DropdownMenuItem @click="goFinalizeFromDownloadMenu">
+              <CheckCircle2 class="mr-2 h-4 w-4" /> 先定稿最新内容
+            </DropdownMenuItem>
+          </template>
+        </template>
+        <DropdownMenuLabel v-else class="text-xs text-muted-foreground">尚无定稿版本，请先定稿</DropdownMenuLabel>
+      </DropdownMenuContent>
+    </DropdownMenu>
     <TooltipProvider :delay-duration="300">
       <Tooltip>
         <TooltipTrigger as-child>
@@ -618,6 +749,15 @@ onBeforeRouteLeave(() => {
     v-if="composition && currentSubjectId"
     ref="versionsSheet"
     v-model:open="versionsOpen"
+    :subject-id="currentSubjectId"
+    :scope="scope"
+    :composition-id="composition.id"
+  />
+
+  <!-- 时间线侧栏 -->
+  <CompositionTimelineSheet
+    v-if="composition && currentSubjectId"
+    v-model:open="timelineOpen"
     :subject-id="currentSubjectId"
     :scope="scope"
     :composition-id="composition.id"

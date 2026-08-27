@@ -22,4 +22,5 @@ from .composition import (
     QuestionRevisionStatus,
     CompositionVersionCreateRequest,
     CompositionVersionSummary, CompositionVersionRead, CompositionEventRead,
+    CompositionEventPage,
 )

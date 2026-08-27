@@ -1068,6 +1068,12 @@ def _build_snapshot(
         "title": comp.title,
         "subject_id": comp.subject_id,
         "finalized_at": finalized_at.isoformat(),
+        # 冻结定稿时刻的显示默认值,供导出/预览解析题目级 show 覆盖的继承基准。
+        "numbering_enabled": bool(comp.numbering_enabled),
+        "scoring_enabled": bool(comp.scoring_enabled),
+        "question_display": {
+            k: bool((comp.question_display or {}).get(k, False)) for k in ANSWER_FIELD_KEYS
+        },
         "nodes": [_node_snapshot(n) for n in ordered],
     }
 

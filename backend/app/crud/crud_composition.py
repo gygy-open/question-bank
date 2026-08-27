@@ -16,6 +16,7 @@ from sqlalchemy.orm import selectinload
 from app.crud.base import CRUDBase
 from app.models.composition import (
     Composition,
+    CompositionEvent,
     CompositionNode,
     CompositionVersion,
     Folder,
@@ -201,6 +202,28 @@ class CRUDComposition(CRUDBase[Composition, CompositionCreate, CompositionUpdate
             )
         )
         return int(result.scalar() or 0)
+
+    async def list_events(
+        self,
+        db: AsyncSession,
+        *,
+        composition_id: int,
+        before_id: Optional[int] = None,
+        limit: int = 30,
+    ) -> tuple[List[CompositionEvent], bool]:
+        """时间线事件,按 id 倒序(最新在前);游标翻页,返回 (本页事件, 是否还有更多)。"""
+        query = (
+            select(CompositionEvent)
+            .where(CompositionEvent.composition_id == composition_id)
+            .options(selectinload(CompositionEvent.actor))
+        )
+        if before_id is not None:
+            query = query.where(CompositionEvent.id < before_id)
+        query = query.order_by(CompositionEvent.id.desc()).limit(limit + 1)
+        result = await db.execute(query)
+        events = list(result.scalars().all())
+        has_more = len(events) > limit
+        return events[:limit], has_more
 
 
 folder = CRUDFolder(Folder)

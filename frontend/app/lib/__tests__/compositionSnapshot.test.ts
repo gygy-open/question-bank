@@ -2,15 +2,20 @@ import { describe, it, expect } from 'vitest'
 import {
   buildSnapshotTree,
   effectiveAnswerFields,
+  effectiveQuestionDisplay,
   resolveModuleAnswerItems,
+  resolvedQuestionNumber,
+  resolvedQuestionScore,
   snapshotQuestionNodeMap,
 } from '@/lib/compositionSnapshot'
 import type {
   CompositionSnapshotV2,
+  QuestionProps,
   QuestionSnapshot,
   SnapshotAnswerItemNode,
   SnapshotNode,
   SnapshotQuestionDetailsNode,
+  SnapshotQuestionNode,
 } from '@/types/composition'
 
 function richDoc(text: string) {
@@ -34,7 +39,7 @@ function qsnap(id: number): QuestionSnapshot {
   }
 }
 
-function questionNode(nodeId: string, position: number, q: QuestionSnapshot): SnapshotNode {
+function questionNode(nodeId: string, position: number, q: QuestionSnapshot, props?: QuestionProps): SnapshotNode {
   return {
     id: nodeId,
     parent_id: null,
@@ -46,6 +51,7 @@ function questionNode(nodeId: string, position: number, q: QuestionSnapshot): Sn
     question_id: q.id,
     question_revision: q.content_revision,
     question: q,
+    props,
   }
 }
 
@@ -86,7 +92,7 @@ function answerItem(
   }
 }
 
-function snapshot(nodes: SnapshotNode[]): CompositionSnapshotV2 {
+function snapshot(nodes: SnapshotNode[], overrides?: Partial<CompositionSnapshotV2>): CompositionSnapshotV2 {
   return {
     schema_version: 2,
     composition_id: 1,
@@ -95,6 +101,7 @@ function snapshot(nodes: SnapshotNode[]): CompositionSnapshotV2 {
     subject_id: 1,
     finalized_at: '2026-01-01T00:00:00Z',
     nodes,
+    ...overrides,
   }
 }
 
@@ -159,5 +166,49 @@ describe('resolveModuleAnswerItems', () => {
     const mod = tree.find((n) => n.id === 'm1')!
     const resolved = resolveModuleAnswerItems(mod, snapshotQuestionNodeMap(snap))
     expect(resolved[0]!.question).toBeNull()
+  })
+})
+
+describe('resolvedQuestionNumber / resolvedQuestionScore', () => {
+  it('numbering_enabled/scoring_enabled 为真时输出 props 里的值', () => {
+    const node = questionNode('q1', 0, qsnap(1), { number: '1', score: 5 }) as SnapshotQuestionNode
+    const snap = snapshot([node], { numbering_enabled: true, scoring_enabled: true })
+    expect(resolvedQuestionNumber(node, snap)).toBe('1')
+    expect(resolvedQuestionScore(node, snap)).toBe(5)
+  })
+
+  it('开关为假时即使 props 有值也不输出', () => {
+    const node = questionNode('q1', 0, qsnap(1), { number: '1', score: 5 }) as SnapshotQuestionNode
+    const snap = snapshot([node], { numbering_enabled: false, scoring_enabled: false })
+    expect(resolvedQuestionNumber(node, snap)).toBe('')
+    expect(resolvedQuestionScore(node, snap)).toBeNull()
+  })
+
+  it('旧快照缺失开关字段时视为关闭', () => {
+    const node = questionNode('q1', 0, qsnap(1), { number: '1', score: 5 }) as SnapshotQuestionNode
+    const snap = snapshot([node])
+    expect(resolvedQuestionNumber(node, snap)).toBe('')
+    expect(resolvedQuestionScore(node, snap)).toBeNull()
+  })
+})
+
+describe('effectiveQuestionDisplay', () => {
+  it('题目级显式覆盖优先于全局默认', () => {
+    const node = questionNode('q1', 0, qsnap(1), { show: { answer: false } }) as SnapshotQuestionNode
+    const snap = snapshot([node], { question_display: { answer: true, thinking: false, analysis: false, summary: false } })
+    expect(effectiveQuestionDisplay(node, snap, 'answer')).toBe(false)
+  })
+
+  it('题目级未覆盖时继承全局默认', () => {
+    const node = questionNode('q1', 0, qsnap(1)) as SnapshotQuestionNode
+    const snap = snapshot([node], { question_display: { answer: true, thinking: false, analysis: true, summary: false } })
+    expect(effectiveQuestionDisplay(node, snap, 'answer')).toBe(true)
+    expect(effectiveQuestionDisplay(node, snap, 'thinking')).toBe(false)
+  })
+
+  it('旧快照缺失 question_display 时视为全局默认全部隐藏', () => {
+    const node = questionNode('q1', 0, qsnap(1)) as SnapshotQuestionNode
+    const snap = snapshot([node])
+    expect(effectiveQuestionDisplay(node, snap, 'answer')).toBe(false)
   })
 })

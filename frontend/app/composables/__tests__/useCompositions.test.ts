@@ -179,6 +179,21 @@ describe('版本 (Version) API 请求构建', () => {
     expect(calls[0]!.opts.query).toEqual({ scope: 'shared' })
   })
 
+  it('listEvents GET events 路径，带 scope/before_id/limit', async () => {
+    const api = useCompositions()
+    await api.listEvents(3, 'shared', 9, { beforeId: 42, limit: 10 })
+    expect(calls[0]!.url).toBe('/subjects/3/compositions/9/events')
+    expect(calls[0]!.opts.method).toBeUndefined()
+    expect(calls[0]!.opts.query).toEqual({ scope: 'shared', before_id: 42, limit: 10 })
+  })
+
+  it('listEvents 省略可选参数时 query 仅带 scope 与 undefined', async () => {
+    const api = useCompositions()
+    await api.listEvents(3, 'shared', 9)
+    expect(calls[0]!.url).toBe('/subjects/3/compositions/9/events')
+    expect(calls[0]!.opts.query).toEqual({ scope: 'shared', before_id: undefined, limit: undefined })
+  })
+
   it('finalizeVersion 的 revision 409 被翻译为可识别冲突', async () => {
     apiImpl = () =>
       Promise.reject({ status: 409, data: { detail: 'Composition revision mismatch' } })

@@ -15,6 +15,8 @@
 
 当前旧版 Paper 与新版 Composition 暂时并存。新版定稿已经能够冻结完整题目内容，但 DOCX/LaTeX 导出仍只支持旧版 Paper。
 
+本计划撰写后，草稿态编辑体验又新增了题号、赋分、题目级字段显隐覆盖、选项排版等能力（详见 3.1 末尾“待补口径”），这些能力目前只影响画布编辑，尚未在 `finalize_version`/Snapshot 中被完整冻结，导出实现启动前必须先补齐。
+
 下一阶段目标是让 `CompositionVersion.snapshot` 成为正式发布和导出的唯一输入，并完成旧 Paper 的一次性迁移准备。当前 AST 与模块契约视为本阶段的稳定输入，不在导出实现中重新设计。
 
 ## 2. 阶段目标
@@ -52,6 +54,9 @@
 - `question_details` 保存 `scope` 与完整的四字段全局开关。
 - `answer_item` 通过 `source_question_node_id` 指向同一文档中的根层 Question Node，并保存 `included` 与完整的四字段 nullable override。
 - 保存 AST 时，服务端已经根据 `before | all` 规范化 `answer_item` 集合和题序；自定义 Heading/RichText 通过 `anchor_before_node_id` 固定在某答案项之前或模块尾部。
+- `question` 节点 `props` 现在还可携带：`number`（题号字符串）、`show`（按 `answer/thinking/analysis/summary` 四键的显隐覆盖，值为 `true/false/缺省`，缺省表示继承 Composition 级全局默认）、`optionLayout`（`auto | 1 | 2 | 4` 选项排版列数）、`score`（0~1000，允许 0.5 步进的分值）。这些字段只在用户点击“保存内容”时随 AST 一起持久化。
+- Composition 本身新增 `numbering_enabled`、`scoring_enabled`（依赖 `numbering_enabled`，关闭题号会级联关闭赋分）、`question_display`（四字段全局显隐默认值）三个即时持久化（PATCH 生效、不走“保存内容”）的草稿态开关；节点最终“是否显示某字段”= `question.props.show[key] ?? question_display[key]`。
+- **待补口径（导出实现前必须解决）**：`_build_snapshot` 当前只冻结每个 `question` 节点自身的 `props`，Composition 级 `numbering_enabled` / `scoring_enabled` / `question_display` 并未写入 Snapshot 顶层元数据。若定稿时某题的 `show` 某字段仍是“继承全局”（未显式覆盖），Snapshot 里将没有信息还原其最终应显示还是隐藏，导出结果会和编辑器预览不一致。必须在编码前二选一并写入 ADR：(a) 冻结时把三个 Composition 级默认值一并写入 Snapshot 顶层，交给 CompositionAssembler 按“节点覆盖 ?? 全局默认”解析；或 (b) 冻结时为每个 `question` 节点把 effective show/number/score 结果展开成完整、无缺省的 `props` 再写入 Snapshot。
 - Snapshot schema version 为 `2`，`nodes` 按前序展平：每个 root node 后紧跟其按 position 排序的 module children。
 
 导出层不得把 `question_details.scope` 当作重新生成答案项的指令；它只能消费 Snapshot 中已经冻结的 `answer_item` 与自定义子节点。
@@ -93,7 +98,7 @@ DOCXRenderer / LaTeXRenderer
 |---|---|
 | `rich_text` | RichDoc 内容 |
 | `heading` | 指定级别的标题 |
-| `question` | 冻结的题干、选项及可选编号 |
+| `question` | 冻结的题干、选项及可选编号、分值、选项排版列数，并按 effective show 内联输出 answer/thinking/analysis/summary |
 | `page_break` | 强制分页 |
 | `question_details` | 按 Snapshot 中已冻结的 body slot 顺序展开自定义内容与 answer_item |
 | `answer_item` | 从同一 Snapshot 的源 Question 节点输出生效字段 |
@@ -164,6 +169,8 @@ backend/app/services/exporting/composition_assemble.py
 
 应复用现有 RichDoc、公式、表格、图片、题目选项、答案和解析渲染能力。
 
+`ExportQuestion` 需要额外携带：题号（`number`）、分值（`score`，允许为空）、选项排版列数（依据 `optionLayout` 与选项内容解析出的最终列数，不在 Renderer 里重新做“宽内容强制单列”的判断）、以及按 effective show 解析出的内联 answer/thinking/analysis/summary 内容。effective show 的解析规则见 3.1 “待补口径”。
+
 ### 4.4 导出错误模型
 
 错误响应至少包含：
@@ -194,6 +201,8 @@ backend/app/services/exporting/composition_assemble.py
 - 题库内容更新后旧版本导出不变。
 - 题目软删除后旧版本仍可导出。
 - 相同版本重复导出的语义内容一致。
+- 题号、赋分开关级联关闭、选项排版（auto/1/2/4，含宽内容强制单列）在导出中的还原。
+- 题目级 `show` 覆盖与 Composition 级 `question_display` 全局默认的组合（显式 true/false、以及继承全局两种情况）。
 - 100+ Node 长组稿。
 
 ## 5. 前端实施任务
@@ -229,11 +238,13 @@ backend/app/services/exporting/composition_assemble.py
 前端 SnapshotRenderer 和后端 CompositionAssembler 必须使用相同语义：
 
 - 相同标题层级。
-- 相同题目顺序。
+- 相同题目顺序、题号和分值。
 - 相同模块子节点、字段配置和源题引用。
+- 相同选项排版列数。
+- 相同的题目级内联字段显隐结果（`show` 覆盖与 `question_display` 全局默认的合并结果）。
 - 相同分页位置。
 
-可允许样式差异，不允许内容差异。
+可允许样式差异，不允许内容差异。截至目前，只读版本预览用的 `SnapshotRenderer.vue` 尚未渲染题号（`props.number`）、分值（`props.score`）以及题目级内联 `show` 字段——这些是画布编辑器新增的能力，早于 Snapshot 顶层口径问题（见 3.1）被引入。在实现 CompositionAssembler/Renderer 之前，应先补齐 `SnapshotRenderer` 对这些字段的渲染，作为导出实现的可视化基线；两者应共用同一套 effective show/layout 解析逻辑（如 `frontend/app/lib/compositionDocument.ts` 中的 `effectiveQuestionField`/`resolveOptionColumns`），避免各自重复实现产生偏差。
 
 ## 6. Paper 迁移计划
 

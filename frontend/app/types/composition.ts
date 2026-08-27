@@ -299,6 +299,15 @@ export interface CompositionVersionCreatePayload {
   label?: string | null
 }
 
+/** 版本导出格式：与后端 app.schemas.paper.OutputFormat 对齐。 */
+export type CompositionExportFormat = 'docx' | 'latex'
+
+/** 版本导出请求体：title 可选覆盖导出文件里的标题。 */
+export interface CompositionExportPayload {
+  format: CompositionExportFormat
+  title?: string
+}
+
 /** 版本列表项：不含 snapshot，避免列表响应携带整稿快照。 */
 export interface CompositionVersionSummary {
   id: number
@@ -311,6 +320,47 @@ export interface CompositionVersionSummary {
   finalized_at: string
   finalized_by: number
 }
+
+// --- 时间线 (Event) 契约 --- //
+
+/** 与后端 CompositionEvent.event_type 对齐的已知取值；后端仍可能新增，故不做穷尽联合校验。 */
+export type CompositionEventType =
+  | 'created'
+  | 'updated'
+  | 'moved'
+  | 'deleted'
+  | 'restored'
+  | 'nodes_replaced'
+  | 'question_nodes_synced'
+  | 'finalized'
+
+export interface CompositionEventActor {
+  id: number
+  username: string
+  full_name?: string | null
+}
+
+export interface CompositionEvent {
+  id: number
+  composition_id: number
+  composition_revision: number
+  event_type: CompositionEventType
+  target_type: string | null
+  target_id: string | null
+  summary: string
+  payload: Record<string, unknown> | null
+  batch_id: string | null
+  actor_id: number
+  actor: CompositionEventActor | null
+  created_at: string
+}
+
+/** 时间线游标分页响应：has_more=true 时可用最后一条 id 作为下一页 before_id。 */
+export interface CompositionEventPage {
+  items: CompositionEvent[]
+  has_more: boolean
+}
+
 
 /**
  * 定稿时冻结的题目内容投影（snapshot v2 内 question 节点携带）。
@@ -399,6 +449,10 @@ export interface CompositionSnapshotV2 {
   title: string
   subject_id: number
   finalized_at: string
+  // 定稿时刻冻结的显示默认值；旧快照（功能上线前定稿）没有这三个字段，消费方需按 false/全 false 兜底。
+  numbering_enabled?: boolean
+  scoring_enabled?: boolean
+  question_display?: Record<AnswerFieldKey, boolean>
   nodes: SnapshotNode[]
 }
 

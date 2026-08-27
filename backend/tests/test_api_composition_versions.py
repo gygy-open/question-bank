@@ -7,12 +7,13 @@ answer_item 配置冻结、跨 scope/subject/个人 owner 404、软删除稿可�
 """
 import json
 import uuid
+from urllib.parse import unquote
 
 import pytest
 from sqlalchemy import func, select
 
 from app.core.security import create_access_token
-from app.models.composition import CompositionEvent
+from app.models.composition import CompositionEvent, CompositionVersion
 from app.models.question import Question, QuestionType
 from app.models.subject import Subject
 from app.models.user import User
@@ -141,6 +142,16 @@ async def _finalize(client, sid, comp_id, headers, *, expected_revision, label=N
     )
 
 
+async def _export(client, sid, comp_id, headers, *, version_no, fmt="docx", title=None, scope="shared"):
+    body = {"format": fmt}
+    if title is not None:
+        body["title"] = title
+    return await client.post(
+        f"{API}/subjects/{sid}/compositions/{comp_id}/versions/{version_no}/export?scope={scope}",
+        json=body, headers=headers,
+    )
+
+
 # --------------------------------------------------------------------------- #
 # 成功冻结完整题目
 # --------------------------------------------------------------------------- #
@@ -188,6 +199,40 @@ async def test_finalize_freezes_full_question(client, ctx, db_session):
     assert qsnap["analysis"] == _rich_doc("因为 1+1=2")
     assert qsnap["thinking"] is None
     assert "tags" not in qsnap and "knowledge_points" not in qsnap and "created_by" not in qsnap
+
+
+# --------------------------------------------------------------------------- #
+# numbering_enabled/scoring_enabled/question_display 冻结进 snapshot 顶层
+# --------------------------------------------------------------------------- #
+async def test_finalize_freezes_numbering_scoring_and_question_display(client, ctx, db_session):
+    sid = ctx["subject"].id
+    h = _auth(ctx["user"])
+    q = await _seed_full_question(db_session, subject_id=sid)
+    comp = await _create_composition(client, sid, h)
+
+    r = await client.patch(
+        f"{API}/subjects/{sid}/compositions/{comp['id']}?scope=shared",
+        json={
+            "expected_revision": 1,
+            "numbering_enabled": True,
+            "scoring_enabled": True,
+            "question_display": {"answer": True, "thinking": False, "analysis": True, "summary": False},
+        },
+        headers=h,
+    )
+    assert r.status_code == 200, r.text
+    assert r.json()["revision"] == 2
+
+    await _put_nodes(client, sid, comp["id"], h, expected_revision=2, nodes=[_question(q.id)])
+
+    r = await _finalize(client, sid, comp["id"], h, expected_revision=3)
+    assert r.status_code == 201, r.text
+    snap = r.json()["snapshot"]
+    assert snap["numbering_enabled"] is True
+    assert snap["scoring_enabled"] is True
+    assert snap["question_display"] == {
+        "answer": True, "thinking": False, "analysis": True, "summary": False,
+    }
 
 
 # --------------------------------------------------------------------------- #
@@ -384,6 +429,113 @@ async def test_finalize_writes_single_event_without_revision_change(client, ctx,
     assert event.target_id == "1"
     assert event.payload["version_no"] == 1
     assert event.payload["label"] == "标签"
+
+
+# --------------------------------------------------------------------------- #
+# 版本导出:DOCX/LaTeX 成功
+# --------------------------------------------------------------------------- #
+async def test_export_version_docx_and_latex_succeed(client, ctx, db_session):
+    sid = ctx["subject"].id
+    h = _auth(ctx["user"])
+    q = await _seed_full_question(db_session, subject_id=sid)
+    comp = await _create_composition(client, sid, h)
+    await _put_nodes(client, sid, comp["id"], h, expected_revision=1, nodes=[_question(q.id)])
+    r = await _finalize(client, sid, comp["id"], h, expected_revision=2)
+    assert r.status_code == 201, r.text
+
+    r = await _export(client, sid, comp["id"], h, version_no=1, fmt="docx")
+    assert r.status_code == 200, r.text
+    assert len(r.content) > 0
+    assert f'{comp["title"]}-v1.docx' in unquote(r.headers["content-disposition"])
+
+    r = await _export(client, sid, comp["id"], h, version_no=1, fmt="latex")
+    assert r.status_code == 200, r.text
+    assert len(r.content) > 0
+    assert f'{comp["title"]}-v1-latex.zip' in unquote(r.headers["content-disposition"])
+
+
+async def test_export_uses_title_override(client, ctx):
+    sid = ctx["subject"].id
+    h = _auth(ctx["user"])
+    comp = await _create_composition(client, sid, h)
+    r = await _finalize(client, sid, comp["id"], h, expected_revision=1)
+    assert r.status_code == 201
+
+    r = await _export(client, sid, comp["id"], h, version_no=1, fmt="docx", title="自定义标题")
+    assert r.status_code == 200, r.text
+    assert "自定义标题-v1.docx" in unquote(r.headers["content-disposition"])
+
+
+# --------------------------------------------------------------------------- #
+# 版本导出:404(版本不存在 / 跨 scope 越权)、软删除稿仍可导出旧版本
+# --------------------------------------------------------------------------- #
+async def test_export_version_not_found_404(client, ctx):
+    sid = ctx["subject"].id
+    h = _auth(ctx["user"])
+    comp = await _create_composition(client, sid, h)
+    r = await _export(client, sid, comp["id"], h, version_no=99, fmt="docx")
+    assert r.status_code == 404
+
+
+async def test_export_cross_owner_not_found_404(client, ctx):
+    sid = ctx["subject"].id
+    h = _auth(ctx["user"])
+    hb = _auth(ctx["other"])
+    personal = await _create_composition(client, sid, h, scope="personal")
+    await _finalize(client, sid, personal["id"], h, expected_revision=1, scope="personal")
+    r = await _export(client, sid, personal["id"], hb, version_no=1, fmt="docx", scope="personal")
+    assert r.status_code == 404
+
+
+async def test_export_allowed_after_composition_soft_deleted(client, ctx):
+    sid = ctx["subject"].id
+    h = _auth(ctx["user"])
+    comp = await _create_composition(client, sid, h)
+    r = await _finalize(client, sid, comp["id"], h, expected_revision=1)
+    assert r.status_code == 201
+
+    d = await client.delete(
+        f"{API}/subjects/{sid}/compositions/{comp['id']}?scope=shared&expected_revision=1", headers=h
+    )
+    assert d.status_code == 204, d.text
+
+    r = await _export(client, sid, comp["id"], h, version_no=1, fmt="docx")
+    assert r.status_code == 200, r.text
+
+
+# --------------------------------------------------------------------------- #
+# 版本导出:损坏/未知 node_type 返回 422,附 node_id/node_type/version_no
+# --------------------------------------------------------------------------- #
+async def test_export_unsupported_node_type_returns_422(client, ctx, db_session):
+    sid = ctx["subject"].id
+    h = _auth(ctx["user"])
+    comp = await _create_composition(client, sid, h)
+    r = await _finalize(client, sid, comp["id"], h, expected_revision=1)
+    assert r.status_code == 201
+    version_no = r.json()["version_no"]
+
+    version = (
+        await db_session.execute(
+            select(CompositionVersion).where(
+                CompositionVersion.composition_id == comp["id"],
+                CompositionVersion.version_no == version_no,
+            )
+        )
+    ).scalars().first()
+    corrupted = dict(version.snapshot)
+    corrupted["nodes"] = [
+        {"id": "bad1", "parent_id": None, "slot": None, "position": 0, "node_kind": "block", "node_type": "weird"}
+    ]
+    version.snapshot = corrupted
+    db_session.add(version)
+    await db_session.commit()
+
+    r = await _export(client, sid, comp["id"], h, version_no=version_no, fmt="docx")
+    assert r.status_code == 422, r.text
+    body = r.json()["detail"]
+    assert body["node_id"] == "bad1"
+    assert body["node_type"] == "weird"
+    assert body["version_no"] == version_no
 
     got = await client.get(f"{API}/subjects/{sid}/compositions/{comp['id']}?scope=shared", headers=h)
     assert got.json()["revision"] == 1
