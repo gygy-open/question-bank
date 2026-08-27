@@ -15,10 +15,10 @@ import {
   ArrowLeft, Loader2, Save, Users, Lock, AlertTriangle, RefreshCw, History, CheckCircle2,
 } from '@lucide/vue'
 import { toast } from 'vue-sonner'
-import CompositionCanvas from '~/components/manager/composition/CompositionCanvas.vue'
-import CompositionNumberingPanel from '~/components/manager/composition/CompositionNumberingPanel.vue'
-import CompositionQuestionDisplayPanel from '~/components/manager/composition/CompositionQuestionDisplayPanel.vue'
-import CompositionVersionsSheet from '~/components/manager/composition/CompositionVersionsSheet.vue'
+import CompositionCanvas from '~/components/composition/CompositionCanvas.vue'
+import CompositionNumberingPanel from '~/components/composition/CompositionNumberingPanel.vue'
+import CompositionQuestionDisplayPanel from '~/components/composition/CompositionQuestionDisplayPanel.vue'
+import CompositionVersionsSheet from '~/components/composition/CompositionVersionsSheet.vue'
 import { useCompositions, CompositionConflictError } from '~/composables/useCompositions'
 import { normalizeScope } from '~/lib/compositions'
 import {
