@@ -33,7 +33,7 @@ function onInput(nodeId: string, raw: string) {
 </script>
 
 <template>
-  <div class="rounded-lg border bg-card p-4">
+  <div>
     <div class="flex items-center justify-between gap-2">
       <div class="flex items-center gap-2">
         <Award class="h-4 w-4 text-muted-foreground" />

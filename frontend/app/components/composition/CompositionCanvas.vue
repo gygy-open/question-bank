@@ -205,7 +205,12 @@ defineExpose({ hasStale })
     </div>
 
     <template v-else>
-      <div v-for="(node, index) in document.nodes" :key="node.id" class="group/ins relative">
+      <div
+        v-for="(node, index) in document.nodes"
+        :key="node.id"
+        class="group/ins relative"
+        :class="node.nodeType === 'heading' && index > 0 ? 'mt-3' : ''"
+      >
         <!-- 悬浮插入：在本节点之前插入新节点（顶部间隙居中） -->
         <div class="pointer-events-none absolute inset-x-0 -top-3 z-10 flex justify-center opacity-0 transition-opacity group-hover/ins:opacity-100 focus-within:opacity-100">
           <CompositionAddBlockMenu align="center" @add="addNode($event, index - 1)">

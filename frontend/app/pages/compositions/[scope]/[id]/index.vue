@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onBeforeUnmount, watch } from 'vue'
 import { onBeforeRouteLeave } from 'vue-router'
+import { useDebounceFn } from '@vueuse/core'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
@@ -12,10 +13,11 @@ import {
 } from '@/components/ui/dialog'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import {
-  ArrowLeft, Loader2, Save, Users, Lock, AlertTriangle, RefreshCw, History, CheckCircle2,
+  ArrowLeft, Loader2, Users, Lock, AlertTriangle, RefreshCw, History, CheckCircle2,
 } from '@lucide/vue'
 import { toast } from 'vue-sonner'
 import CompositionCanvas from '~/components/composition/CompositionCanvas.vue'
+import CompositionSettingsPanel from '~/components/composition/CompositionSettingsPanel.vue'
 import CompositionNumberingPanel from '~/components/composition/CompositionNumberingPanel.vue'
 import CompositionScoringPanel from '~/components/composition/CompositionScoringPanel.vue'
 import CompositionQuestionDisplayPanel from '~/components/composition/CompositionQuestionDisplayPanel.vue'
@@ -74,6 +76,29 @@ const questionDisplay = computed<Record<AnswerFieldKey, boolean>>(
 )
 const scorableQuestions = computed(() => orderedScorableQuestions(document.value))
 const totalScoreValue = computed(() => totalScore(document.value))
+
+// 自动保存：标题/描述与正文节点各自去抖，静默等待到手停顿后再落库，替代手动点击保存。
+// 保存中或本就不脏时跳过；标题为空/正文存在校验问题时也跳过，避免每次去抖窗口都弹错误提示。
+const autosaveMeta = useDebounceFn(() => {
+  if (!composition.value || saving.value || !metaDirty.value) return
+  if (!title.value.trim()) return
+  saveMeta()
+}, 1000)
+
+const autosaveNodes = useDebounceFn(() => {
+  if (!composition.value || saving.value || !nodesDirty.value) return
+  if (collectDocumentIssues(document.value).length) return
+  saveNodes()
+}, 1400)
+
+watch([title, description], () => {
+  if (loading.value) return
+  autosaveMeta()
+})
+watch(document, () => {
+  if (loading.value) return
+  autosaveNodes()
+})
 
 async function load() {
   if (!currentSubjectId.value) {
@@ -336,7 +361,7 @@ const versionsSheet = ref<InstanceType<typeof CompositionVersionsSheet> | null>(
 
 function openFinalize() {
   if (dirty.value) {
-    toast.error('有未保存修改，请先保存后再定稿')
+    toast.error('正在自动保存，请稍候再定稿')
     return
   }
   finalizeLabel.value = ''
@@ -405,8 +430,11 @@ onBeforeRouteLeave(() => {
     <div class="min-w-0 flex-1">
       <p class="truncate text-sm font-medium">{{ composition?.title || '组稿' }}</p>
     </div>
-    <Badge v-if="dirty" variant="outline" class="gap-1 text-amber-600 dark:text-amber-400">
-      未保存
+    <Badge v-if="saving" variant="outline" class="gap-1 text-muted-foreground">
+      <Loader2 class="h-3 w-3 animate-spin" /> 保存中…
+    </Badge>
+    <Badge v-else-if="dirty" variant="outline" class="gap-1 text-amber-600 dark:text-amber-400">
+      未保存改动
     </Badge>
     <Badge variant="outline" class="gap-1">
       <component :is="scope === 'shared' ? Users : Lock" class="h-3 w-3" />
@@ -432,7 +460,7 @@ onBeforeRouteLeave(() => {
             </Button>
           </span>
         </TooltipTrigger>
-        <TooltipContent>{{ dirty ? '请先保存后再定稿' : '冻结当前内容为不可变版本' }}</TooltipContent>
+        <TooltipContent>{{ dirty ? '正在自动保存，请稍候' : '冻结当前内容为不可变版本' }}</TooltipContent>
       </Tooltip>
     </TooltipProvider>
   </header>
@@ -443,21 +471,19 @@ onBeforeRouteLeave(() => {
     </div>
 
     <div v-else-if="composition" class="mx-auto flex w-full max-w-6xl flex-col gap-6">
-      <!-- 元数据 -->
-      <div class="flex flex-col gap-4 sm:flex-row sm:items-end">
-        <div class="flex-1 space-y-2">
-          <Label>标题</Label>
-          <Input v-model="title" placeholder="组稿标题" />
-        </div>
-        <Button size="sm" variant="outline" :disabled="saving || !metaDirty" @click="saveMeta">
-          <Loader2 v-if="savingMeta" class="mr-2 h-4 w-4 animate-spin" />
-          <Save v-else class="mr-2 h-4 w-4" />
-          保存标题/描述
-        </Button>
-      </div>
-      <div class="space-y-2">
-        <Label>描述</Label>
-        <Textarea v-model="description" placeholder="组稿说明（可选）" rows="2" />
+      <!-- 元数据：标题即文档大标题，无独立保存入口，自动保存 -->
+      <div class="space-y-1">
+        <Input
+          v-model="title"
+          placeholder="组稿标题"
+          class="h-auto border-0 bg-transparent px-0 py-1 text-2xl font-semibold shadow-none focus-visible:ring-1 focus-visible:ring-ring/30"
+        />
+        <Textarea
+          v-model="description"
+          placeholder="组稿说明（可选）"
+          rows="1"
+          class="min-h-0 resize-none border-0 bg-transparent px-0 py-0 text-sm text-muted-foreground shadow-none focus-visible:ring-1 focus-visible:ring-ring/30"
+        />
       </div>
 
       <Separator />
@@ -477,15 +503,6 @@ onBeforeRouteLeave(() => {
       <!-- 画布 + 题号面板 -->
       <div class="flex flex-col gap-6 lg:flex-row lg:items-start">
         <div class="flex min-w-0 flex-1 flex-col gap-6">
-          <div class="flex items-center justify-between">
-            <h2 class="text-sm font-medium text-muted-foreground">内容画布</h2>
-            <Button size="sm" :disabled="saving || !nodesDirty" @click="saveNodes">
-              <Loader2 v-if="savingNodes" class="mr-2 h-4 w-4 animate-spin" />
-              <Save v-else class="mr-2 h-4 w-4" />
-              保存内容
-            </Button>
-          </div>
-
           <CompositionCanvas
             v-model:document="document"
             :subject-id="currentSubjectId"
@@ -504,26 +521,30 @@ onBeforeRouteLeave(() => {
           </p>
         </div>
 
-        <aside class="flex flex-col gap-4 lg:sticky lg:top-6 lg:w-72 lg:shrink-0">
-          <CompositionNumberingPanel
-            :enabled="numberingEnabled"
-            :disabled="saving"
-            @update:enabled="toggleNumbering"
-            @autofill="autofillNumbers"
-          />
-          <CompositionScoringPanel
-            :enabled="scoringEnabled"
-            :numbering-enabled="numberingEnabled"
-            :disabled="saving"
-            :items="scorableQuestions"
-            @update:enabled="toggleScoring"
-            @update-score="updateQuestionScore"
-          />
-          <CompositionQuestionDisplayPanel
-            :fields="questionDisplay"
-            :disabled="saving"
-            @toggle="toggleDisplayField"
-          />
+        <aside class="lg:sticky lg:top-6 lg:w-72 lg:shrink-0">
+          <CompositionSettingsPanel>
+            <CompositionNumberingPanel
+              :enabled="numberingEnabled"
+              :disabled="saving"
+              @update:enabled="toggleNumbering"
+              @autofill="autofillNumbers"
+            />
+            <Separator />
+            <CompositionScoringPanel
+              :enabled="scoringEnabled"
+              :numbering-enabled="numberingEnabled"
+              :disabled="saving"
+              :items="scorableQuestions"
+              @update:enabled="toggleScoring"
+              @update-score="updateQuestionScore"
+            />
+            <Separator />
+            <CompositionQuestionDisplayPanel
+              :fields="questionDisplay"
+              :disabled="saving"
+              @toggle="toggleDisplayField"
+            />
+          </CompositionSettingsPanel>
         </aside>
       </div>
     </div>

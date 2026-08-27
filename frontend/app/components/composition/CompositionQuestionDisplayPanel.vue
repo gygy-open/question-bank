@@ -22,7 +22,7 @@ const FIELD_LABELS: Record<AnswerFieldKey, string> = {
 </script>
 
 <template>
-  <div class="rounded-lg border bg-card p-4">
+  <div>
     <div class="flex items-center gap-2">
       <Eye class="h-4 w-4 text-muted-foreground" />
       <span class="text-sm font-medium">题目显示</span>
