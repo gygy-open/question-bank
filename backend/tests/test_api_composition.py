@@ -112,6 +112,34 @@ async def test_composition_list_can_filter_root_only(client, ctx):
     assert [item["title"] for item in response.json()] == ["根目录组稿"]
 
 
+async def test_composition_list_can_filter_by_keyword(client, ctx):
+    sid = ctx["subject"].id
+    headers = _auth(ctx["user"])
+
+    for title in ("期中数学试卷", "期末数学试卷", "英语听力材料"):
+        response = await client.post(
+            f"{API}/subjects/{sid}/compositions?scope=shared",
+            json={"title": title},
+            headers=headers,
+        )
+        assert response.status_code == 201, response.text
+
+    response = await client.get(
+        f"{API}/subjects/{sid}/compositions?scope=shared&keyword=数学",
+        headers=headers,
+    )
+    assert response.status_code == 200
+    assert {item["title"] for item in response.json()} == {"期中数学试卷", "期末数学试卷"}
+
+    # 大小写不敏感。
+    response = await client.get(
+        f"{API}/subjects/{sid}/compositions?scope=shared&keyword=英语",
+        headers=headers,
+    )
+    assert response.status_code == 200
+    assert [item["title"] for item in response.json()] == ["英语听力材料"]
+
+
 # --------------------------------------------------------------------------- #
 # personal 隔离
 # --------------------------------------------------------------------------- #

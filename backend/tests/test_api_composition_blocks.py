@@ -571,3 +571,69 @@ async def test_module_unanchored_custom_before_answer_items_leads(client, ctx, d
     children = _children(r.json()["nodes"], mod)
     assert [c["node_type"] for c in children] == ["heading", "answer_item"]
     assert children[0]["id"] == title
+
+
+async def test_duplicate_composition_clones_nodes_with_new_ids(client, ctx, db_session):
+    sid = ctx["subject"].id
+    h = _auth(ctx["user"])
+    comp = await _create_shared_composition(client, sid, h)
+    q1 = await _seed_question(db_session, subject_id=sid)
+
+    qn1, mod, ai = _uid(), _uid(), _uid()
+    r = await _put_nodes(
+        client, sid, comp["id"], h, expected_revision=1,
+        nodes=[
+            _question(q1.id, qn1),
+            _module("all", {"answer": True}, mod),
+            _answer_item(mod, qn1, nid=ai, included=False, overrides={"answer": True}),
+        ],
+    )
+    assert r.status_code == 200, r.text
+    original_node_ids = {n["id"] for n in r.json()["nodes"]}
+    revision_after_nodes = r.json()["revision"]
+
+    # 题号开关一并克隆(而不仅仅是节点)。
+    r = await client.patch(
+        f"{API}/subjects/{sid}/compositions/{comp['id']}?scope=shared",
+        json={"expected_revision": revision_after_nodes, "numbering_enabled": True},
+        headers=h,
+    )
+    assert r.status_code == 200, r.text
+
+    r = await client.post(
+        f"{API}/subjects/{sid}/compositions/{comp['id']}/duplicate?scope=shared", headers=h,
+    )
+    assert r.status_code == 201, r.text
+    dup = r.json()
+    assert dup["id"] != comp["id"]
+    assert dup["title"] == "稿件 副本"
+    assert dup["numbering_enabled"] is True
+    # revision=1(创建)+1(结算题号/赋分/显示字段设置)。
+    assert dup["revision"] == 2
+
+    got = await client.get(
+        f"{API}/subjects/{sid}/compositions/{dup['id']}?scope=shared", headers=h,
+    )
+    assert got.status_code == 200
+    dup_nodes = got.json()["nodes"]
+    assert len(dup_nodes) == 3
+    # 节点 id 全部重新生成,不与源稿件重复。
+    assert original_node_ids.isdisjoint({n["id"] for n in dup_nodes})
+
+    dup_question = next(n for n in dup_nodes if n["node_type"] == "question")
+    assert dup_question["question_id"] == q1.id
+    assert dup_question["question_revision"] == 1  # 原样搬运,不重新冻结
+
+    dup_module = next(n for n in dup_nodes if n["node_type"] == "question_details")
+    dup_answer_item = next(n for n in dup_nodes if n["node_type"] == "answer_item")
+    assert dup_answer_item["parent_id"] == dup_module["id"]
+    assert dup_answer_item["source_question_node_id"] == dup_question["id"]
+    assert dup_answer_item["props"]["included"] is False
+    assert dup_answer_item["props"]["overrides"]["answer"] is True
+
+    # 源稿件不受影响。
+    original = await client.get(
+        f"{API}/subjects/{sid}/compositions/{comp['id']}?scope=shared", headers=h,
+    )
+    assert len(original.json()["nodes"]) == 3
+

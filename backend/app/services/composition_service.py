@@ -315,6 +315,91 @@ async def create_composition(
     return comp
 
 
+async def duplicate_composition(
+    db: AsyncSession,
+    *,
+    source: Composition,
+    actor: User,
+) -> Composition:
+    """整份克隆:新建"标题 副本"稿件,原样复制全部节点(id 重生成,question 快照原样保留、不重新冻结)。
+
+    与 replace_nodes 不同,此处直接搬运源节点的 content/question_revision,不去读实时题目,
+    避免"复制"时静默把过期题目一并同步成最新版本。
+    """
+    new_comp = await create_composition(
+        db,
+        subject_id=source.subject_id,
+        scope_type=source.scope_type,
+        owner_id=source.owner_id,
+        actor=actor,
+        title=f"{source.title} 副本",
+        description=source.description,
+        folder_id=source.folder_id,
+    )
+
+    if source.numbering_enabled or source.scoring_enabled or source.question_display:
+        new_comp = await update_composition(
+            db,
+            comp=new_comp,
+            actor=actor,
+            expected_revision=new_comp.revision,
+            numbering_enabled=source.numbering_enabled,
+            scoring_enabled=source.scoring_enabled,
+            question_display=source.question_display,
+        )
+
+    source_nodes = await crud_composition.composition.list_nodes(db, composition_id=source.id)
+    if source_nodes:
+        id_map = {n.id: str(uuid.uuid4()) for n in source_nodes}
+
+        def _clone(n: CompositionNode) -> CompositionNode:
+            return CompositionNode(
+                id=id_map[n.id],
+                composition_id=new_comp.id,
+                parent_id=id_map.get(n.parent_id),
+                slot=n.slot,
+                position=n.position,
+                node_kind=n.node_kind,
+                node_type=n.node_type,
+                content=n.content,
+                props=n.props,
+                schema_version=n.schema_version,
+                question_id=n.question_id,
+                question_revision=n.question_revision,
+                source_question_node_id=id_map.get(n.source_question_node_id),
+                anchor_before_node_id=id_map.get(n.anchor_before_node_id),
+                created_by=actor.id,
+                updated_by=actor.id,
+            )
+
+        # root 先、module 子后插入,满足自引用 FK(与 replace_nodes 的删旧建新顺序一致)。
+        roots = [n for n in source_nodes if n.parent_id is None]
+        children = [n for n in source_nodes if n.parent_id is not None]
+        db.add_all(_clone(n) for n in roots)
+        await db.flush()
+        db.add_all(_clone(n) for n in children)
+        await db.flush()
+
+    await _add_event(
+        db,
+        composition_id=new_comp.id,
+        composition_revision=new_comp.revision,
+        event_type="duplicated",
+        summary=f"Duplicated from composition #{source.id}",
+        actor_id=actor.id,
+    )
+    await db.commit()
+    refreshed = await crud_composition.composition.get_scoped(
+        db,
+        composition_id=new_comp.id,
+        subject_id=new_comp.subject_id,
+        scope_type=new_comp.scope_type,
+        owner_id=new_comp.owner_id,
+    )
+    assert refreshed is not None
+    return refreshed
+
+
 async def _guarded_write(
     db: AsyncSession,
     *,

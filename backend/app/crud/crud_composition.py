@@ -142,6 +142,7 @@ class CRUDComposition(CRUDBase[Composition, CompositionCreate, CompositionUpdate
         root_only: bool = False,
         include_deleted: bool = False,
         only_deleted: bool = False,
+        keyword: Optional[str] = None,
     ) -> List[Composition]:
         query = select(Composition).where(
             Composition.subject_id == subject_id,
@@ -156,6 +157,8 @@ class CRUDComposition(CRUDBase[Composition, CompositionCreate, CompositionUpdate
             query = query.where(Composition.folder_id.is_(None))
         elif folder_id is not None:
             query = query.where(Composition.folder_id == folder_id)
+        if keyword:
+            query = query.where(Composition.title.ilike(f"%{keyword}%"))
         query = query.order_by(Composition.updated_at.desc(), Composition.id.desc())
         result = await db.execute(query)
         return list(result.scalars().all())

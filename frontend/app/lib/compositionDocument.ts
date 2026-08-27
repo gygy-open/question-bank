@@ -613,6 +613,51 @@ export function insertRootNodeAfter(
   return normalizeDocument({ nodes: next })
 }
 
+/** 同 insertRootNodeAfter 语义，一次性插入多个 root 节点（仅在末尾统一 normalize 一次）。 */
+export function insertRootNodesAfter(
+  doc: EditorDocument,
+  index: number,
+  nodes: EditorNode[],
+): EditorDocument {
+  const next = doc.nodes.slice()
+  const at = index < 0 ? 0 : Math.min(index + 1, next.length)
+  next.splice(at, 0, ...nodes)
+  return normalizeDocument({ nodes: next })
+}
+
+// --------------------------------------------------------------------------- //
+// 克隆插入：从另一份稿件搬入一组 root 节点
+// --------------------------------------------------------------------------- //
+
+/**
+ * 深拷贝一组 root 节点（含 module 子节点），重新生成全部节点 UUID，并重写节点内部的软指针
+ * （sourceQuestionNodeId / anchorBeforeNodeId）以指向新 id，使合并进目标文档后 normalizeDocument
+ * 仍可按 sourceQuestionNodeId 命中这些 answer_item，保留其 included/overrides 自定义。
+ * 引用不在本次克隆集合内的软指针（理论上不应出现）会被置 null，避免悬空引用。
+ */
+export function cloneNodesForInsert(nodes: EditorNode[]): EditorNode[] {
+  const idMap = new Map<string, string>()
+  const collectIds = (list: EditorNode[]) => {
+    for (const n of list) {
+      idMap.set(n.id, generateNodeId())
+      if (n.children.length) collectIds(n.children)
+    }
+  }
+  collectIds(nodes)
+
+  const remap = (id: string | null): string | null => (id == null ? null : idMap.get(id) ?? null)
+
+  const cloneOne = (n: EditorNode): EditorNode => ({
+    ...n,
+    id: idMap.get(n.id)!,
+    sourceQuestionNodeId: remap(n.sourceQuestionNodeId),
+    anchorBeforeNodeId: remap(n.anchorBeforeNodeId),
+    children: n.children.map(cloneOne),
+  })
+
+  return nodes.map(cloneOne)
+}
+
 export function moveRootNode(
   doc: EditorDocument,
   index: number,

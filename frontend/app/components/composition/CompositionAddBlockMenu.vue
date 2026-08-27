@@ -4,9 +4,9 @@ import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel,
   DropdownMenuSeparator, DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
-import { Plus, Type, Heading, FileQuestion, SeparatorHorizontal, ListChecks } from '@lucide/vue'
+import { Plus, Type, Heading, FileQuestion, SeparatorHorizontal, ListChecks, FileStack } from '@lucide/vue'
 
-export type AddBlockKind = 'rich_text' | 'heading' | 'question' | 'page_break' | 'module_summary'
+export type AddBlockKind = 'rich_text' | 'heading' | 'question' | 'page_break' | 'module_summary' | 'insert_composition'
 
 withDefaults(defineProps<{ align?: 'start' | 'center' | 'end' }>(), { align: 'center' })
 
@@ -30,6 +30,8 @@ const emit = defineEmits<{ add: [kind: AddBlockKind] }>()
       <DropdownMenuSeparator />
       <DropdownMenuLabel class="text-xs">模块</DropdownMenuLabel>
       <DropdownMenuItem @click="emit('add', 'module_summary')"><ListChecks class="mr-2 h-4 w-4" /> 参考答案模块</DropdownMenuItem>
+      <DropdownMenuSeparator />
+      <DropdownMenuItem @click="emit('add', 'insert_composition')"><FileStack class="mr-2 h-4 w-4" /> 插入稿件</DropdownMenuItem>
     </DropdownMenuContent>
   </DropdownMenu>
 </template>

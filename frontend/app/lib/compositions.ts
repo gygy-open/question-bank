@@ -38,6 +38,10 @@ export function compositionRestorePath(subjectId: number, compositionId: number)
   return `${compositionItemPath(subjectId, compositionId)}/restore`
 }
 
+export function compositionDuplicatePath(subjectId: number, compositionId: number): string {
+  return `${compositionItemPath(subjectId, compositionId)}/duplicate`
+}
+
 /** 整棵 AST 节点整体替换路径。 */
 export function compositionNodesPath(subjectId: number, compositionId: number): string {
   return `${compositionItemPath(subjectId, compositionId)}/nodes`
@@ -94,12 +98,14 @@ export function compositionListQuery(params: {
   rootOnly?: boolean
   onlyDeleted?: boolean
   includeDeleted?: boolean
+  keyword?: string
 }): Record<string, string | number | boolean> {
   const query: Record<string, string | number | boolean> = { scope: params.scope }
   if (params.folderId != null) query.folder_id = params.folderId
   if (params.rootOnly) query.root_only = true
   if (params.onlyDeleted) query.only_deleted = true
   if (params.includeDeleted) query.include_deleted = true
+  if (params.keyword) query.keyword = params.keyword
   return query
 }
 

@@ -20,7 +20,7 @@ import {
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import {
   Plus, FolderPlus, MoreVertical, Pencil, FolderInput, Trash2, ArchiveRestore,
-  Archive, FileText, Clock, Loader2, Trash, RotateCcw, Users, Lock, Home,
+  Archive, FileText, Clock, Loader2, Trash, RotateCcw, Users, Lock, Home, Copy,
 } from '@lucide/vue'
 import { toast } from 'vue-sonner'
 import { useCompositions, CompositionConflictError } from '~/composables/useCompositions'
@@ -393,6 +393,22 @@ async function restore(comp: Composition) {
   }
 }
 
+const duplicatingId = ref<number | null>(null)
+
+async function duplicate(comp: Composition) {
+  if (!currentSubjectId.value || duplicatingId.value != null) return
+  duplicatingId.value = comp.id
+  try {
+    await api.duplicateComposition(currentSubjectId.value, scope.value, comp.id)
+    toast.success('已创建副本')
+    await loadCompositions()
+  } catch (err) {
+    handleConflict(err, '创建副本失败')
+  } finally {
+    duplicatingId.value = null
+  }
+}
+
 function openComposition(comp: Composition) {
   router.push(`/compositions/${scope.value}/${comp.id}`)
 }
@@ -583,6 +599,9 @@ function openComposition(comp: Composition) {
                     </DropdownMenuItem>
                     <DropdownMenuItem @click="openMoveComposition(comp)">
                       <FolderInput class="mr-2 h-4 w-4" /> 移动
+                    </DropdownMenuItem>
+                    <DropdownMenuItem :disabled="duplicatingId === comp.id" @click="duplicate(comp)">
+                      <Copy class="mr-2 h-4 w-4" /> 创建副本
                     </DropdownMenuItem>
                     <DropdownMenuItem @click="toggleArchive(comp)">
                       <ArchiveRestore v-if="comp.status === 'archived'" class="mr-2 h-4 w-4" />

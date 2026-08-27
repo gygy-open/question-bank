@@ -667,6 +667,8 @@ onBeforeRouteLeave(() => {
           <CompositionCanvas
             v-model:document="document"
             :subject-id="currentSubjectId"
+            :composition-id="compositionId"
+            :scope="scope"
             :question-status="questionStatus"
             :sync-disabled="dirty"
             :syncing="syncingNodes"

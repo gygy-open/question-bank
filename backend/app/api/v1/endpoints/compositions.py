@@ -159,6 +159,7 @@ async def list_compositions(
     root_only: bool = False,
     include_deleted: bool = False,
     only_deleted: bool = False,
+    keyword: Optional[str] = None,
     current_user: models.User = Depends(deps.get_current_active_user),
 ) -> Any:
     await _ensure_subject(db, subject_id)
@@ -172,6 +173,7 @@ async def list_compositions(
         root_only=root_only,
         include_deleted=include_deleted,
         only_deleted=only_deleted,
+        keyword=keyword,
     )
 
 
@@ -409,6 +411,32 @@ async def restore_composition(
     return await composition_service.restore_composition(
         db, comp=comp, actor=current_user, expected_revision=expected_revision
     )
+
+
+@router.post(
+    "/{subject_id}/compositions/{composition_id}/duplicate",
+    response_model=CompositionRead,
+    status_code=status.HTTP_201_CREATED,
+)
+async def duplicate_composition(
+    subject_id: int,
+    composition_id: int,
+    db: deps.SessionDep,
+    scope: ScopeType = Query(...),
+    current_user: models.User = Depends(deps.get_current_active_user),
+) -> Any:
+    await _ensure_subject(db, subject_id)
+    scope_type, owner_id = _resolve_scope(scope, current_user)
+    comp = await crud_composition.composition.get_scoped(
+        db,
+        composition_id=composition_id,
+        subject_id=subject_id,
+        scope_type=scope_type,
+        owner_id=owner_id,
+    )
+    if comp is None:
+        raise HTTPException(status_code=404, detail="Composition not found")
+    return await composition_service.duplicate_composition(db, source=comp, actor=current_user)
 
 
 # --------------------------------------------------------------------------- #

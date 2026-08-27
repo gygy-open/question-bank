@@ -19,6 +19,7 @@ import type {
   QuestionRevisionStatus,
 } from '@/types/composition'
 import {
+  compositionDuplicatePath,
   compositionEventsPath,
   compositionNodesPath,
   compositionItemPath,
@@ -130,6 +131,7 @@ export function useCompositions() {
       rootOnly?: boolean
       onlyDeleted?: boolean
       includeDeleted?: boolean
+      keyword?: string
     } = {},
   ) =>
     $api<Composition[]>(scopedBasePath(subjectId, 'compositions'), {
@@ -189,6 +191,17 @@ export function useCompositions() {
     $api<Composition>(compositionRestorePath(subjectId, compositionId), {
       method: 'POST',
       query: { scope, expected_revision: expectedRevision },
+    }).catch(mapConflict)
+
+  // 创建副本：整份克隆为新稿件（新 id/revision，不影响源稿件）。
+  const duplicateComposition = (
+    subjectId: number,
+    scope: CompositionScope,
+    compositionId: number,
+  ) =>
+    $api<Composition>(compositionDuplicatePath(subjectId, compositionId), {
+      method: 'POST',
+      query: { scope },
     }).catch(mapConflict)
 
   // 画布：整棵 AST 节点整体替换。乐观锁经 expected_revision；409 复用冲突映射。
@@ -317,6 +330,7 @@ export function useCompositions() {
     updateComposition,
     deleteComposition,
     restoreComposition,
+    duplicateComposition,
     replaceNodes,
     getQuestionRevisions,
     syncQuestionNodes,

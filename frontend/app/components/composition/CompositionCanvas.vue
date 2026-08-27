@@ -7,19 +7,24 @@ import BlockItem from './BlockItem.vue'
 import CompositionAddBlockMenu from './CompositionAddBlockMenu.vue'
 import QuestionDetailsModuleEditor from './QuestionDetailsModuleEditor.vue'
 import QuestionPicker from './QuestionPicker.vue'
+import CompositionPicker from './CompositionPicker.vue'
 import {
-  collectStaleQuestionNodeIds, createHeadingNode, createPageBreakNode, createQuestionNode,
-  createRichTextNode, DETAIL_PRESETS, insertModuleCustomBefore, insertRootNodeAfter,
-  moveModuleCustomChild, moveRootNode, normalizeDocument, patchNode, questionNodeStatus,
-  removeModuleCustomChild, removeRootNode,
+  cloneNodesForInsert, collectStaleQuestionNodeIds, createHeadingNode, createPageBreakNode,
+  createQuestionNode, createRichTextNode, DETAIL_PRESETS, documentFromNodes,
+  insertModuleCustomBefore, insertRootNodeAfter, insertRootNodesAfter, moveModuleCustomChild,
+  moveRootNode, normalizeDocument, patchNode, questionNodeStatus, removeModuleCustomChild,
+  removeRootNode,
 } from '@/lib/compositionDocument'
 import type { EditorDocument, EditorNode } from '@/lib/compositionDocument'
 import type { AnswerFieldKey, QuestionRevisionStatus } from '@/types/composition'
-import type { Question } from '@/types'
+import type { CompositionDetail, CompositionScope, Question } from '@/types'
 
 const props = defineProps<{
   document: EditorDocument
   subjectId: number | null
+  // 当前正在编辑的稿件 id/scope，供「插入稿件」选择器排除自身。
+  compositionId?: number | null
+  scope?: CompositionScope | null
   // 题目版本状态（question_id → 实时 revision/可用性），由页面按需刷新。
   questionStatus?: Map<number, QuestionRevisionStatus>
   // 有未保存修改时禁止同步，避免覆盖本地内容。
@@ -40,7 +45,8 @@ const emit = defineEmits<{
 }>()
 
 const pickerOpen = ref(false)
-// 题目选择器的插入位置（insertRootNodeAfter 的 at 语义），缺省末尾。
+const compositionPickerOpen = ref(false)
+// 题目/稿件选择器的插入位置（insertRootNodeAfter 的 at 语义），缺省末尾。
 const pendingInsertAt = ref<number>(-1)
 
 // 当前处于编辑态的节点 UUID；null 表示全部渲染态。单节点激活，聚焦稿件式编辑。
@@ -84,7 +90,7 @@ const questionNodeMap = computed(() => {
   return map
 })
 
-type AddKind = 'rich_text' | 'heading' | 'question' | 'page_break' | 'module_summary'
+type AddKind = 'rich_text' | 'heading' | 'question' | 'page_break' | 'module_summary' | 'insert_composition'
 
 // at 为 insertRootNodeAfter 语义：在第 at 个节点之后插入，缺省为末尾。
 function addNode(kind: AddKind, at?: number) {
@@ -92,6 +98,11 @@ function addNode(kind: AddKind, at?: number) {
   if (kind === 'question') {
     pendingInsertAt.value = insertAt
     pickerOpen.value = true
+    return
+  }
+  if (kind === 'insert_composition') {
+    pendingInsertAt.value = insertAt
+    compositionPickerOpen.value = true
     return
   }
   let node: EditorNode
@@ -108,6 +119,13 @@ function onQuestionSelected(question: Question) {
   const node = createQuestionNode(question)
   setDocument(insertRootNodeAfter(props.document, pendingInsertAt.value, node))
   setActive(node.id)
+}
+
+function onCompositionSelected(detail: CompositionDetail) {
+  const cloned = cloneNodesForInsert(documentFromNodes(detail.nodes).nodes)
+  setDocument(insertRootNodesAfter(props.document, pendingInsertAt.value, cloned))
+  // 多节点插入，不聚焦单个节点，保持全部渲染态。
+  clearActive()
 }
 
 // --- root 层操作 ---
@@ -266,6 +284,13 @@ defineExpose({ hasStale })
       v-model:open="pickerOpen"
       :subject-id="subjectId"
       @select="onQuestionSelected"
+    />
+    <CompositionPicker
+      v-model:open="compositionPickerOpen"
+      :subject-id="subjectId"
+      :exclude-composition-id="compositionId"
+      :exclude-scope="scope"
+      @select="onCompositionSelected"
     />
   </div>
 </template>
