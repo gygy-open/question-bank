@@ -7,6 +7,7 @@ import tempfile
 from typing import Any
 
 from docx import Document
+from docx.enum.text import WD_ALIGN_PARAGRAPH
 from docx.oxml.ns import qn
 from docx.shared import Pt
 
@@ -28,6 +29,13 @@ from app.services.exporting.richdoc.docx import DocxRichRenderer
 
 _HEADING_SIZES = {1: 18, 2: 16, 3: 14, 4: 12}
 _LABELS = (("thinking", "【思路】"), ("analysis", "【解析】"), ("summary", "【总结】"))
+# 与 richdoc/docx.py 的 _ALIGN 保持一致（那边是模块私有常量，不跨模块导入）。
+_ALIGN = {
+    "center": WD_ALIGN_PARAGRAPH.CENTER,
+    "right": WD_ALIGN_PARAGRAPH.RIGHT,
+    "justify": WD_ALIGN_PARAGRAPH.JUSTIFY,
+    "left": WD_ALIGN_PARAGRAPH.LEFT,
+}
 
 
 def _format_score(score: float) -> str:
@@ -68,11 +76,15 @@ class CompositionDocxRenderer:
             self._add_question_details(document, node)
 
     def _add_heading(self, document: Document, node: ExportHeadingNode) -> None:
-        # heading content 恒为单段落纯行内内容(schema 已保证),直接抽取该段落渲染并整体加粗放大。
+        # heading content 恒为单段落纯行内内容(schema 已保证),直接抽取该段落渲染并整体加粗放大，
+        # 同时保留编辑器中设置的段落对齐(textAlign)。
         p = document.add_paragraph()
         blocks = (node.content or {}).get("content") or []
         first = blocks[0] if blocks else None
         if isinstance(first, dict):
+            align = (first.get("attrs") or {}).get("textAlign")
+            if align in _ALIGN:
+                p.alignment = _ALIGN[align]
             for child in first.get("content") or []:
                 if isinstance(child, dict):
                     self.rich.add_inline(p, child)

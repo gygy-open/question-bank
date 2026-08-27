@@ -26,6 +26,13 @@ def _rich_doc(text: str) -> dict:
     return {"type": "doc", "content": [{"type": "paragraph", "content": [{"type": "text", "text": text}]}]}
 
 
+def _rich_doc_aligned(text: str, align: str) -> dict:
+    return {
+        "type": "doc",
+        "content": [{"type": "paragraph", "attrs": {"textAlign": align}, "content": [{"type": "text", "text": text}]}],
+    }
+
+
 def _sample_doc() -> CompositionExportDoc:
     options = [
         ExportOption(id="opt_a", label="A", content=_rich_doc("2")),
@@ -88,6 +95,22 @@ def test_composition_docx_renderer_does_not_print_title_in_body():
         paragraph_texts = [p.text for p in document.paragraphs]
         assert "导出冒烟测试" not in paragraph_texts
         assert paragraph_texts[0] == "第一节"
+    finally:
+        os.remove(path)
+
+
+def test_composition_docx_renderer_applies_heading_text_align():
+    from docx.enum.text import WD_ALIGN_PARAGRAPH
+
+    doc = CompositionExportDoc(
+        title="t",
+        nodes=[ExportHeadingNode(level=2, content=_rich_doc_aligned("居中标题", "center"))],
+    )
+    path = CompositionDocxRenderer().render(doc)
+    try:
+        document = Document(path)
+        assert document.paragraphs[0].text == "居中标题"
+        assert document.paragraphs[0].alignment == WD_ALIGN_PARAGRAPH.CENTER
     finally:
         os.remove(path)
 
