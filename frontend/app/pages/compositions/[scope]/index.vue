@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, watch, onMounted } from 'vue'
+import { ref, computed, watch, onActivated } from 'vue'
 import PageHeader from '~/components/PageHeader.vue'
 import CompositionFolderTree from '~/components/manager/CompositionFolderTree.vue'
 import { Button } from '@/components/ui/button'
@@ -44,7 +44,14 @@ const compositions = ref<Composition[]>([])
 const trashed = ref<Composition[]>([])
 const loadingFolders = ref(false)
 const loadingList = ref(false)
-const selectedFolderId = ref<number | null>(null)
+// 选中文件夹与 URL 的 ?folder= 查询参数双向绑定：地址栏编辑、浏览器前进后退、
+// 详情页面包屑跳转都会生效，selectFolder 只负责改路由，具体加载由下方 watch 驱动。
+const selectedFolderId = computed<number | null>(() => {
+  const raw = route.query.folder
+  const value = Array.isArray(raw) ? raw[0] : raw
+  const n = Number(value)
+  return value != null && Number.isFinite(n) ? n : null
+})
 const expanded = ref<Set<number>>(new Set())
 const view = ref<'active' | 'trash'>('active')
 
@@ -89,6 +96,11 @@ async function loadFolders() {
   loadingFolders.value = true
   try {
     folders.value = await api.listFolders(currentSubjectId.value, scope.value)
+    // 高亮题展开选中目录的祖先链，保证它在树中可见。
+    if (selectedFolderId.value != null) {
+      const chain = folderBreadcrumb(folders.value, selectedFolderId.value)
+      expanded.value = new Set([...expanded.value, ...chain.map((f) => f.id)])
+    }
   } catch {
     toast.error('加载文件夹失败')
   } finally {
@@ -121,17 +133,19 @@ async function reloadAll() {
   await Promise.all([loadFolders(), loadCompositions()])
 }
 
-onMounted(reloadAll)
+// onActivated（而非 onMounted）：页面被全局 keepalive 缓存，需要在每次重新激活时刷新数据
+onActivated(reloadAll)
 watch(currentSubjectId, () => {
-  selectedFolderId.value = null
-  reloadAll()
+  // 文件夹 id 是按科目划分的，切科目时旧的 ?folder= 对新科目无意义
+  if (route.query.folder != null) router.replace({ query: {} })
+  loadFolders()
 })
 watch(scope, () => {
-  selectedFolderId.value = null
+  if (route.query.folder != null) router.replace({ query: {} })
   view.value = 'active'
-  reloadAll()
+  loadFolders()
 })
-watch([selectedFolderId, view], loadCompositions)
+watch([currentSubjectId, scope, selectedFolderId, view], loadCompositions)
 
 function switchScope(next: string | number) {
   const value = String(next) as CompositionScope
@@ -147,7 +161,7 @@ function toggleFolder(id: number) {
 
 function selectFolder(id: number | null) {
   view.value = 'active'
-  selectedFolderId.value = id
+  router.push({ query: id != null ? { folder: id } : {} })
 }
 
 // -------------------------------------------------------------- Folder 弹窗 //
@@ -208,7 +222,7 @@ async function deleteFolder(folder: CompositionFolder) {
   try {
     await api.deleteFolder(currentSubjectId.value, scope.value, folder.id)
     toast.success('已删除文件夹')
-    if (selectedFolderId.value === folder.id) selectedFolderId.value = null
+    if (selectedFolderId.value === folder.id) selectFolder(null)
     await loadFolders()
   } catch (err) {
     handleConflict(err, '删除文件夹失败')

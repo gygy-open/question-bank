@@ -13,7 +13,7 @@ import {
 } from '@/components/ui/dialog'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import {
-  ArrowLeft, Loader2, Users, Lock, AlertTriangle, RefreshCw, History, CheckCircle2,
+  Loader2, Users, Lock, AlertTriangle, RefreshCw, History, CheckCircle2,
 } from '@lucide/vue'
 import { toast } from 'vue-sonner'
 import CompositionCanvas from '~/components/composition/CompositionCanvas.vue'
@@ -23,14 +23,16 @@ import CompositionScoringPanel from '~/components/composition/CompositionScoring
 import CompositionQuestionDisplayPanel from '~/components/composition/CompositionQuestionDisplayPanel.vue'
 import CompositionVersionsSheet from '~/components/composition/CompositionVersionsSheet.vue'
 import { useCompositions, CompositionConflictError } from '~/composables/useCompositions'
-import { normalizeScope } from '~/lib/compositions'
+import { folderBreadcrumb, normalizeScope } from '~/lib/compositions'
 import {
   applyQuestionNumbers, collectDocumentIssues, collectStaleQuestionNodeIds, documentFromNodes,
   documentToReplaceRequest, hasAnyQuestionNumber, orderedScorableQuestions, patchNode,
   questionPropsWithScore, snapshotDocument, totalScore,
 } from '~/lib/compositionDocument'
 import type { EditorDocument, NumberingMode } from '~/lib/compositionDocument'
-import type { AnswerFieldKey, CompositionDetail, CompositionScope, QuestionRevisionStatus } from '~/types'
+import type {
+  AnswerFieldKey, CompositionDetail, CompositionFolder, CompositionScope, QuestionRevisionStatus,
+} from '~/types'
 
 const route = useRoute()
 const router = useRouter()
@@ -54,6 +56,20 @@ const editConflict = ref(false)
 // 题目版本状态（question_id → 实时 revision/可用性），只用于 stale/deleted 标记，不渲染内容。
 const questionStatus = ref<Map<number, QuestionRevisionStatus>>(new Map())
 const syncingNodes = ref(false)
+
+// 面包屑：仅用于头部路径展示与导航，加载失败静默降级为空路径。
+const folders = ref<CompositionFolder[]>([])
+const folderBreadcrumbChain = computed(() =>
+  folderBreadcrumb(folders.value, composition.value?.folder_id ?? null),
+)
+async function loadFolders() {
+  if (!currentSubjectId.value) return
+  try {
+    folders.value = await api.listFolders(currentSubjectId.value, scope.value)
+  } catch {
+    folders.value = []
+  }
+}
 
 const saving = computed(() => savingMeta.value || savingNodes.value)
 
@@ -138,8 +154,12 @@ async function loadQuestionStatus() {
   }
 }
 
-onMounted(load)
+onMounted(() => {
+  load()
+  loadFolders()
+})
 watch([currentSubjectId, scope, compositionId], load)
+watch([currentSubjectId, scope], loadFolders)
 
 async function saveMeta() {
   if (!currentSubjectId.value || !composition.value || saving.value) return
@@ -390,7 +410,7 @@ async function doFinalize() {
     if (err instanceof CompositionConflictError && err.kind === 'revision') {
       // 定稿 revision 冲突：保留本地内容并复用现有冲突条。
       finalizeOpen.value = false
-      blockConflict.value = true
+      editConflict.value = true
       toast.error('组稿已被他人更新，定稿失败；你的本地修改仍保留')
     } else {
       toast.error('定稿失败')
@@ -398,10 +418,6 @@ async function doFinalize() {
   } finally {
     finalizing.value = false
   }
-}
-
-function back() {
-  router.push(`/compositions/${scope.value}`)
 }
 
 // --- 离开前提示未保存修改 ---
@@ -424,21 +440,35 @@ onBeforeRouteLeave(() => {
 
 <template>
   <header class="flex h-16 shrink-0 items-center gap-2 border-b px-4">
-    <Button variant="ghost" size="icon" class="h-8 w-8" @click="back">
-      <ArrowLeft class="h-4 w-4" />
-    </Button>
-    <div class="min-w-0 flex-1">
-      <p class="truncate text-sm font-medium">{{ composition?.title || '组稿' }}</p>
-    </div>
+    <nav class="flex min-w-0 flex-1 items-center gap-1.5 overflow-hidden text-sm">
+      <span class="shrink-0 text-muted-foreground">组稿工作台</span>
+      <span class="shrink-0 text-muted-foreground">/</span>
+      <button
+        type="button"
+        class="inline-flex shrink-0 items-center gap-1 text-muted-foreground hover:text-foreground"
+        @click="router.push(`/compositions/${scope}`)"
+      >
+        <component :is="scope === 'shared' ? Users : Lock" class="h-3.5 w-3.5" />
+        {{ scope === 'shared' ? '共享空间' : '个人空间' }}
+      </button>
+      <template v-for="folder in folderBreadcrumbChain" :key="folder.id">
+        <span class="shrink-0 text-muted-foreground">/</span>
+        <button
+          type="button"
+          class="shrink-0 text-muted-foreground hover:text-foreground"
+          @click="router.push(`/compositions/${scope}?folder=${folder.id}`)"
+        >
+          {{ folder.name }}
+        </button>
+      </template>
+      <span class="shrink-0 text-muted-foreground">/</span>
+      <p class="truncate font-medium">{{ composition?.title || '组稿' }}</p>
+    </nav>
     <Badge v-if="saving" variant="outline" class="gap-1 text-muted-foreground">
       <Loader2 class="h-3 w-3 animate-spin" /> 保存中…
     </Badge>
     <Badge v-else-if="dirty" variant="outline" class="gap-1 text-amber-600 dark:text-amber-400">
       未保存改动
-    </Badge>
-    <Badge variant="outline" class="gap-1">
-      <component :is="scope === 'shared' ? Users : Lock" class="h-3 w-3" />
-      {{ scope === 'shared' ? '共享' : '个人' }}
     </Badge>
     <TooltipProvider :delay-duration="300">
       <Tooltip>
