@@ -14,8 +14,9 @@ import { Pencil, Trash2, Copy, ChevronDown, Star, ShoppingBasket, CheckCircle, H
 import MarkdownPreview from './MarkdownPreview.vue'
 import RichContent from './rich-editor/RichContent.vue'
 import AnswerDisplay from './AnswerDisplay.vue'
-import { isEmptyRichDoc } from './rich-editor/richDoc'
-import PaperQuickSelector from './PaperQuickSelector.vue'
+import { isEmptyRichDoc, richDocToPlainText } from './rich-editor/richDoc'
+import CompositionQuickAdd from './CompositionQuickAdd.vue'
+import { useQuestionBasket } from '@/composables/useQuestionBasket'
 import type { Question as DbQuestion, KnowledgePoint, ImportItem, OptionSpec } from '@/types'
 import { toast } from 'vue-sonner'
 
@@ -122,6 +123,21 @@ const contentPreview = computed(() => {
 const difficultyLabel = computed(() => {
   return `难度 ${props.item.difficulty}`
 })
+
+const basket = useQuestionBasket()
+const inBasket = computed(() => basket.has(Number(props.item.id)))
+const toggleBasket = () => {
+  const q = props.item as DbQuestion
+  const wasInBasket = inBasket.value
+  basket.toggle({
+    id: Number(q.id),
+    subject_id: q.subject_id ?? 0,
+    content_preview: richDocToPlainText(q.content).slice(0, 40),
+    q_type: q.q_type,
+    difficulty: q.difficulty,
+  })
+  toast.success(wasInBasket ? '已移出试题篮' : '已加入试题篮')
+}
 
 const expanded = ref(props.defaultExpanded)
 
@@ -291,9 +307,22 @@ const sourceFileUrl = computed(() => {
               <CheckCircle class="h-4 w-4" />
             </Button>
 
-            <PaperQuickSelector
+            <Button
+              v-if="mode === 'library'"
+              variant="ghost"
+              size="icon"
+              class="h-8 w-8"
+              :class="inBasket ? 'text-primary' : 'text-muted-foreground'"
+              :title="inBasket ? '移出试题篮' : '加入试题篮'"
+              @click="toggleBasket"
+            >
+              <ShoppingBasket class="h-4 w-4" />
+            </Button>
+
+            <CompositionQuickAdd
               v-if="mode === 'library'"
               :question-id="Number(item.id)"
+              :subject-id="(item as DbQuestion).subject_id ?? null"
             />
 
             <!-- Lower-frequency/destructive actions grouped to reduce icon clutter -->

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, onMounted, onBeforeUnmount, watch } from 'vue'
+import { ref, computed, onMounted, onActivated, onBeforeUnmount, watch } from 'vue'
 import { onBeforeRouteLeave } from 'vue-router'
 import { useDebounceFn } from '@vueuse/core'
 import { Button } from '@/components/ui/button'
@@ -162,7 +162,8 @@ async function loadQuestionStatus() {
   }
 }
 
-onMounted(() => {
+// keepalive 缓存下 onMounted 只会触发一次；用 onActivated 覆盖“离开又切回同一稿件”的重新加载。
+onActivated(() => {
   load()
   loadFolders()
 })

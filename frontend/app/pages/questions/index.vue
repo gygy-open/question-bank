@@ -7,9 +7,13 @@ import QuestionListItem from '~/components/QuestionListItem.vue'
 import QuestionEditDialog from '~/components/QuestionEditDialog.vue'
 import QuestionStructureSheet from '~/components/QuestionStructureSheet.vue'
 import PageHeader from '~/components/PageHeader.vue'
-import PaperFullSelector from '~/components/PaperFullSelector.vue'
+import CompositionTargetPicker from '~/components/CompositionTargetPicker.vue'
+import QuestionBasketButton from '~/components/QuestionBasketButton.vue'
+import QuestionBasketPanel from '~/components/QuestionBasketPanel.vue'
 import TagFilter from '~/components/TagFilter.vue'
-import { Loader2, Plus, X, Trash2, ShoppingBasket, ListTree, Edit, SlidersHorizontal, ChevronsUpDown, ChevronLeft, ChevronRight } from '@lucide/vue'
+import { useQuestionBasket } from '~/composables/useQuestionBasket'
+import { richDocToPlainText } from '~/components/rich-editor/richDoc'
+import { Loader2, Plus, X, Trash2, ShoppingBasket, FileText, ListTree, Edit, SlidersHorizontal, ChevronsUpDown, ChevronLeft, ChevronRight } from '@lucide/vue'
 import { Label } from '@/components/ui/label'
 import { Badge } from '@/components/ui/badge'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
@@ -62,9 +66,13 @@ const dialogMode = ref<'create' | 'edit'>('create')
 // --- Selection & Batch Actions ---
 const selectedIds = ref<Set<number>>(new Set())
 
-// --- Add to paper ---
-const paperSelectorOpen = ref(false)
-const paperSelectorQuestionIds = ref<number[]>([])
+// --- Add to composition (direct path, bypasses the basket) ---
+const compositionPickerOpen = ref(false)
+const compositionPickerQuestionIds = ref<number[]>([])
+
+// --- Question basket (staging path) ---
+const questionBasket = useQuestionBasket()
+const basketPanelOpen = ref(false)
 
 // --- Filters ---
 const filters = reactive({
@@ -196,11 +204,26 @@ const handleSelect = (id: number, selected: boolean) => {
 const batchAddToBasket = () => {
   const ids = Array.from(selectedIds.value)
   if (ids.length === 0) return
-  paperSelectorQuestionIds.value = ids
-  paperSelectorOpen.value = true
+  const selectedQuestions = questions.value.filter(q => selectedIds.value.has(q.id))
+  questionBasket.addMany(selectedQuestions.map(q => ({
+    id: q.id,
+    subject_id: q.subject_id ?? 0,
+    content_preview: richDocToPlainText(q.content).slice(0, 40),
+    q_type: q.q_type,
+    difficulty: q.difficulty,
+  })))
+  toast.success(`已将 ${ids.length} 道题加入试题篮`)
+  selectedIds.value.clear()
 }
 
-const onPaperSelectorAdded = () => {
+const batchAddDirectlyToComposition = () => {
+  const ids = Array.from(selectedIds.value)
+  if (ids.length === 0) return
+  compositionPickerQuestionIds.value = ids
+  compositionPickerOpen.value = true
+}
+
+const onCompositionPickerAdded = () => {
   selectedIds.value.clear()
 }
 
@@ -671,7 +694,11 @@ const viewStructure = (question: Question) => {
                       <span class="text-sm text-muted-foreground">已选 {{ selectedIds.size }} 项</span>
                       <Button size="sm" variant="outline" class="h-7 px-2" @click="batchAddToBasket">
                         <ShoppingBasket class="mr-1 h-3 w-3" />
-                        加入试卷
+                        加入试题篮
+                      </Button>
+                      <Button size="sm" variant="outline" class="h-7 px-2" @click="batchAddDirectlyToComposition">
+                        <FileText class="mr-1 h-3 w-3" />
+                        直接加入稿件
                       </Button>
                       <Button size="sm" variant="outline" class="h-7 px-2" @click="openBatchUpdateSourceDialog">
                         <Edit class="mr-1 h-3 w-3" />
@@ -803,9 +830,13 @@ const viewStructure = (question: Question) => {
     </DialogContent>
   </Dialog>
 
-  <PaperFullSelector
-    v-model:open="paperSelectorOpen"
-    :question-ids="paperSelectorQuestionIds"
-    @added="onPaperSelectorAdded"
+  <CompositionTargetPicker
+    v-model:open="compositionPickerOpen"
+    :subject-id="currentSubjectId"
+    :question-ids="compositionPickerQuestionIds"
+    @added="onCompositionPickerAdded"
   />
+
+  <QuestionBasketButton @click="basketPanelOpen = true" />
+  <QuestionBasketPanel v-model:open="basketPanelOpen" :subjects="subjects" />
 </template>
