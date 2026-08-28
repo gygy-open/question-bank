@@ -115,10 +115,12 @@ function addNode(kind: AddKind, at?: number) {
   setActive(node.id)
 }
 
-function onQuestionSelected(question: Question) {
-  const node = createQuestionNode(question)
-  setDocument(insertRootNodeAfter(props.document, pendingInsertAt.value, node))
-  setActive(node.id)
+function onQuestionsSelected(questions: Question[]) {
+  const nodes = questions.map((q) => createQuestionNode(q))
+  setDocument(insertRootNodesAfter(props.document, pendingInsertAt.value, nodes))
+  // 单题插入保持旧的聚焦行为；多题插入不聚焦单个节点，保持全部渲染态。
+  if (nodes.length === 1) setActive(nodes[0]!.id)
+  else clearActive()
 }
 
 function onCompositionSelected(detail: CompositionDetail) {
@@ -283,7 +285,7 @@ defineExpose({ hasStale })
     <QuestionPicker
       v-model:open="pickerOpen"
       :subject-id="subjectId"
-      @select="onQuestionSelected"
+      @select="onQuestionsSelected"
     />
     <CompositionPicker
       v-model:open="compositionPickerOpen"
