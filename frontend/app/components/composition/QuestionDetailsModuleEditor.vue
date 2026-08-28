@@ -18,7 +18,7 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import {
-  ArrowUp, ArrowDown, Trash2, ListChecks, Plus, Type, Heading, FileQuestion,
+  ArrowUp, ArrowDown, Trash2, ListChecks, Plus, Type, Heading,
   AlignLeft, AlignCenter, AlignRight, AlignJustify,
 } from '@lucide/vue'
 import { questionTypeLabel } from '@/lib/answerFormat'
@@ -86,6 +86,11 @@ function questionNumber(child: EditorNode): string {
   const q = sourceQuestion(child)
   return q ? questionNumberOf(q) : ''
 }
+
+// 渲染态：题号只贴在首个可见字段行上（各题可见字段集合一致，取全局开关顺序中的第一个）。
+const firstVisibleFieldKey = computed<AnswerFieldKey | null>(
+  () => ANSWER_FIELD_KEYS.find((k) => detail.value.fields[k]) ?? null,
+)
 
 // --- 自定义子节点（heading/rich_text）编辑 ---
 function childRichModel(child: EditorNode) {
@@ -261,13 +266,13 @@ function childHeadingLevel(child: EditorNode) {
           <!-- answer_item：WYSIWYG 真实冻结题目字段 + 题级配置（不可重排） -->
           <div v-else-if="child.nodeType === 'answer_item'" class="rounded-md border bg-card">
             <div class="flex flex-wrap items-center gap-2 border-b px-3 py-1.5">
-              <FileQuestion class="h-3.5 w-3.5 text-muted-foreground" />
               <Badge
-                v-if="numberingEnabled && questionNumber(child)"
+                v-if="numberingEnabled"
                 variant="outline"
                 class="text-xs font-medium"
+                :class="questionNumber(child) ? '' : 'text-muted-foreground/50'"
               >
-                {{ questionNumber(child) }}
+                {{ questionNumber(child) || '__' }}
               </Badge>
               <template v-if="sourceQuestion(child)?.questionContent">
                 <Badge variant="secondary" class="text-xs">{{ questionTypeLabel(sourceQuestion(child)!.questionContent!.q_type) }}</Badge>
@@ -340,7 +345,7 @@ function childHeadingLevel(child: EditorNode) {
     </template>
 
     <!-- 渲染态：只读排版，隐藏所有编辑控件 -->
-    <div v-else class="space-y-4 px-3 py-2">
+    <div v-else class="space-y-2 px-3 py-2">
       <p v-if="!hasChildren" class="text-xs text-muted-foreground">此范围内暂无题目。</p>
       <template v-for="child in node.children" :key="child.id">
         <!-- 自定义标题 -->
@@ -351,30 +356,25 @@ function childHeadingLevel(child: EditorNode) {
         <!-- 自定义文本 -->
         <RichContent v-else-if="child.nodeType === 'rich_text'" :content="child.content" />
 
-        <!-- answer_item：按全局字段渲染真实冻结内容 -->
-        <div v-else-if="child.nodeType === 'answer_item'" class="flex gap-2 text-sm">
-          <FileQuestion class="mt-0.5 h-3.5 w-3.5 shrink-0 text-muted-foreground" />
-          <div class="min-w-0 flex-1 space-y-1">
-            <span v-if="numberingEnabled && questionNumber(child)" class="text-xs font-medium text-muted-foreground">
-              {{ questionNumber(child) }}
-            </span>
-            <template v-if="sourceQuestion(child)?.questionContent">
-              <template v-for="key in ANSWER_FIELD_KEYS" :key="key">
-                <div v-if="detail.fields[key]" class="flex items-start gap-2">
-                  <span class="w-10 shrink-0 pt-0.5 text-[11px] font-medium text-muted-foreground">{{ FIELD_LABELS[key] }}</span>
-                  <div class="min-w-0 flex-1">
-                    <AnswerDisplay
-                      v-if="key === 'answer'"
-                      :answer="sourceQuestion(child)!.questionContent!.answer"
-                      :options="sourceQuestion(child)!.questionContent!.options"
-                    />
-                    <RichContent v-else :content="sourceQuestion(child)!.questionContent![key]" class="[&_.prose]:my-0" empty-text="（空）" />
-                  </div>
-                </div>
-              </template>
+        <!-- answer_item：按全局字段渲染真实冻结内容；题号与首个可见字段同行，紧凑排布 -->
+        <div v-else-if="child.nodeType === 'answer_item'" class="space-y-1 border-l-2 border-muted pl-2.5 text-sm">
+          <template v-if="sourceQuestion(child)?.questionContent">
+            <template v-for="key in ANSWER_FIELD_KEYS" :key="key">
+              <div v-if="detail.fields[key]" class="flex flex-wrap items-baseline gap-x-1.5 gap-y-0.5">
+                <span v-if="key === firstVisibleFieldKey && numberingEnabled && questionNumber(child)" class="font-medium text-muted-foreground">
+                  {{ questionNumber(child) }}.
+                </span>
+                <span class="shrink-0 text-xs font-medium text-muted-foreground">{{ FIELD_LABELS[key] }}：</span>
+                <AnswerDisplay
+                  v-if="key === 'answer'"
+                  :answer="sourceQuestion(child)!.questionContent!.answer"
+                  :options="sourceQuestion(child)!.questionContent!.options"
+                />
+                <RichContent v-else :content="sourceQuestion(child)!.questionContent![key]" class="[&_.prose]:my-0" empty-text="（空）" />
+              </div>
             </template>
-            <span v-else class="text-xs text-destructive">题目内容不可用</span>
-          </div>
+          </template>
+          <span v-else class="text-xs text-destructive">题目内容不可用</span>
         </div>
       </template>
     </div>

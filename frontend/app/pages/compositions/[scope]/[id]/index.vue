@@ -32,7 +32,7 @@ import { useCompositions, CompositionConflictError } from '~/composables/useComp
 import { folderBreadcrumb, normalizeScope } from '~/lib/compositions'
 import {
   applyQuestionNumbers, collectDocumentIssues, collectStaleQuestionNodeIds, documentFromNodes,
-  documentToReplaceRequest, hasAnyQuestionNumber, orderedScorableQuestions, patchNode,
+  documentToReplaceRequest, hasAnyQuestionNumber, normalizeDocument, orderedScorableQuestions, patchNode,
   questionPropsWithScore, snapshotDocument, totalScore,
 } from '~/lib/compositionDocument'
 import type { EditorDocument, NumberingMode } from '~/lib/compositionDocument'
@@ -293,7 +293,8 @@ async function toggleNumbering(value: boolean) {
     )
     composition.value = { ...composition.value, ...updated }
     if (value && !hasAnyQuestionNumber(document.value)) {
-      document.value = applyQuestionNumbers(document.value, 'global')
+      // 补齐题号后同步重建各 question_details 模块的 answer_item 归属，避免其题号解析对象过期。
+      document.value = normalizeDocument(applyQuestionNumbers(document.value, 'global'))
     }
   } catch (err) {
     if (err instanceof CompositionConflictError && err.kind === 'revision') {
@@ -378,7 +379,7 @@ function autofillNumbers(mode: NumberingMode) {
   ) {
     return
   }
-  document.value = applyQuestionNumbers(document.value, mode)
+  document.value = normalizeDocument(applyQuestionNumbers(document.value, mode))
 }
 
 // --- 定稿（冻结当前 revision 为不可变版本） ---

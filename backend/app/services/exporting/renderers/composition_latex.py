@@ -42,6 +42,8 @@ _PREAMBLE = r"""\documentclass[12pt,a4paper]{article}
 
 _HEADING_CMD = {1: "section*", 2: "subsection*", 3: "subsubsection*", 4: "paragraph*"}
 _LABELS = (("thinking", "【思路】"), ("analysis", "【解析】"), ("summary", "【总结】"))
+# 与前端画布一致：有题号时题干用 hangindent 折行对齐首行文字起点，选项同量右移。
+_NUMBER_INDENT = "1.5em"
 
 
 def _format_score(score: float) -> str:
@@ -111,21 +113,26 @@ class CompositionLatexRenderer:
         return f"\\{cmd}{{{text}}}\n"
 
     def _render_question(self, q: ExportQuestionNode, image_path: ImagePathFn) -> str:
+        # 题号(粗体)+ 分值(斜体)同挤在题干首段前,而非各占一行,与编辑器内联展示口径一致。
+        hang = f"\\hangindent={_NUMBER_INDENT}\\hangafter=1 " if q.number else ""
         prefix = f"\\textbf{{{latex_escape(q.number)}.}}\\ " if q.number else ""
-        parts = [f"{prefix}{rich_doc_to_latex(q.stem, image_path)}\n"]
-        if q.options:
-            parts.append(self._render_options(q.options, q.option_columns, image_path))
         if q.score is not None:
-            parts.append(f"\\textit{{（{_format_score(q.score)} 分）}}\n")
+            prefix += f"\\textit{{（{_format_score(q.score)} 分）}}\\ "
+        parts = [f"{hang}{prefix}{rich_doc_to_latex(q.stem, image_path)}\n"]
+        if q.options:
+            parts.append(self._render_options(q.options, q.option_columns, image_path, indent=bool(q.number)))
         inline = self._render_inline_fields(q.answer, q.thinking, q.analysis, q.summary, q.options, image_path)
         if inline:
             parts.append(inline)
         return "\n".join(parts)
 
-    def _render_options(self, options: list[ExportOption], columns: int, image_path: ImagePathFn) -> str:
+    def _render_options(
+        self, options: list[ExportOption], columns: int, image_path: ImagePathFn, indent: bool = False,
+    ) -> str:
         columns = max(1, columns)
+        lead = f"\\hspace*{{{_NUMBER_INDENT}}}" if indent else ""
         items = [
-            f"\\noindent {latex_escape(opt.label)}.\\ {rich_doc_to_latex(opt.content, image_path)}"
+            f"\\noindent {lead}{latex_escape(opt.label)}.\\ {rich_doc_to_latex(opt.content, image_path)}"
             for opt in options
         ]
         if columns <= 1:
@@ -146,7 +153,7 @@ class CompositionLatexRenderer:
         return "\n".join(parts)
 
     def _render_answer_entry(self, entry: ExportAnswerEntry, image_path: ImagePathFn) -> str:
-        parts = [f"\\textit{{\\#{entry.question_id}}}\n"]
+        parts = [f"\\textbf{{{latex_escape(entry.number)}.}}\n"] if entry.number else []
         inline = self._render_inline_fields(
             entry.answer, entry.thinking, entry.analysis, entry.summary, entry.options, image_path
         )

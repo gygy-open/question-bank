@@ -56,6 +56,7 @@ class ExportAnswerEntry:
     thinking: RichDoc
     analysis: RichDoc
     summary: RichDoc
+    number: str = ""  # ''  = 不显示(source question 无题号或 numbering_enabled 为假)
 
 
 # question_details 的子节点:自定义 heading/rich_text 原样透传,或已解析的 answer_item。

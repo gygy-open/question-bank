@@ -248,6 +248,32 @@ def test_answer_item_override_wins_over_module_global_field():
     assert entry.thinking is not None
 
 
+def test_answer_item_number_from_source_question_when_numbering_enabled():
+    snap = _snapshot([
+        _question_node("q1", 0, qid=1, props={"number": "1"}),
+        _module_node("m1", 1),
+        _answer_item_node("ai1", "m1", 0, source_id="q1"),
+    ], numbering_enabled=True)
+    doc = CompositionAssembler().assemble(snap)
+    module = next(n for n in doc.nodes if isinstance(n, ExportQuestionDetailsNode))
+    entry = module.children[0]
+    assert isinstance(entry, ExportAnswerEntry)
+    assert entry.number == "1"
+
+
+def test_answer_item_number_empty_when_numbering_disabled():
+    snap = _snapshot([
+        _question_node("q1", 0, qid=1, props={"number": "1"}),
+        _module_node("m1", 1),
+        _answer_item_node("ai1", "m1", 0, source_id="q1"),
+    ], numbering_enabled=False)
+    doc = CompositionAssembler().assemble(snap)
+    module = next(n for n in doc.nodes if isinstance(n, ExportQuestionDetailsNode))
+    entry = module.children[0]
+    assert isinstance(entry, ExportAnswerEntry)
+    assert entry.number == ""
+
+
 def test_answer_item_excluded_when_not_included():
     snap = _snapshot([
         _question_node("q1", 0, qid=1),

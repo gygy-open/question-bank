@@ -153,7 +153,9 @@ class CompositionAssembler:
                 question_display=question_display,
             )
         if node_type == "question_details":
-            return self._assemble_question_details(n, children_by_parent, question_nodes_by_id)
+            return self._assemble_question_details(
+                n, children_by_parent, question_nodes_by_id, numbering_enabled=numbering_enabled,
+            )
         raise CompositionExportError(
             f"Unsupported snapshot node type: {node_type!r}", node_id=n.get("id"), node_type=node_type,
         )
@@ -201,6 +203,8 @@ class CompositionAssembler:
         n: dict[str, Any],
         children_by_parent: dict[str, list[dict[str, Any]]],
         question_nodes_by_id: dict[str, dict[str, Any]],
+        *,
+        numbering_enabled: bool,
     ) -> ExportQuestionDetailsNode:
         props = n.get("props") or {}
         scope = str(props.get("scope", "all"))
@@ -218,7 +222,9 @@ class CompositionAssembler:
             elif ctype == "rich_text":
                 children.append(ExportRichTextNode(content=c.get("content")))
             elif ctype == "answer_item":
-                entry = self._assemble_answer_item(c, question_nodes_by_id, module_fields)
+                entry = self._assemble_answer_item(
+                    c, question_nodes_by_id, module_fields, numbering_enabled=numbering_enabled,
+                )
                 if entry is not None:
                     children.append(entry)
             else:
@@ -233,6 +239,8 @@ class CompositionAssembler:
         c: dict[str, Any],
         question_nodes_by_id: dict[str, dict[str, Any]],
         module_fields: dict[str, Any],
+        *,
+        numbering_enabled: bool,
     ) -> Optional[ExportAnswerEntry]:
         props = c.get("props") or {}
         # included=false:该题在此模块内被排除,与前端 effectiveAnswerFields 一致地整条跳过。
@@ -249,6 +257,8 @@ class CompositionAssembler:
 
         q = source.get("question") or {}
         overrides = props.get("overrides") or {}
+        # 题号取自源 question 节点自身的 props(与本体题目块同一个值),而非 answer_item 自身的 props。
+        number = str((source.get("props") or {}).get("number") or "") if numbering_enabled else ""
 
         def field_or_none(key: str) -> Any:
             override = overrides.get(key)
@@ -257,6 +267,7 @@ class CompositionAssembler:
 
         return ExportAnswerEntry(
             question_id=q.get("id"),
+            number=number,
             q_type=str(q.get("q_type", "")),
             stem=q.get("content"),
             options=_parse_options(q.get("options")),

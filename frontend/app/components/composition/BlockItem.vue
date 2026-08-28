@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
+import { computed, nextTick, ref, watch } from 'vue'
 import RichEditor from '@/components/rich-editor/RichEditor.vue'
 import RichContent from '@/components/rich-editor/RichContent.vue'
 import AnswerDisplay from '@/components/AnswerDisplay.vue'
@@ -80,6 +80,8 @@ watch(
   () => {
     headingText.value = headingDocToText(props.node.content)
     forcePlainEdit.value = false
+    editingNumber.value = false
+    editingScore.value = false
   },
 )
 const headingHasRich = computed(() => headingHasRichInline(props.node.content))
@@ -132,6 +134,32 @@ const questionScore = computed<number | null>({
     emit('patch', { props: Object.keys(next).length ? next : null })
   },
 })
+
+// --- question 题号/分值：点击原地编辑（与内容行展示位置一致，不再单独开工具条输入框） ---
+const editingNumber = ref(false)
+const editingScore = ref(false)
+const numberInputRef = ref<InstanceType<typeof Input> | null>(null)
+const scoreInputRef = ref<InstanceType<typeof Input> | null>(null)
+
+function startEditNumber() {
+  if (!props.active) return
+  editingNumber.value = true
+  nextTick(() => (numberInputRef.value?.$el as HTMLInputElement | undefined)?.focus())
+}
+function startEditScore() {
+  if (!props.active) return
+  editingScore.value = true
+  nextTick(() => (scoreInputRef.value?.$el as HTMLInputElement | undefined)?.focus())
+}
+watch(
+  () => props.active,
+  (v) => {
+    if (!v) {
+      editingNumber.value = false
+      editingScore.value = false
+    }
+  },
+)
 
 // --- question 选项排版（每卷覆盖） ---
 const OPTION_LAYOUT_ITEMS: { value: OptionLayout; label: string }[] = [
@@ -338,21 +366,6 @@ function setShow(key: AnswerFieldKey, value: string) {
         </div>
         <div v-else class="space-y-3">
           <div v-if="active" class="flex items-center gap-2">
-            <Input
-              v-if="numberingEnabled"
-              :model-value="questionNumber"
-              placeholder="题号"
-              class="h-6 w-16 text-xs"
-              @update:model-value="questionNumber = String($event)"
-            />
-            <Input
-              v-if="scoringEnabled"
-              type="number" min="0" max="1000" step="0.5"
-              :model-value="questionScore ?? ''"
-              placeholder="分值"
-              class="h-6 w-16 text-xs"
-              @update:model-value="questionScore = $event === '' ? null : Number($event)"
-            />
             <Badge variant="secondary" class="text-xs">{{ questionTypeLabel(node.questionContent.q_type) }}</Badge>
             <span class="text-xs text-muted-foreground">#{{ node.questionId }} · 版本 r{{ node.questionRevision }}</span>
             <div class="ml-auto flex items-center gap-2">
@@ -387,27 +400,68 @@ function setShow(key: AnswerFieldKey, value: string) {
               </Popover>
             </div>
           </div>
-          <div class="flex gap-2">
-            <span
-              v-if="numberingEnabled && questionNumber"
-              class="shrink-0 font-medium text-muted-foreground"
-            >{{ questionNumber }}.</span>
-            <RichContent :content="node.questionContent.content" empty-text="（无题干）" class="min-w-0 flex-1 [&_p]:my-0" />
-            <span
-              v-if="scoringEnabled && questionScore != null"
-              class="shrink-0 text-sm text-muted-foreground"
-            >（{{ questionScore }} 分）</span>
+          <div class="flex items-baseline gap-2 text-sm">
+            <!-- 题号仍是 flex 兄弟，保留原有的整段缩进；分值改为 float 嵌入题干首行，不再单占一列 -->
+            <template v-if="numberingEnabled">
+              <Input
+                v-if="active && editingNumber"
+                ref="numberInputRef"
+                :model-value="questionNumber"
+                placeholder="题号"
+                class="h-6 w-12 shrink-0 text-sm"
+                @update:model-value="questionNumber = String($event)"
+                @blur="editingNumber = false"
+                @keydown.enter="editingNumber = false"
+                @keydown.esc="editingNumber = false"
+              />
+              <span
+                v-else-if="active || questionNumber"
+                class="shrink-0 font-medium"
+                :class="active
+                  ? 'cursor-text rounded px-0.5 hover:bg-muted/60 ' + (questionNumber ? 'text-muted-foreground' : 'text-muted-foreground/50')
+                  : 'text-muted-foreground'"
+                @click.stop="startEditNumber"
+              >{{ questionNumber || '__' }}.</span>
+            </template>
+            <div class="min-w-0 flex-1 space-y-2">
+              <div class="flow-root">
+                <template v-if="scoringEnabled">
+                  <Input
+                    v-if="active && editingScore"
+                    ref="scoreInputRef"
+                    type="number" min="0" max="1000" step="0.5"
+                    :model-value="questionScore ?? ''"
+                    placeholder="分值"
+                    class="float-left mr-2 h-6 w-16 text-sm"
+                    @update:model-value="questionScore = $event === '' ? null : Number($event)"
+                    @blur="editingScore = false"
+                    @keydown.enter="editingScore = false"
+                    @keydown.esc="editingScore = false"
+                  />
+                  <span
+                    v-else-if="active || questionScore != null"
+                    class="float-left mr-2 text-sm"
+                    :class="active
+                      ? 'cursor-text rounded px-0.5 hover:bg-muted/60 ' + (questionScore != null ? 'text-muted-foreground' : 'text-muted-foreground/50')
+                      : 'text-muted-foreground'"
+                    @click.stop="startEditScore"
+                  >（{{ questionScore ?? '__' }} 分）</span>
+                </template>
+                <RichContent :content="node.questionContent.content" empty-text="（无题干）" class="[&_p]:my-0" />
+              </div>
+              <!-- 选项与题干共享同一列，保持和题号一致的缩进 -->
+              <ul
+                v-if="node.questionContent.options?.length"
+                class="grid gap-x-6 gap-y-1"
+                :style="{ gridTemplateColumns: `repeat(${optionColumns}, minmax(0, 1fr))` }"
+              >
+                <li v-for="opt in node.questionContent.options" :key="opt.id" class="flex items-baseline gap-2 text-sm">
+                  <span class="font-medium text-muted-foreground">{{ opt.label }}.</span>
+                  <RichContent :content="opt.content" class="min-w-0 [&_p]:my-0" />
+                </li>
+              </ul>
+            </div>
           </div>
-          <ul
-            v-if="node.questionContent.options?.length"
-            class="grid gap-x-6 gap-y-1"
-            :style="{ gridTemplateColumns: `repeat(${optionColumns}, minmax(0, 1fr))` }"
-          >
-            <li v-for="opt in node.questionContent.options" :key="opt.id" class="flex items-baseline gap-2 text-sm">
-              <span class="font-medium text-muted-foreground">{{ opt.label }}.</span>
-              <RichContent :content="opt.content" class="min-w-0 [&_p]:my-0" />
-            </li>
-          </ul>
           <template v-for="key in ANSWER_FIELD_KEYS" :key="key">
             <div v-if="fieldVisible(key)" class="rounded-md bg-muted/50 px-3 py-2">
               <p class="mb-1 text-xs font-medium text-muted-foreground">{{ FIELD_LABELS[key] }}</p>
