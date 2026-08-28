@@ -16,7 +16,7 @@ import {
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import {
   ArrowUp, ArrowDown, Trash2, Type, Heading, FileQuestion, SeparatorHorizontal,
-  AlertTriangle, Pencil, RefreshCw, Eye, AlignLeft, AlignCenter, AlignRight, AlignJustify,
+  AlertTriangle, Pencil, RefreshCw, Eye, ScanEye, AlignLeft, AlignCenter, AlignRight, AlignJustify,
 } from '@lucide/vue'
 import { questionTypeLabel } from '@/lib/answerFormat'
 import {
@@ -82,6 +82,7 @@ watch(
     forcePlainEdit.value = false
     editingNumber.value = false
     editingScore.value = false
+    previewAll.value = false
   },
 )
 const headingHasRich = computed(() => headingHasRichInline(props.node.content))
@@ -188,7 +189,11 @@ const DEFAULT_DISPLAY: Record<AnswerFieldKey, boolean> = {
   answer: false, thinking: false, analysis: false, summary: false,
 }
 
+// 临时预览：纯 UI 态，开启时强制显示全部字段，不写入 props、不触发保存。
+const previewAll = ref(false)
+
 function fieldVisible(key: AnswerFieldKey): boolean {
+  if (previewAll.value) return true
   return effectiveQuestionField(props.node, props.globalDisplayFields ?? DEFAULT_DISPLAY, key)
 }
 
@@ -249,6 +254,20 @@ function setShow(key: AnswerFieldKey, value: string) {
           <TooltipContent>
             {{ syncDisabled ? '请先保存未保存的修改' : '把此题更新为题库最新内容' }}
           </TooltipContent>
+        </Tooltip>
+      </TooltipProvider>
+      <TooltipProvider v-if="node.nodeType === 'question' && node.questionContent" :delay-duration="300">
+        <Tooltip>
+          <TooltipTrigger as-child>
+            <Button
+              variant="ghost" size="icon" class="h-7 w-7"
+              :class="previewAll ? 'text-primary' : ''"
+              @click.stop="previewAll = !previewAll"
+            >
+              <ScanEye class="h-3.5 w-3.5" />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>{{ previewAll ? '退出预览' : '临时预览全部内容' }}</TooltipContent>
         </Tooltip>
       </TooltipProvider>
       <div class="ml-1 flex items-center gap-0.5">
