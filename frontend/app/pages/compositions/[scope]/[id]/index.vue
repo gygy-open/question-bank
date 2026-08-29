@@ -20,7 +20,7 @@ import {
   Download, Loader2, Users, Lock, AlertTriangle, RefreshCw, History, CheckCircle2, Clock,
 } from '@lucide/vue'
 import { toast } from 'vue-sonner'
-import CompositionCanvas from '~/components/composition/CompositionCanvas.vue'
+import CompositionTiptapCanvas from '~/components/composition-next/CompositionTiptapCanvas.vue'
 import CompositionSettingsPanel from '~/components/composition/CompositionSettingsPanel.vue'
 import CompositionNumberingPanel from '~/components/composition/CompositionNumberingPanel.vue'
 import CompositionScoringPanel from '~/components/composition/CompositionScoringPanel.vue'
@@ -106,13 +106,13 @@ const totalScoreValue = computed(() => totalScore(document.value))
 const autosaveMeta = useDebounceFn(() => {
   if (!composition.value || saving.value || !metaDirty.value) return
   if (!title.value.trim()) return
-  saveMeta()
+  saveMeta({ silent: true })
 }, 1000)
 
 const autosaveNodes = useDebounceFn(() => {
   if (!composition.value || saving.value || !nodesDirty.value) return
   if (collectDocumentIssues(document.value).length) return
-  saveNodes()
+  saveNodes({ silent: true })
 }, 1400)
 
 watch([title, description], () => {
@@ -170,7 +170,7 @@ onActivated(() => {
 watch([currentSubjectId, scope, compositionId], load)
 watch([currentSubjectId, scope], loadFolders)
 
-async function saveMeta() {
+async function saveMeta(opts?: { silent?: boolean }) {
   if (!currentSubjectId.value || !composition.value || saving.value) return
   if (!title.value.trim()) {
     toast.error('请输入标题')
@@ -192,7 +192,7 @@ async function saveMeta() {
     composition.value = { ...composition.value, ...updated }
     title.value = updated.title
     description.value = updated.description ?? ''
-    toast.success('已保存标题/描述')
+    if (!opts?.silent) toast.success('已保存标题/描述')
   } catch (err) {
     if (err instanceof CompositionConflictError && err.kind === 'revision') {
       // 与内容保存冲突采用同一策略：保留全部本地修改，由用户决定何时放弃并重载。
@@ -206,11 +206,11 @@ async function saveMeta() {
   }
 }
 
-async function saveNodes() {
+async function saveNodes(opts?: { silent?: boolean }) {
   if (!currentSubjectId.value || !composition.value || saving.value) return
   const issues = collectDocumentIssues(document.value)
   if (issues.length) {
-    toast.error(`存在无法保存的块：${issues[0]}`)
+    if (!opts?.silent) toast.error(`存在无法保存的块：${issues[0]}`)
     return
   }
   savingNodes.value = true
@@ -227,7 +227,7 @@ async function saveNodes() {
     composition.value = { ...composition.value, revision: resp.revision }
     savedSnapshot.value = snapshotDocument(document.value)
     editConflict.value = false
-    toast.success('已保存内容')
+    if (!opts?.silent) toast.success('已保存内容')
     await loadQuestionStatus()
   } catch (err) {
     if (err instanceof CompositionConflictError && err.kind === 'revision') {
@@ -666,17 +666,17 @@ onBeforeRouteLeave(() => {
       <!-- 画布 + 题号面板 -->
       <div class="flex flex-col gap-6 lg:flex-row lg:items-start">
         <div class="flex min-w-0 flex-1 flex-col gap-6">
-          <CompositionCanvas
+          <CompositionTiptapCanvas
             v-model:document="document"
             :subject-id="currentSubjectId"
-            :composition-id="compositionId"
             :scope="scope"
-            :question-status="questionStatus"
-            :sync-disabled="dirty"
-            :syncing="syncingNodes"
+            :composition-id="compositionId"
             :numbering-enabled="numberingEnabled"
             :scoring-enabled="scoringEnabled"
             :global-display-fields="questionDisplay"
+            :question-status="questionStatus"
+            :sync-disabled="dirty"
+            :syncing="syncingNodes"
             @sync="syncNodes"
           />
 

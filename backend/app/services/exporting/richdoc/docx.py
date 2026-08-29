@@ -13,7 +13,9 @@ import math
 from typing import Any, Optional
 
 from docx.enum.text import WD_ALIGN_PARAGRAPH
-from docx.shared import Emu
+from docx.oxml import OxmlElement
+from docx.oxml.ns import qn
+from docx.shared import Emu, Inches
 
 from app.services.exporting.images import ImageResolver
 from app.services.exporting.richdoc.omml import latex_to_omml
@@ -87,11 +89,74 @@ class DocxRichRenderer:
             self._add_table(parent, node)
             return
 
+        if t == "blockquote":
+            self._add_blockquote(parent, node.get("content") or [])
+            return
+
+        if t == "codeBlock":
+            self._add_code_block(parent, node)
+            return
+
+        if t == "horizontalRule":
+            self._add_horizontal_rule(parent)
+            return
+
         # 未知/未来块:优先递归,否则退化为纯文本段落。
         if node.get("content"):
             self.add_blocks(parent, node.get("content") or [], list_style)
         elif node.get("text"):
             parent.add_paragraph().add_run(str(node.get("text")))
+
+    def _collect_text(self, node: dict[str, Any]) -> str:
+        """收集块内文本（代码块用），hardBreak 视为换行。"""
+        parts: list[str] = []
+        for child in node.get("content") or []:
+            if not isinstance(child, dict):
+                continue
+            if child.get("type") == "text":
+                parts.append(str(child.get("text") or ""))
+            elif child.get("type") == "hardBreak":
+                parts.append("\n")
+            else:
+                parts.append(self._collect_text(child))
+        return "".join(parts)
+
+    def _add_blockquote(self, parent: Any, nodes: list[Any]) -> None:
+        for node in nodes:
+            if not isinstance(node, dict):
+                continue
+            if node.get("type") == "paragraph":
+                try:
+                    p = parent.add_paragraph(style="Quote")
+                except (KeyError, ValueError):
+                    p = parent.add_paragraph()
+                    p.paragraph_format.left_indent = Inches(0.5)
+                for child in node.get("content") or []:
+                    if isinstance(child, dict):
+                        self.add_inline(p, child)
+            else:
+                self.add_block(parent, node)
+
+    def _add_code_block(self, parent: Any, node: dict[str, Any]) -> None:
+        p = parent.add_paragraph()
+        for i, line in enumerate(self._collect_text(node).split("\n")):
+            if i:
+                p.add_run().add_break()
+            run = p.add_run(line)
+            run.font.name = "Consolas"
+
+    def _add_horizontal_rule(self, parent: Any) -> None:
+        # 底边框空段落模拟分隔线（python-docx 无原生 HR）。
+        p = parent.add_paragraph()
+        p_pr = p._p.get_or_add_pPr()
+        borders = OxmlElement("w:pBdr")
+        bottom = OxmlElement("w:bottom")
+        bottom.set(qn("w:val"), "single")
+        bottom.set(qn("w:sz"), "6")
+        bottom.set(qn("w:space"), "1")
+        bottom.set(qn("w:color"), "auto")
+        borders.append(bottom)
+        p_pr.append(borders)
 
     # --- 行内 ---------------------------------------------------------- #
     def add_inline(self, paragraph: Any, node: dict[str, Any]) -> None:

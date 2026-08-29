@@ -25,6 +25,7 @@ export interface SlashCommandItem {
     title: string
     icon: Component
     aliases?: string[]
+    group?: string
     command: (opts: { editor: Editor; range: Range; options: SlashCommandOptions }) => void
 }
 

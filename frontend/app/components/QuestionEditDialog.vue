@@ -280,6 +280,15 @@ const handlePublish = async () => {
 
 const handleClose = () => emit('update:open', false)
 
+// MathLive 虚拟键盘渲染在弹窗之外，点击它会触发 Dialog 的“点击外部关闭”；目标在键盘内时阻止关闭。
+const onInteractOutside = (event: Event) => {
+  const detail = (event as CustomEvent).detail as { originalEvent?: Event } | undefined
+  const target = (detail?.originalEvent?.target ?? event.target) as HTMLElement | null
+  if (target?.closest?.('[class*="ML__keyboard"], [class*="MLK__"], [class*="ML__virtual-keyboard"]')) {
+    event.preventDefault()
+  }
+}
+
 // --- tags (db mode only) ---
 const selectedTags = computed(() => {
   if (!tags.value || !draft.value) return []
@@ -298,6 +307,7 @@ const toggleTag = (tagId: number) => {
     <DialogScrollContent
       :show-close-button="false"
       class="bg-background !my-0 !max-w-none !min-w-full !p-0 !rounded-none !border-none !shadow-none !min-h-screen lg:!h-screen lg:overflow-hidden"
+      @interact-outside="onInteractOutside"
     >
       <div class="flex w-full flex-col bg-background min-h-screen lg:h-full">
         <!-- Header -->

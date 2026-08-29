@@ -16,12 +16,7 @@ import {
   generateNodeId,
   hasAnyQuestionNumber,
   applyQuestionNumbers,
-  headingDocToText,
-  headingHasRichInline,
   headingTextToDoc,
-  insertModuleCustomBefore,
-  insertRootNodeAfter,
-  moveRootNode,
   normalizeDocument,
   patchNode,
   questionNodeStatus,
@@ -33,7 +28,6 @@ import {
   questionPropsWithShow,
   questionScoreOf,
   questionShowOverride,
-  removeRootNode,
   resolveOptionColumns,
   snapshotDocument,
   orderedScorableQuestions,
@@ -107,7 +101,7 @@ describe('根节点工厂与预设', () => {
     expect(detailPropsOf(summary).fields).toEqual({
       answer: true, thinking: false, analysis: false, summary: false,
     })
-    expect(headingDocToText(summary.children[0]!.content)).toBe('参考答案')
+    expect(summary.children[0]!.content?.content?.[0]?.content?.[0]).toEqual({ type: 'text', text: '参考答案' })
   })
 })
 
@@ -148,39 +142,12 @@ describe('规范化 answer_item（scope=all / before）', () => {
     const ai = d.nodes[1]!.children[0]!
     // 用户改配置。
     d = patchNode(d, ai.id, { props: { included: false, overrides: { answer: true, thinking: null, analysis: null, summary: null } } })
-    // 触发再规范化（插入无关节点）。
-    d = insertRootNodeAfter(d, 0, createPageBreakNode())
+    // 触发再规范化。
+    d = normalizeDocument(d)
     const again = d.nodes.find((n) => n.nodeType === 'question_details')!.children[0]!
     expect(again.id).toBe(ai.id)
     expect(answerItemPropsOf(again).included).toBe(false)
     expect(answerItemPropsOf(again).overrides.answer).toBe(true)
-  })
-
-  it('自定义 heading/rich_text 依 anchor 排在指定 answer_item 之前', () => {
-    const q1 = createQuestionNode(fakeQuestion(1))
-    const q2 = createQuestionNode(fakeQuestion(2))
-    const mod = createQuestionDetailsModule('all')
-    let d = doc([q1, q2, mod])
-    const secondAi = d.nodes[2]!.children[1]!
-    const heading = createHeadingNode()
-    heading.content = richDoc('小节')
-    d = insertModuleCustomBefore(d, mod.id, secondAi.id, heading)
-    const kids = d.nodes.find((n) => n.id === mod.id)!.children
-    const headingIdx = kids.findIndex((c) => c.nodeType === 'heading')
-    const secondIdx = kids.findIndex((c) => c.id === secondAi.id)
-    expect(headingIdx).toBeGreaterThanOrEqual(0)
-    expect(headingIdx).toBe(secondIdx - 1)
-  })
-
-  it('无题目时也能在模块尾部插入自定义内容', () => {
-    const mod = createQuestionDetailsModule('all')
-    const text = createRichTextNode()
-    text.content = richDoc('使用说明')
-    const d = insertModuleCustomBefore(doc([mod]), mod.id, null, text)
-    const children = d.nodes[0]!.children
-    expect(children).toHaveLength(1)
-    expect(children[0]!.nodeType).toBe('rich_text')
-    expect(children[0]!.anchorBeforeNodeId).toBeNull()
   })
 
   it('未锚定且位于 answer_item 之前的自定义节点置顶', () => {
@@ -392,22 +359,6 @@ describe('documentFromNodes 重建（含 module 子树）', () => {
   })
 })
 
-describe('root 层编辑操作', () => {
-  it('moveRootNode 交换相邻，越界返回原序', () => {
-    const a = createPageBreakNode(); const b = createRichTextNode(); const c = createPageBreakNode()
-    b.content = richDoc('x')
-    const d = doc([a, b, c])
-    expect(moveRootNode(d, 0, 'down').nodes.map((n) => n.id)).toEqual([b.id, a.id, c.id])
-    expect(moveRootNode(d, 0, 'up').nodes.map((n) => n.id)).toEqual([a.id, b.id, c.id])
-  })
-
-  it('removeRootNode 删除根节点', () => {
-    const a = createPageBreakNode(); const b = createPageBreakNode()
-    const d = doc([a, b])
-    expect(removeRootNode(d, a.id).nodes.map((n) => n.id)).toEqual([b.id])
-  })
-})
-
 describe('脏检测与保存校验', () => {
   it('snapshotDocument 忽略 id / questionRevision / questionContent', () => {
     const q1 = createQuestionNode(fakeQuestion(1, 2))
@@ -479,17 +430,9 @@ describe('question 节点版本状态', () => {
 })
 
 describe('heading 富文本转换', () => {
-  it('纯文本 <-> 单段落 RichDoc 往返', () => {
-    const d = headingTextToDoc('第一章')
-    expect(d).toEqual(richDoc('第一章'))
-    expect(headingDocToText(d)).toBe('第一章')
-    expect(headingDocToText(headingTextToDoc(''))).toBe('')
-  })
-
-  it('headingHasRichInline 检测非文本行内节点', () => {
-    const withMath = { type: 'doc' as const, content: [{ type: 'paragraph', content: [{ type: 'inlineMath', attrs: { latex: 'x^2' } }] }] }
-    expect(headingHasRichInline(withMath)).toBe(true)
-    expect(headingHasRichInline(richDoc('纯文本'))).toBe(false)
+  it('纯文本 → 单段落 RichDoc', () => {
+    expect(headingTextToDoc('第一章')).toEqual(richDoc('第一章'))
+    expect(headingTextToDoc('')).toEqual({ type: 'doc', content: [{ type: 'paragraph' }] })
   })
 })
 

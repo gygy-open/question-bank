@@ -9,12 +9,13 @@ const props = defineProps<{ editor: Editor }>()
 
 const items = getInlineFormatItems(props.editor)
 
-// 仅在存在非空文本选区时浮出；图片等 atom 节点选中不显示。
+// 仅在存在非空文本选区时浮出；图片/题目/模块等 atom 节点选中不显示。
+const ATOM_NODES = ['image', 'question', 'questionDetails']
 function shouldShow({ editor, from, to }: { editor: Editor; from: number; to: number }): boolean {
     if (from === to) {
         return false
     }
-    if (editor.isActive('image')) {
+    if (ATOM_NODES.some((name) => editor.isActive(name))) {
         return false
     }
     return true

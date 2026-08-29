@@ -53,20 +53,26 @@ defineExpose({ onKeyDown })
         class="z-50 max-h-80 w-56 overflow-y-auto rounded-md border border-border bg-popover p-1 text-popover-foreground shadow-md"
     >
         <template v-if="items.length">
-            <button
-                v-for="(item, index) in items"
-                :key="item.title"
-                type="button"
-                :class="[
-                    'flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-left text-sm transition-colors',
-                    index === selectedIndex ? 'bg-accent text-accent-foreground' : 'hover:bg-accent/50',
-                ]"
-                @click="selectItem(index)"
-                @mouseenter="selectedIndex = index"
-            >
-                <component :is="item.icon" class="size-4 shrink-0" />
-                <span>{{ item.title }}</span>
-            </button>
+            <template v-for="(item, index) in items" :key="item.title">
+                <div
+                    v-if="item.group && item.group !== items[index - 1]?.group"
+                    class="px-2 pb-1 pt-2 text-xs font-medium text-muted-foreground"
+                >
+                    {{ item.group }}
+                </div>
+                <button
+                    type="button"
+                    :class="[
+                        'flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-left text-sm transition-colors',
+                        index === selectedIndex ? 'bg-accent text-accent-foreground' : 'hover:bg-accent/50',
+                    ]"
+                    @click="selectItem(index)"
+                    @mouseenter="selectedIndex = index"
+                >
+                    <component :is="item.icon" class="size-4 shrink-0" />
+                    <span>{{ item.title }}</span>
+                </button>
+            </template>
         </template>
         <div v-else class="px-2 py-1.5 text-sm text-muted-foreground">无匹配结果</div>
     </div>

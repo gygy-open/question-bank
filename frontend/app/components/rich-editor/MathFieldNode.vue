@@ -1,17 +1,22 @@
 <script setup lang="ts">
-import { ref, computed, inject, onMounted } from 'vue'
+import { ref, computed, onMounted, nextTick } from 'vue'
 import katex from 'katex'
 import { NodeViewWrapper, nodeViewProps } from '@tiptap/vue-3'
-import type { OpenMathEditor } from './mathEditorKey'
-import { MATH_EDITOR_KEY } from './mathEditorKey'
+import { MathfieldElement } from 'mathlive'
+import 'mathlive/static.css'
+import { consumeMathAutofocus } from './mathFieldExtensions'
+
+// 关闭 MathLive 默认音效，避免请求并不存在的 .wav 资源（控制台 404）。
+if (typeof window !== 'undefined') {
+    MathfieldElement.soundsDirectory = null
+}
 
 const props = defineProps(nodeViewProps)
 
-const openMathEditor = inject<OpenMathEditor | null>(MATH_EDITOR_KEY, null)
-
 const isBlock = computed(() => props.node.type.name === 'blockMath')
 const latex = computed<string>(() => (props.node.attrs.latex as string) || '')
-const displayRef = ref<HTMLElement | null>(null)
+const editing = ref(false)
+const mathfieldRef = ref<HTMLElement | null>(null)
 
 const rendered = computed(() => {
     try {
@@ -24,26 +29,83 @@ const rendered = computed(() => {
     }
 })
 
-function requestEdit() {
-    if (!props.editor.isEditable || !openMathEditor) {
+function startEdit() {
+    if (!props.editor.isEditable || editing.value) {
         return
     }
-    const pos = typeof props.getPos === 'function' ? props.getPos() : null
-    if (pos == null) {
-        return
-    }
-    openMathEditor({
-        pos,
-        isBlock: isBlock.value,
-        latex: latex.value,
-        anchorEl: displayRef.value,
+    editing.value = true
+    nextTick(() => {
+        const mf = mathfieldRef.value as unknown as { value: string; focus: () => void } | null
+        if (!mf) return
+        mf.value = latex.value
+        mf.focus()
     })
 }
 
+function currentValue(): string {
+    const mf = mathfieldRef.value as unknown as { value?: string } | null
+    return mf ? String(mf.value ?? '').trim() : ''
+}
+
+function commit() {
+    if (!editing.value) {
+        return
+    }
+    const value = currentValue()
+    editing.value = false
+    if (!value) {
+        props.deleteNode()
+        return
+    }
+    if (value !== latex.value) {
+        props.updateAttributes({ latex: value })
+    }
+    props.editor.commands.focus()
+}
+
+function cancel() {
+    const wasEmpty = !latex.value
+    editing.value = false
+    if (wasEmpty) {
+        props.deleteNode()
+    } else {
+        props.editor.commands.focus()
+    }
+}
+
+function onKeydown(event: KeyboardEvent) {
+    if (event.key === 'Enter' && !event.shiftKey) {
+        event.preventDefault()
+        commit()
+    } else if (event.key === 'Escape') {
+        event.preventDefault()
+        event.stopPropagation()
+        cancel()
+    }
+}
+
+// MathLive 虚拟键盘渲染在 math-field 之外，点击它会触发 focusout；
+// 延迟一拍后若焦点仍在输入框/虚拟键盘内、或虚拟键盘可见，则不提交，避免键盘与输入框一起闪退。
+function isKeyboardEl(el: Element | null): boolean {
+    return !!el?.closest?.('[class*="ML__keyboard"], [class*="MLK__"]')
+}
+function onFocusOut() {
+    window.setTimeout(() => {
+        if (!editing.value) return
+        const mf = mathfieldRef.value
+        const active = document.activeElement
+        if (mf && active && (active === mf || mf.contains(active))) return
+        if (isKeyboardEl(active)) return
+        const vk = (window as unknown as { mathVirtualKeyboard?: { visible?: boolean } }).mathVirtualKeyboard
+        if (vk?.visible) return
+        commit()
+    }, 0)
+}
+
 onMounted(() => {
-    // 新插入的空公式自动进入编辑
-    if (props.editor.isEditable && !latex.value) {
-        requestEdit()
+    // 新插入的空公式自动进入行内编辑（插入时打的标记）；页面加载的持久空节点不自动抢焦点。
+    if (props.editor.isEditable && !latex.value && consumeMathAutofocus()) {
+        startEdit()
     }
 })
 </script>
@@ -55,7 +117,14 @@ onMounted(() => {
         class="rich-math"
         :class="isBlock ? 'rich-math--block' : 'rich-math--inline'"
     >
-        <span ref="displayRef" class="rich-math__display" @click="requestEdit">
+        <math-field
+            v-if="editing"
+            ref="mathfieldRef"
+            class="rich-math__field"
+            @keydown="onKeydown"
+            @focusout="onFocusOut"
+        />
+        <span v-else class="rich-math__display" @click="startEdit">
             <span v-if="latex" v-html="rendered" />
             <span v-else class="rich-math__placeholder">点击输入公式</span>
         </span>
@@ -82,5 +151,17 @@ onMounted(() => {
 .rich-math__placeholder {
     color: var(--muted-foreground);
     font-size: 0.875em;
+}
+.rich-math__field {
+    display: inline-block;
+    min-width: 14rem;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 2px 6px;
+    background-color: var(--background);
+}
+.rich-math--block .rich-math__field {
+    display: block;
+    min-width: 24rem;
 }
 </style>

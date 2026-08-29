@@ -13,7 +13,7 @@ import RichEditorBlankPopover from './RichEditorBlankPopover.vue'
 import { useImageUpload } from './useImageUpload'
 import { getSchemaExtensions } from './schemaExtensions'
 import { ResetFormatOnEnter } from './resetFormatExtension'
-import { createMathNodeView } from './mathFieldExtensions'
+import { createMathNodeView, requestMathAutofocus } from './mathFieldExtensions'
 import { createBlankNodeView } from './blankNodeView'
 import { MATH_EDITOR_KEY, type OpenMathEditorParams } from './mathEditorKey'
 import { BLANK_EDITOR_KEY, type OpenBlankEditorParams } from './blankEditorKey'
@@ -78,9 +78,10 @@ async function handleMathPaste(html: string, from: number, to: number) {
     }
 }
 
-// 插入空公式节点，nodeView 挂载后会自动弹出 MathLive 编辑浮层。
+// 插入空公式节点，nodeView 挂载后会自动进入行内编辑。
 function openInsertMath(isBlock: boolean) {
     const type = isBlock ? 'blockMath' : 'inlineMath'
+    requestMathAutofocus()
     editor.value?.chain().focus().insertContent({ type, attrs: { latex: '' } }).run()
 }
 

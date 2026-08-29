@@ -93,10 +93,35 @@ def _block(node: dict[str, Any], image_path: ImagePathFn) -> str:
     if t == "table":
         return _table(node, image_path)
 
+    if t == "blockquote":
+        return f"\\begin{{quote}}\n{_blocks(node.get('content') or [], image_path)}\n\\end{{quote}}"
+
+    if t == "codeBlock":
+        # verbatim 原样输出，不转义（内容不应含 \end{verbatim}）。
+        return f"\\begin{{verbatim}}\n{_collect_text(node)}\n\\end{{verbatim}}"
+
+    if t == "horizontalRule":
+        return "\\begin{center}\\rule{0.9\\linewidth}{0.4pt}\\end{center}"
+
     # 未知/未来块:优先递归,否则退化为转义文本,绝不丢字符。
     if node.get("content"):
         return _blocks(node.get("content") or [], image_path)
     return latex_escape(str(node.get("text") or ""))
+
+
+def _collect_text(node: dict[str, Any]) -> str:
+    """收集块内文本（代码块用），hardBreak 视为换行。"""
+    parts: list[str] = []
+    for child in node.get("content") or []:
+        if not isinstance(child, dict):
+            continue
+        if child.get("type") == "text":
+            parts.append(str(child.get("text") or ""))
+        elif child.get("type") == "hardBreak":
+            parts.append("\n")
+        else:
+            parts.append(_collect_text(child))
+    return "".join(parts)
 
 
 def _inline(nodes: list[Any], image_path: ImagePathFn) -> str:

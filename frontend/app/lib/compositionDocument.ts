@@ -39,6 +39,8 @@ export interface EditorNode {
   // module 子节点专用软指针。
   sourceQuestionNodeId: string | null
   anchorBeforeNodeId: string | null
+  // 节点内容格式版本；rich_text 为 2 表示「content 恰好一个顶层块」（单文档画布产出）。
+  schemaVersion?: number
   // question_details module 的规范化子节点序列（answer_item + 自定义 heading/rich_text）。
   children: EditorNode[]
 }
@@ -164,16 +166,6 @@ function defaultAnswerItemOverrides(): Record<AnswerFieldKey, AnswerItemOverride
 
 export function defaultAnswerItemProps(): AnswerItemProps {
   return { included: true, overrides: defaultAnswerItemOverrides() }
-}
-
-/** 新建挂在 module 内、锚定在某 answer_item 之前的自定义 heading/rich_text 子节点。 */
-export function createModuleCustomNode(
-  nodeType: 'heading' | 'rich_text',
-  anchorBeforeNodeId: string | null,
-): EditorNode {
-  const node = nodeType === 'heading' ? createHeadingNode() : createRichTextNode()
-  node.anchorBeforeNodeId = anchorBeforeNodeId
-  return node
 }
 
 // --------------------------------------------------------------------------- //
@@ -333,6 +325,7 @@ export function documentFromNodes(nodes: CompositionNode[]): EditorDocument {
     const node = baseNode(n.node_type)
     node.id = n.id
     node.props = (n.props as EditorNode['props']) ?? null
+    node.schemaVersion = n.schema_version
     if (n.node_type === 'question') {
       node.questionId = n.question_id
       node.questionRevision = n.question_revision
@@ -555,9 +548,9 @@ function nodeToInput(node: EditorNode, parentId: string | null): CompositionNode
   const slot = parentId == null ? undefined : BODY_SLOT
   switch (node.nodeType) {
     case 'rich_text':
-      return { id: node.id, parent_id: parentId, slot, node_kind: 'block', node_type: 'rich_text', content: node.content, ...(node.anchorBeforeNodeId ? { anchor_before_node_id: node.anchorBeforeNodeId } : {}) }
+      return { id: node.id, parent_id: parentId, slot, node_kind: 'block', node_type: 'rich_text', content: node.content, ...(node.schemaVersion ? { schema_version: node.schemaVersion } : {}), ...(node.anchorBeforeNodeId ? { anchor_before_node_id: node.anchorBeforeNodeId } : {}) }
     case 'heading':
-      return { id: node.id, parent_id: parentId, slot, node_kind: 'block', node_type: 'heading', content: node.content, props: { level: headingLevelOf(node) }, ...(node.anchorBeforeNodeId ? { anchor_before_node_id: node.anchorBeforeNodeId } : {}) }
+      return { id: node.id, parent_id: parentId, slot, node_kind: 'block', node_type: 'heading', content: node.content, props: { level: headingLevelOf(node) }, ...(node.schemaVersion ? { schema_version: node.schemaVersion } : {}), ...(node.anchorBeforeNodeId ? { anchor_before_node_id: node.anchorBeforeNodeId } : {}) }
     case 'question':
       return {
         id: node.id,
@@ -602,18 +595,7 @@ export function documentToReplaceRequest(
 // root 层 / module 子层编辑操作（均返回新文档，不改入参）
 // --------------------------------------------------------------------------- //
 
-export function insertRootNodeAfter(
-  doc: EditorDocument,
-  index: number,
-  node: EditorNode,
-): EditorDocument {
-  const next = doc.nodes.slice()
-  const at = index < 0 ? 0 : Math.min(index + 1, next.length)
-  next.splice(at, 0, node)
-  return normalizeDocument({ nodes: next })
-}
-
-/** 同 insertRootNodeAfter 语义，一次性插入多个 root 节点（仅在末尾统一 normalize 一次）。 */
+/** 在第 index 个 root 节点之后一次性插入多个节点（末尾统一 normalize 一次）。 */
 export function insertRootNodesAfter(
   doc: EditorDocument,
   index: number,
@@ -658,26 +640,6 @@ export function cloneNodesForInsert(nodes: EditorNode[]): EditorNode[] {
   return nodes.map(cloneOne)
 }
 
-export function moveRootNode(
-  doc: EditorDocument,
-  index: number,
-  direction: 'up' | 'down',
-): EditorDocument {
-  const target = direction === 'up' ? index - 1 : index + 1
-  if (index < 0 || index >= doc.nodes.length || target < 0 || target >= doc.nodes.length) {
-    return { nodes: doc.nodes.slice() }
-  }
-  const next = doc.nodes.slice()
-  const tmp = next[index]!
-  next[index] = next[target]!
-  next[target] = tmp
-  return normalizeDocument({ nodes: next })
-}
-
-export function removeRootNode(doc: EditorDocument, id: string): EditorDocument {
-  return normalizeDocument({ nodes: doc.nodes.filter((n) => n.id !== id) })
-}
-
 /** 用 patch 更新某个（root 或 module 子）节点。 */
 export function patchNode(
   doc: EditorDocument,
@@ -700,81 +662,6 @@ export function patchNode(
     return updated
   })
   return { nodes }
-}
-
-/** 在 module 内某 answer_item 之前插入自定义 heading/rich_text 子节点。 */
-export function insertModuleCustomBefore(
-  doc: EditorDocument,
-  moduleId: string,
-  answerItemId: string | null,
-  node: EditorNode,
-): EditorDocument {
-  const nodes = doc.nodes.map((root) => {
-    if (root.id !== moduleId || root.nodeType !== 'question_details') return root
-    const children = root.children.slice()
-    const idx = answerItemId == null ? -1 : children.findIndex((c) => c.id === answerItemId)
-    const custom = { ...node, anchorBeforeNodeId: answerItemId }
-    if (idx < 0) children.push(custom)
-    else children.splice(idx, 0, custom)
-    return { ...root, children }
-  })
-  return normalizeDocument({ nodes })
-}
-
-/** 移动 module 内某个自定义子节点（仅在自定义子节点之间换位；answer_item 不可重排）。 */
-export function moveModuleCustomChild(
-  doc: EditorDocument,
-  moduleId: string,
-  childId: string,
-  direction: 'up' | 'down',
-): EditorDocument {
-  const nodes = doc.nodes.map((root) => {
-    if (root.id !== moduleId || root.nodeType !== 'question_details') return root
-    const children = root.children.slice()
-    const idx = children.findIndex((c) => c.id === childId)
-    if (idx < 0) return root
-    const child = children[idx]!
-    if (child.nodeType === 'answer_item') return root
-    // 目标：跨过相邻的 answer_item，落到相邻的自定义可放置点。
-    const target = direction === 'up' ? idx - 1 : idx + 1
-    if (target < 0 || target >= children.length) return root
-    // 重新锚定：move up → 锚到目标位置对应的 answer_item；到末尾则清锚。
-    children.splice(idx, 1)
-    children.splice(target, 0, child)
-    return reanchorModuleCustom({ ...root, children })
-  })
-  return normalizeDocument({ nodes })
-}
-
-/** 删除 module 内某个自定义子节点。 */
-export function removeModuleCustomChild(
-  doc: EditorDocument,
-  moduleId: string,
-  childId: string,
-): EditorDocument {
-  const nodes = doc.nodes.map((root) => {
-    if (root.id !== moduleId || root.nodeType !== 'question_details') return root
-    return { ...root, children: root.children.filter((c) => c.id !== childId) }
-  })
-  return normalizeDocument({ nodes })
-}
-
-/** 依据当前子节点顺序，把每个自定义节点的 anchor 重设为其后紧邻的 answer_item（无则清锚）。 */
-function reanchorModuleCustom(moduleNode: EditorNode): EditorNode {
-  const children = moduleNode.children.map((c) => ({ ...c }))
-  for (let i = 0; i < children.length; i += 1) {
-    const c = children[i]!
-    if (c.nodeType !== 'heading' && c.nodeType !== 'rich_text') continue
-    let anchor: string | null = null
-    for (let j = i + 1; j < children.length; j += 1) {
-      if (children[j]!.nodeType === 'answer_item') {
-        anchor = children[j]!.id
-        break
-      }
-    }
-    c.anchorBeforeNodeId = anchor
-  }
-  return { ...moduleNode, children }
 }
 
 // --------------------------------------------------------------------------- //
@@ -825,9 +712,11 @@ export function collectDocumentIssues(doc: EditorDocument): string[] {
   const issues: string[] = []
   doc.nodes.forEach((node, i) => {
     const at = `第 ${i + 1} 个块`
-    if (node.nodeType === 'rich_text' && isEmptyRichDoc(node.content)) {
+    // 单文档模型（schema_version>=2）的空段落/空标题是合法的连续编辑形态，不阻断保存。
+    const singleDoc = (node.schemaVersion ?? 1) >= 2
+    if (node.nodeType === 'rich_text' && !singleDoc && isEmptyRichDoc(node.content)) {
       issues.push(`${at}（文本）内容为空`)
-    } else if (node.nodeType === 'heading' && isEmptyRichDoc(node.content)) {
+    } else if (node.nodeType === 'heading' && !singleDoc && isEmptyRichDoc(node.content)) {
       issues.push(`${at}（标题）内容为空`)
     } else if (node.nodeType === 'question' && node.questionId == null) {
       issues.push(`${at}（题目）未选择题目`)
@@ -874,54 +763,16 @@ export function collectStaleQuestionNodeIds(
 }
 
 // --------------------------------------------------------------------------- //
-// heading 富文本 <-> 纯文本（首期 heading 用受限单行编辑）
+// heading 富文本辅助（受限单行编辑 + 渲染字号）
 // --------------------------------------------------------------------------- //
 
-export function headingDocToText(doc: RichDocNode | null | undefined): string {
-  if (!doc || doc.type !== 'doc') return ''
-  const first = (doc.content ?? [])[0]
-  if (!first || first.type !== 'paragraph') return ''
-  const parts: string[] = []
-  for (const node of first.content ?? []) {
-    if (node.type === 'text' && node.text) parts.push(node.text)
-  }
-  return parts.join('')
-}
-
 export type HeadingAlign = 'left' | 'center' | 'right' | 'justify'
-
-/** 读取 heading 段落的对齐方式；缺省或 left 视为左对齐。 */
-export function headingAlignOf(doc: RichDocNode | null | undefined): HeadingAlign {
-  if (!doc || doc.type !== 'doc') return 'left'
-  const first = (doc.content ?? [])[0]
-  const align = (first?.attrs as { textAlign?: unknown } | undefined)?.textAlign
-  return align === 'center' || align === 'right' || align === 'justify' ? align : 'left'
-}
 
 export function headingTextToDoc(text: string, align: HeadingAlign = 'left'): RichDocNode {
   const paragraph: RichNode = { type: 'paragraph' }
   if (align !== 'left') paragraph.attrs = { textAlign: align }
   if (text) paragraph.content = [{ type: 'text', text }]
   return { type: 'doc', content: [paragraph] }
-}
-
-/** 保留 heading 段落原内容，仅设置对齐；left 归为默认并移除 textAlign。 */
-export function setHeadingAlign(doc: RichDocNode | null | undefined, align: HeadingAlign): RichDocNode {
-  const first = doc && doc.type === 'doc' ? (doc.content ?? [])[0] : undefined
-  const paragraph: RichNode = first && first.type === 'paragraph' ? { ...first } : { type: 'paragraph' }
-  const attrs: Record<string, unknown> = { ...(paragraph.attrs ?? {}) }
-  if (align === 'left') delete attrs.textAlign
-  else attrs.textAlign = align
-  if (Object.keys(attrs).length) paragraph.attrs = attrs
-  else delete paragraph.attrs
-  return { type: 'doc', content: [paragraph] }
-}
-
-export function headingHasRichInline(doc: RichDocNode | null | undefined): boolean {
-  if (!doc || doc.type !== 'doc') return false
-  const first = (doc.content ?? [])[0]
-  if (!first || first.type !== 'paragraph') return false
-  return (first.content ?? []).some((node: RichNode) => node.type !== 'text')
 }
 
 // 渲染态标题按层级的排版字号（H1–H4），供画布/快照只读渲染共用。

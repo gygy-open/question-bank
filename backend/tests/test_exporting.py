@@ -55,6 +55,60 @@ def test_rich_doc_to_latex_empty():
     assert rich_doc_to_latex({"type": "doc", "content": []}) == ""
 
 
+def test_rich_doc_to_latex_blockquote():
+    doc = {
+        "type": "doc",
+        "content": [{"type": "blockquote", "content": [
+            {"type": "paragraph", "content": [{"type": "text", "text": "引文"}]}
+        ]}],
+    }
+    tex = rich_doc_to_latex(doc)
+    assert r"\begin{quote}" in tex and r"\end{quote}" in tex
+    assert "引文" in tex
+
+
+def test_rich_doc_to_latex_code_block_verbatim():
+    doc = {
+        "type": "doc",
+        "content": [{"type": "codeBlock", "content": [{"type": "text", "text": "a & b % c"}]}],
+    }
+    tex = rich_doc_to_latex(doc)
+    assert r"\begin{verbatim}" in tex and r"\end{verbatim}" in tex
+    # verbatim 原样保留，不转义特殊字符。
+    assert "a & b % c" in tex
+
+
+def test_rich_doc_to_latex_horizontal_rule():
+    doc = {"type": "doc", "content": [{"type": "horizontalRule"}]}
+    assert r"\rule{" in rich_doc_to_latex(doc)
+
+
+def test_docx_renderer_blockquote_codeblock_hr():
+    from docx import Document
+
+    from app.services.exporting.richdoc.docx import DocxRichRenderer
+
+    document = Document()
+    DocxRichRenderer().render_doc(
+        document,
+        {
+            "type": "doc",
+            "content": [
+                {"type": "blockquote", "content": [
+                    {"type": "paragraph", "content": [{"type": "text", "text": "引文"}]}
+                ]},
+                {"type": "codeBlock", "content": [{"type": "text", "text": "print(1)"}]},
+                {"type": "horizontalRule"},
+            ],
+        },
+    )
+    texts = "\n".join(p.text for p in document.paragraphs)
+    assert "引文" in texts
+    assert "print(1)" in texts
+    # 分隔线以末段底边框呈现。
+    assert "w:pBdr" in document.paragraphs[-1]._p.xml
+
+
 # --------------------------------------------------------------------------- #
 # 答案行内化
 # --------------------------------------------------------------------------- #

@@ -123,6 +123,16 @@ def _require_nonempty_rich_doc(content: Any, *, label: str) -> None:
         raise ValueError(f"{label} content must be a non-empty RichDoc")
 
 
+def _require_single_block_rich_doc(content: Any, *, label: str) -> None:
+    """schema_version>=2 的不变量：content 恰好一个顶层块（单文档画布每块=一行）。"""
+    doc = validate_rich_doc(content)
+    blocks = (doc or {}).get("content") or []
+    if len(blocks) != 1:
+        raise ValueError(
+            f"{label} content (schema_version>=2) must contain exactly one top-level block"
+        )
+
+
 def _require_single_paragraph_doc(content: Any) -> None:
     doc = validate_rich_doc(content)
     if doc is None:
@@ -279,6 +289,8 @@ class CompositionNodeInput(BaseModel):
         # 分类型 payload 校验。
         if nt == NODE_TYPE_RICH_TEXT:
             _require_nonempty_rich_doc(self.content, label="rich_text")
+            if self.schema_version >= 2:
+                _require_single_block_rich_doc(self.content, label="rich_text")
             if self.props:
                 raise ValueError("rich_text nodes must not carry props")
         elif nt == NODE_TYPE_HEADING:
