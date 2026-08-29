@@ -352,10 +352,10 @@ watch(
 </script>
 
 <template>
-  <div class="composition-tiptap-canvas overflow-hidden rounded-md border border-border bg-background">
+  <div class="composition-tiptap-canvas rounded-md border border-border bg-background">
     <div
       v-if="staleNodeIds.length"
-      class="flex items-center gap-3 border-b border-amber-400 bg-amber-50 px-4 py-2.5 text-sm dark:border-amber-700 dark:bg-amber-900/20"
+      class="flex items-center gap-3 rounded-t-md border-b border-amber-400 bg-amber-50 px-4 py-2.5 text-sm dark:border-amber-700 dark:bg-amber-900/20"
     >
       <RefreshCw class="h-4 w-4 shrink-0 text-amber-600 dark:text-amber-400" />
       <span class="flex-1">有 {{ staleNodeIds.length }} 道题目在题库中已更新（当前仍显示定格的旧内容）。</span>
@@ -371,42 +371,43 @@ watch(
       </Button>
     </div>
 
-    <RichEditorToolbar
-      v-if="editor"
-      :editor="editor"
-      allow-heading
-      @image="triggerImagePicker"
-      @math="openInsertMath"
-      @blank="insertBlank"
-      @table="insertTable"
-    >
-      <Tooltip>
-        <TooltipTrigger as-child>
-          <Button type="button" variant="ghost" size="icon" class="size-8" @mousedown.prevent @click="openQuestionPicker">
-            <FileQuestion class="size-4" />
-          </Button>
-        </TooltipTrigger>
-        <TooltipContent>插入题目</TooltipContent>
-      </Tooltip>
-      <Tooltip>
-        <TooltipTrigger as-child>
-          <Button type="button" variant="ghost" size="icon" class="size-8" @mousedown.prevent @click="openCompositionPicker">
-            <Files class="size-4" />
-          </Button>
-        </TooltipTrigger>
-        <TooltipContent>插入稿件</TooltipContent>
-      </Tooltip>
-      <Tooltip>
-        <TooltipTrigger as-child>
-          <Button type="button" variant="ghost" size="icon" class="size-8" @mousedown.prevent @click="insertModule">
-            <ListChecks class="size-4" />
-          </Button>
-        </TooltipTrigger>
-        <TooltipContent>插入参考答案</TooltipContent>
-      </Tooltip>
-    </RichEditorToolbar>
+    <div v-if="editor" class="sticky top-0 z-30 rounded-t-md bg-background">
+      <RichEditorToolbar
+        :editor="editor"
+        allow-heading
+        @image="triggerImagePicker"
+        @math="openInsertMath"
+        @blank="insertBlank"
+        @table="insertTable"
+      >
+        <Tooltip>
+          <TooltipTrigger as-child>
+            <Button type="button" variant="ghost" size="icon" class="size-8" @mousedown.prevent @click="openQuestionPicker">
+              <FileQuestion class="size-4" />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>插入题目</TooltipContent>
+        </Tooltip>
+        <Tooltip>
+          <TooltipTrigger as-child>
+            <Button type="button" variant="ghost" size="icon" class="size-8" @mousedown.prevent @click="openCompositionPicker">
+              <Files class="size-4" />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>插入稿件</TooltipContent>
+        </Tooltip>
+        <Tooltip>
+          <TooltipTrigger as-child>
+            <Button type="button" variant="ghost" size="icon" class="size-8" @mousedown.prevent @click="insertModule">
+              <ListChecks class="size-4" />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>插入参考答案</TooltipContent>
+        </Tooltip>
+      </RichEditorToolbar>
+    </div>
 
-    <div class="relative">
+    <div class="relative overflow-hidden rounded-b-md">
       <DragHandle
         v-if="editor"
         :editor="editor"
