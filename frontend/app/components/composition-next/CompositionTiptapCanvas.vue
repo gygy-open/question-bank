@@ -207,8 +207,8 @@ function insertBlank() {
   editor.value?.chain().focus().insertBlank().run()
 }
 
-function insertTable() {
-  editor.value?.chain().focus().insertTable({ rows: 2, cols: 2, withHeaderRow: true }).run()
+function insertTable(options: { rows: number; cols: number; withHeaderRow: boolean }) {
+  editor.value?.chain().focus().insertTable(options).run()
 }
 
 // --- 题目 / 稿件插入 ---
@@ -532,5 +532,60 @@ watch(
 :deep([data-resize-handle='top-right']),
 :deep([data-resize-handle='bottom-left']) {
   cursor: nesw-resize;
+}
+
+:deep(.tableWrapper) {
+  overflow-x: auto;
+}
+
+:deep(.ProseMirror table) {
+  border-collapse: collapse;
+  table-layout: fixed;
+  width: 100%;
+  overflow: hidden;
+}
+
+:deep(.ProseMirror td),
+:deep(.ProseMirror th) {
+  vertical-align: top;
+  box-sizing: border-box;
+  position: relative;
+  border: 1px solid var(--border);
+  padding: 0.35em 0.6em;
+}
+
+:deep(.ProseMirror td:not([data-colwidth])),
+:deep(.ProseMirror th:not([data-colwidth])) {
+  min-width: var(--default-cell-min-width);
+}
+
+:deep(.ProseMirror th) {
+  background-color: var(--muted);
+  font-weight: 600;
+  text-align: left;
+}
+
+:deep(.ProseMirror .selectedCell)::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: color-mix(in srgb, var(--primary) 15%, transparent);
+  pointer-events: none;
+  z-index: 2;
+}
+
+:deep(.ProseMirror .column-resize-handle) {
+  position: absolute;
+  right: -2px;
+  top: 0;
+  bottom: 0;
+  width: 4px;
+  z-index: 20;
+  background-color: var(--primary);
+  pointer-events: none;
+}
+
+:deep(.ProseMirror.resize-cursor) {
+  cursor: col-resize;
 }
 </style>

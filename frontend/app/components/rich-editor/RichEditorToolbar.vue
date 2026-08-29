@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import type { Editor } from '@tiptap/vue-3'
-import { ImageIcon, List, ListOrdered, Undo2, Redo2, Sigma, SquareSigma, SquareDashed, Table as TableIcon } from '@lucide/vue'
+import { ImageIcon, List, ListOrdered, Undo2, Redo2, Sigma, SquareSigma, SquareDashed } from '@lucide/vue'
 import { Button } from '@/components/ui/button'
 import {
     Tooltip,
@@ -12,9 +12,15 @@ import {
 import { getInlineFormatItems, type ToolbarItem } from './inlineFormatItems'
 import RichEditorAlignMenu from './RichEditorAlignMenu.vue'
 import RichEditorHeadingMenu from './RichEditorHeadingMenu.vue'
+import RichEditorTableMenu from './RichEditorTableMenu.vue'
 
 const props = defineProps<{ editor: Editor; allowBlank?: boolean; allowHeading?: boolean }>()
-const emit = defineEmits<{ image: []; math: [boolean]; blank: []; table: [] }>()
+const emit = defineEmits<{
+    image: []
+    math: [boolean]
+    blank: []
+    table: [{ rows: number; cols: number; withHeaderRow: boolean }]
+}>()
 
 const inlineItems = getInlineFormatItems(props.editor)
 
@@ -34,13 +40,12 @@ const paragraphItems: ToolbarItem[] = [
     },
 ]
 
-// 插入：公式 / 图片 / 表格 /（填空）。
+// 插入：公式 / 图片 /（表格单独渲染，需要弹出行列选择）/（填空）。
 const insertItems = computed<ToolbarItem[]>(() => {
     const items: ToolbarItem[] = [
         { label: '行内公式', icon: Sigma, action: () => emit('math', false) },
         { label: '块公式', icon: SquareSigma, action: () => emit('math', true) },
         { label: '图片', icon: ImageIcon, action: () => emit('image') },
-        { label: '插入表格', icon: TableIcon, action: () => emit('table') },
     ]
     if (props.allowBlank) {
         items.push({ label: '插入填空', icon: SquareDashed, action: () => emit('blank') })
@@ -124,6 +129,7 @@ const historyGroup: ToolbarItem[] = [
                 </TooltipTrigger>
                 <TooltipContent>{{ item.label }}</TooltipContent>
             </Tooltip>
+            <RichEditorTableMenu @insert="(options) => emit('table', options)" />
 
             <template v-if="$slots.default">
                 <div aria-hidden="true" class="mx-1 h-6 w-px shrink-0 bg-border" />

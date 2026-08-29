@@ -217,7 +217,7 @@ export function getSchemaExtensions(options: SchemaExtensionOptions = {}) {
                 }
                 : false,
         }),
-        Table.configure({ resizable: false }),
+        Table.configure({ resizable: true, lastColumnResizable: true }),
         TableRow,
         TableHeader,
         TableCell,

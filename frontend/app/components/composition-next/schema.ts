@@ -75,7 +75,7 @@ export function getCompositionExtensions(options: CompositionExtensionOptions = 
           }
         : false,
     }),
-    Table.configure({ resizable: false }),
+    Table.configure({ resizable: true, lastColumnResizable: true }),
     TableRow,
     TableHeader,
     TableCell,

@@ -4,17 +4,22 @@ import { BubbleMenu } from '@tiptap/vue-3/menus'
 import { Button } from '@/components/ui/button'
 import { getInlineFormatItems } from './inlineFormatItems'
 import { getImageAlignFormatItems } from './imageAlignFormatItems'
+import { getTableFormatItemGroups } from './tableFormatItems'
 import RichEditorAlignMenu from './RichEditorAlignMenu.vue'
 
 const props = defineProps<{ editor: Editor }>()
 
 const items = getInlineFormatItems(props.editor)
 const imageAlignItems = getImageAlignFormatItems(props.editor)
+const tableItemGroups = getTableFormatItemGroups(props.editor)
 
-// 图片选中时只展示对齐按钮；question/questionDetails 等模块节点不展示气泡菜单。
+// 图片/表格选中时只展示对应操作按钮；question/questionDetails 等模块节点不展示气泡菜单。
 const NO_BUBBLE_NODES = ['question', 'questionDetails']
 function shouldShow({ editor, from, to }: { editor: Editor; from: number; to: number }): boolean {
     if (editor.isActive('image')) {
+        return true
+    }
+    if (editor.isActive('table')) {
         return true
     }
     if (from === to) {
@@ -49,6 +54,24 @@ function shouldShow({ editor, from, to }: { editor: Editor; from: number; to: nu
                 >
                     <component :is="item.icon" class="size-4" />
                 </Button>
+            </template>
+            <template v-else-if="editor.isActive('table')">
+                <template v-for="(group, groupIndex) in tableItemGroups" :key="groupIndex">
+                    <div v-if="groupIndex > 0" aria-hidden="true" class="mx-0.5 h-6 w-px shrink-0 bg-border" />
+                    <Button
+                        v-for="item in group"
+                        :key="item.label"
+                        type="button"
+                        size="icon"
+                        class="size-8"
+                        variant="ghost"
+                        :disabled="item.disabled?.()"
+                        :title="item.label"
+                        @click="item.action"
+                    >
+                        <component :is="item.icon" class="size-4" />
+                    </Button>
+                </template>
             </template>
             <template v-else>
                 <Button
