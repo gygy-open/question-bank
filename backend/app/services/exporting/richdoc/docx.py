@@ -218,6 +218,9 @@ class DocxRichRenderer:
 
     def _add_image(self, paragraph: Any, node: dict[str, Any]) -> None:
         attrs = node.get("attrs") or {}
+        align = attrs.get("align")
+        if align in _ALIGN:
+            paragraph.alignment = _ALIGN[align]
         src = str(attrs.get("src", ""))
         path = self.images.resolve(src)
         if path is None:

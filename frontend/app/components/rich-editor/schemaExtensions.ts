@@ -36,6 +36,51 @@ export const BLANK_WIDTH_MIN_EM = 2
 export const BLANK_WIDTH_MAX_EM = 30
 export const BLANK_WIDTH_DEFAULT_EM = 4
 
+export type ImageAlign = 'left' | 'center' | 'right'
+
+function syncImageAlign(container: HTMLElement, align: unknown) {
+    container.style.justifyContent = align === 'center' ? 'center' : align === 'right' ? 'flex-end' : 'flex-start'
+}
+
+/**
+ * 支持四角缩放 + 左/中/右对齐的图片节点。
+ * 对齐通过设置外层 flex 容器（resize nodeView 的 dom）的 justify-content 实现——
+ * wrapper 按图片内容宽度撑开，margin:auto 加在 img/wrapper 上都不生效。
+ * 只读渲染（无 nodeView）走 renderHTML 的 data-align + CSS。
+ */
+export const ResizableImage = Image.extend({
+    addAttributes() {
+        return {
+            ...this.parent?.(),
+            align: {
+                default: null,
+                parseHTML: (el: HTMLElement) => el.getAttribute('data-align'),
+                renderHTML: (attrs: { align?: ImageAlign | null }) =>
+                    attrs.align ? { 'data-align': attrs.align } : {},
+            },
+        }
+    },
+
+    addNodeView() {
+        const base = this.parent?.()
+        if (!base) {
+            return base
+        }
+        return (props) => {
+            const nodeView = base(props)
+            const container = nodeView.dom as HTMLElement
+            syncImageAlign(container, props.node.attrs.align)
+            const baseUpdate = nodeView.update?.bind(nodeView)
+            nodeView.update = (node, decorations, innerDecorations) => {
+                const result = baseUpdate ? baseUpdate(node, decorations, innerDecorations) : true
+                syncImageAlign(container, node.attrs.align)
+                return result
+            }
+            return nodeView
+        }
+    },
+})
+
 /** 把任意输入规整为 [2, 30] 的整数 em；非法/缺省回退默认宽度。 */
 export function clampBlankWidthEm(value: unknown): number {
     const n = typeof value === 'number' ? value : Number(value)
@@ -160,7 +205,7 @@ export function getSchemaExtensions(options: SchemaExtensionOptions = {}) {
         Superscript,
         Subscript,
         TextAlign.configure({ types: ['paragraph'] }),
-        Image.configure({
+        ResizableImage.configure({
             inline: false,
             resize: options.imageResizable
                 ? {

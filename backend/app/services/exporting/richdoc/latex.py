@@ -88,7 +88,7 @@ def _block(node: dict[str, Any], image_path: ImagePathFn) -> str:
         return f"\\begin{{{env}}}\n{body}\n\\end{{{env}}}"
 
     if t == "image":
-        return _image(node, image_path)
+        return _image_block(node, image_path)
 
     if t == "table":
         return _table(node, image_path)
@@ -181,6 +181,17 @@ def _image(node: dict[str, Any], image_path: ImagePathFn) -> str:
     if isinstance(width, (int, float)) and not isinstance(width, bool) and math.isfinite(float(width)) and width > 0:
         opts = f"[width={float(width) / 96:.4f}in]"
     return f"\\includegraphics{opts}{{{resolved}}}"
+
+
+def _image_block(node: dict[str, Any], image_path: ImagePathFn) -> str:
+    """块级图片按 align 包一层对齐；行内退化路径（_inline_node）不包，避免破坏环境嵌套。"""
+    graphic = _image(node, image_path)
+    align = (node.get("attrs") or {}).get("align")
+    if align == "center":
+        return f"\\begin{{center}}\n{graphic}\n\\end{{center}}"
+    if align == "right":
+        return f"{{\\raggedleft\n{graphic}\\par}}"
+    return graphic
 
 
 def _table(node: dict[str, Any], image_path: ImagePathFn) -> str:

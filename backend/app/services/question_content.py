@@ -106,6 +106,9 @@ def validate_rich_doc(doc: Any) -> Optional[RichDoc]:
                     raise ValueError(
                         f"image {name} must be a finite number between 0 and 20000 px"
                     )
+            align = attrs.get("align")
+            if align is not None and align not in ("left", "center", "right"):
+                raise ValueError("image align must be one of left/center/right")
         if node.get("type") == "blank":
             # widthEm 可选;缺省由渲染侧按默认宽度处理。给定时必须是 2..30 的有限数字。
             value = (node.get("attrs") or {}).get("widthEm")

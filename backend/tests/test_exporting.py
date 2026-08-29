@@ -83,6 +83,23 @@ def test_rich_doc_to_latex_horizontal_rule():
     assert r"\rule{" in rich_doc_to_latex(doc)
 
 
+def test_rich_doc_to_latex_image_align_wraps_includegraphics():
+    def image_path(src: str) -> str:
+        return "images/x.png"
+
+    center = {"type": "doc", "content": [{"type": "image", "attrs": {"src": "x", "align": "center"}}]}
+    tex = rich_doc_to_latex(center, image_path)
+    assert r"\begin{center}" in tex and r"\includegraphics" in tex and r"\end{center}" in tex
+
+    right = {"type": "doc", "content": [{"type": "image", "attrs": {"src": "x", "align": "right"}}]}
+    tex = rich_doc_to_latex(right, image_path)
+    assert r"\raggedleft" in tex
+
+    left = {"type": "doc", "content": [{"type": "image", "attrs": {"src": "x"}}]}
+    tex = rich_doc_to_latex(left, image_path)
+    assert r"\begin{center}" not in tex and r"\raggedleft" not in tex
+
+
 def test_docx_renderer_blockquote_codeblock_hr():
     from docx import Document
 
@@ -107,6 +124,24 @@ def test_docx_renderer_blockquote_codeblock_hr():
     assert "print(1)" in texts
     # 分隔线以末段底边框呈现。
     assert "w:pBdr" in document.paragraphs[-1]._p.xml
+
+
+def test_docx_renderer_image_align_sets_paragraph_alignment():
+    from docx import Document
+    from docx.enum.text import WD_ALIGN_PARAGRAPH
+
+    from app.services.exporting.richdoc.docx import DocxRichRenderer
+
+    document = Document()
+    # src 无法解析时退化为 alt run，无需真实图片文件即可验证对齐已生效。
+    DocxRichRenderer().render_doc(
+        document,
+        {
+            "type": "doc",
+            "content": [{"type": "image", "attrs": {"src": "missing.png", "alt": "图", "align": "center"}}],
+        },
+    )
+    assert document.paragraphs[-1].alignment == WD_ALIGN_PARAGRAPH.CENTER
 
 
 # --------------------------------------------------------------------------- #

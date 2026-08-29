@@ -250,6 +250,27 @@ def test_rich_doc_image_dimensions_must_be_valid_px_numbers():
             validate_rich_doc(doc)
 
 
+def test_rich_doc_image_align_must_be_left_center_or_right():
+    for align in (None, "left", "center", "right"):
+        doc = {
+            "type": "doc",
+            "content": [
+                {"type": "image", "attrs": {"src": "/image.png", "align": align}}
+            ],
+        }
+        assert validate_rich_doc(doc) is doc
+
+    for invalid in ("top", "justify", 1, True):
+        doc = {
+            "type": "doc",
+            "content": [
+                {"type": "image", "attrs": {"src": "/image.png", "align": invalid}}
+            ],
+        }
+        with pytest.raises(ValueError, match="image align"):
+            validate_rich_doc(doc)
+
+
 def test_rich_doc_to_markdown_unknown_node_does_not_crash():
     doc = {
         "type": "doc",

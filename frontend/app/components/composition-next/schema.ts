@@ -2,14 +2,13 @@
 // 与富文本编辑器 getSchemaExtensions 保持内联节点/标记一致，但把 heading/blockquote/
 // codeBlock/horizontalRule 这些顶层块打开——它们在组稿文档里是一等公民（每块=一行）。
 import StarterKit from '@tiptap/starter-kit'
-import Image from '@tiptap/extension-image'
 import Superscript from '@tiptap/extension-superscript'
 import Subscript from '@tiptap/extension-subscript'
 import TextAlign from '@tiptap/extension-text-align'
 import { Table, TableRow, TableHeader, TableCell } from '@tiptap/extension-table'
 import { InlineMath, BlockMath } from '@tiptap/extension-mathematics'
 import type { AnyExtension, NodeViewRenderer } from '@tiptap/core'
-import { Blank } from '@/components/rich-editor/schemaExtensions'
+import { Blank, ResizableImage } from '@/components/rich-editor/schemaExtensions'
 import { UniqueId } from './uniqueId'
 import { PageBreak } from './nodes/PageBreak'
 import { QuestionBlock } from './nodes/QuestionBlock'
@@ -64,7 +63,7 @@ export function getCompositionExtensions(options: CompositionExtensionOptions = 
     Superscript,
     Subscript,
     TextAlign.configure({ types: ['paragraph', 'heading'] }),
-    Image.configure({
+    ResizableImage.configure({
       inline: false,
       resize: options.imageResizable
         ? {

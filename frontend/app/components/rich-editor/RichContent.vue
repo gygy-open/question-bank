@@ -32,6 +32,17 @@ const html = computed(() => renderRichContentToHTML(props.content))
     height: auto;
 }
 
+.rich-content :deep(img[data-align='center']) {
+    display: block;
+    margin-left: auto;
+    margin-right: auto;
+}
+
+.rich-content :deep(img[data-align='right']) {
+    display: block;
+    margin-left: auto;
+}
+
 .rich-content :deep(.rich-blank) {
     display: inline-block;
     min-width: 2em;

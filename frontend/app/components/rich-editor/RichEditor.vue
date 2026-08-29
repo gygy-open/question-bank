@@ -367,6 +367,34 @@ watch(model, (value) => {
     outline: 2px solid var(--primary);
 }
 
+/* 图片缩放手柄：tiptap 内置 ResizableNodeView 只写 data-* 属性，不带任何可见样式 */
+:deep([data-resize-handle]) {
+    width: 10px;
+    height: 10px;
+    background: var(--background);
+    border: 2px solid var(--primary);
+    border-radius: 2px;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.15s ease;
+}
+
+:deep([data-resize-wrapper]:hover [data-resize-handle]),
+:deep(.ProseMirror-selectednode [data-resize-handle]) {
+    opacity: 1;
+    pointer-events: auto;
+}
+
+:deep([data-resize-handle='top-left']),
+:deep([data-resize-handle='bottom-right']) {
+    cursor: nwse-resize;
+}
+
+:deep([data-resize-handle='top-right']),
+:deep([data-resize-handle='bottom-left']) {
+    cursor: nesw-resize;
+}
+
 :deep(.ProseMirror .rich-blank) {
     display: inline-block;
     min-width: 2em;

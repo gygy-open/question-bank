@@ -81,3 +81,26 @@ describe('blank widthEm 渲染与规整', () => {
         expect(clampBlankWidthEm(6.4)).toBe(6)
     })
 })
+
+describe('image align 渲染与回读', () => {
+    function imageDoc(align: unknown): RichDoc {
+        return {
+            type: 'doc',
+            content: [{ type: 'image', attrs: { src: '/x.png', align } }],
+        }
+    }
+
+    it('align 为 center/right 时输出 data-align', () => {
+        expect(generateHTML(imageDoc('center'), getSchemaExtensions())).toContain('data-align="center"')
+        expect(generateHTML(imageDoc('right'), getSchemaExtensions())).toContain('data-align="right"')
+    })
+
+    it('align 缺省/为空不输出 data-align', () => {
+        expect(generateHTML(imageDoc(null), getSchemaExtensions())).not.toContain('data-align')
+    })
+
+    it('从 HTML 回读 align', () => {
+        const doc = generateJSON('<img src="/x.png" data-align="right">', getSchemaExtensions())
+        expect(doc.content?.[0]?.attrs).toMatchObject({ align: 'right' })
+    })
+})
