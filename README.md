@@ -40,7 +40,7 @@
 ## 其他部署方式
 
 - **局域网共享** — 桌面版打开共享开关，让同网段的同事一起用，无需额外部署。详见 [局域网共享](https://gygy-open.github.io/question-bank/desktop/lan-sharing)。
-- **服务器版（Docker Compose）** — 多人协作 / 生产环境，完整 MySQL + ChromaDB 技术栈，一键启动。详见 [Docker Compose 部署](https://gygy-open.github.io/question-bank/server/docker)。
+- **服务器版（Docker Compose）** — 多人协作 / 生产环境，完整 MySQL + ChromaDB 技术栈，直接拉取预构建镜像一键启动，无需本地构建。详见 [Docker Compose 部署](https://gygy-open.github.io/question-bank/server/docker)。
 
 ## 核心特性
 

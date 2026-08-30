@@ -29,6 +29,7 @@ services:
       - "8001:8000"
 
   backend:
+    image: ghcr.io/gygy-open/question-bank-backend:${IMAGE_TAG:-latest}
     build:
       context: ./backend
       dockerfile: Dockerfile
@@ -53,6 +54,7 @@ services:
         condition: service_started
 
   worker:
+    image: ghcr.io/gygy-open/question-bank-backend:${IMAGE_TAG:-latest}
     build:
       context: ./backend
       dockerfile: Dockerfile
@@ -73,6 +75,7 @@ services:
       - backend
 
   frontend:
+    image: ghcr.io/gygy-open/question-bank-frontend:${IMAGE_TAG:-latest}
     build:
       context: ./frontend
       dockerfile: Dockerfile
