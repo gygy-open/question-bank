@@ -196,7 +196,7 @@ function confirmInsert() {
             <ExternalLink class="h-3 w-3" />
           </NuxtLink>
         </DialogTitle>
-        <DialogDescription>从当前科目题库检索并选择题目插入画布，支持多选。</DialogDescription>
+        <DialogDescription>从当前学科题库检索并选择题目插入画布，支持多选。</DialogDescription>
       </DialogHeader>
 
       <div class="flex items-center gap-2">

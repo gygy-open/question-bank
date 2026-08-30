@@ -60,7 +60,7 @@ const breadcrumb = computed(() => folderBreadcrumb(folders.value, selectedFolder
 
 const scopeHint = computed(() =>
   scope.value === 'shared'
-    ? '共享空间：本科目团队成员均可查看与编辑。'
+    ? '共享空间：本学科团队成员均可查看与编辑。'
     : '个人空间：仅你自己可见，团队其他成员无法访问。',
 )
 
@@ -136,7 +136,7 @@ async function reloadAll() {
 // onActivated（而非 onMounted）：页面被全局 keepalive 缓存，需要在每次重新激活时刷新数据
 onActivated(reloadAll)
 watch(currentSubjectId, () => {
-  // 文件夹 id 是按科目划分的，切科目时旧的 ?folder= 对新科目无意义
+  // 文件夹 id 是按学科划分的，切学科时旧的 ?folder= 对新学科无意义
   if (route.query.folder != null) router.replace({ query: {} })
   loadFolders()
 })
@@ -428,14 +428,14 @@ function openComposition(comp: Composition) {
   </PageHeader>
 
   <div class="flex flex-1 flex-col gap-4 px-4 py-4">
-    <!-- 无科目守卫：复用全局科目上下文，不自造状态 -->
+    <!-- 无学科守卫：复用全局学科上下文，不自造状态 -->
     <div
       v-if="!currentSubject"
       class="flex flex-1 flex-col items-center justify-center gap-3 py-16 text-center"
     >
       <FileText class="h-10 w-10 text-muted-foreground/50" />
       <p class="text-muted-foreground">
-        {{ hasSubjects ? '请先在左侧选择一个科目' : '请先创建一个科目后再使用组稿工作台' }}
+        {{ hasSubjects ? '请先在左侧选择一个学科' : '请先创建一个学科后再使用组稿工作台' }}
       </p>
     </div>
 

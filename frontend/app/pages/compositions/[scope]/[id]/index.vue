@@ -681,7 +681,7 @@ onBeforeRouteLeave(() => {
           />
 
           <p class="text-xs text-muted-foreground">
-            科目：{{ currentSubject?.name || '—' }} · 修订版本 r{{ composition.revision }}
+            学科：{{ currentSubject?.name || '—' }} · 修订版本 r{{ composition.revision }}
             <template v-if="scoringEnabled"> · 总分 {{ totalScoreValue }} 分</template>
           </p>
         </div>

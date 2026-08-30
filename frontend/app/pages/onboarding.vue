@@ -36,7 +36,7 @@ watch(name, (v) => {
   if (!slugTouched.value) slug.value = suggestSlug(v)
 })
 
-// 已经有科目则不该停留在引导页
+// 已经有学科则不该停留在引导页
 onMounted(async () => {
   await init()
   if (hasSubjects.value) await navigateTo('/')
@@ -44,11 +44,11 @@ onMounted(async () => {
 
 const submit = async () => {
   if (!name.value.trim()) {
-    toast.error('请输入科目名称')
+    toast.error('请输入学科名称')
     return
   }
   if (!slug.value.trim()) {
-    toast.error('请输入科目标识 (slug)')
+    toast.error('请输入学科标识 (slug)')
     return
   }
   submitting.value = true
@@ -64,7 +64,7 @@ const submit = async () => {
     })
     await refreshSubjects()
     await setSubject(created.id)
-    toast.success('科目已创建，开始使用吧')
+    toast.success('学科已创建，开始使用吧')
     await navigateTo('/')
   } catch (e: any) {
     toast.error(e?.data?.detail || '创建失败，请重试')
@@ -83,15 +83,15 @@ const submit = async () => {
             <Sparkles class="h-7 w-7" />
           </div>
         </div>
-        <CardTitle class="text-2xl text-center">创建你的第一个科目</CardTitle>
+        <CardTitle class="text-2xl text-center">创建你的第一个学科</CardTitle>
         <CardDescription class="text-center">
-          题库以科目为单位组织。先创建一个科目，之后可随时在「科目管理」中增删。
+          题库以学科为单位组织。先创建一个学科，之后可随时在「学科管理」中增删。
         </CardDescription>
       </CardHeader>
 
       <CardContent class="grid gap-4">
         <div class="grid gap-1.5">
-          <Label>科目名称</Label>
+          <Label>学科名称</Label>
           <Input v-model="name" placeholder="例如：高中数学" @keyup.enter="submit" />
         </div>
 
@@ -110,7 +110,7 @@ const submit = async () => {
 
         <div class="grid gap-1.5">
           <Label>描述<span class="text-muted-foreground font-normal">（可选）</span></Label>
-          <Input v-model="description" placeholder="可选：科目的简要说明" @keyup.enter="submit" />
+          <Input v-model="description" placeholder="可选：学科的简要说明" @keyup.enter="submit" />
         </div>
       </CardContent>
 

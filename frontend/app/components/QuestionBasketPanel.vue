@@ -31,7 +31,7 @@ const isOpen = computed({
 
 const { groupedBySubject, remove, clear, removeMany } = useQuestionBasket()
 
-const subjectName = (id: number) => props.subjects?.find((s) => s.id === id)?.name ?? `科目 ${id}`
+const subjectName = (id: number) => props.subjects?.find((s) => s.id === id)?.name ?? `学科 ${id}`
 
 const qTypeLabels: Record<string, string> = {
   single_choice: '单选',

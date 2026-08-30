@@ -276,10 +276,10 @@ const deletePaper = async (paper: Paper) => {
           <Input v-model="form.title" placeholder="例如：期中考试" />
         </div>
         <div class="space-y-2">
-          <Label>科目</Label>
+          <Label>学科</Label>
           <Select v-model="form.subject_id">
             <SelectTrigger>
-              <SelectValue placeholder="选择科目（可选）" />
+              <SelectValue placeholder="选择学科（可选）" />
             </SelectTrigger>
             <SelectContent>
               <SelectItem v-for="s in subjects" :key="s.id" :value="s.id">

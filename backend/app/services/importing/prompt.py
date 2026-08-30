@@ -1,6 +1,6 @@
 """抽取阶段:AI 抽取 prompt 组装。
 
-Prompt 分层:科目覆盖(subject_prompts) → 代码默认(prompts.py),再渲染科目占位符,
+Prompt 分层:学科覆盖(subject_prompts) → 代码默认(prompts.py),再渲染学科占位符,
 最后把 tag/category 上下文注入 `{tags}` 占位符(无占位符则追加)。
 """
 from __future__ import annotations
@@ -22,7 +22,7 @@ logger = logging.getLogger(__name__)
 
 class PromptBuilder:
     async def build(self, db: AsyncSession, *, mode: str, subject_id: int | None) -> str:
-        """产出最终 extract/solve prompt 字符串(科目渲染 + tag 上下文注入)。"""
+        """产出最终 extract/solve prompt 字符串(学科渲染 + tag 上下文注入)。"""
         prompt_key = "AI_SOLVE_PROMPT" if mode == "solve" else "AI_EXTRACT_PROMPT"
 
         subject = None

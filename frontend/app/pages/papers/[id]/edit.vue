@@ -492,10 +492,10 @@ watch(
                 <Input v-model="paper.title" />
               </div>
               <div class="space-y-2">
-                <Label>科目</Label>
+                <Label>学科</Label>
                 <Select v-model="paper.subject_id" @update:model-value="savePaperInfo">
                   <SelectTrigger>
-                    <SelectValue placeholder="选择科目" />
+                    <SelectValue placeholder="选择学科" />
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem v-for="s in subjects" :key="s.id" :value="s.id">

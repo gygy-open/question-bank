@@ -18,7 +18,7 @@ branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
 
-# 这些键已废弃：GEMINI_* 为旧供应商配置；三个 PROMPT 已改为硬编码/科目分层。
+# 这些键已废弃：GEMINI_* 为旧供应商配置；三个 PROMPT 已改为硬编码/学科分层。
 # 作为数据迁移一次性清理，不再依赖 initial_data.py。
 OBSOLETE_KEYS = [
     "GEMINI_API_KEY",

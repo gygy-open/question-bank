@@ -30,7 +30,7 @@ async def list_subject_prompts(
     db: deps.SessionDep,
     current_user: models.User = Depends(deps.get_current_active_superuser),
 ) -> Any:
-    """列出某科目的可覆盖提示词：含代码默认值、覆盖原文与是否已定制。"""
+    """列出某学科的可覆盖提示词：含代码默认值、覆盖原文与是否已定制。"""
     subject = await crud_subject.get(db, id=subject_id)
     if not subject:
         raise HTTPException(status_code=404, detail="Subject not found")
@@ -49,7 +49,7 @@ async def update_subject_prompt(
     db: deps.SessionDep,
     current_user: models.User = Depends(deps.get_current_active_superuser),
 ) -> Any:
-    """保存某科目对某提示词的覆盖。"""
+    """保存某学科对某提示词的覆盖。"""
     if key not in SUBJECT_PROMPTS:
         raise HTTPException(status_code=404, detail="Unknown prompt key")
     subject = await crud_subject.get(db, id=subject_id)
@@ -66,7 +66,7 @@ async def reset_subject_prompt(
     db: deps.SessionDep,
     current_user: models.User = Depends(deps.get_current_active_superuser),
 ) -> Any:
-    """重置为默认：删除该科目的覆盖行。"""
+    """重置为默认：删除该学科的覆盖行。"""
     if key not in SUBJECT_PROMPTS:
         raise HTTPException(status_code=404, detail="Unknown prompt key")
     await crud_subject_prompt.remove(db, subject_id, key)

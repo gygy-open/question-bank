@@ -77,7 +77,7 @@ function mapConflict(err: unknown): never {
 
 /**
  * 组稿工作台数据层：封装 folder / composition 的 CRUD 与软删除/恢复。
- * scope 决定共享/个人；subject_id 来自全局科目上下文，由调用方传入当前科目。
+ * scope 决定共享/个人；subject_id 来自全局学科上下文，由调用方传入当前学科。
  * personal owner_id 永远由后端依据鉴权注入，前端不构造、不传递。
  */
 export function useCompositions() {

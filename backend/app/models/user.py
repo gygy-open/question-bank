@@ -17,10 +17,10 @@ class User(Base):
     last_login = Column(DateTime, nullable=True)
     login_count = Column(Integer, default=0)
     
-    # 用户负责的科目
+    # 用户负责的学科
     subject_id = Column(Integer, ForeignKey("subjects.id"), nullable=True, index=True)
 
-    # 用户最后选择的工作科目（全局学科上下文，用于跨设备恢复）
+    # 用户最后选择的工作学科（全局学科上下文，用于跨设备恢复）
     last_active_subject_id = Column(Integer, ForeignKey("subjects.id"), nullable=True)
 
     chat_sessions = relationship("ChatSession", back_populates="user", cascade="all, delete-orphan")

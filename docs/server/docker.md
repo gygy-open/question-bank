@@ -54,7 +54,7 @@ docker compose exec backend python scripts/create_superuser.py
 
 登录后，以超级管理员身份：
 
-1. 首次登录会自动进入引导页，创建第一个科目（题库以科目为单位组织）。
+1. 首次登录会自动进入引导页，创建第一个学科（题库以学科为单位组织）。
 2. 在 [AI 供应商与模型](/admin/ai-config) 中添加 Provider / Model 并设为激活。
 3. 在 [用户与权限](/admin/users) 中为团队成员创建账号。
 4. 开始 [智能导入](/features/import) 或手动录题。

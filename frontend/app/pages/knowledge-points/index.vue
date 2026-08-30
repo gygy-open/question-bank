@@ -264,12 +264,12 @@ onMounted(fetchVectorStatus)
 </script>
 
 <template>
-  <PageHeader title="知识点管理" description="管理各科目的知识点结构" />
+  <PageHeader title="知识点管理" description="管理各学科的知识点结构" />
 
   <div class="flex flex-1 flex-col">
     <div class="@container/main flex flex-1 flex-col px-4 space-y-6 py-6">
       <div v-if="!subjects || subjects.length === 0" class="text-center py-10 text-muted-foreground">
-        暂无科目，请先添加科目。
+        暂无学科，请先添加学科。
       </div>
 
       <Tabs v-else v-model="selectedSubjectId" class="w-full">
@@ -333,7 +333,7 @@ onMounted(fetchVectorStatus)
           <!-- Tree View -->
           <div v-else class="space-y-1">
             <div v-if="knowledgePointTree.length === 0" class="text-center py-10 text-muted-foreground">
-              该科目暂无知识点。
+              该学科暂无知识点。
             </div>
 
             <ManagerKnowledgePointTreeItem v-for="node in knowledgePointTree" :key="node.id" :knowledge-point="node"

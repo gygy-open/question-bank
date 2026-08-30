@@ -69,7 +69,7 @@ const handleReview = async () => {
   if (props.mode !== 'library') return
   isReviewing.value = true
   try {
-    // 只表达审核意图，是否达到发布所需审核次数由后端依据科目配置判定。
+    // 只表达审核意图，是否达到发布所需审核次数由后端依据学科配置判定。
     const data = await $api<DbQuestion>(`/questions/${props.item.id}/review`, {
       method: 'POST',
       body: { action: 'approve', comment: 'Approved via quick review' }

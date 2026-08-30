@@ -264,7 +264,7 @@ async def review_question(
 
     if review_in.action == "approve":
         question.review_count = (question.review_count or 0) + 1
-        # 是否发布由后端依据科目所需审核次数决定，前端不感知审核进度。
+        # 是否发布由后端依据学科所需审核次数决定，前端不感知审核进度。
         required_count = question.subject.required_review_count if question.subject else 1
         if question.review_count >= required_count:
             question.status = QuestionStatus.PUBLISHED.value

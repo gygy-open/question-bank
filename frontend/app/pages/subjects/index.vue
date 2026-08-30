@@ -69,7 +69,7 @@ const saveSubject = async () => {
 }
 
 const deleteSubject = async (id: number) => {
-  if (!confirm('确定要删除这个科目吗？删除科目可能会影响关联的题目和目录。')) return
+  if (!confirm('确定要删除这个学科吗？删除学科可能会影响关联的题目和目录。')) return
   try {
     await $api(`/api/v1/subjects/${id}`, { method: 'DELETE' })
     await refresh()
@@ -80,11 +80,11 @@ const deleteSubject = async (id: number) => {
 </script>
 
 <template>
-  <PageHeader title="科目管理">
+  <PageHeader title="学科管理">
     <template #actions>
       <Button @click="openCreateDialog">
         <Plus class="w-4 h-4 mr-2" />
-        新建科目
+        新建学科
       </Button>
     </template>
   </PageHeader>
@@ -124,7 +124,7 @@ const deleteSubject = async (id: number) => {
             </TableRow>
             <TableRow v-if="!subjects || subjects.length === 0">
               <TableCell colspan="6" class="text-center py-8 text-muted-foreground">
-                暂无科目
+                暂无学科
               </TableCell>
             </TableRow>
           </TableBody>
@@ -137,9 +137,9 @@ const deleteSubject = async (id: number) => {
   <Dialog v-model:open="isDialogOpen">
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>{{ isEditing ? '编辑科目' : '新建科目' }}</DialogTitle>
+          <DialogTitle>{{ isEditing ? '编辑学科' : '新建学科' }}</DialogTitle>
           <DialogDescription>
-            配置科目的基本信息。
+            配置学科的基本信息。
           </DialogDescription>
         </DialogHeader>
         
@@ -157,7 +157,7 @@ const deleteSubject = async (id: number) => {
 
           <div class="grid gap-2">
             <label>描述</label>
-            <Input v-model="currentSubject.description" placeholder="可选：科目的详细描述" />
+            <Input v-model="currentSubject.description" placeholder="可选：学科的详细描述" />
           </div>
 
           <div class="grid gap-2">

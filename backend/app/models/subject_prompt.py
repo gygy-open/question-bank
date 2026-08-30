@@ -5,9 +5,9 @@ from .base import Base
 
 
 class SubjectPrompt(Base):
-    """科目级提示词覆盖。
+    """学科级提示词覆盖。
 
-    只有被用户显式定制的科目才有行；缺省时消费端回退到代码默认值
+    只有被用户显式定制的学科才有行；缺省时消费端回退到代码默认值
     (app/services/prompts.py 的 SUBJECT_PROMPTS)，默认值不写入数据库。
     """
 

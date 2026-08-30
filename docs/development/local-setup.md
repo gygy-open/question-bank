@@ -27,7 +27,7 @@ uv run python scripts/create_superuser.py
 uv run fastapi dev app/main.py
 ```
 
-后端默认监听 `http://localhost:8000`，API 文档在 `/docs`。首次登录后会自动进入引导页创建第一个科目。
+后端默认监听 `http://localhost:8000`，API 文档在 `/docs`。首次登录后会自动进入引导页创建第一个学科。
 
 ## 前端
 

@@ -46,7 +46,7 @@ const fetchSubjects = async () => {
       selectedSubjectId.value = String(subjects.value[0].id)
     }
   } catch (error) {
-    toast.error('获取科目失败', { description: (error as any).message })
+    toast.error('获取学科失败', { description: (error as any).message })
   }
 }
 
@@ -83,7 +83,7 @@ const save = async (p: SubjectPrompt) => {
       method: 'PUT',
       body: { value: drafts[p.key] },
     })
-    toast.success('已保存', { description: `${p.title} 已应用于当前科目` })
+    toast.success('已保存', { description: `${p.title} 已应用于当前学科` })
     await fetchPrompts()
   } catch (error) {
     toast.error('保存失败', { description: (error as any).message })
@@ -116,12 +116,12 @@ onMounted(async () => {
 
 <template>
   <div class="space-y-6">
-    <!-- 科目选择 -->
+    <!-- 学科选择 -->
     <div class="flex items-center gap-3 max-w-4xl">
-      <span class="text-sm font-medium shrink-0">配置科目</span>
+      <span class="text-sm font-medium shrink-0">配置学科</span>
       <Select v-model="selectedSubjectId">
         <SelectTrigger class="w-64">
-          <SelectValue placeholder="选择科目" />
+          <SelectValue placeholder="选择学科" />
         </SelectTrigger>
         <SelectContent>
           <SelectItem v-for="s in subjects" :key="s.id" :value="String(s.id)">
@@ -130,7 +130,7 @@ onMounted(async () => {
         </SelectContent>
       </Select>
       <p class="text-xs text-muted-foreground">
-        提示词按科目独立配置；未定制的科目自动使用系统默认。
+        提示词按学科独立配置；未定制的学科自动使用系统默认。
       </p>
     </div>
 
@@ -216,7 +216,7 @@ onMounted(async () => {
       <div v-if="!loading && prompts.length === 0" class="flex flex-col items-center justify-center p-12 text-center border rounded-xl bg-card border-dashed">
         <MessageSquareText class="w-8 h-8 text-muted-foreground/50 mb-4" />
         <h3 class="text-lg font-medium">暂无可配置的提示词</h3>
-        <p class="text-sm text-muted-foreground mt-1">请先选择一个科目</p>
+        <p class="text-sm text-muted-foreground mt-1">请先选择一个学科</p>
       </div>
     </div>
   </div>

@@ -97,7 +97,7 @@ class AIExtractor:
 
 
 class TemplateExtractor:
-    """确定性、无 AI 的标签模板解析(【题目】【选项】【答案】…)。忽略图像/科目。"""
+    """确定性、无 AI 的标签模板解析(【题目】【选项】【答案】…)。忽略图像/学科。"""
 
     async def extract(
         self,

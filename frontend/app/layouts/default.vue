@@ -11,7 +11,7 @@ const ignoredVersion = useLocalStorage('ignored-update-version', '')
 const hasPrompted = useSessionStorage('update-prompted', false)
 
 onMounted(async () => {
-  // 科目上下文已由 auth.global.ts 中间件在进入本布局前初始化完毕
+  // 学科上下文已由 auth.global.ts 中间件在进入本布局前初始化完毕
   if (token.value) {
     await fetchUser()
   }

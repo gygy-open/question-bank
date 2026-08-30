@@ -68,7 +68,7 @@ const openEditDialog = (subject: Subject) => {
 }
 
 const deleteSubject = async (id: number) => {
-  if (!confirm('确定要删除这个科目吗？')) return
+  if (!confirm('确定要删除这个学科吗？')) return
   try {
     await $api(`/subjects/${id}`, {
       method: 'DELETE',
@@ -83,8 +83,8 @@ const deleteSubject = async (id: number) => {
 <template>
   <div class="space-y-4">
     <div class="flex items-center justify-between">
-      <h3 class="text-lg font-medium">科目列表</h3>
-      <Button @click="openCreateDialog" size="sm">创建科目</Button>
+      <h3 class="text-lg font-medium">学科列表</h3>
+      <Button @click="openCreateDialog" size="sm">创建学科</Button>
     </div>
 
     <div class="rounded-md border">
@@ -128,9 +128,9 @@ const deleteSubject = async (id: number) => {
     <Dialog :open="isDialogOpen" @update:open="isDialogOpen = $event">
       <DialogContent class="sm:max-w-[425px]">
         <DialogHeader>
-          <DialogTitle>{{ isEditing ? '编辑科目' : '创建科目' }}</DialogTitle>
+          <DialogTitle>{{ isEditing ? '编辑学科' : '创建学科' }}</DialogTitle>
           <DialogDescription>
-            {{ isEditing ? '修改科目信息' : '添加一个新的科目' }}
+            {{ isEditing ? '修改学科信息' : '添加一个新的学科' }}
           </DialogDescription>
         </DialogHeader>
         <form @submit="onSubmit" class="space-y-4">
@@ -158,7 +158,7 @@ const deleteSubject = async (id: number) => {
             <FormItem>
               <FormLabel>描述</FormLabel>
               <FormControl>
-                <Textarea placeholder="科目描述..." v-bind="componentField" />
+                <Textarea placeholder="学科描述..." v-bind="componentField" />
               </FormControl>
               <FormMessage />
             </FormItem>

@@ -41,8 +41,8 @@ CHAT_SYSTEM_PROMPT = """你是一名资深{subject_name}教研员。{subject_des
 """
 
 
-# 以下两个提示词是"内容处理规范"，允许用户按科目覆盖（存 subject_prompts 表）。
-# 这里的常量是代码默认值：未被科目覆盖时回退到此，不写入数据库。
+# 以下两个提示词是"内容处理规范"，允许用户按学科覆盖（存 subject_prompts 表）。
+# 这里的常量是代码默认值：未被学科覆盖时回退到此，不写入数据库。
 # 保留 {subject_name}/{subject_description} 占位符（render_subject_prompt 注入），
 # 以及 {tags}/{content} 占位符（doc_processor / provider 后续替换）。
 
@@ -150,7 +150,7 @@ DEFAULT_SOLVE_PROMPT = r"""你是一位资深的{subject_name}老师。{subject_
 ```"""
 
 
-# 可按科目覆盖的提示词注册表：key -> {default, title, description}。
+# 可按学科覆盖的提示词注册表：key -> {default, title, description}。
 # 前端据此渲染配置项；消费端据此取默认值。
 SUBJECT_PROMPTS: dict[str, dict[str, str]] = {
     "AI_EXTRACT_PROMPT": {
@@ -167,6 +167,6 @@ SUBJECT_PROMPTS: dict[str, dict[str, str]] = {
 
 
 def get_default_prompt(key: str) -> str:
-    """返回某提示词的代码默认值（未被科目覆盖时的回退）。"""
+    """返回某提示词的代码默认值（未被学科覆盖时的回退）。"""
     return SUBJECT_PROMPTS[key]["default"]
 

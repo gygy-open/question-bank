@@ -11,7 +11,7 @@ class Tag(Base):
     category = Column(String(50), default="general", index=True, nullable=False) # 标签分类: year, source, grade, semester, exam_type, feature(典型,压轴,同步等)
     color = Column(String(20), default="#grey") # 标签颜色
 
-    # 标签归属的科目（学科级隔离，不同科目允许同名标签）
+    # 标签归属的学科（学科级隔离，不同学科允许同名标签）
     subject_id = Column(Integer, ForeignKey('subjects.id'), nullable=False, index=True)
 
     created_by = Column(Integer, ForeignKey('user.id'), nullable=True)

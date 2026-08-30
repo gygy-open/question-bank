@@ -70,7 +70,7 @@ export function useQuestionBasket() {
     else add(item)
   }
 
-  // subjectId 缺省时清空整个试题篮，否则只清空该科目分组。
+  // subjectId 缺省时清空整个试题篮，否则只清空该学科分组。
   const clear = (subjectId?: number) => {
     items.value = subjectId == null ? [] : items.value.filter((i) => i.subject_id !== subjectId)
     persist()

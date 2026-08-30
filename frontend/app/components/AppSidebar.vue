@@ -193,7 +193,7 @@ const navActiveClass = 'border-l-2 border-transparent data-[active=true]:border-
                 <SidebarMenuButton as-child :is-active="route.path === '/subjects'" :class="navActiveClass">
                   <NuxtLink to="/subjects">
                     <Library />
-                    <span>科目管理</span>
+                    <span>学科管理</span>
                   </NuxtLink>
                 </SidebarMenuButton>
               </SidebarMenuItem>

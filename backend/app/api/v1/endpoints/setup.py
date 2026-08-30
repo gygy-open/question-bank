@@ -117,6 +117,6 @@ async def complete_setup(payload: SetupComplete) -> dict:
                 ),
             )
 
-    # 科目不再预置：首次登录后由前端引导页 (/onboarding) 让用户创建第一个科目。
+    # 学科不再预置：首次登录后由前端引导页 (/onboarding) 让用户创建第一个学科。
     logger.info("First-run setup completed (db_type=%s)", payload.db_type)
     return {"ok": True}
