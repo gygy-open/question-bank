@@ -30,8 +30,15 @@ import {
     SelectValue,
 } from '@/components/ui/select'
 import { Badge } from '@/components/ui/badge'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { Plus, Pencil, Trash2, Settings } from '@lucide/vue'
+import {
+    Sheet,
+    SheetContent,
+    SheetHeader,
+    SheetTitle,
+    SheetTrigger,
+} from '@/components/ui/sheet'
+import TagCategorySidebar from '@/components/manager/TagCategorySidebar.vue'
+import { Plus, Pencil, Trash2, ChevronDown } from '@lucide/vue'
 import { toast } from 'vue-sonner'
 
 // State
@@ -71,16 +78,17 @@ const currentTag = ref<Partial<Tag>>({
     color: '#grey'
 })
 
-// Category Management State
-const isCategoryDialogOpen = ref(false)
+// Category Management State (sidebar owns the inline add/edit form UI, this page owns the API calls)
 const editingCategoryId = ref<number | null>(null)
 const editingCategory = ref<Partial<TagCategory>>({})
+const isAddingCategory = ref(false)
 const newCategory = ref<Partial<TagCategory>>({
     name: '',
     slug: '',
     sort_order: 0,
     is_active: true
 })
+const isMobileCategorySheetOpen = ref(false)
 
 // Computed
 const categories = computed(() => {
@@ -93,6 +101,11 @@ const filteredTags = computed(() => {
     return tags.value.filter(tag => tag.category === selectedCategory.value)
 })
 
+const currentCategoryLabel = computed(() => {
+    if (selectedCategory.value === 'all') return '全部'
+    return categories.value.find(c => c.value === selectedCategory.value)?.label || selectedCategory.value
+})
+
 const isAllSelected = computed(() => {
     return filteredTags.value.length > 0 && filteredTags.value.every(t => selectedTags.value.includes(t.id))
 })
@@ -100,7 +113,11 @@ const isAllSelected = computed(() => {
 // Actions
 const openCreateDialog = () => {
     isEditing.value = false
-    currentTag.value = { name: '', category: 'general', color: '#grey' }
+    currentTag.value = {
+        name: '',
+        category: selectedCategory.value !== 'all' ? selectedCategory.value : 'general',
+        color: '#grey'
+    }
     isDialogOpen.value = true
 }
 
@@ -108,6 +125,13 @@ const openEditDialog = (tag: Tag) => {
     isEditing.value = true
     currentTag.value = { ...tag }
     isDialogOpen.value = true
+}
+
+const openCreateDialogForCategory = (categorySlug: string) => {
+    isEditing.value = false
+    currentTag.value = { name: '', category: categorySlug, color: '#grey' }
+    isDialogOpen.value = true
+    isMobileCategorySheetOpen.value = false
 }
 
 const saveTag = async () => {
@@ -177,28 +201,25 @@ const batchDelete = async () => {
 }
 
 // Category Actions
-const startEditCategory = (category: TagCategory) => {
-    editingCategoryId.value = category.id
-    editingCategory.value = { ...category }
-}
-
-const cancelEditCategory = () => {
-    editingCategoryId.value = null
-    editingCategory.value = {}
-}
-
 const saveCategory = async () => {
     if (!editingCategoryId.value) return
+    const previousSlug = tagCategories.value?.find(c => c.id === editingCategoryId.value)?.slug
     try {
         await $api(`/tag-categories/${editingCategoryId.value}`, {
             method: 'PUT',
             body: editingCategory.value
         })
         await refreshCategories()
+        // Keep the current filter selection pointing at the (possibly renamed) category.
+        if (previousSlug && selectedCategory.value === previousSlug && editingCategory.value.slug) {
+            selectedCategory.value = editingCategory.value.slug
+        }
         editingCategoryId.value = null
         editingCategory.value = {}
-    } catch (error) {
+        toast.success('分类更新成功')
+    } catch (error: any) {
         console.error('Failed to update category', error)
+        toast.error(error.data?.detail || '更新分类失败')
     }
 }
 
@@ -207,27 +228,34 @@ const createCategory = async () => {
         toast.error('请先选择学科')
         return
     }
-    
+
     try {
         await $api('/tag-categories', {
             method: 'POST',
-            body: { 
-                ...newCategory.value, 
-                subject_id: parseInt(currentSubjectId.value) 
+            body: {
+                ...newCategory.value,
+                subject_id: currentSubjectId.value
             }
         })
         await refreshCategories()
         newCategory.value = { name: '', slug: '', sort_order: 0, is_active: true }
-    } catch (error) {
+        isAddingCategory.value = false
+        toast.success('分类创建成功')
+    } catch (error: any) {
         console.error('Failed to create category', error)
+        toast.error(error.data?.detail || '创建分类失败')
     }
 }
 
 const deleteCategory = async (id: number) => {
     if (!confirm('确定要删除这个分类吗？这将同时删除该分类下的所有标签！')) return
     try {
+        const deletedSlug = tagCategories.value?.find(c => c.id === id)?.slug
         await $api(`/tag-categories/${id}`, { method: 'DELETE' })
         await refreshCategories()
+        if (deletedSlug && selectedCategory.value === deletedSlug) {
+            selectedCategory.value = 'all'
+        }
         toast.success('分类删除成功')
     } catch (error) {
         console.error('Failed to delete category', error)
@@ -239,13 +267,6 @@ const deleteCategory = async (id: number) => {
 <template>
     <PageHeader title="标签管理">
         <template #actions>
-            <span v-if="currentSubject" class="mr-2 text-sm text-muted-foreground">
-                当前学科：{{ currentSubject.name }}
-            </span>
-            <Button variant="outline" class="mr-2" @click="isCategoryDialogOpen = true">
-                <Settings class="w-4 h-4 mr-2" />
-                管理分类
-            </Button>
             <Button :disabled="!hasSubjects" @click="openCreateDialog">
                 <Plus class="w-4 h-4 mr-2" />
                 新建标签
@@ -253,15 +274,59 @@ const deleteCategory = async (id: number) => {
         </template>
     </PageHeader>
     <div class="flex flex-1 flex-col">
-        <div class="@container/main flex flex-1 flex-col px-4 space-y-6 py-6">
-            <Tabs v-model="selectedCategory" class="w-full">
-                <div class="flex justify-between items-center mb-4">
-                    <TabsList class="flex flex-wrap h-auto">
-                        <TabsTrigger value="all">全部</TabsTrigger>
-                        <TabsTrigger v-for="cat in categories" :key="cat.value" :value="cat.value">
-                            {{ cat.label }}
-                        </TabsTrigger>
-                    </TabsList>
+        <div class="@container/main flex flex-1 flex-col gap-4 px-4 py-6 md:flex-row">
+            <!-- Desktop: category rail, stretches to match the table column's height -->
+            <aside class="hidden shrink-0 rounded-md border p-2 md:block md:w-56 lg:w-64">
+                <TagCategorySidebar
+                    v-model:selected="selectedCategory"
+                    v-model:editing-id="editingCategoryId"
+                    v-model:editing-form="editingCategory"
+                    v-model:is-adding="isAddingCategory"
+                    v-model:new-category-form="newCategory"
+                    :categories="tagCategories || []"
+                    :disabled="!hasSubjects"
+                    @create="createCategory"
+                    @save-edit="saveCategory"
+                    @delete="deleteCategory"
+                    @create-tag="openCreateDialogForCategory"
+                />
+            </aside>
+
+            <div class="flex min-w-0 flex-1 flex-col gap-4">
+                <div class="flex items-center justify-between gap-2">
+                    <!-- Mobile: category picker opens the same sidebar in a drawer -->
+                    <div class="md:hidden">
+                        <Sheet v-model:open="isMobileCategorySheetOpen">
+                            <SheetTrigger as-child>
+                                <Button variant="outline" class="justify-between">
+                                    {{ currentCategoryLabel }}
+                                    <ChevronDown class="ml-2 h-4 w-4 opacity-50" />
+                                </Button>
+                            </SheetTrigger>
+                            <SheetContent side="left" class="w-72 p-4">
+                                <SheetHeader class="p-0">
+                                    <SheetTitle>标签分类</SheetTitle>
+                                </SheetHeader>
+                                <TagCategorySidebar
+                                    class="mt-4"
+                                    v-model:selected="selectedCategory"
+                                    v-model:editing-id="editingCategoryId"
+                                    v-model:editing-form="editingCategory"
+                                    v-model:is-adding="isAddingCategory"
+                                    v-model:new-category-form="newCategory"
+                                    :categories="tagCategories || []"
+                                    :disabled="!hasSubjects"
+                                    @create="createCategory"
+                                    @save-edit="saveCategory"
+                                    @delete="deleteCategory"
+                                    @create-tag="openCreateDialogForCategory"
+                                />
+                            </SheetContent>
+                        </Sheet>
+                    </div>
+                    <h2 class="hidden text-sm font-medium text-muted-foreground md:block">
+                        {{ currentCategoryLabel }}
+                    </h2>
                     <Button v-if="selectedTags.length > 0" variant="destructive" size="sm" @click="batchDelete">
                         <Trash2 class="w-4 h-4 mr-2" />
                         批量删除 ({{ selectedTags.length }})
@@ -332,7 +397,7 @@ const deleteCategory = async (id: number) => {
                         </TableBody>
                     </Table>
                 </div>
-            </Tabs>
+            </div>
 
             <Dialog v-model:open="isDialogOpen">
                 <DialogContent>
@@ -361,6 +426,7 @@ const deleteCategory = async (id: number) => {
                                     </SelectItem>
                                 </SelectContent>
                             </Select>
+                            <p class="text-xs text-muted-foreground">决定这个标签在筛选和选择时归到哪一组</p>
                         </div>
 
                         <div class="grid gap-2">
@@ -374,82 +440,8 @@ const deleteCategory = async (id: number) => {
 
                     <DialogFooter>
                         <Button variant="outline" @click="isDialogOpen = false">取消</Button>
-                        <Button @click="saveTag">保存</Button>
+                        <Button :disabled="!currentTag.name?.trim()" @click="saveTag">保存</Button>
                     </DialogFooter>
-                </DialogContent>
-            </Dialog>
-
-            <!-- Category Management Dialog -->
-            <Dialog v-model:open="isCategoryDialogOpen">
-                <DialogContent class="max-w-3xl">
-                    <DialogHeader>
-                        <DialogTitle>管理标签分类</DialogTitle>
-                        <DialogDescription>
-                            添加、编辑或删除标签分类。
-                        </DialogDescription>
-                    </DialogHeader>
-                    
-                    <div class="grid gap-4 py-4">
-                        <div class="border rounded-md">
-                            <Table>
-                                <TableHeader>
-                                    <TableRow>
-                                        <TableHead>名称</TableHead>
-                                        <TableHead>代码 (Slug)</TableHead>
-                                        <TableHead>排序</TableHead>
-                                        <TableHead class="text-right">操作</TableHead>
-                                    </TableRow>
-                                </TableHeader>
-                                <TableBody>
-                                    <TableRow v-for="cat in tagCategories" :key="cat.id">
-                                        <TableCell>
-                                            <Input v-if="editingCategoryId === cat.id" v-model="editingCategory.name" />
-                                            <span v-else>{{ cat.name }}</span>
-                                        </TableCell>
-                                        <TableCell>
-                                            <Input v-if="editingCategoryId === cat.id" v-model="editingCategory.slug" />
-                                            <span v-else>{{ cat.slug }}</span>
-                                        </TableCell>
-                                        <TableCell>
-                                            <Input v-if="editingCategoryId === cat.id" v-model="editingCategory.sort_order" type="number" />
-                                            <span v-else>{{ cat.sort_order }}</span>
-                                        </TableCell>
-                                        <TableCell class="text-right">
-                                            <div class="flex justify-end gap-2">
-                                                <template v-if="editingCategoryId === cat.id">
-                                                    <Button size="sm" @click="saveCategory">保存</Button>
-                                                    <Button size="sm" variant="ghost" @click="cancelEditCategory">取消</Button>
-                                                </template>
-                                                <template v-else>
-                                                    <Button variant="ghost" size="icon" @click="startEditCategory(cat)">
-                                                        <Pencil class="w-4 h-4" />
-                                                    </Button>
-                                                    <Button variant="ghost" size="icon" class="text-destructive" @click="deleteCategory(cat.id)">
-                                                        <Trash2 class="w-4 h-4" />
-                                                    </Button>
-                                                </template>
-                                            </div>
-                                        </TableCell>
-                                    </TableRow>
-                                    <!-- New Category Row -->
-                                    <TableRow>
-                                        <TableCell>
-                                            <Input v-model="newCategory.name" placeholder="新分类名称" />
-                                        </TableCell>
-                                        <TableCell>
-                                            <Input v-model="newCategory.slug" placeholder="slug" />
-                                        </TableCell>
-                                        <TableCell>
-                                            <Input v-model="newCategory.sort_order" type="number" placeholder="0" />
-                                        </TableCell>
-                                        <TableCell class="text-right">
-                                            <Button size="sm" @click="createCategory" :disabled="!newCategory.name || !newCategory.slug">添加</Button>
-                                        </TableCell>
-                                    </TableRow>
-                                </TableBody>
-                            </Table>
-                        </div>
-                    </div>
                 </DialogContent>
             </Dialog>
         </div>
