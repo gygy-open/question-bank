@@ -10,7 +10,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
-import { Pencil, Trash2, Copy, ChevronDown, Star, ShoppingBasket, CheckCircle, History, Workflow, CornerDownRight, GitFork, FileText, AlertTriangle, MoreHorizontal } from '@lucide/vue'
+import { Pencil, Trash2, Copy, ChevronDown, Star, ShoppingBasket, CheckCircle, History, Workflow, CornerDownRight, GitFork, FileText, AlertTriangle, MoreVertical } from '@lucide/vue'
 import MarkdownPreview from './MarkdownPreview.vue'
 import RichContent from './rich-editor/RichContent.vue'
 import AnswerDisplay from './AnswerDisplay.vue'
@@ -213,6 +213,22 @@ const isChecked = computed({
   set: (val) => emit('select', val as boolean)
 })
 
+// Left accent border so status is scannable without reading the badge text
+const statusAccentClass = computed(() => {
+  const item = props.item as DbQuestion
+  switch (item.status) {
+    case 'published':
+      return 'border-l-green-600 dark:border-l-green-600'
+    case 'pending':
+      return 'border-l-amber-400 dark:border-l-amber-500'
+    case 'archived':
+      return 'border-l-muted-foreground/25'
+    case 'draft':
+    default:
+      return 'border-l-muted-foreground/40'
+  }
+})
+
 const copyId = (id: string | number) => {
   navigator.clipboard.writeText(String(id))
   toast.success('ID 已复制')
@@ -228,7 +244,10 @@ const sourceFileUrl = computed(() => {
 </script>
 
 <template>
-  <Card class="hover:shadow-md transition-shadow py-0" :class="{ 'opacity-60': !isSelected }">
+  <Card
+    class="py-0 transition-colors hover:border-foreground/20"
+    :class="[{ 'opacity-60': !isSelected }, mode === 'library' ? ['border-l-4', statusAccentClass] : '']"
+  >
     <div class="p-4">
       <div class="flex flex-col gap-3">
         <!-- Header: Meta & Actions -->
@@ -244,13 +263,11 @@ const sourceFileUrl = computed(() => {
 
             <!-- Type & Status (library mode) -->
             <div v-else class="flex gap-2 items-center flex-wrap">
-              <span 
-                class="text-xs font-mono text-muted-foreground bg-muted px-1.5 py-0.5 rounded cursor-pointer hover:bg-accent hover:text-accent-foreground transition-colors"
-                title="点击复制 ID"
-                @click="copyId(item.id)"
-              >ID: {{ item.id }}</span>
+              <Badge v-if="(item as DbQuestion).status" :variant="statusBadgeProps.variant" :class="['text-xs', statusBadgeProps.class]">
+                {{ statusLabel }}
+              </Badge>
               <Badge variant="outline">{{ typeLabel }}</Badge>
-              
+
               <!-- Structure Badges -->
               <Badge v-if="(item as DbQuestion).parent_id" variant="secondary" class="flex items-center gap-1 px-1.5 bg-indigo-50 text-indigo-700 hover:bg-indigo-100 dark:bg-indigo-500/10 dark:text-indigo-400">
                  子题
@@ -260,25 +277,18 @@ const sourceFileUrl = computed(() => {
               </Badge>
 
               <!-- Fixed 5-star scale so difficulty is comparable at a glance across items -->
-              <div class="flex" :title="difficultyLabel">
+              <div class="flex items-center gap-1" :title="difficultyLabel">
+                <span class="text-xs text-muted-foreground">难度</span>
                 <Star v-for="i in 5" :key="i"
                   class="h-3 w-3"
                   :class="i <= item.difficulty ? 'fill-primary text-primary' : 'fill-none text-muted-foreground/30'" />
               </div>
-              <Badge v-if="(item as DbQuestion).status" :variant="statusBadgeProps.variant" :class="['text-xs', statusBadgeProps.class]">
-                {{ statusLabel }}
-              </Badge>
 
-              <NuxtLink 
-                v-if="sourceFileUrl" 
-                :to="{ path: '/preview', query: { url: sourceFileUrl } }" 
-                target="_blank" 
-                class="flex items-center gap-1 text-xs text-muted-foreground hover:text-primary hover:underline ml-2"
-                title="查看源文件"
-              >
-                <FileText class="h-3 w-3" />
-                源文件
-              </NuxtLink>
+              <span 
+                class="text-xs font-mono text-muted-foreground bg-muted px-1.5 py-0.5 rounded cursor-pointer hover:bg-accent hover:text-accent-foreground transition-colors"
+                title="点击复制 ID"
+                @click="copyId(item.id)"
+              >ID: {{ item.id }}</span>
             </div>
           </div>
 
@@ -325,11 +335,25 @@ const sourceFileUrl = computed(() => {
               :subject-id="(item as DbQuestion).subject_id ?? null"
             />
 
+            <!-- Low-frequency reference action: kept before the overflow menu, after the higher-frequency edit/review/basket/compose actions -->
+            <Button
+              v-if="sourceFileUrl"
+              as-child
+              variant="ghost"
+              size="icon"
+              class="h-8 w-8 text-muted-foreground"
+              title="查看源文件"
+            >
+              <NuxtLink :to="{ path: '/preview', query: { url: sourceFileUrl } }" target="_blank">
+                <FileText class="h-4 w-4" />
+              </NuxtLink>
+            </Button>
+
             <!-- Lower-frequency/destructive actions grouped to reduce icon clutter -->
             <DropdownMenu v-if="mode === 'library'">
               <DropdownMenuTrigger as-child>
                 <Button variant="ghost" size="icon" class="h-8 w-8" title="更多操作">
-                  <MoreHorizontal class="h-4 w-4" />
+                  <MoreVertical class="h-4 w-4" />
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
@@ -400,18 +424,18 @@ const sourceFileUrl = computed(() => {
           </div>
           
           <!-- Options for choice questions -->
-          <div v-if="mode === 'library' && dbOptions.length > 0 && (item.q_type === 'single_choice' || item.q_type === 'multiple_choice')" class="mt-2 mb-3 space-y-1">
-            <div v-for="opt in dbOptions" :key="opt.id" class="flex gap-2 text-xs">
+          <div v-if="mode === 'library' && dbOptions.length > 0 && (item.q_type === 'single_choice' || item.q_type === 'multiple_choice')" class="mt-2 mb-3 flex flex-wrap gap-x-6 gap-y-1.5">
+            <div v-for="opt in dbOptions" :key="opt.id" class="flex max-w-full gap-2 items-baseline text-xs">
               <span class="font-bold text-muted-foreground shrink-0">{{ opt.label }}.</span>
-              <div class="flex-1 text-foreground/80 [&_.prose]:my-0 [&_.prose>p]:my-0 [&_.prose]:text-xs">
+              <div class="min-w-0 text-foreground/80 [&_.prose]:my-0 [&_.prose_p]:my-0 [&_.prose]:text-xs [&_.prose]:leading-normal">
                 <RichContent :content="opt.content" />
               </div>
             </div>
           </div>
-          <div v-else-if="mode !== 'library' && importOptions.length > 0 && (item.q_type === 'single_choice' || item.q_type === 'multiple_choice')" class="mt-2 mb-3 space-y-1">
-            <div v-for="(opt, oi) in importOptions" :key="oi" class="flex gap-2 text-xs">
+          <div v-else-if="mode !== 'library' && importOptions.length > 0 && (item.q_type === 'single_choice' || item.q_type === 'multiple_choice')" class="mt-2 mb-3 flex flex-wrap gap-x-6 gap-y-1.5">
+            <div v-for="(opt, oi) in importOptions" :key="oi" class="flex max-w-full gap-2 items-baseline text-xs">
               <span class="font-bold text-muted-foreground shrink-0">{{ opt.label }}.</span>
-              <div class="flex-1 text-foreground/80 [&_.prose]:my-0 [&_.prose>p]:my-0 [&_.prose]:text-xs">
+              <div class="min-w-0 text-foreground/80 [&_.prose]:my-0 [&_.prose_p]:my-0 [&_.prose]:text-xs [&_.prose]:leading-normal">
                 <MarkdownPreview :content="opt.content" />
               </div>
             </div>
@@ -508,16 +532,47 @@ const sourceFileUrl = computed(() => {
 
       <!-- Expandable Details (library mode) -->
       <div v-if="mode === 'library' && expanded" class="mt-4 pt-4 border-t border-border/50 space-y-4">
-        <div class="text-xs text-muted-foreground grid grid-cols-1 sm:grid-cols-2 gap-2">
-          <div>
-            <span class="font-medium">创建:</span> {{ (item as DbQuestion).creator?.full_name || (item as DbQuestion).creator?.username || 'Unknown' }}
-            <span class="ml-1">{{ new Date((item as DbQuestion).created_at + 'Z').toLocaleString() }}</span>
+        <div class="space-y-2">
+          <div class="text-sm font-semibold text-foreground">答案</div>
+          <div class="text-sm bg-muted/30 p-2 rounded">
+            <AnswerDisplay :answer="(item as DbQuestion).answer" :options="(item as DbQuestion).options" />
           </div>
-          <div>
-            <span class="font-medium">更新:</span> {{ (item as DbQuestion).updater?.full_name || (item as DbQuestion).updater?.username || 'Unknown' }}
-            <span class="ml-1">{{ new Date((item as DbQuestion).updated_at + 'Z').toLocaleString() }}</span>
+        </div>
+
+        <div v-if="!isEmptyRichDoc((item as DbQuestion).thinking)" class="space-y-2">
+          <div class="text-sm font-semibold text-foreground">分析</div>
+          <div class="text-sm bg-muted/20 p-3 rounded [&_.prose]:my-0 [&_.prose_p]:my-0">
+            <RichContent :content="(item as DbQuestion).thinking" />
           </div>
-          <div class="col-span-1 sm:col-span-2 flex flex-col gap-1">
+        </div>
+
+        <div v-if="!isEmptyRichDoc((item as DbQuestion).analysis)" class="space-y-2">
+          <div class="text-sm font-semibold text-foreground">解析</div>
+          <div class="text-sm bg-muted/20 p-3 rounded [&_.prose]:my-0 [&_.prose_p]:my-0">
+            <RichContent :content="(item as DbQuestion).analysis" />
+          </div>
+        </div>
+
+        <div v-if="!isEmptyRichDoc((item as DbQuestion).summary)" class="space-y-2">
+          <div class="text-sm font-semibold text-foreground">总结</div>
+          <div class="text-sm bg-muted/20 p-3 rounded [&_.prose]:my-0 [&_.prose_p]:my-0">
+            <RichContent :content="(item as DbQuestion).summary" />
+          </div>
+        </div>
+
+        <!-- Audit metadata: secondary info, pushed to the footer so answer/analysis surface first -->
+        <div class="text-xs text-muted-foreground flex flex-col gap-1.5 pt-3 border-t border-border/50">
+          <div class="flex flex-wrap gap-x-6 gap-y-1">
+            <div>
+              <span class="font-medium">创建:</span> {{ (item as DbQuestion).creator?.full_name || (item as DbQuestion).creator?.username || 'Unknown' }}
+              <span class="ml-1">{{ new Date((item as DbQuestion).created_at + 'Z').toLocaleString() }}</span>
+            </div>
+            <div>
+              <span class="font-medium">更新:</span> {{ (item as DbQuestion).updater?.full_name || (item as DbQuestion).updater?.username || 'Unknown' }}
+              <span class="ml-1">{{ new Date((item as DbQuestion).updated_at + 'Z').toLocaleString() }}</span>
+            </div>
+          </div>
+          <div class="flex flex-col gap-1">
             <div class="flex items-center gap-2">
               <span class="font-medium">审核次数:</span> {{ (item as DbQuestion).review_count }}
             </div>
@@ -528,35 +583,8 @@ const sourceFileUrl = computed(() => {
                </span>
             </div>
           </div>
-          <div v-if="(item as DbQuestion).source" class="col-span-1 sm:col-span-2">
+          <div v-if="(item as DbQuestion).source">
             <span class="font-medium">来源:</span> {{ (item as DbQuestion).source }}
-          </div>
-        </div>
-        <div class="space-y-2">
-          <div class="text-sm font-semibold text-foreground">答案</div>
-          <div class="text-sm bg-muted/30 p-2 rounded">
-            <AnswerDisplay :answer="(item as DbQuestion).answer" :options="(item as DbQuestion).options" />
-          </div>
-        </div>
-
-        <div v-if="!isEmptyRichDoc((item as DbQuestion).thinking)" class="space-y-2">
-          <div class="text-sm font-semibold text-foreground">分析</div>
-          <div class="text-sm bg-muted/20 p-3 rounded [&_.prose]:my-0 [&_.prose>p]:my-0">
-            <RichContent :content="(item as DbQuestion).thinking" />
-          </div>
-        </div>
-
-        <div v-if="!isEmptyRichDoc((item as DbQuestion).analysis)" class="space-y-2">
-          <div class="text-sm font-semibold text-foreground">解析</div>
-          <div class="text-sm bg-muted/20 p-3 rounded [&_.prose]:my-0 [&_.prose>p]:my-0">
-            <RichContent :content="(item as DbQuestion).analysis" />
-          </div>
-        </div>
-
-        <div v-if="!isEmptyRichDoc((item as DbQuestion).summary)" class="space-y-2">
-          <div class="text-sm font-semibold text-foreground">总结</div>
-          <div class="text-sm bg-muted/20 p-3 rounded [&_.prose]:my-0 [&_.prose>p]:my-0">
-            <RichContent :content="(item as DbQuestion).summary" />
           </div>
         </div>
       </div>

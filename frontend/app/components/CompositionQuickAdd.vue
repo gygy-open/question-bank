@@ -3,7 +3,7 @@ import { ref } from 'vue'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { FileText, Clock, Plus, Loader2 } from '@lucide/vue'
+import { FilePlus, Clock, Plus, Loader2 } from '@lucide/vue'
 import { toast } from 'vue-sonner'
 import { useCompositions, CompositionConflictError } from '@/composables/useCompositions'
 import { useAddQuestionsToComposition } from '@/composables/useAddQuestionsToComposition'
@@ -115,7 +115,7 @@ const onKey = (e: KeyboardEvent) => {
         class="h-8 w-8 text-muted-foreground"
         title="加入稿件"
       >
-        <FileText class="h-4 w-4" />
+        <FilePlus class="h-4 w-4" />
       </Button>
     </PopoverTrigger>
 

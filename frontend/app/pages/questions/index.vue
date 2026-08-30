@@ -529,7 +529,7 @@ const viewStructure = (question: Question) => {
           <span class="text-sm font-medium">正在查看最新导入的题目任务</span>
           <Button variant="ghost" size="sm" @click="resetFilters" class="h-8 hover:bg-primary/20">
               <X class="mr-2 h-4 w-4" />
-              清除筛选
+              重置筛选
           </Button>
       </div>
 
@@ -571,8 +571,10 @@ const viewStructure = (question: Question) => {
                 </div>
 
                 <div class="flex flex-wrap items-end gap-4">
+                  <!-- Fields group: grows to fill available space, capped so it doesn't stretch unbounded on wide screens -->
+                  <div class="flex flex-1 flex-wrap gap-4">
                   <!-- Knowledge Point Filter: popover replaces the old dedicated sidebar column -->
-                  <div class="space-y-2 flex-1 min-w-[200px]">
+                  <div class="space-y-2 flex-1 min-w-[200px] max-w-sm">
                     <Label class="text-xs font-medium">知识点</Label>
                     <Popover v-model:open="kpPopoverOpen">
                       <PopoverTrigger as-child>
@@ -607,7 +609,7 @@ const viewStructure = (question: Question) => {
                   </div>
 
                   <!-- Tag Filter -->
-                  <div class="space-y-2 flex-1 min-w-[240px]">
+                  <div class="space-y-2 flex-1 min-w-[240px] max-w-sm">
                     <Label class="text-xs font-medium">标签</Label>
                     <TagFilter 
                       v-model="filters.tag_ids" 
@@ -615,7 +617,10 @@ const viewStructure = (question: Question) => {
                       :categories="tagCategories || []" 
                     />
                   </div>
+                  </div>
 
+                  <!-- Actions group: pinned to the row's trailing edge, visually separate from the filter fields -->
+                  <div class="flex items-center gap-2 ml-auto shrink-0">
                   <!-- More Filters Popover: source / import task / review count / creator / reviewer -->
                   <Popover>
                     <PopoverTrigger as-child>
@@ -675,6 +680,7 @@ const viewStructure = (question: Question) => {
                     <X class="mr-2 h-4 w-4" />
                     重置
                   </Button>
+                  </div>
                 </div>
               </div>
 
