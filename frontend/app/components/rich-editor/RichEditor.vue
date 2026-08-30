@@ -1,10 +1,17 @@
 <script setup lang="ts">
 import { ref, watch, provide } from 'vue'
 import type { EditorView } from '@tiptap/pm/view'
+import type { Node as PMNode } from '@tiptap/pm/model'
 import { useEditor, EditorContent } from '@tiptap/vue-3'
 import Placeholder from '@tiptap/extension-placeholder'
 import { DragHandle } from '@tiptap/extension-drag-handle-vue-3'
-import { GripVertical } from '@lucide/vue'
+import { GripVertical, Copy, Trash2 } from '@lucide/vue'
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
 import { SlashCommand } from './SlashCommand'
 import RichEditorToolbar from './RichEditorToolbar.vue'
 import RichEditorBubbleMenu from './RichEditorBubbleMenu.vue'
@@ -199,6 +206,26 @@ function insertTable(options: { rows: number; cols: number; withHeaderRow: boole
         .run()
 }
 
+// 拖拽手柄当前指向的顶层块（由 DragHandle 的 onNodeChange 更新），用于块操作菜单。
+const handleNode = ref<PMNode | null>(null)
+const handlePos = ref(-1)
+function onHandleNodeChange(data: { node: PMNode | null; pos: number }) {
+    handleNode.value = data.node
+    handlePos.value = data.pos
+}
+function deleteHandleNode() {
+    const node = handleNode.value
+    const pos = handlePos.value
+    if (!node || pos < 0 || !editor.value) return
+    editor.value.chain().focus().deleteRange({ from: pos, to: pos + node.nodeSize }).run()
+}
+function duplicateHandleNode() {
+    const node = handleNode.value
+    const pos = handlePos.value
+    if (!node || pos < 0 || !editor.value) return
+    editor.value.chain().focus().insertContentAt(pos + node.nodeSize, node.toJSON()).run()
+}
+
 const editor = useEditor({
     content: model.value ?? '',
     extensions: [
@@ -287,8 +314,22 @@ watch(model, (value) => {
         <RichEditorToolbar v-if="editor" :editor="editor" :allow-blank="allowBlank" @image="triggerImagePicker" @math="openInsertMath" @blank="insertBlank" @table="insertTable" />
 
         <div class="relative">
-            <DragHandle v-if="editor" :editor="editor" class="rich-editor__drag-handle">
-                <GripVertical class="size-4 text-muted-foreground" />
+            <DragHandle v-if="editor" :editor="editor" class="rich-editor__drag-handle" :on-node-change="onHandleNodeChange">
+                <DropdownMenu>
+                    <DropdownMenuTrigger as-child>
+                        <button type="button" class="flex size-full items-center justify-center" aria-label="块操作">
+                            <GripVertical class="size-4 text-muted-foreground" />
+                        </button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="start" side="bottom" class="w-40">
+                        <DropdownMenuItem @click="duplicateHandleNode">
+                            <Copy class="mr-2 size-4" />复制
+                        </DropdownMenuItem>
+                        <DropdownMenuItem class="text-destructive focus:text-destructive" @click="deleteHandleNode">
+                            <Trash2 class="mr-2 size-4" />删除
+                        </DropdownMenuItem>
+                    </DropdownMenuContent>
+                </DropdownMenu>
             </DragHandle>
             <EditorContent :editor="editor" />
         </div>
