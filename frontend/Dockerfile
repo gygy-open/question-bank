@@ -17,7 +17,11 @@ COPY --chown=node:node pnpm-lock.yaml package.json .
 
 USER node
 
-RUN --mount=type=cache,id=pnpm,target=/pnpm/store,uid=1000,gid=1000 pnpm install --frozen-lockfile
+# --ignore-scripts: postinstall runs `nuxt prepare`, which needs the app source
+# to generate correct types/aliases. Source isn't copied yet at this layer (kept
+# separate for cache reuse), so running it here would bake a stale .nuxt dir and
+# break "@/..." import resolution during the later build.
+RUN --mount=type=cache,id=pnpm,target=/pnpm/store,uid=1000,gid=1000 pnpm install --frozen-lockfile --ignore-scripts
 
 COPY --chown=node:node . .
 
