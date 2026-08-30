@@ -197,7 +197,9 @@ class QuestionUpdate(QuestionBase):
 
 
 class QuestionReview(BaseModel):
-    status: QuestionStatus
+    # 前端只表达审核意图，最终 status 由后端依据 subject.required_review_count 计算，
+    # 避免客户端在不知道审核进度的情况下臆断题目是否应变为 published。
+    action: Literal["approve", "reject"]
     comment: Optional[str] = None
 
 

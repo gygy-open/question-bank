@@ -250,6 +250,46 @@ async def update_question(
     question = await crud.question.update_with_tags(db=db, db_obj=question, obj_in=question_in, user_id=current_user.id)
     return question
 
+@router.post("/{id}/review", response_model=schemas.Question)
+async def review_question(
+    *,
+    db: deps.SessionDep,
+    id: int,
+    review_in: schemas.QuestionReview,
+    current_user: models.User = Depends(deps.get_current_active_user),
+) -> Any:
+    question = await crud.question.get(db=db, id=id)
+    if not question:
+        raise HTTPException(status_code=404, detail="Question not found")
+
+    if review_in.action == "approve":
+        question.review_count = (question.review_count or 0) + 1
+        # 是否发布由后端依据科目所需审核次数决定，前端不感知审核进度。
+        required_count = question.subject.required_review_count if question.subject else 1
+        if question.review_count >= required_count:
+            question.status = QuestionStatus.PUBLISHED.value
+        elif question.status == QuestionStatus.DRAFT.value:
+            question.status = QuestionStatus.PENDING.value
+    else:
+        # 驳回:退回草稿重新编辑，审核次数清零重新计数。
+        question.status = QuestionStatus.DRAFT.value
+        question.review_count = 0
+
+    question.updated_by = current_user.id
+    db.add(question)
+
+    await log_activity(
+        db,
+        current_user.id,
+        action="review",
+        resource_type="question",
+        resource_id=id,
+        details={"action": review_in.action, "comment": review_in.comment, "resulting_status": question.status},
+    )
+
+    await db.commit()
+    return await crud.question.get(db=db, id=id)
+
 @router.delete("/{id}", response_model=schemas.Question)
 async def delete_question(
     *,
