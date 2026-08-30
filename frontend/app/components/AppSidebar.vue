@@ -203,16 +203,6 @@ const navActiveClass = 'border-l-2 border-transparent data-[active=true]:border-
       </SidebarGroup>
     </SidebarContent>
     <SidebarFooter>
-      <SidebarMenu>
-        <SidebarMenuItem>
-          <SidebarMenuButton as-child :is-active="route.path === '/manual'" :class="navActiveClass">
-            <NuxtLink to="/manual">
-              <HelpCircle />
-              <span>使用手册</span>
-            </NuxtLink>
-          </SidebarMenuButton>
-        </SidebarMenuItem>
-      </SidebarMenu>
 
       <!-- 系统：LAN 共享与超管入口归为同一簇 -->
       <div>
