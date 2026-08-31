@@ -23,6 +23,17 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # Stamp the git tag into app/_version.py so `/system/version` reports the
+      # real release instead of the repo's dev-default "0.1.0" (mirrors desktop-build.yml).
+      - name: Stamp version
+        if: startsWith(github.ref, 'refs/tags/v')
+        working-directory: backend
+        run: |
+          v="${GITHUB_REF_NAME#v}"
+          printf '__version__ = "%s"\n' "$v" > app/_version.py
+          echo "Stamped version $v"
+          cat app/_version.py
+
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
