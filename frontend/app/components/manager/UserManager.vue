@@ -35,7 +35,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Badge } from '@/components/ui/badge'
 import ClearableInput from '~/components/ClearableInput.vue'
-import { Loader2, Pencil, Trash2, Plus, TriangleAlert, KeyRound, Upload } from '@lucide/vue'
+import { Loader2, Pencil, Trash2, Plus, TriangleAlert, KeyRound, Upload, Eye, EyeOff } from '@lucide/vue'
 import UserImportDialog from '~/components/manager/UserImportDialog.vue'
 import type { User } from '~/types'
 
@@ -68,6 +68,10 @@ const userToReset = ref<User | null>(null)
 const newPassword = ref('')
 const confirmPassword = ref('')
 
+const showPassword = ref(false)
+const showNewPassword = ref(false)
+const showConfirmPassword = ref(false)
+
 const formData = reactive({
   id: 0,
   username: '',
@@ -91,6 +95,7 @@ const resetForm = () => {
 
 const openCreateDialog = () => {
   resetForm()
+  showPassword.value = false
   isDialogOpen.value = true
 }
 
@@ -195,6 +200,8 @@ const openResetPasswordDialog = (user: User) => {
   userToReset.value = user
   newPassword.value = ''
   confirmPassword.value = ''
+  showNewPassword.value = false
+  showConfirmPassword.value = false
   isResetPasswordOpen.value = true
 }
 
@@ -326,7 +333,7 @@ const confirmResetPassword = async () => {
         <DialogHeader>
           <DialogTitle>{{ isEditing ? '编辑用户' : '新增用户' }}</DialogTitle>
           <DialogDescription>
-            {{ isEditing ? '修改用户信息，留空密码则不修改。' : '创建一个新的用户账号。' }}
+            {{ isEditing ? '修改用户信息，留空密码则不修改' : '创建一个新的用户账号' }}
           </DialogDescription>
         </DialogHeader>
         <div class="grid gap-4 py-4">
@@ -368,14 +375,25 @@ const confirmResetPassword = async () => {
             <Label for="password" class="text-right">
               密码 <span class="text-red-500">*</span>
             </Label>
-            <Input
-              id="password"
-              type="password"
-              v-model="formData.password"
-              class="col-span-3"
-              placeholder="必填"
-              autocomplete="new-password"
-            />
+            <div class="col-span-3 relative">
+              <Input
+                id="password"
+                :type="showPassword ? 'text' : 'password'"
+                v-model="formData.password"
+                class="pr-10"
+                placeholder="必填"
+                autocomplete="new-password"
+              />
+              <button
+                type="button"
+                class="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                :aria-label="showPassword ? '隐藏密码' : '显示密码'"
+                @click="showPassword = !showPassword"
+              >
+                <EyeOff v-if="showPassword" class="h-4 w-4" />
+                <Eye v-else class="h-4 w-4" />
+              </button>
+            </div>
           </div>
           <div class="grid grid-cols-4 items-center gap-4">
             <Label class="text-right">状态</Label>
@@ -460,27 +478,49 @@ const confirmResetPassword = async () => {
             <Label for="new_password" class="text-right">
               新密码 <span class="text-red-500">*</span>
             </Label>
-            <Input
-              id="new_password"
-              type="password"
-              v-model="newPassword"
-              class="col-span-3"
-              placeholder="必填"
-              autocomplete="new-password"
-            />
+            <div class="col-span-3 relative">
+              <Input
+                id="new_password"
+                :type="showNewPassword ? 'text' : 'password'"
+                v-model="newPassword"
+                class="pr-10"
+                placeholder="必填"
+                autocomplete="new-password"
+              />
+              <button
+                type="button"
+                class="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                :aria-label="showNewPassword ? '隐藏密码' : '显示密码'"
+                @click="showNewPassword = !showNewPassword"
+              >
+                <EyeOff v-if="showNewPassword" class="h-4 w-4" />
+                <Eye v-else class="h-4 w-4" />
+              </button>
+            </div>
           </div>
           <div class="grid grid-cols-4 items-center gap-4">
             <Label for="confirm_password" class="text-right">
               确认密码 <span class="text-red-500">*</span>
             </Label>
-            <Input
-              id="confirm_password"
-              type="password"
-              v-model="confirmPassword"
-              class="col-span-3"
-              placeholder="必填"
-              autocomplete="new-password"
-            />
+            <div class="col-span-3 relative">
+              <Input
+                id="confirm_password"
+                :type="showConfirmPassword ? 'text' : 'password'"
+                v-model="confirmPassword"
+                class="pr-10"
+                placeholder="必填"
+                autocomplete="new-password"
+              />
+              <button
+                type="button"
+                class="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                :aria-label="showConfirmPassword ? '隐藏密码' : '显示密码'"
+                @click="showConfirmPassword = !showConfirmPassword"
+              >
+                <EyeOff v-if="showConfirmPassword" class="h-4 w-4" />
+                <Eye v-else class="h-4 w-4" />
+              </button>
+            </div>
           </div>
         </div>
         <DialogFooter>
