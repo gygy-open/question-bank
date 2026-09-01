@@ -1,5 +1,6 @@
 from typing import Any, Dict, List
 import shutil
+import socket
 import chromadb
 from app.core.config import settings, chroma_mode, chroma_path, legacy_chroma_path
 
@@ -7,9 +8,28 @@ class VectorStore:
     _client = None
     _embedding_function = None
 
+    # chromadb's HttpClient hardcodes an unbounded httpx timeout internally, so an
+    # unreachable server otherwise blocks for the OS-level TCP timeout (~110-130s on
+    # Linux) on every single call. Probe first with a short, bounded timeout instead.
+    _HTTP_PROBE_TIMEOUT_SECONDS = 2.0
+
     @classmethod
     def set_embedding_function(cls, ef):
         cls._embedding_function = ef
+
+    @classmethod
+    def is_reachable(cls) -> bool:
+        """Whether the configured ChromaDB backend can be reached right now."""
+        if chroma_mode() == "embedded":
+            return True
+        try:
+            with socket.create_connection(
+                (settings.CHROMADB_HOST, settings.CHROMADB_PORT),
+                timeout=cls._HTTP_PROBE_TIMEOUT_SECONDS,
+            ):
+                return True
+        except OSError:
+            return False
 
     @classmethod
     def get_client(cls):
@@ -26,6 +46,10 @@ class VectorStore:
                 cls._client = chromadb.PersistentClient(path=str(path))
             else:
                 # Server / Docker: connect to a standalone ChromaDB service.
+                if not cls.is_reachable():
+                    raise ConnectionError(
+                        f"ChromaDB HTTP server {settings.CHROMADB_HOST}:{settings.CHROMADB_PORT} unreachable"
+                    )
                 cls._client = chromadb.HttpClient(
                     host=settings.CHROMADB_HOST,
                     port=settings.CHROMADB_PORT

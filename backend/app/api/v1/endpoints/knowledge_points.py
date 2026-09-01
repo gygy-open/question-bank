@@ -44,6 +44,7 @@ async def get_embedding_status(
 ) -> Any:
     """Import-page readiness: whether embedding is configured and the subject's KPs are vectorized."""
     embedding_configured = VectorStore.is_available()
+    chroma_reachable = VectorStore.is_reachable()
 
     if subject_id is not None:
         kps = await crud.knowledge_point.get_by_subject(db, subject_id=subject_id, limit=None)
@@ -54,12 +55,13 @@ async def get_embedding_status(
 
     # Empty subject has nothing to vectorize; treat as "vectorized".
     kp_vectorized = True
-    if embedding_configured and kp_total > 0:
+    if embedding_configured and chroma_reachable and kp_total > 0:
         vec_count = VectorStore.count_by_subject(subject_id) if subject_id is not None else VectorStore.count()
         kp_vectorized = vec_count >= kp_total
 
     return {
         "embedding_configured": embedding_configured,
+        "chroma_reachable": chroma_reachable,
         "kp_total": kp_total,
         "kp_vectorized": kp_vectorized,
     }

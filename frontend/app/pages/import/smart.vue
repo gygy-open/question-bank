@@ -71,17 +71,20 @@ const { user } = useAuth()
 const isSuperuser = computed(() => !!user.value?.is_superuser)
 const embeddingConfigured = ref(true)
 const kpVectorized = ref(true)
+const chromaReachable = ref(true)
 
 const fetchImportStatus = async () => {
     try {
-        const res = await $api<{ embedding_configured: boolean; kp_total: number; kp_vectorized: boolean }>(
+        const res = await $api<{ embedding_configured: boolean; chroma_reachable: boolean; kp_total: number; kp_vectorized: boolean }>(
             '/knowledge-points/embedding-status',
             { query: { subject_id: globalSettings.value.subject_id } }
         )
         embeddingConfigured.value = res.embedding_configured
+        chromaReachable.value = res.chroma_reachable
         kpVectorized.value = res.kp_vectorized
     } catch {
         embeddingConfigured.value = true
+        chromaReachable.value = true
         kpVectorized.value = true
     }
 }
@@ -133,7 +136,10 @@ const handleAutoUpload = () => {
         toast.error('请先选择所属学科')
         return
     }
-    
+    if (parseMethod.value === 'ai' && embeddingConfigured.value && !chromaReachable.value) {
+        if (!confirm('知识点向量库暂时不可达，是否跳过知识点自动匹配继续导入？')) return
+    }
+
     // Auto-detect based on file type or pasted image
     if (pastedImage.value || (file.value && file.value.type.startsWith('image/'))) {
         handleUploadImage();
