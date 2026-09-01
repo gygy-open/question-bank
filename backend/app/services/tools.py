@@ -472,7 +472,7 @@ async def propose_question_draft(db: AsyncSession, args: Dict[str, Any]) -> str:
             analysis=v2_fields["analysis"],
             summary=v2_fields["summary"],
             difficulty=args.get("difficulty", 1),
-            status=QuestionStatus.DRAFT, # Use DRAFT status for proposals
+            status=v2_fields["status"],
             subject_id=subject_id,
             knowledge_point_ids=args.get("knowledge_point_ids", []),
             tag_ids=tag_ids
@@ -545,7 +545,7 @@ async def propose_questions_batch(db: AsyncSession, args: Dict[str, Any]) -> str
             analysis=v2_fields["analysis"],
             summary=v2_fields["summary"],
             difficulty=q_data.get("difficulty", 1),
-            status=QuestionStatus.DRAFT, # Use DRAFT status for proposals
+            status=v2_fields["status"],
             subject_id=subject_id,
             knowledge_point_ids=q_data.get("knowledge_point_ids", []),
             tag_ids=tag_ids,

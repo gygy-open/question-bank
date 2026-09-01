@@ -8,6 +8,8 @@
 关键约束(见 docs/development/question-model-v2.md §7/§10):
 - 普通新导入**不得**静默写入 `legacy_unresolved`:选择/判断/填空答案无法解析时抛
   `LegacyQuestionError`,由调用方按既有任务机制标失败/告警。
+- 答案**完全缺失**(而非无法解析)时不拒绝导入:返回的 `status` 会从 pending/published
+  降级为 draft,完整性校验交给消费端(发布/组卷/导出,见 §11)。
 - 只用于 legacy 路径;已是 v2 的对象不要再经过本 adapter(避免重复转换)。
 """
 
@@ -88,8 +90,9 @@ def adapt_legacy_question(
 ) -> dict[str, Any]:
     """把 legacy 题目 payload 转成严格 v2 QuestionCreate 字段 dict。
 
-    返回:{content, options, answer, thinking, analysis, summary}(均为 v2 对象/None)。
-    无法解析选择/判断/填空答案时抛 ``LegacyQuestionError``。
+    返回:{content, options, answer, thinking, analysis, summary, status}(内容字段均为
+    v2 对象/None;status 为字符串,答案缺失且原 status 为 pending/published 时降级为
+    "draft")。无法解析选择/判断/填空答案时抛 ``LegacyQuestionError``。
     """
     qt = _q_type_value(q_type)
     status_value = _q_type_value(status)
@@ -116,10 +119,8 @@ def adapt_legacy_question(
             )
         answer_spec = spec
     elif status_value in {"pending", "published"}:
-        raise LegacyQuestionError(
-            f"{qt} 答案为空,不能进入 {status_value} 状态",
-            warnings=[f"answer_missing:{qt}"],
-        )
+        # 答案缺失不阻断导入;完整性交给消费端(发布/组卷/导出)校验。
+        status_value = "draft"
 
     return {
         "content": content_doc,
@@ -128,4 +129,5 @@ def adapt_legacy_question(
         "thinking": markdown_to_rich_doc(None if thinking is None else str(thinking)),
         "analysis": markdown_to_rich_doc(None if analysis is None else str(analysis)),
         "summary": markdown_to_rich_doc(None if summary is None else str(summary)),
+        "status": status_value,
     }

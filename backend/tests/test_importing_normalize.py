@@ -83,3 +83,30 @@ async def test_import_batch_worker_style_dicts(db_session):
     answer = json.loads(rows[0].answer) if isinstance(rows[0].answer, str) else rows[0].answer
     assert answer["kind"] == "free_response"
     assert rows[0].source == "unit.md"
+
+
+async def test_import_batch_missing_answer_downgrades_to_draft(db_session):
+    """答案缺失不应丢弃题目;应降级为 draft,交由消费端(发布/组卷/导出)校验完整性。"""
+    user = User(username="importer-unit-2", full_name="U", hashed_password="x", is_active=True)
+    db_session.add(user)
+    await db_session.commit()
+    await db_session.refresh(user)
+
+    raws = [{"content": "解答题,暂无答案", "q_type": "free_response"}]
+
+    report = await QuestionImporter().import_batch(
+        db_session,
+        raws,
+        user_id=user.id,
+        import_task_id=None,
+        defaults=ImportDefaults(subject_id=None, status=QuestionStatus.PENDING, source="unit.md"),
+    )
+
+    assert report.saved_count == 1
+    assert report.failed_count == 0
+
+    rows = (await db_session.execute(select(Question))).scalars().all()
+    assert len(rows) == 1
+    assert rows[0].status == QuestionStatus.DRAFT
+    assert rows[0].answer is None
+

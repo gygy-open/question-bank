@@ -129,9 +129,10 @@ def test_adapter_rejects_empty_content():
         adapt_legacy_question(q_type="free_response", content="   ")
 
 
-def test_adapter_rejects_empty_answer_for_pending():
-    with pytest.raises(LegacyQuestionError):
-        adapt_legacy_question(q_type="free_response", status="pending", content="题干")
+def test_adapter_downgrades_empty_answer_for_pending_to_draft():
+    v2 = adapt_legacy_question(q_type="free_response", status="pending", content="题干")
+    assert v2["answer"] is None
+    assert v2["status"] == "draft"
 
 
 def test_exam_validation_rejects_incomplete_draft():

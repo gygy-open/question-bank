@@ -119,7 +119,7 @@ class QuestionImporter:
                     analysis=v2_fields["analysis"],
                     summary=v2_fields["summary"],
                     q_type=q_type,
-                    status=status,
+                    status=v2_fields["status"],
                     difficulty=raw.get("difficulty", 1) or 1,
                     subject_id=subject_id,
                     knowledge_point_ids=_coerce_kp_ids(raw.get("knowledge_point_ids")),
