@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, reactive, computed, watch } from 'vue'
+import { ref, reactive, computed, watch, onActivated } from 'vue'
 import type { Question, KnowledgePoint, TagCategory, Subject, QuestionPage, TagPage, User } from '~/types'
 import { useAPI } from '~/composables/useAPI'
 import KnowledgePointTreeSelector from '~/components/KnowledgePointTreeSelector.vue'
@@ -100,6 +100,18 @@ if (route.query.import_task_id) {
 if (route.query.id) {
     filters.id = route.query.id as string
 }
+
+// 页面被全局 keepalive 缓存，setup 只跑一次；重新进入时按最新 query 同步筛选，触发接口重载
+onActivated(() => {
+    if (route.query.import_task_id) {
+        filters.import_task_id = route.query.import_task_id as string
+        page.value = 1
+    }
+    if (route.query.id) {
+        filters.id = route.query.id as string
+        page.value = 1
+    }
+})
 
 // --- Data Fetching ---
 const { data: subjects, refresh: refreshSubjects } = await useAPI<Subject[]>('/subjects')
