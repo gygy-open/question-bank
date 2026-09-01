@@ -55,13 +55,13 @@ class PromptBuilder:
         categories = (await db.execute(stmt_cat)).scalars().all()
         tags = (await db.execute(select(Tag))).scalars().all()
 
-        tags_by_cat: dict[str, list[str]] = {}
+        tags_by_cat: dict[int, list[str]] = {}
         for tag in tags:
-            tags_by_cat.setdefault(tag.category, []).append(tag.name)
+            tags_by_cat.setdefault(tag.category_id, []).append(tag.name)
 
         lines = []
         for cat in categories:
-            cat_tags = tags_by_cat.get(cat.slug, [])
+            cat_tags = tags_by_cat.get(cat.id, [])
             if cat_tags:
-                lines.append(f"    - **{cat.name} ({cat.slug})**: {', '.join(cat_tags)}")
+                lines.append(f"    - **{cat.name}**: {', '.join(cat_tags)}")
         return "\n".join(lines)

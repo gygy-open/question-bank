@@ -162,7 +162,7 @@ export interface UserImportResult {
 export interface Tag {
   id: number
   name: string
-  category: string
+  category_id: number | null
   color: string
   subject_id: number
 }
@@ -170,7 +170,6 @@ export interface Tag {
 export interface TagCategory {
   id: number
   name: string
-  slug: string
   sort_order: number
   is_active: boolean
 }

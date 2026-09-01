@@ -8,7 +8,7 @@ class Tag(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String(50), index=True, nullable=False)
-    category = Column(String(50), default="general", index=True, nullable=False) # 标签分类: year, source, grade, semester, exam_type, feature(典型,压轴,同步等)
+    category_id = Column(Integer, ForeignKey('tag_categories.id'), nullable=True, index=True) # NULL = 未分类
     color = Column(String(20), default="#grey") # 标签颜色
 
     # 标签归属的学科（学科级隔离，不同学科允许同名标签）
@@ -20,6 +20,7 @@ class Tag(Base):
     creator = relationship("User", foreign_keys=[created_by], back_populates="tags_created")
     updater = relationship("User", foreign_keys=[updated_by], back_populates="tags_updated")
     subject = relationship("Subject", backref="tags")
+    category = relationship("TagCategory", backref="tags")
 
     # 关系
     # secondary 将在 question.py 中定义 table 后引用，或者我们在这里引用字符串

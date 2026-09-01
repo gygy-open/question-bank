@@ -7,12 +7,10 @@ class TagCategory(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String(50), nullable=False) # 显示名称，如：年份
-    slug = Column(String(50), index=True, nullable=False) # 代码，如：year
     subject_id = Column(Integer, ForeignKey('subjects.id'), nullable=False, index=True)
     sort_order = Column(Integer, default=0) # 排序
     is_active = Column(Boolean, default=True) # 是否启用
 
     __table_args__ = (
-        UniqueConstraint('subject_id', 'slug', name='uq_tag_category_subject_slug'),
         UniqueConstraint('subject_id', 'name', name='uq_tag_category_subject_name'),
     )

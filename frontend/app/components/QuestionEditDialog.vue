@@ -426,9 +426,9 @@ const toggleTag = (tagId: number) => {
                         <CommandInput placeholder="搜索标签..." />
                         <CommandEmpty>未找到标签</CommandEmpty>
                         <CommandList>
-                          <CommandGroup v-for="cat in tagCategories" :key="cat.slug" :heading="cat.name">
+                          <CommandGroup v-for="cat in tagCategories" :key="cat.id" :heading="cat.name">
                             <CommandItem
-                              v-for="tag in tags?.filter(t => t.category === cat.slug)"
+                              v-for="tag in tags?.filter(t => t.category_id === cat.id)"
                               :key="tag.id"
                               :value="tag.name"
                               @select="toggleTag(tag.id)"
@@ -442,7 +442,7 @@ const toggleTag = (tagId: number) => {
                           </CommandGroup>
                           <CommandGroup heading="其他">
                             <CommandItem
-                              v-for="tag in tags?.filter(t => !t.category || !tagCategories?.find(c => c.slug === t.category))"
+                              v-for="tag in tags?.filter(t => t.category_id == null || !tagCategories?.find(c => c.id === t.category_id))"
                               :key="tag.id"
                               :value="tag.name"
                               @select="toggleTag(tag.id)"

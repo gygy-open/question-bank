@@ -30,21 +30,22 @@ const emit = defineEmits(['update:modelValue'])
 
 const open = ref(false)
 
+const UNCATEGORIZED = 'uncategorized'
+
 // Group tags by category
 const tagsByCategory = computed(() => {
   const grouped: Record<string, Tag[]> = {}
-  
+
   // Initialize with all categories
   props.categories.forEach(cat => {
-    grouped[cat.slug] = []
+    grouped[cat.id] = []
   })
-  // Also add 'general' if not present
-  if (!grouped['general']) grouped['general'] = []
+  grouped[UNCATEGORIZED] = []
 
   props.tags.forEach(tag => {
-    const cat = tag.category || 'general'
-    if (!grouped[cat]) grouped[cat] = []
-    grouped[cat].push(tag)
+    const key = tag.category_id != null ? String(tag.category_id) : UNCATEGORIZED
+    if (!grouped[key]) grouped[key] = []
+    grouped[key].push(tag)
   })
 
   return grouped
@@ -67,10 +68,6 @@ const toggleTag = (tagId: string) => {
 
 const clearTags = () => {
   emit('update:modelValue', [])
-}
-
-const getCategoryName = (slug: string) => {
-  return props.categories.find(c => c.slug === slug)?.name || slug
 }
 </script>
 
@@ -102,11 +99,11 @@ const getCategoryName = (slug: string) => {
             
             <template v-for="category in categories" :key="category.id">
               <CommandGroup 
-                v-if="tagsByCategory[category.slug]?.length" 
+                v-if="tagsByCategory[category.id]?.length" 
                 :heading="category.name"
               >
                 <CommandItem
-                  v-for="tag in tagsByCategory[category.slug]"
+                  v-for="tag in tagsByCategory[category.id]"
                   :key="tag.id"
                   :value="tag.name"
                   @select="toggleTag(String(tag.id))"
@@ -131,16 +128,16 @@ const getCategoryName = (slug: string) => {
                   </div>
                 </CommandItem>
               </CommandGroup>
-              <CommandSeparator v-if="tagsByCategory[category.slug]?.length" />
+              <CommandSeparator v-if="tagsByCategory[category.id]?.length" />
             </template>
 
-            <!-- Handle tags with unknown categories or 'general' if not in categories list -->
+            <!-- 未分类标签 -->
              <CommandGroup 
-                v-if="tagsByCategory['general']?.length && !categories.find(c => c.slug === 'general')" 
-                heading="通用"
+                v-if="tagsByCategory['uncategorized']?.length" 
+                heading="未分类"
               >
                 <CommandItem
-                  v-for="tag in tagsByCategory['general']"
+                  v-for="tag in tagsByCategory['uncategorized']"
                   :key="tag.id"
                   :value="tag.name"
                   @select="toggleTag(String(tag.id))"

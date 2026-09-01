@@ -3,7 +3,6 @@ from typing import Optional
 
 class TagCategoryBase(BaseModel):
     name: str
-    slug: str
     subject_id: int
     sort_order: int = 0
     is_active: bool = True
@@ -13,7 +12,6 @@ class TagCategoryCreate(TagCategoryBase):
 
 class TagCategoryUpdate(TagCategoryBase):
     name: Optional[str] = None
-    slug: Optional[str] = None
     sort_order: Optional[int] = None
     is_active: Optional[bool] = None
 

@@ -15,12 +15,12 @@ class CRUDTagCategory(CRUDBase[TagCategory, TagCategoryCreate, TagCategoryUpdate
         result = await db.execute(query)
         return result.scalars().all()
 
-    async def get_by_slug_in_subject(
-        self, db: AsyncSession, *, slug: str, subject_id: int
+    async def get_by_name_in_subject(
+        self, db: AsyncSession, *, name: str, subject_id: int
     ) -> Optional[TagCategory]:
         result = await db.execute(
             select(self.model).where(
-                self.model.slug == slug, self.model.subject_id == subject_id
+                self.model.name == name, self.model.subject_id == subject_id
             )
         )
         return result.scalar_one_or_none()

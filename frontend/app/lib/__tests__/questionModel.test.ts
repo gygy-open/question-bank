@@ -208,7 +208,7 @@ describe('dbQuestionToDraft + buildQuestionPayload', () => {
             ],
             answer: { kind: 'single_choice', correct: 'opt_a' },
             knowledge_points: [{ id: 3, name: 'x', slug: 'x', subject_id: 1 }],
-            tags: [{ id: 5, name: 't', category: 'c', color: '#000', subject_id: 1 }],
+            tags: [{ id: 5, name: 't', category_id: null, color: '#000', subject_id: 1 }],
             subject_id: 1,
             difficulty: 4,
             status: 'published',

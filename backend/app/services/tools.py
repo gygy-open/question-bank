@@ -631,16 +631,16 @@ async def get_available_tags(db: AsyncSession, args: Dict[str, Any]) -> str:
         # Group tags by category
         tags_by_cat = {}
         for tag in tags:
-            if tag.category not in tags_by_cat:
-                tags_by_cat[tag.category] = []
-            tags_by_cat[tag.category].append(tag.name)
+            if tag.category_id not in tags_by_cat:
+                tags_by_cat[tag.category_id] = []
+            tags_by_cat[tag.category_id].append(tag.name)
         
         # Build Markdown
         tag_context_lines = []
         for cat in categories:
-            cat_tags = tags_by_cat.get(cat.slug, [])
+            cat_tags = tags_by_cat.get(cat.id, [])
             if cat_tags:
-                tag_context_lines.append(f"- **{cat.name} ({cat.slug})**: {', '.join(cat_tags)}")
+                tag_context_lines.append(f"- **{cat.name}**: {', '.join(cat_tags)}")
         
         if not tag_context_lines:
             return "No tags available."

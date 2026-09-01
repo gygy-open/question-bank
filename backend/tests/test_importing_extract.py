@@ -30,12 +30,15 @@ async def test_prompt_builder_injects_tag_context(db_session):
     await db_session.commit()
     await db_session.refresh(subject)
 
-    db_session.add(TagCategory(name="年份", slug="year", subject_id=subject.id, sort_order=1))
-    db_session.add(Tag(name="2024", category="year", subject_id=subject.id))
+    category = TagCategory(name="年份", subject_id=subject.id, sort_order=1)
+    db_session.add(category)
+    await db_session.commit()
+    await db_session.refresh(category)
+    db_session.add(Tag(name="2024", category_id=category.id, subject_id=subject.id))
     await db_session.commit()
 
     prompt = await PromptBuilder().build(db_session, mode="extract", subject_id=None)
 
     # 分类与标签都进入 prompt 上下文。
-    assert "年份 (year)" in prompt
+    assert "年份" in prompt
     assert "2024" in prompt

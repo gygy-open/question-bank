@@ -37,7 +37,7 @@ async def _seed_taxonomy(db_session):
     await db_session.commit()
     await db_session.refresh(subject)
 
-    tag = Tag(name="重点", category="feature", subject_id=subject.id)
+    tag = Tag(name="重点", subject_id=subject.id)
     kp = KnowledgePoint(name="函数", slug="function", subject_id=subject.id)
     db_session.add_all([tag, kp])
     await db_session.commit()

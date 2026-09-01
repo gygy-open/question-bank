@@ -68,13 +68,13 @@ watch(currentSubjectId, () => {
     }
 }, { immediate: true })
 
-const selectedCategory = ref('all')
+const selectedCategory = ref<number | 'all'>('all')
 const selectedTags = ref<number[]>([])
 const isDialogOpen = ref(false)
 const isEditing = ref(false)
 const currentTag = ref<Partial<Tag>>({
     name: '',
-    category: 'general',
+    category_id: null,
     color: '#grey'
 })
 
@@ -84,7 +84,6 @@ const editingCategory = ref<Partial<TagCategory>>({})
 const isAddingCategory = ref(false)
 const newCategory = ref<Partial<TagCategory>>({
     name: '',
-    slug: '',
     sort_order: 0,
     is_active: true
 })
@@ -92,18 +91,24 @@ const isMobileCategorySheetOpen = ref(false)
 
 // Computed
 const categories = computed(() => {
-    return tagCategories.value?.map(c => ({ value: c.slug, label: c.name })) || []
+    return tagCategories.value?.map(c => ({ value: c.id, label: c.name })) || []
 })
 
 const filteredTags = computed(() => {
     if (!tags.value) return []
     if (selectedCategory.value === 'all') return tags.value
-    return tags.value.filter(tag => tag.category === selectedCategory.value)
+    return tags.value.filter(tag => tag.category_id === selectedCategory.value)
 })
 
 const currentCategoryLabel = computed(() => {
     if (selectedCategory.value === 'all') return '全部'
-    return categories.value.find(c => c.value === selectedCategory.value)?.label || selectedCategory.value
+    return categories.value.find(c => c.value === selectedCategory.value)?.label || '未分类'
+})
+
+// Select 组件用字符串值，'none' 代表未分类（category_id = null）
+const categorySelectValue = computed<string>({
+    get: () => currentTag.value.category_id != null ? String(currentTag.value.category_id) : 'none',
+    set: (v) => { currentTag.value.category_id = v === 'none' ? null : Number(v) }
 })
 
 const isAllSelected = computed(() => {
@@ -115,7 +120,7 @@ const openCreateDialog = () => {
     isEditing.value = false
     currentTag.value = {
         name: '',
-        category: selectedCategory.value !== 'all' ? selectedCategory.value : 'general',
+        category_id: selectedCategory.value !== 'all' ? selectedCategory.value : null,
         color: '#grey'
     }
     isDialogOpen.value = true
@@ -127,9 +132,9 @@ const openEditDialog = (tag: Tag) => {
     isDialogOpen.value = true
 }
 
-const openCreateDialogForCategory = (categorySlug: string) => {
+const openCreateDialogForCategory = (categoryId: number) => {
     isEditing.value = false
-    currentTag.value = { name: '', category: categorySlug, color: '#grey' }
+    currentTag.value = { name: '', category_id: categoryId, color: '#grey' }
     isDialogOpen.value = true
     isMobileCategorySheetOpen.value = false
 }
@@ -203,17 +208,12 @@ const batchDelete = async () => {
 // Category Actions
 const saveCategory = async () => {
     if (!editingCategoryId.value) return
-    const previousSlug = tagCategories.value?.find(c => c.id === editingCategoryId.value)?.slug
     try {
         await $api(`/tag-categories/${editingCategoryId.value}`, {
             method: 'PUT',
             body: editingCategory.value
         })
         await refreshCategories()
-        // Keep the current filter selection pointing at the (possibly renamed) category.
-        if (previousSlug && selectedCategory.value === previousSlug && editingCategory.value.slug) {
-            selectedCategory.value = editingCategory.value.slug
-        }
         editingCategoryId.value = null
         editingCategory.value = {}
         toast.success('分类更新成功')
@@ -238,7 +238,7 @@ const createCategory = async () => {
             }
         })
         await refreshCategories()
-        newCategory.value = { name: '', slug: '', sort_order: 0, is_active: true }
+        newCategory.value = { name: '', sort_order: 0, is_active: true }
         isAddingCategory.value = false
         toast.success('分类创建成功')
     } catch (error: any) {
@@ -250,10 +250,9 @@ const createCategory = async () => {
 const deleteCategory = async (id: number) => {
     if (!confirm('确定要删除这个分类吗？这将同时删除该分类下的所有标签！')) return
     try {
-        const deletedSlug = tagCategories.value?.find(c => c.id === id)?.slug
         await $api(`/tag-categories/${id}`, { method: 'DELETE' })
         await refreshCategories()
-        if (deletedSlug && selectedCategory.value === deletedSlug) {
+        if (selectedCategory.value === id) {
             selectedCategory.value = 'all'
         }
         toast.success('分类删除成功')
@@ -365,9 +364,7 @@ const deleteCategory = async (id: number) => {
                                     </Badge>
                                 </TableCell>
                                 <TableCell>
-                                    <Badge variant="secondary">{{categories.find(c => c.value === tag.category)?.label
-                                        ||
-                                        tag.category }}</Badge>
+                                    <Badge variant="secondary">{{ categories.find(c => c.value === tag.category_id)?.label || '未分类' }}</Badge>
                                 </TableCell>
                                 <TableCell>
                                     <div class="flex items-center gap-2">
@@ -416,12 +413,13 @@ const deleteCategory = async (id: number) => {
 
                         <div class="grid gap-2">
                             <label>分类</label>
-                            <Select v-model="currentTag.category">
+                            <Select v-model="categorySelectValue">
                                 <SelectTrigger>
                                     <SelectValue placeholder="选择分类" />
                                 </SelectTrigger>
                                 <SelectContent>
-                                    <SelectItem v-for="cat in categories" :key="cat.value" :value="cat.value">
+                                    <SelectItem value="none">未分类</SelectItem>
+                                    <SelectItem v-for="cat in categories" :key="cat.value" :value="String(cat.value)">
                                         {{ cat.label }}
                                     </SelectItem>
                                 </SelectContent>

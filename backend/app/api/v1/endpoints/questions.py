@@ -125,13 +125,6 @@ async def create_questions_batch(
     await db.commit()
     await db.refresh(import_task)
 
-    # Pre-fetch all tag categories for AI suggested tags
-    tag_categories_map = {}
-    stmt = select(models.TagCategory)
-    result = await db.execute(stmt)
-    for cat in result.scalars().all():
-        tag_categories_map[cat.slug] = cat
-
     created_questions = []
     
     async def create_recursive(question_in: schemas.QuestionCreate, parent_id: Optional[int] = None) -> models.Question:

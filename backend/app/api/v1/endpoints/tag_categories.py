@@ -37,9 +37,9 @@ async def create_tag_category(
     if not tag_category_in.subject_id:
         raise HTTPException(status_code=400, detail="subject_id is required")
         
-    existing = await crud.tag_category.get_by_slug_in_subject(db, slug=tag_category_in.slug, subject_id=tag_category_in.subject_id)
+    existing = await crud.tag_category.get_by_name_in_subject(db, name=tag_category_in.name, subject_id=tag_category_in.subject_id)
     if existing:
-        raise HTTPException(status_code=400, detail="Tag category with this slug already exists in this subject")
+        raise HTTPException(status_code=400, detail="Tag category with this name already exists in this subject")
         
     tag_category = await crud.tag_category.create(db=db, obj_in=tag_category_in)
     return tag_category
@@ -76,7 +76,7 @@ async def delete_tag_category(
         raise HTTPException(status_code=404, detail="Tag category not found")
     
     # Find all tags in this category
-    result = await db.execute(select(Tag).where(Tag.category == tag_category.slug))
+    result = await db.execute(select(Tag).where(Tag.category_id == id))
     tags = result.scalars().all()
     
     for tag in tags:

@@ -3,7 +3,7 @@ from typing import Optional
 
 class TagBase(BaseModel):
     name: str
-    category: str = "general" # 默认分类
+    category_id: Optional[int] = None # NULL = 未分类
     color: Optional[str] = "#grey"
 
 class TagCreate(TagBase):
@@ -11,7 +11,7 @@ class TagCreate(TagBase):
 
 class TagUpdate(TagBase):
     name: Optional[str] = None
-    category: Optional[str] = None
+    category_id: Optional[int] = None
 
 class Tag(TagBase):
     id: int
