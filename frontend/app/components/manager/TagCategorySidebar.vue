@@ -3,6 +3,7 @@ import { computed } from 'vue'
 import type { TagCategory } from '~/types'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import { Plus, Pencil, Trash2, Info, Tag } from '@lucide/vue'
 
@@ -65,24 +66,20 @@ const cancelAdd = () => {
                     </Tooltip>
                 </TooltipProvider>
             </div>
-            <TooltipProvider :delay-duration="300">
-                <Tooltip>
-                    <TooltipTrigger as-child>
-                        <Button variant="ghost" size="icon" class="h-5 w-5" :disabled="disabled" aria-label="新建分类" @click="isAdding = true">
-                            <Plus class="h-3.5 w-3.5" />
-                        </Button>
-                    </TooltipTrigger>
-                    <TooltipContent side="right">新建分类</TooltipContent>
-                </Tooltip>
-            </TooltipProvider>
-        </div>
-
-        <div v-if="isAdding" class="mb-2 space-y-2 rounded-md border p-2" @keydown.esc="cancelAdd">
-            <Input v-model="newCategoryForm.name" placeholder="分类名称" aria-label="新分类名称" autofocus />
-            <div class="flex justify-end gap-1">
-                <Button size="sm" variant="ghost" @click="cancelAdd">取消</Button>
-                <Button size="sm" :disabled="!newCategoryForm.name" @click="emit('create')">添加</Button>
-            </div>
+            <Popover :open="isAdding" @update:open="(v) => !v && cancelAdd()">
+                <PopoverTrigger as-child>
+                    <Button variant="ghost" size="icon" class="h-5 w-5" :disabled="disabled" aria-label="新建分类" title="新建分类" @click="isAdding = true">
+                        <Plus class="h-3.5 w-3.5" />
+                    </Button>
+                </PopoverTrigger>
+                <PopoverContent side="right" align="start" class="w-64 space-y-2 p-2">
+                    <Input v-model="newCategoryForm.name" placeholder="分类名称" aria-label="新分类名称" autofocus />
+                    <div class="flex justify-end gap-1">
+                        <Button size="sm" variant="ghost" @click="cancelAdd">取消</Button>
+                        <Button size="sm" :disabled="!newCategoryForm.name" @click="emit('create')">添加</Button>
+                    </div>
+                </PopoverContent>
+            </Popover>
         </div>
 
         <button
