@@ -685,8 +685,9 @@ class OpenAIProvider(AIProvider):
 3. 保持简洁具体。避免使用模糊的术语（如“数学”）或过长的句子。
 4. 这些知识点将用于向量检索，因此准确性至关重要。
 
-请严格输出符合以下模式的有效 JSON：
-{schema_json}"""
+下面是输出格式的 JSON Schema 定义，仅供你理解字段结构，不要把这段 Schema 本身（如 $defs、properties 等）当作答案输出：
+{schema_json}
+请只输出符合上述 Schema 的实际数据 JSON。"""
             messages.append({"role": "system", "content": system_prompt})
 
             if image_data:
@@ -753,8 +754,10 @@ class OpenAIProvider(AIProvider):
                 raise e
             
         except Exception as e:
+            # Propagate: swallowing here used to make extraction failures look like "0 questions
+            # found" to callers, returning a silent 200 instead of a visible error.
             logger.exception(f"OpenAI API error: {e}")
-            return []
+            raise
 
     async def rerank_knowledge_points(self, question_content: str, candidates: List[str], config: Dict[str, str] = None) -> List[str]:
         try:
