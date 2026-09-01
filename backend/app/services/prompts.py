@@ -57,7 +57,8 @@ DEFAULT_EXTRACT_PROMPT = r"""你是一个专业的{subject_name}题目提取助�
 - **题目类型 (q_type)**：识别为 `single_choice` (单选), `multiple_choice` (多选), `fill_in_the_blank` (填空), `free_response` (解答), `true_false` (判断)。
 - **题干 (content)**：
     - **必须**去除开头的题号（如 "1.", "2、", "(1)" 等）。
-    - **必须**保留图片链接（如 `/static/media/...`）。
+    - **必须**原样保留形如 `@@IMG0@@`、`@@IMG1@@` 的图片占位符标记（每个代表一张图片），放在它在原文中
+      出现的位置，**不要**删除、翻译、修改或尝试解释其含义。
 - **选项 (options)**：如果是选择题，提取选项列表。
 - **答案 (answer)**：
     - **填空题**：必须返回一个二维数组 `[["答案1A", "答案1B"], ["答案2"]]`。
@@ -120,7 +121,8 @@ DEFAULT_SOLVE_PROMPT = r"""你是一位资深的{subject_name}老师。{subject_
 - **题目类型 (q_type)**：识别为 `single_choice` (单选), `multiple_choice` (多选), `fill_in_the_blank` (填空), `free_response` (解答), `true_false` (判断)。
 - **题干 (content)**：
     - **必须**去除开头的题号。
-    - **必须**保留图片链接。
+    - **必须**原样保留形如 `@@IMG0@@`、`@@IMG1@@` 的图片占位符标记（每个代表一张图片），放在它在原文中
+      出现的位置，**不要**删除、翻译、修改或尝试解释其含义。
 - **选项 (options)**：如果是选择题，提取选项列表。
 - **答案 (answer)**：
     - **请务必自己做一遍题目**，不要直接抄写原文中的标记。

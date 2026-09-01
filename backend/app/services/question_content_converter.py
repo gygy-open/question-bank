@@ -58,6 +58,9 @@ _PX_PER_UNIT = {
     "pt": 96.0 / 72.0,
 }
 _MAX_IMAGE_DIMENSION_PX = 20_000.0
+# 缺失/无法解析宽度时的兜底显示宽度;不兜底 height,避免在未知宽高比时伪造出拉伸变形。
+# TODO: 目前是写死常量,未来若要支持后台可调,可挪到 system_settings 并在此处读取。
+_DEFAULT_IMAGE_WIDTH_PX = 300.0
 
 
 # --------------------------------------------------------------------------- #
@@ -206,7 +209,7 @@ def _convert_inline(
         elif t.startswith("math_inline"):
             out.append({"type": "inlineMath", "attrs": {"latex": node.content.strip()}})
         elif t == "image":
-            out.append(_image(node, needs_review))
+            out.append(_image(node))
         elif t == "html_inline":
             handled = _apply_html_inline(node.content, html_marks)
             if not handled and node.content:
@@ -263,7 +266,7 @@ def _text(text: str, marks: Optional[list[Mark]] = None) -> Node:
     return node
 
 
-def _image(node: SyntaxTreeNode, needs_review: list[bool]) -> Node:
+def _image(node: SyntaxTreeNode) -> Node:
     attrs = dict(node.attrs)
     src = str(attrs.get("src", ""))
     # alt 文本在 image 节点的子文本节点里(markdown-it 不放进 attrs)。
@@ -274,15 +277,16 @@ def _image(node: SyntaxTreeNode, needs_review: list[bool]) -> Node:
     title = attrs.get("title")
     if title:
         image_attrs["title"] = str(title)
-    for name in ("width", "height"):
-        raw_dimension = attrs.get(name)
-        if raw_dimension is None:
-            continue
-        dimension = _image_dimension_to_px(raw_dimension)
-        if dimension is None:
-            needs_review[0] = True
-            continue
-        image_attrs[name] = dimension
+    # width 缺失或格式非法都兜底成默认宽度;height 不兜底,缺失/非法都不写入(避免伪造宽高比)。
+    raw_width = attrs.get("width")
+    image_attrs["width"] = (
+        _image_dimension_to_px(raw_width) if raw_width is not None else None
+    ) or _DEFAULT_IMAGE_WIDTH_PX
+    raw_height = attrs.get("height")
+    if raw_height is not None:
+        height = _image_dimension_to_px(raw_height)
+        if height is not None:
+            image_attrs["height"] = height
     return {"type": "image", "attrs": image_attrs}
 
 

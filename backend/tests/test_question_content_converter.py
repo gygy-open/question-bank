@@ -89,11 +89,16 @@ def test_block_math():
 
 
 def test_image():
-    doc = markdown_to_rich_doc("![cat](/static/media/cat.png)")
+    doc, needs_review = markdown_to_rich_doc_with_review("![cat](/static/media/cat.png)")
     nodes = doc["content"][0]["content"]
     img = next(n for n in nodes if n["type"] == "image")
+
+    assert needs_review is False
     assert img["attrs"]["src"] == "/static/media/cat.png"
     assert img["attrs"]["alt"] == "cat"
+    # 完全没有尺寸属性时兜底为默认宽度,不写入 needs_review。
+    assert img["attrs"]["width"] == 300.0
+    assert "height" not in img["attrs"]
 
 
 def test_image_pandoc_dimensions_are_normalized_to_px():
@@ -136,14 +141,27 @@ def test_image_detached_pandoc_dimensions_are_supported():
     ]
 
 
-def test_invalid_image_dimension_marks_review_without_storing_css():
+def test_invalid_image_dimension_falls_back_to_default_width():
     doc, needs_review = markdown_to_rich_doc_with_review(
         '![](/static/media/image6.png){width="50%"}'
     )
     image = doc["content"][0]["content"][0]
 
-    assert needs_review is True
-    assert "width" not in image["attrs"]
+    # 格式非法不再写 needs_review(该字段不再由图片尺寸逻辑写入);直接兜底为默认宽度。
+    assert needs_review is False
+    assert image["attrs"]["width"] == 300.0
+    assert "height" not in image["attrs"]
+
+
+def test_image_with_only_width_keeps_height_absent():
+    doc, needs_review = markdown_to_rich_doc_with_review(
+        '![](/static/media/image6.png){width="1in"}'
+    )
+    image = doc["content"][0]["content"][0]
+
+    assert needs_review is False
+    assert image["attrs"]["width"] == 96.0
+    assert "height" not in image["attrs"]
 
 
 # --------------------------------------------------------------------------- #

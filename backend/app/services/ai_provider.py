@@ -747,8 +747,12 @@ class OpenAIProvider(AIProvider):
                 return QuestionList.model_validate_json(content).questions
             except Exception as e:
                 logger.warning(f"Failed to parse as QuestionList, trying raw list: {e}")
-                # Fallback: try to parse as list directly if model returned list instead of object
+                # Fallback: some providers ignore the wrapper schema and return either a bare list
+                # of questions or a single question object. Normalize both to a list.
                 data = json.loads(content)
+                if isinstance(data, dict):
+                    questions = data.get("questions")
+                    data = questions if isinstance(questions, list) else [data]
                 if isinstance(data, list):
                     return [AIQuestion(**q) for q in data]
                 raise e

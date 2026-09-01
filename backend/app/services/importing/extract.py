@@ -10,10 +10,12 @@ from typing import Optional, Protocol
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.schemas.ai import AIQuestion
 from app.services.ai_provider import get_ai_provider
 from app.services.structured_parser import parse_structured
 
 from .enrich import KnowledgePointEnricher
+from .image_mask import mask_images, restore_images
 from .prompt import PromptBuilder
 from .provider_config import resolve_active_provider
 
@@ -80,12 +82,21 @@ class AIExtractor:
 
         provider = get_ai_provider(provider_name)
 
-        final_content = content
+        # 视觉抽取没有 markdown 文本可遮罩;文本抽取才需要把图片 token 换成占位符再喂给 AI。
+        masked_content = content
+        image_map: dict[str, str] = {}
+        if not image_data and content:
+            masked_content, image_map = mask_images(content)
+
+        final_content = masked_content
         if filename:
-            final_content = f"文件名: {filename}\n\n{content}"
+            final_content = f"文件名: {filename}\n\n{masked_content}"
 
         try:
             questions = await provider.extract_questions(final_content, image_data, config)
+            # 文本路径无论是否遮罩到图片都跑还原,以清掉 AI 凭空写出的裸露占位符;视觉路径不涉及。
+            if not image_data:
+                questions = self._restore_images(questions, image_map)
             await self.enricher.enrich(
                 questions, subject_id=subject_id, provider=provider, config=config
             )
@@ -94,6 +105,25 @@ class AIExtractor:
         except Exception as e:
             logger.error(f"AI Provider error: {e}")
             raise
+
+    @staticmethod
+    def _restore_images(
+        questions: list[AIQuestion], image_map: dict[str, str]
+    ) -> list[AIQuestion]:
+        """把 AI 返回题目里的 @@IMGn@@ 占位符换回真实图片 token(容忍编号写错)，并记录异常。"""
+        dumped = [q.model_dump() for q in questions]
+        restored, dropped, unresolved = restore_images(dumped, image_map)
+        if dropped:
+            logger.warning(
+                "AI extraction referenced %d more image placeholder(s) than exist; extras stripped",
+                dropped,
+            )
+        if unresolved:
+            logger.warning(
+                "AI extraction result is missing %d/%d image placeholder(s)",
+                unresolved, len(image_map),
+            )
+        return [AIQuestion(**item) for item in restored]
 
 
 class TemplateExtractor:
