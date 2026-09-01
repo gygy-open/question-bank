@@ -9,6 +9,8 @@ import type {
   AnswerFieldKey,
   AnswerItemOverride,
   AnswerItemProps,
+  AnswerSpaceProps,
+  AnswerSpaceStyle,
   CompositionNode,
   CompositionNodeInput,
   CompositionNodeType,
@@ -31,7 +33,7 @@ export interface EditorNode {
   id: string
   nodeType: CompositionNodeType
   content: RichDocNode | null
-  props: HeadingProps | QuestionDetailsProps | AnswerItemProps | QuestionProps | null
+  props: HeadingProps | QuestionDetailsProps | AnswerItemProps | QuestionProps | AnswerSpaceProps | null
   // question 节点：questionId 引用题库题目；questionRevision/questionContent 由服务端冻结。
   questionId: number | null
   questionRevision: number | null
@@ -106,6 +108,16 @@ export function createPageBreakNode(): EditorNode {
   return baseNode('page_break')
 }
 
+/** 作答空间：默认 3 行空白。 */
+export function createAnswerSpaceNode(
+  lines = 3,
+  style: AnswerSpaceStyle = 'blank',
+): EditorNode {
+  const node = baseNode('answer_space')
+  node.props = { lines, style }
+  return node
+}
+
 /** 把实时题目冻结为 question 节点的内容快照（不含 id/revision，与后端 QuestionContentSnapshot 对齐）。 */
 export function questionContentSnapshotFromQuestion(q: Question): QuestionContentSnapshot {
   return {
@@ -174,6 +186,14 @@ export function defaultAnswerItemProps(): AnswerItemProps {
 
 export function headingLevelOf(node: EditorNode): HeadingLevel {
   return (node.props as HeadingProps | null)?.level ?? 2
+}
+
+/** 读作答空间属性（缺省 3 行空白）。 */
+export function answerSpacePropsOf(node: EditorNode): AnswerSpaceProps {
+  const p = node.props as AnswerSpaceProps | null
+  const lines = typeof p?.lines === 'number' && p.lines >= 1 ? Math.round(p.lines) : 3
+  const style: AnswerSpaceStyle = p?.style === 'lined' ? 'lined' : 'blank'
+  return { lines, style }
 }
 
 export function questionNumberOf(node: EditorNode): string {
@@ -561,6 +581,10 @@ function nodeToInput(node: EditorNode, parentId: string | null): CompositionNode
       }
     case 'page_break':
       return { id: node.id, node_kind: 'block', node_type: 'page_break' }
+    case 'answer_space': {
+      const props = answerSpacePropsOf(node)
+      return { id: node.id, node_kind: 'block', node_type: 'answer_space', props: { lines: props.lines, style: props.style } }
+    }
     case 'question_details': {
       const props = detailPropsOf(node)
       return { id: node.id, node_kind: 'module', node_type: 'question_details', props: { scope: props.scope, fields: { ...props.fields } } }
@@ -697,6 +721,11 @@ function snapNode(node: EditorNode): Record<string, unknown> {
     }
     case 'page_break':
       break
+    case 'answer_space': {
+      const props = answerSpacePropsOf(node)
+      base.p = { lines: props.lines, style: props.style }
+      break
+    }
   }
   return base
 }

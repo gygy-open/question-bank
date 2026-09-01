@@ -4,6 +4,7 @@
 import type { EditorDocument, EditorNode } from '@/lib/compositionDocument'
 import { generateNodeId } from '@/lib/compositionDocument'
 import type {
+  AnswerSpaceProps,
   CompositionNodeType,
   HeadingProps,
   QuestionContentSnapshot,
@@ -13,6 +14,15 @@ import type {
 import type { RichDocNode, RichNode } from '@/types'
 
 const UID_ATTR = 'uid'
+
+/** 从 answer_space 行读出 PM attrs（lines/style），缺省 3 行空白。 */
+function answerSpaceAttrs(node: EditorNode): { lines: number; style: 'blank' | 'lined' } {
+  const p = node.props as AnswerSpaceProps | null
+  return {
+    lines: typeof p?.lines === 'number' && p.lines >= 1 ? p.lines : 3,
+    style: p?.style === 'lined' ? 'lined' : 'blank',
+  }
+}
 
 function makeNode(nodeType: CompositionNodeType): EditorNode {
   return {
@@ -85,6 +95,9 @@ export function editorDocumentToPmDoc(doc: EditorDocument): RichDocNode {
         break
       case 'page_break':
         content.push({ type: 'pageBreak', attrs: { [UID_ATTR]: node.id } })
+        break
+      case 'answer_space':
+        content.push({ type: 'answerSpace', attrs: { [UID_ATTR]: node.id, ...answerSpaceAttrs(node) } })
         break
       case 'question_details':
         pushModuleAslim(content, node)
@@ -185,6 +198,16 @@ export function pmDocToEditorDocument(pmDoc: RichDocNode): EditorDocument {
       case 'pageBreak': {
         const node = makeNode('page_break')
         if (typeof uid === 'string') node.id = uid
+        nodes.push(node)
+        break
+      }
+      case 'answerSpace': {
+        const node = makeNode('answer_space')
+        if (typeof uid === 'string') node.id = uid
+        node.props = {
+          lines: typeof block.attrs?.lines === 'number' ? block.attrs.lines : 3,
+          style: block.attrs?.style === 'lined' ? 'lined' : 'blank',
+        }
         nodes.push(node)
         break
       }

@@ -46,6 +46,13 @@ class ExportPageBreakNode:
 
 
 @dataclass
+class ExportAnswerSpaceNode:
+    """作答留白：按行数预留垂直空间（blank）或答题横线（lined）。"""
+    lines: int
+    style: str  # "blank" | "lined"
+
+
+@dataclass
 class ExportAnswerEntry:
     """question_details 模块内一条已解析的 answer_item:源题冻结内容 + 有效字段。"""
     question_id: int
@@ -74,6 +81,7 @@ CompositionExportNode = Union[
     ExportHeadingNode,
     ExportQuestionNode,
     ExportPageBreakNode,
+    ExportAnswerSpaceNode,
     ExportQuestionDetailsNode,
 ]
 

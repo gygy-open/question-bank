@@ -43,6 +43,13 @@ def _page_break(nid: str | None = None) -> dict:
     return {"id": nid or _uid(), "node_kind": "block", "node_type": "page_break"}
 
 
+def _answer_space(nid: str | None = None, *, lines: int = 3, style: str = "blank") -> dict:
+    return {
+        "id": nid or _uid(), "node_kind": "block", "node_type": "answer_space",
+        "props": {"lines": lines, "style": style},
+    }
+
+
 def _question(question_id: int, nid: str | None = None) -> dict:
     return {"id": nid or _uid(), "node_kind": "block", "node_type": "question", "question_id": question_id}
 
@@ -168,6 +175,23 @@ async def test_replace_builds_tree_with_positions(client, ctx):
     assert [n["id"] for n in roots] == [n1, n2, n3]
     assert [n["position"] for n in roots] == [0, 1, 2]
     assert [n["node_type"] for n in roots] == ["rich_text", "heading", "page_break"]
+
+
+async def test_replace_roundtrips_answer_space(client, ctx):
+    sid = ctx["subject"].id
+    h = _auth(ctx["user"])
+    comp = await _create_shared_composition(client, sid, h)
+
+    a1 = _uid()
+    r = await _put_nodes(
+        client, sid, comp["id"], h,
+        expected_revision=1,
+        nodes=[_answer_space(a1, lines=6, style="lined")],
+    )
+    assert r.status_code == 200, r.text
+    roots = _roots(r.json()["nodes"])
+    assert [n["node_type"] for n in roots] == ["answer_space"]
+    assert roots[0]["props"] == {"lines": 6, "style": "lined"}
 
 
 # --------------------------------------------------------------------------- #

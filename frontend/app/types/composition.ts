@@ -82,6 +82,7 @@ export type CompositionNodeType =
   | 'heading'
   | 'question'
   | 'page_break'
+  | 'answer_space'
   | 'question_details'
   | 'answer_item'
 
@@ -92,6 +93,15 @@ export type HeadingLevel = 1 | 2 | 3 | 4
 
 export interface HeadingProps {
   level: HeadingLevel
+}
+
+/** 作答空间样式：纯空白或答题横线。 */
+export type AnswerSpaceStyle = 'blank' | 'lined'
+
+/** answer_space 节点属性：按行数控高 + 样式。 */
+export interface AnswerSpaceProps {
+  lines: number
+  style: AnswerSpaceStyle
 }
 
 /** 选项排版：auto=按内容长度自适应列数，或固定 1/2/4 列。缺省视为 auto。 */
@@ -204,6 +214,17 @@ export interface PageBreakNode extends CompositionNodeCommon {
   anchor_before_node_id: null
 }
 
+export interface AnswerSpaceNode extends CompositionNodeCommon {
+  node_kind: 'block'
+  node_type: 'answer_space'
+  content: null
+  props: AnswerSpaceProps
+  question_id: null
+  question_revision: null
+  source_question_node_id: null
+  anchor_before_node_id: null
+}
+
 export interface QuestionDetailsNode extends CompositionNodeCommon {
   node_kind: 'module'
   node_type: 'question_details'
@@ -232,6 +253,7 @@ export type CompositionNode =
   | HeadingNode
   | QuestionNode
   | PageBreakNode
+  | AnswerSpaceNode
   | QuestionDetailsNode
   | AnswerItemNode
 
@@ -420,6 +442,12 @@ export interface SnapshotPageBreakNode extends SnapshotNodeCommon {
   node_type: 'page_break'
 }
 
+export interface SnapshotAnswerSpaceNode extends SnapshotNodeCommon {
+  node_kind: 'block'
+  node_type: 'answer_space'
+  props: AnswerSpaceProps
+}
+
 export interface SnapshotQuestionDetailsNode extends SnapshotNodeCommon {
   node_kind: 'module'
   node_type: 'question_details'
@@ -438,6 +466,7 @@ export type SnapshotNode =
   | SnapshotHeadingNode
   | SnapshotQuestionNode
   | SnapshotPageBreakNode
+  | SnapshotAnswerSpaceNode
   | SnapshotQuestionDetailsNode
   | SnapshotAnswerItemNode
 

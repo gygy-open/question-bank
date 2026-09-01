@@ -1,8 +1,10 @@
 import { describe, it, expect } from 'vitest'
 import {
   answerItemPropsOf,
+  answerSpacePropsOf,
   collectDocumentIssues,
   collectStaleQuestionNodeIds,
+  createAnswerSpaceNode,
   createHeadingNode,
   createPageBreakNode,
   createQuestionDetailsModule,
@@ -94,6 +96,14 @@ describe('根节点工厂与预设', () => {
     expect(q.questionId).toBe(7)
     expect(q.questionRevision).toBe(4)
     expect(q.questionContent?.q_type).toBe('single_choice')
+  })
+
+  it('作答空间默认 3 行空白，属性可读回', () => {
+    const a = createAnswerSpaceNode()
+    expect(a.nodeType).toBe('answer_space')
+    expect(a.content).toBeNull()
+    expect(answerSpacePropsOf(a)).toEqual({ lines: 3, style: 'blank' })
+    expect(answerSpacePropsOf(createAnswerSpaceNode(8, 'lined'))).toEqual({ lines: 8, style: 'lined' })
   })
 
   it('汇总模块预设：默认仅答案、标题「参考答案」', () => {
@@ -190,6 +200,14 @@ describe('序列化 documentToReplaceRequest', () => {
   it('无 batchId 时不带 batch_id', () => {
     const req = documentToReplaceRequest(doc([createPageBreakNode()]), 1)
     expect(req.batch_id).toBeUndefined()
+  })
+
+  it('answer_space 序列化为带 lines/style 的 block 输入', () => {
+    const req = documentToReplaceRequest(doc([createAnswerSpaceNode(5, 'lined')]), 1)
+    const node = req.nodes[0]!
+    expect(node.node_kind).toBe('block')
+    expect(node.node_type).toBe('answer_space')
+    expect(node.props).toEqual({ lines: 5, style: 'lined' })
   })
 })
 

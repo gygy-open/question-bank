@@ -38,6 +38,11 @@ function headingClass(level: number): string {
   return headingClassFor(level)
 }
 
+// 作答空间行数的安全下限（避免快照异常时高度为 0/负）。
+function answerSpaceLines(lines: number): number {
+  return Number.isFinite(lines) && lines >= 1 ? Math.round(lines) : 3
+}
+
 // 快照冻结的选项排版覆盖；旧快照无 props 时回退 auto。
 function optionColumnsOf(node: SnapshotQuestionNode): number {
   const layout = node.props?.optionLayout
@@ -120,6 +125,23 @@ function anyVisible(moduleNode: SnapshotTreeNode, child: SnapshotAnswerItemNode)
         <div class="h-px flex-1 border-t-2 border-dashed border-muted-foreground/40" />
         <span class="text-xs font-medium text-muted-foreground">分页</span>
         <div class="h-px flex-1 border-t-2 border-dashed border-muted-foreground/40" />
+      </div>
+
+      <!-- 作答空间：按行数预留留白 / 答题横线 -->
+      <div v-else-if="node.node_type === 'answer_space'" class="my-1">
+        <div
+          v-if="node.props.style === 'lined'"
+          class="flex flex-col justify-between"
+          :style="{ height: `${answerSpaceLines(node.props.lines) * 1.75}rem` }"
+        >
+          <div
+            v-for="i in answerSpaceLines(node.props.lines)"
+            :key="i"
+            class="border-b border-muted-foreground/50"
+            :style="{ height: '1.75rem' }"
+          />
+        </div>
+        <div v-else :style="{ height: `${answerSpaceLines(node.props.lines) * 1.75}rem` }" />
       </div>
 
       <!-- 答案汇总模块：按 module 子节点顺序渲染（自定义节点 + answer_item） -->

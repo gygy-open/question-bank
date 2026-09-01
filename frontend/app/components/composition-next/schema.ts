@@ -11,6 +11,7 @@ import type { AnyExtension, NodeViewRenderer } from '@tiptap/core'
 import { Blank, ResizableImage } from '@/components/rich-editor/schemaExtensions'
 import { UniqueId } from './uniqueId'
 import { PageBreak } from './nodes/PageBreak'
+import { AnswerSpace } from './nodes/AnswerSpace'
 import { QuestionBlock } from './nodes/QuestionBlock'
 import { QuestionDetailsBlock } from './nodes/QuestionDetailsBlock'
 import { OpaqueBlock } from './nodes/OpaqueBlock'
@@ -28,6 +29,7 @@ export const TOP_LEVEL_TYPES = [
   'horizontalRule',
   'image',
   'pageBreak',
+  'answerSpace',
   'question',
   'questionDetails',
   'opaqueBlock',
@@ -83,6 +85,7 @@ export function getCompositionExtensions(options: CompositionExtensionOptions = 
     blockMath.configure({ katexOptions: { throwOnError: false, displayMode: true } }),
     blank,
     PageBreak,
+    AnswerSpace,
     QuestionBlock,
     QuestionDetailsBlock,
     OpaqueBlock,

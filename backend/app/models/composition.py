@@ -73,12 +73,19 @@ NODE_TYPE_RICH_TEXT = "rich_text"
 NODE_TYPE_HEADING = "heading"
 NODE_TYPE_QUESTION = "question"
 NODE_TYPE_PAGE_BREAK = "page_break"
+NODE_TYPE_ANSWER_SPACE = "answer_space"
 NODE_TYPE_QUESTION_DETAILS = "question_details"
 NODE_TYPE_ANSWER_ITEM = "answer_item"
 
 # 各 kind 允许的 node_type 集合(服务层/契约共享)。
 BLOCK_NODE_TYPES = frozenset(
-    {NODE_TYPE_RICH_TEXT, NODE_TYPE_HEADING, NODE_TYPE_QUESTION, NODE_TYPE_PAGE_BREAK}
+    {
+        NODE_TYPE_RICH_TEXT,
+        NODE_TYPE_HEADING,
+        NODE_TYPE_QUESTION,
+        NODE_TYPE_PAGE_BREAK,
+        NODE_TYPE_ANSWER_SPACE,
+    }
 )
 MODULE_NODE_TYPES = frozenset({NODE_TYPE_QUESTION_DETAILS})
 REFERENCE_NODE_TYPES = frozenset({NODE_TYPE_ANSWER_ITEM})
@@ -255,7 +262,7 @@ class CompositionNode(Base):
         ),
         CheckConstraint(
             "(node_kind = 'block' AND node_type IN "
-            "('rich_text', 'heading', 'question', 'page_break')) OR "
+            "('rich_text', 'heading', 'question', 'page_break', 'answer_space')) OR "
             "(node_kind = 'module' AND node_type = 'question_details') OR "
             "(node_kind = 'reference' AND node_type = 'answer_item')",
             name="kind_matches_type",

@@ -16,6 +16,7 @@ from app.services.exporting.composition_contracts import (
     CompositionExportDoc,
     CompositionExportNode,
     ExportAnswerEntry,
+    ExportAnswerSpaceNode,
     ExportHeadingNode,
     ExportOption,
     ExportPageBreakNode,
@@ -145,6 +146,12 @@ class CompositionAssembler:
             return ExportHeadingNode(level=int(props.get("level", 2)), content=n.get("content"))
         if node_type == "page_break":
             return ExportPageBreakNode()
+        if node_type == "answer_space":
+            props = n.get("props") or {}
+            return ExportAnswerSpaceNode(
+                lines=int(props.get("lines", 3)),
+                style=str(props.get("style", "blank")),
+            )
         if node_type == "question":
             return self._assemble_question(
                 n,

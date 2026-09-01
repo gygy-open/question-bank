@@ -4,12 +4,14 @@ import os
 import zipfile
 
 from docx import Document
+from docx.oxml.ns import qn
 
 from app.schemas.paper import OutputFormat
 from app.services.exporting.composition_assemble import CompositionAssembler
 from app.services.exporting.composition_contracts import (
     CompositionExportDoc,
     ExportAnswerEntry,
+    ExportAnswerSpaceNode,
     ExportHeadingNode,
     ExportOption,
     ExportPageBreakNode,
@@ -137,6 +139,42 @@ def test_composition_latex_renderer_produces_nonempty_zip_with_tex():
 def test_composition_registry_resolves_both_formats():
     assert isinstance(composition_renderer_for(OutputFormat.DOCX), CompositionDocxRenderer)
     assert isinstance(composition_renderer_for(OutputFormat.LATEX), CompositionLatexRenderer)
+
+
+def test_composition_docx_renderer_answer_space_adds_lines():
+    # lined 作答空间：按行数生成带下边框的空段落。
+    doc = CompositionExportDoc(
+        title="t", nodes=[ExportAnswerSpaceNode(lines=4, style="lined")],
+    )
+    path = CompositionDocxRenderer().render(doc)
+    try:
+        document = Document(path)
+        assert len(document.paragraphs) == 4
+        bordered = [p for p in document.paragraphs if p._p.find(qn("w:pPr")) is not None
+                    and p._p.pPr.find(qn("w:pBdr")) is not None]
+        assert len(bordered) == 4
+    finally:
+        os.remove(path)
+
+
+def test_composition_latex_renderer_answer_space_blank_and_lined():
+    blank = CompositionLatexRenderer().render(
+        CompositionExportDoc(title="t", nodes=[ExportAnswerSpaceNode(lines=3, style="blank")])
+    )
+    lined = CompositionLatexRenderer().render(
+        CompositionExportDoc(title="t", nodes=[ExportAnswerSpaceNode(lines=2, style="lined")])
+    )
+    try:
+        with zipfile.ZipFile(blank) as zf:
+            tex = zf.read([n for n in zf.namelist() if n.endswith(".tex")][0]).decode("utf-8")
+        assert "\\vspace{3\\baselineskip}" in tex
+        with zipfile.ZipFile(lined) as zf:
+            tex = zf.read([n for n in zf.namelist() if n.endswith(".tex")][0]).decode("utf-8")
+        assert tex.count("\\rule{\\linewidth}") == 2
+    finally:
+        os.remove(blank)
+        os.remove(lined)
+
 
 
 def test_assembled_snapshot_renders_end_to_end_without_error():

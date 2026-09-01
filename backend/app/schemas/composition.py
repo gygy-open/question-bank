@@ -19,6 +19,7 @@ from app.models.composition import (
     CompositionStatus,
     MODULE_NODE_TYPES,
     NODE_TYPE_ANSWER_ITEM,
+    NODE_TYPE_ANSWER_SPACE,
     NODE_TYPE_HEADING,
     NODE_TYPE_PAGE_BREAK,
     NODE_TYPE_QUESTION,
@@ -35,6 +36,9 @@ from app.services.question_content import validate_rich_doc
 ANSWER_FIELD_KEYS = ("answer", "thinking", "analysis", "summary")
 # question_details.props.scope 合法取值。
 DETAIL_SCOPE_VALUES = ("before", "all")
+# answer_space.props.style 合法取值与行数上限。
+ANSWER_SPACE_STYLES = ("blank", "lined")
+ANSWER_SPACE_MAX_LINES = 50
 
 
 def _validate_scope_owner(scope_type: ScopeType, owner_id: Optional[int]) -> None:
@@ -205,6 +209,20 @@ def _validate_question_props(props: Optional[Dict[str, Any]]) -> None:
             raise ValueError("question props.score must be between 0 and 1000")
 
 
+def _validate_answer_space_props(props: Optional[Dict[str, Any]]) -> None:
+    props = props or {}
+    if set(props.keys()) - {"lines", "style"}:
+        raise ValueError("answer_space props may only contain 'lines' and 'style'")
+    lines = props.get("lines")
+    if isinstance(lines, bool) or not isinstance(lines, int):
+        raise ValueError("answer_space props.lines must be an integer")
+    if not (1 <= lines <= ANSWER_SPACE_MAX_LINES):
+        raise ValueError(f"answer_space props.lines must be between 1 and {ANSWER_SPACE_MAX_LINES}")
+    style = props.get("style")
+    if style not in ANSWER_SPACE_STYLES:
+        raise ValueError(f"answer_space props.style must be one of {ANSWER_SPACE_STYLES}")
+
+
 def _validate_answer_item_props(props: Optional[Dict[str, Any]]) -> None:
     props = props or {}
     if set(props.keys()) - {"included", "overrides"}:
@@ -280,7 +298,12 @@ class CompositionNodeInput(BaseModel):
             raise ValueError("anchor_before_node_id must be a valid UUID string")
 
         # 层级归属约束(跨节点的“父必须是同稿 module”留给服务层):
-        if nt in (NODE_TYPE_QUESTION, NODE_TYPE_PAGE_BREAK, NODE_TYPE_QUESTION_DETAILS):
+        if nt in (
+            NODE_TYPE_QUESTION,
+            NODE_TYPE_PAGE_BREAK,
+            NODE_TYPE_ANSWER_SPACE,
+            NODE_TYPE_QUESTION_DETAILS,
+        ):
             if self.parent_id is not None:
                 raise ValueError(f"{nt} must be a root-level node")
         if nt == NODE_TYPE_ANSWER_ITEM and self.parent_id is None:
@@ -305,6 +328,10 @@ class CompositionNodeInput(BaseModel):
         elif nt == NODE_TYPE_PAGE_BREAK:
             if self.content is not None or self.props is not None:
                 raise ValueError("page_break node must not carry content or props")
+        elif nt == NODE_TYPE_ANSWER_SPACE:
+            if self.content is not None:
+                raise ValueError("answer_space node content must be null")
+            _validate_answer_space_props(self.props)
         elif nt == NODE_TYPE_QUESTION_DETAILS:
             if self.content is not None:
                 raise ValueError("question_details node content must be null")

@@ -9,7 +9,7 @@ import type { SuggestionKeyDownProps, SuggestionProps } from '@tiptap/suggestion
 import {
   Type, Heading1, Heading2, Heading3, List, ListOrdered, Quote, Code, Minus,
   Table as TableIcon, Sigma, SquareSigma, ImageIcon, SeparatorHorizontal,
-  FileQuestion, Files, ListChecks,
+  FileQuestion, Files, ListChecks, PencilLine,
 } from '@lucide/vue'
 import SlashCommandList from '@/components/rich-editor/SlashCommandList.vue'
 
@@ -76,6 +76,13 @@ const ITEMS: CompositionSlashItem[] = [
     title: '分页符', icon: SeparatorHorizontal, group: '块', aliases: ['pagebreak', 'page', 'fenye'],
     command: ({ editor, range }) =>
       editor.chain().focus().deleteRange(range).insertContent({ type: 'pageBreak' }).run(),
+  },
+  {
+    title: '作答空间', icon: PencilLine, group: '块',
+    aliases: ['answer', 'space', 'zuoda', 'kongbai', 'liubai', 'zuodakongjian'],
+    command: ({ editor, range }) =>
+      editor.chain().focus().deleteRange(range)
+        .insertContent({ type: 'answerSpace', attrs: { lines: 3, style: 'blank' } }).run(),
   },
   {
     title: '题目', icon: FileQuestion, group: '组稿', aliases: ['question', 'timu', 'q'],

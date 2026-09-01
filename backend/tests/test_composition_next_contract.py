@@ -97,6 +97,42 @@ def test_page_break_node_is_accepted() -> None:
     assert node.node_type == "page_break"
 
 
+def test_answer_space_node_is_accepted() -> None:
+    node = CompositionNodeInput(
+        id=_uid(), node_kind="block", node_type="answer_space",
+        props={"lines": 5, "style": "lined"},
+    )
+    assert node.node_type == "answer_space"
+    assert node.props == {"lines": 5, "style": "lined"}
+
+
+def test_answer_space_rejects_bad_props() -> None:
+    with pytest.raises(ValidationError):
+        CompositionNodeInput(
+            id=_uid(), node_kind="block", node_type="answer_space",
+            props={"lines": 0, "style": "blank"},
+        )
+    with pytest.raises(ValidationError):
+        CompositionNodeInput(
+            id=_uid(), node_kind="block", node_type="answer_space",
+            props={"lines": 3, "style": "dotted"},
+        )
+    with pytest.raises(ValidationError):
+        CompositionNodeInput(
+            id=_uid(), node_kind="block", node_type="answer_space",
+            content=_doc({"type": "paragraph"}), props={"lines": 3, "style": "blank"},
+        )
+
+
+def test_answer_space_must_be_root_level() -> None:
+    with pytest.raises(ValidationError):
+        CompositionNodeInput(
+            id=_uid(), parent_id=_uid(), slot="body", node_kind="block",
+            node_type="answer_space", props={"lines": 3, "style": "blank"},
+        )
+
+
+
 def test_heading_rejects_nested_block_content() -> None:
     # 防御：heading 段落内若混入块级节点应被拒（convert 永不产出此形态）。
     with pytest.raises(ValidationError):

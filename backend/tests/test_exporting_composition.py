@@ -8,6 +8,7 @@ from app.services.exporting.composition_assemble import (
 )
 from app.services.exporting.composition_contracts import (
     ExportAnswerEntry,
+    ExportAnswerSpaceNode,
     ExportHeadingNode,
     ExportPageBreakNode,
     ExportQuestionDetailsNode,
@@ -79,6 +80,14 @@ def _page_break_node(nid: str, position: int) -> dict:
     }
 
 
+def _answer_space_node(nid: str, position: int, lines: int = 3, style: str = "blank") -> dict:
+    return {
+        "id": nid, "parent_id": None, "slot": None, "position": position,
+        "node_kind": "block", "node_type": "answer_space", "schema_version": 1,
+        "props": {"lines": lines, "style": style},
+    }
+
+
 def _module_node(nid: str, position: int, scope: str = "all", fields: dict | None = None) -> dict:
     complete_fields = {"answer": True, "thinking": False, "analysis": False, "summary": False, **(fields or {})}
     return {
@@ -132,6 +141,14 @@ def test_assemble_basic_node_types_in_order():
         ExportHeadingNode, ExportRichTextNode, ExportQuestionNode, ExportPageBreakNode,
     ]
     assert doc.nodes[0].level == 2
+
+
+def test_assemble_answer_space_carries_props():
+    snap = _snapshot([_answer_space_node("a1", 0, lines=6, style="lined")])
+    doc = CompositionAssembler().assemble(snap)
+    assert [type(n) for n in doc.nodes] == [ExportAnswerSpaceNode]
+    assert doc.nodes[0].lines == 6
+    assert doc.nodes[0].style == "lined"
 
 
 def test_unsupported_node_type_raises_with_node_id():

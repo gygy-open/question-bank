@@ -17,6 +17,7 @@ from app.services.exporting.composition_contracts import (
     CompositionExportDoc,
     CompositionExportNode,
     ExportAnswerEntry,
+    ExportAnswerSpaceNode,
     ExportHeadingNode,
     ExportOption,
     ExportPageBreakNode,
@@ -41,6 +42,19 @@ _ALIGN = {
 
 def _format_score(score: float) -> str:
     return f"{score:g}"
+
+
+def _set_bottom_border(paragraph: Any) -> None:
+    """给段落加一条下边框，作为作答横线。"""
+    p_pr = paragraph._p.get_or_add_pPr()
+    borders = OxmlElement("w:pBdr")
+    bottom = OxmlElement("w:bottom")
+    bottom.set(qn("w:val"), "single")
+    bottom.set(qn("w:sz"), "6")
+    bottom.set(qn("w:space"), "1")
+    bottom.set(qn("w:color"), "auto")
+    borders.append(bottom)
+    p_pr.append(borders)
 
 
 class CompositionDocxRenderer:
@@ -73,8 +87,17 @@ class CompositionDocxRenderer:
             self._add_question(document, node)
         elif isinstance(node, ExportPageBreakNode):
             document.add_page_break()
+        elif isinstance(node, ExportAnswerSpaceNode):
+            self._add_answer_space(document, node)
         elif isinstance(node, ExportQuestionDetailsNode):
             self._add_question_details(document, node)
+
+    def _add_answer_space(self, document: Document, node: ExportAnswerSpaceNode) -> None:
+        # 逐行加空段落;lined 样式给每段落加下边框形成答题横线。
+        for _ in range(max(1, node.lines)):
+            p = document.add_paragraph()
+            if node.style == "lined":
+                _set_bottom_border(p)
 
     def _add_heading(self, document: Document, node: ExportHeadingNode) -> None:
         # heading content 恒为单段落纯行内内容(schema 已保证),直接抽取该段落渲染并整体加粗放大，

@@ -15,6 +15,7 @@ from app.services.exporting.composition_contracts import (
     CompositionExportDoc,
     CompositionExportNode,
     ExportAnswerEntry,
+    ExportAnswerSpaceNode,
     ExportHeadingNode,
     ExportOption,
     ExportPageBreakNode,
@@ -44,6 +45,8 @@ _HEADING_CMD = {1: "section*", 2: "subsection*", 3: "subsubsection*", 4: "paragr
 _LABELS = (("thinking", "【思路】"), ("analysis", "【解析】"), ("summary", "【总结】"))
 # 与前端画布一致：有题号时题干用 hangindent 折行对齐首行文字起点，选项同量右移。
 _NUMBER_INDENT = "1.5em"
+# 作答横线单行占高（与 blank 每行 1\baselineskip 视觉相近）。
+_ANSWER_SPACE_LINE_HEIGHT = "1.5\\baselineskip"
 
 
 def _format_score(score: float) -> str:
@@ -101,6 +104,8 @@ class CompositionLatexRenderer:
             return self._render_question(node, image_path)
         if isinstance(node, ExportPageBreakNode):
             return "\\clearpage\n"
+        if isinstance(node, ExportAnswerSpaceNode):
+            return self._render_answer_space(node)
         if isinstance(node, ExportQuestionDetailsNode):
             return self._render_question_details(node, image_path)
         raise ValueError(f"Unsupported composition export node: {type(node)!r}")
@@ -111,6 +116,14 @@ class CompositionLatexRenderer:
         text = rich_doc_to_latex(node.content, image_path)
         cmd = _HEADING_CMD.get(node.level, "subsubsection*")
         return f"\\{cmd}{{{text}}}\n"
+
+    def _render_answer_space(self, node: ExportAnswerSpaceNode) -> str:
+        # 每行按固定行距预留;lined 逐行画满宽横线,blank 只留等高垂直空白。
+        lines = max(1, node.lines)
+        if node.style == "lined":
+            row = "\\noindent\\rule{\\linewidth}{0.4pt}\\par\\vspace{%s}\n" % _ANSWER_SPACE_LINE_HEIGHT
+            return "\\par\\vspace{0.3\\baselineskip}\n" + row * lines
+        return "\\par\\vspace{%d\\baselineskip}\n" % lines
 
     def _render_question(self, q: ExportQuestionNode, image_path: ImagePathFn) -> str:
         # 题号(粗体)+ 分值(斜体)同挤在题干首段前,而非各占一行,与编辑器内联展示口径一致。

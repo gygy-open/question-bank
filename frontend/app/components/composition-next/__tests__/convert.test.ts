@@ -74,6 +74,21 @@ function pageBreakRow(id: string): EditorNode {
   }
 }
 
+function answerSpaceRow(id: string, lines = 3, style: 'blank' | 'lined' = 'blank'): EditorNode {
+  return {
+    id,
+    nodeType: 'answer_space',
+    content: null,
+    props: { lines, style },
+    questionId: null,
+    questionRevision: null,
+    questionContent: null,
+    sourceQuestionNodeId: null,
+    anchorBeforeNodeId: null,
+    children: [],
+  }
+}
+
 function moduleRow(id: string): EditorNode {
   return {
     id,
@@ -119,6 +134,12 @@ describe('composition-next convert round-trip', () => {
     const doc: EditorDocument = { nodes: [pageBreakRow('p1')] }
     const back = pmDocToEditorDocument(editorDocumentToPmDoc(doc))
     expect(back.nodes[0]).toEqual(pageBreakRow('p1'))
+  })
+
+  it('answer_space survives losslessly with lines and style', () => {
+    const doc: EditorDocument = { nodes: [answerSpaceRow('a1', 6, 'lined')] }
+    const back = pmDocToEditorDocument(editorDocumentToPmDoc(doc))
+    expect(back.nodes[0]).toEqual(answerSpaceRow('a1', 6, 'lined'))
   })
 
   it('module lifts custom heading out and becomes a childless atom', () => {
