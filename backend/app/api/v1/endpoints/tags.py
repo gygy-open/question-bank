@@ -1,10 +1,14 @@
 import math
 from typing import Any, List, Optional
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
+from fastapi.responses import StreamingResponse
 from app import crud, schemas, models
 from app.api import deps
+from app.services import tag_import_service
 
 router = APIRouter()
+
+MAX_IMPORT_SIZE = 5 * 1024 * 1024  # 5 MB
 
 @router.get("", response_model=schemas.TagPage)
 async def read_tags(
@@ -45,6 +49,40 @@ async def create_tag(
 
     tag = await crud.tag.create(db=db, obj_in=tag_in, user_id=current_user.id)
     return tag
+
+@router.get("/import-template")
+async def download_import_template(
+    current_user: models.User = Depends(deps.get_current_active_user),
+) -> Any:
+    """Download the .xlsx tag import template."""
+    content = tag_import_service.generate_template()
+    return StreamingResponse(
+        iter([content]),
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={
+            "Content-Disposition": 'attachment; filename="tags_template.xlsx"'
+        },
+    )
+
+@router.post("/import", response_model=schemas.TagImportResult)
+async def import_tags(
+    *,
+    db: deps.SessionDep,
+    subject_id: int,
+    file: UploadFile = File(...),
+    current_user: models.User = Depends(deps.get_current_active_user),
+) -> Any:
+    """Batch import tags from an .xlsx file for a subject."""
+    if not file.filename or not file.filename.lower().endswith(".xlsx"):
+        raise HTTPException(status_code=400, detail="仅支持 .xlsx 格式的文件")
+
+    content = await file.read()
+    if len(content) > MAX_IMPORT_SIZE:
+        raise HTTPException(status_code=400, detail="文件过大，请确保文件小于 5MB")
+
+    return await tag_import_service.import_excel(
+        db, subject_id=subject_id, file_bytes=content, user_id=current_user.id
+    )
 
 @router.put("/{id}", response_model=schemas.Tag)
 async def update_tag(

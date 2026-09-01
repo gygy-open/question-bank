@@ -159,6 +159,20 @@ export interface UserImportResult {
   errors: UserImportRowError[]
 }
 
+export interface TagImportRowError {
+  row: number
+  message: string
+}
+
+export interface TagImportResult {
+  status: 'success' | 'failed'
+  created: number
+  failed: number
+  skipped: number
+  total: number
+  errors: TagImportRowError[]
+}
+
 export interface Tag {
   id: number
   name: string

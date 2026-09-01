@@ -38,7 +38,8 @@ import {
     SheetTrigger,
 } from '@/components/ui/sheet'
 import TagCategorySidebar from '@/components/manager/TagCategorySidebar.vue'
-import { Plus, Pencil, Trash2, ChevronDown, ChevronLeft, ChevronRight } from '@lucide/vue'
+import TagImportDialog from '@/components/manager/TagImportDialog.vue'
+import { Plus, Pencil, Trash2, ChevronDown, ChevronLeft, ChevronRight, Upload } from '@lucide/vue'
 import {
     Pagination,
     PaginationEllipsis,
@@ -114,6 +115,7 @@ const newCategory = ref<Partial<TagCategory>>({
     is_active: true
 })
 const isMobileCategorySheetOpen = ref(false)
+const isImportOpen = ref(false)
 
 // Computed
 const categories = computed(() => {
@@ -290,6 +292,10 @@ const deleteCategory = async (id: number) => {
 <template>
     <PageHeader title="标签管理">
         <template #actions>
+            <Button variant="outline" :disabled="!hasSubjects" @click="isImportOpen = true">
+                <Upload class="w-4 h-4 mr-2" />
+                批量导入
+            </Button>
             <Button :disabled="!hasSubjects" @click="openCreateDialog">
                 <Plus class="w-4 h-4 mr-2" />
                 新建标签
@@ -495,6 +501,8 @@ const deleteCategory = async (id: number) => {
                     </DialogFooter>
                 </DialogContent>
             </Dialog>
+
+            <TagImportDialog v-model:open="isImportOpen" :subject-id="currentSubjectId" @imported="refresh(); refreshCategories()" />
         </div>
     </div>
 </template>

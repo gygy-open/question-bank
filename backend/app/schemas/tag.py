@@ -27,3 +27,17 @@ class TagPage(BaseModel):
     page: int
     size: int
     pages: int
+
+
+class TagImportRowError(BaseModel):
+    row: int
+    message: str
+
+
+class TagImportResult(BaseModel):
+    status: str  # "success" | "failed"
+    created: int
+    failed: int
+    skipped: int  # duplicate names skipped (not treated as errors)
+    total: int
+    errors: List[TagImportRowError]

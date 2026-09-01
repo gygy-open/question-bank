@@ -4,7 +4,7 @@ from .knowledge_point import (
     VectorStatus, ReindexResult,
     KPImportRowError, KPImportResult, KPImportPreflight,
 )
-from .tag import Tag, TagCreate, TagUpdate, TagPage
+from .tag import Tag, TagCreate, TagUpdate, TagPage, TagImportRowError, TagImportResult
 from .tag_category import TagCategory, TagCategoryCreate, TagCategoryUpdate
 from .question import Question, QuestionCreate, QuestionUpdate, QuestionPage, QuestionBatchCreate, QuestionReview, QuestionBatchConfirm, QuestionBatchDelete, QuestionBatchUpdate, LegacyQuestionCreate, LegacyQuestionBatchCreate, LegacyBatchError, LegacyBatchResult
 from .system_setting import SystemSetting, SystemSettingCreate, SystemSettingUpdate
