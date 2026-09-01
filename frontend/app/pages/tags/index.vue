@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue'
 import { useAPI } from '~/composables/useAPI'
-import type { Tag, TagCategory } from '~/types'
+import type { Tag, TagCategory, TagPage } from '~/types'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Checkbox } from '@/components/ui/checkbox'
@@ -38,16 +38,32 @@ import {
     SheetTrigger,
 } from '@/components/ui/sheet'
 import TagCategorySidebar from '@/components/manager/TagCategorySidebar.vue'
-import { Plus, Pencil, Trash2, ChevronDown } from '@lucide/vue'
+import { Plus, Pencil, Trash2, ChevronDown, ChevronLeft, ChevronRight } from '@lucide/vue'
+import {
+    Pagination,
+    PaginationEllipsis,
+    PaginationContent,
+    PaginationItem,
+    PaginationNext,
+    PaginationPrevious,
+} from '@/components/ui/pagination'
 import { toast } from 'vue-sonner'
 
 // State
 const { $api } = useNuxtApp()
 const { currentSubjectId, currentSubject, hasSubjects } = useSubjectContext()
 
-const { data: tags, refresh } = await useAPI<Tag[]>('/tags', {
+const page = ref(1)
+const pageSize = ref(20)
+const selectedCategory = ref<number | 'all'>('all')
+const selectedTags = ref<number[]>([])
+
+const { data: tagsPage, refresh } = await useAPI<TagPage>('/tags', {
   query: computed(() => ({
-    subject_id: currentSubjectId.value || undefined
+    subject_id: currentSubjectId.value || undefined,
+    page: page.value,
+    size: pageSize.value,
+    category_id: selectedCategory.value !== 'all' ? selectedCategory.value : undefined,
   })),
   immediate: false,
   watch: false,
@@ -60,16 +76,26 @@ const { data: tagCategories, refresh: refreshCategories } = await useAPI<TagCate
   watch: false,
 })
 
+const tags = computed(() => tagsPage.value?.items || [])
+const total = computed(() => tagsPage.value?.total || 0)
+
 // Only fetch once a real subject is selected (never send an empty subject_id).
 watch(currentSubjectId, () => {
+    page.value = 1
     if (currentSubjectId.value) {
       refresh()
       refreshCategories()
     }
 }, { immediate: true })
 
-const selectedCategory = ref<number | 'all'>('all')
-const selectedTags = ref<number[]>([])
+// Category filtering and paging both live server-side now; refetch on change and reset to page 1 when the category changes.
+watch(selectedCategory, () => {
+    page.value = 1
+})
+watch([page, pageSize, selectedCategory], () => {
+    selectedTags.value = []
+    if (currentSubjectId.value) refresh()
+})
 const isDialogOpen = ref(false)
 const isEditing = ref(false)
 const currentTag = ref<Partial<Tag>>({
@@ -94,12 +120,6 @@ const categories = computed(() => {
     return tagCategories.value?.map(c => ({ value: c.id, label: c.name })) || []
 })
 
-const filteredTags = computed(() => {
-    if (!tags.value) return []
-    if (selectedCategory.value === 'all') return tags.value
-    return tags.value.filter(tag => tag.category_id === selectedCategory.value)
-})
-
 const currentCategoryLabel = computed(() => {
     if (selectedCategory.value === 'all') return '全部'
     return categories.value.find(c => c.value === selectedCategory.value)?.label || '未分类'
@@ -111,8 +131,8 @@ const categorySelectValue = computed<string>({
     set: (v) => { currentTag.value.category_id = v === 'none' ? null : Number(v) }
 })
 
-const isAllSelected = computed(() => {
-    return filteredTags.value.length > 0 && filteredTags.value.every(t => selectedTags.value.includes(t.id))
+const isAllPageSelected = computed(() => {
+    return tags.value.length > 0 && tags.value.every(t => selectedTags.value.includes(t.id))
 })
 
 // Actions
@@ -167,14 +187,16 @@ const deleteTag = async (id: number) => {
     try {
         await $api(`/tags/${id}`, { method: 'DELETE' })
         await refresh()
+        // Deleting the last tag on a page (not page 1) would otherwise leave an empty page.
+        if (tags.value.length === 0 && page.value > 1) page.value -= 1
     } catch (error) {
         console.error('Failed to delete tag', error)
     }
 }
 
-const toggleSelectAll = (checked: boolean) => {
+const toggleAllPage = (checked: boolean) => {
     if (checked) {
-        selectedTags.value = filteredTags.value.map(t => t.id)
+        selectedTags.value = tags.value.map(t => t.id)
     } else {
         selectedTags.value = []
     }
@@ -199,6 +221,8 @@ const batchDelete = async () => {
         toast.success(`成功删除 ${selectedTags.value.length} 个标签`)
         selectedTags.value = []
         await refresh()
+        // Batch-deleting the rest of a page (not page 1) would otherwise leave an empty page.
+        if (tags.value.length === 0 && page.value > 1) page.value -= 1
     } catch (error) {
         console.error('Batch delete failed', error)
         toast.error('批量删除失败')
@@ -326,6 +350,7 @@ const deleteCategory = async (id: number) => {
                     <h2 class="hidden text-sm font-medium text-muted-foreground md:block">
                         {{ currentCategoryLabel }}
                     </h2>
+                    <span class="hidden text-sm text-muted-foreground md:block">共 {{ total }} 个标签</span>
                     <Button v-if="selectedTags.length > 0" variant="destructive" size="sm" @click="batchDelete">
                         <Trash2 class="w-4 h-4 mr-2" />
                         批量删除 ({{ selectedTags.length }})
@@ -338,8 +363,8 @@ const deleteCategory = async (id: number) => {
                             <TableRow>
                                 <TableHead class="w-[50px]">
                                     <Checkbox 
-                                        :checked="isAllSelected"
-                                        @update:model-value="(v) => toggleSelectAll(v as boolean)"
+                                        :checked="isAllPageSelected"
+                                        @update:model-value="(v) => toggleAllPage(v as boolean)"
                                     />
                                 </TableHead>
                                 <TableHead>ID</TableHead>
@@ -350,7 +375,7 @@ const deleteCategory = async (id: number) => {
                             </TableRow>
                         </TableHeader>
                         <TableBody>
-                            <TableRow v-for="tag in filteredTags" :key="tag.id">
+                            <TableRow v-for="tag in tags" :key="tag.id">
                                 <TableCell>
                                     <Checkbox 
                                         :checked="selectedTags.includes(tag.id)"
@@ -386,13 +411,41 @@ const deleteCategory = async (id: number) => {
                                     </div>
                                 </TableCell>
                             </TableRow>
-                            <TableRow v-if="filteredTags.length === 0">
+                            <TableRow v-if="tags.length === 0">
                                 <TableCell colspan="5" class="text-center py-8 text-muted-foreground">
                                     暂无标签
                                 </TableCell>
                             </TableRow>
                         </TableBody>
                     </Table>
+                </div>
+
+                <div v-if="total > 0" class="flex justify-center">
+                    <Pagination v-model:page="page" :total="total" :sibling-count="1" show-edges :default-page="1"
+                        :items-per-page="pageSize">
+                        <PaginationContent v-slot="{ items }" class="flex items-center gap-1">
+                            <PaginationPrevious class="h-8 w-8 p-0" aria-label="上一页">
+                                <ChevronLeft class="h-4 w-4" />
+                            </PaginationPrevious>
+                            <template v-for="(item, index) in items">
+                                <PaginationItem v-if="item.type === 'page'" :key="index" :value="item.value" as-child>
+                                    <Button
+                                        :variant="item.value === page ? 'outline' : 'ghost'"
+                                        :class="[
+                                            'w-8 h-8 p-0 text-sm',
+                                            item.value === page ? 'border-primary text-primary font-medium' : 'text-muted-foreground'
+                                        ]"
+                                    >
+                                        {{ item.value }}
+                                    </Button>
+                                </PaginationItem>
+                                <PaginationEllipsis v-else :key="item.type" :index="index" class="size-8" />
+                            </template>
+                            <PaginationNext class="h-8 w-8 p-0" aria-label="下一页">
+                                <ChevronRight class="h-4 w-4" />
+                            </PaginationNext>
+                        </PaginationContent>
+                    </Pagination>
                 </div>
             </div>
 

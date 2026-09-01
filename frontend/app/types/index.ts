@@ -174,6 +174,14 @@ export interface TagCategory {
   is_active: boolean
 }
 
+export interface TagPage {
+  items: Tag[]
+  total: number
+  page: number
+  size: number
+  pages: number
+}
+
 export interface User {
   id: number
   username: string

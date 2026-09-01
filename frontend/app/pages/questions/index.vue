@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, reactive, computed, watch } from 'vue'
-import type { Question, KnowledgePoint, Tag, TagCategory, Subject, QuestionPage, User } from '~/types'
+import type { Question, KnowledgePoint, TagCategory, Subject, QuestionPage, TagPage, User } from '~/types'
 import { useAPI } from '~/composables/useAPI'
 import KnowledgePointTreeSelector from '~/components/KnowledgePointTreeSelector.vue'
 import QuestionListItem from '~/components/QuestionListItem.vue'
@@ -299,13 +299,15 @@ watch(questions, (newQuestions) => {
 const { data: knowledgePoints, refresh: refreshKnowledgePoints } = await useAPI<KnowledgePoint[]>('/knowledge-points', {
   query: { limit: -1 }
 })
-const { data: tags, refresh: refreshTags } = await useAPI<Tag[]>('/tags', {
+const { data: tagsPage, refresh: refreshTags } = await useAPI<TagPage>('/tags', {
   query: computed(() => ({
-    subject_id: selectedSubjectId.value && selectedSubjectId.value !== '0' ? selectedSubjectId.value : undefined
+    subject_id: selectedSubjectId.value && selectedSubjectId.value !== '0' ? selectedSubjectId.value : undefined,
+    size: -1, // 标签选择下拉需要该学科下的全部标签，不分页
   })),
   immediate: false,
   watch: false,
 })
+const tags = computed(() => tagsPage.value?.items)
 const { data: tagCategories, refresh: refreshTagCategories } = await useAPI<TagCategory[]>('/tag-categories', {
   query: computed(() => ({
     subject_id: selectedSubjectId.value && selectedSubjectId.value !== '0' ? selectedSubjectId.value : undefined

@@ -1,5 +1,5 @@
 from pydantic import BaseModel
-from typing import Optional
+from typing import List, Optional
 
 class TagBase(BaseModel):
     name: str
@@ -19,3 +19,11 @@ class Tag(TagBase):
 
     class Config:
         from_attributes = True
+
+
+class TagPage(BaseModel):
+    items: List[Tag]
+    total: int
+    page: int
+    size: int
+    pages: int

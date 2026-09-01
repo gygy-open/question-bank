@@ -4,8 +4,8 @@ import type {
   Question,
   KnowledgePoint,
   ImportItem,
-  Tag,
   TagCategory,
+  TagPage,
   Subject,
   QuestionType,
   OptionSpec,
@@ -100,11 +100,12 @@ const activeSubjectId = computed<number | undefined>(
     ?? undefined,
 )
 
-const { data: tags, refresh: refreshTags } = useAPI<Tag[]>('/tags', {
-  query: computed(() => ({ subject_id: activeSubjectId.value || undefined })),
+const { data: tagsPage, refresh: refreshTags } = useAPI<TagPage>('/tags', {
+  query: computed(() => ({ subject_id: activeSubjectId.value || undefined, size: -1 })), // 标签选择器需要全部标签，不分页
   immediate: false,
   watch: false,
 })
+const tags = computed(() => tagsPage.value?.items)
 const { data: tagCategories, refresh: refreshTagCategories } = useAPI<TagCategory[]>('/tag-categories', {
   query: computed(() => ({ subject_id: activeSubjectId.value || undefined })),
   immediate: false,

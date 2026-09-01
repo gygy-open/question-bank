@@ -1,6 +1,6 @@
 from typing import Optional, Union, Dict, Any, List
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
+from sqlalchemy import select, func
 from app.crud.base import CRUDBase
 from app.models.tag import Tag
 from app.schemas.tag import TagCreate, TagUpdate
@@ -8,13 +8,26 @@ from app.services.activity_logger import log_activity
 
 class CRUDTag(CRUDBase[Tag, TagCreate, TagUpdate]):
     async def get_multi_by_subject(
-        self, db: AsyncSession, *, subject_id: int, skip: int = 0, limit: Optional[int] = 100
+        self, db: AsyncSession, *, subject_id: int, skip: int = 0, limit: Optional[int] = 100,
+        category_id: Optional[int] = None,
     ) -> List[Tag]:
-        query = select(self.model).where(self.model.subject_id == subject_id).offset(skip)
+        query = select(self.model).where(self.model.subject_id == subject_id)
+        if category_id is not None:
+            query = query.where(self.model.category_id == category_id)
+        query = query.offset(skip)
         if limit is not None:
             query = query.limit(limit)
         result = await db.execute(query)
         return result.scalars().all()
+
+    async def count_by_subject(
+        self, db: AsyncSession, *, subject_id: int, category_id: Optional[int] = None
+    ) -> int:
+        query = select(func.count()).select_from(self.model).where(self.model.subject_id == subject_id)
+        if category_id is not None:
+            query = query.where(self.model.category_id == category_id)
+        result = await db.execute(query)
+        return result.scalar_one()
 
     async def get_by_name_in_subject(
         self, db: AsyncSession, *, name: str, subject_id: int

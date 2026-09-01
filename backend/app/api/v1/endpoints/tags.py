@@ -1,21 +1,33 @@
-from typing import Any, List
+import math
+from typing import Any, List, Optional
 from fastapi import APIRouter, Depends, HTTPException
 from app import crud, schemas, models
 from app.api import deps
 
 router = APIRouter()
 
-@router.get("", response_model=List[schemas.Tag])
+@router.get("", response_model=schemas.TagPage)
 async def read_tags(
     db: deps.SessionDep,
     subject_id: int,
-    skip: int = 0,
-    limit: int = 100,
+    page: int = 1,
+    size: int = 20,
+    category_id: Optional[int] = None,
 ) -> Any:
+    """Set size to -1 to retrieve all tags for the subject (used by tag-picker UIs)."""
+    limit = None if size == -1 else size
+    skip = 0 if limit is None else (page - 1) * size
     tags = await crud.tag.get_multi_by_subject(
-        db, subject_id=subject_id, skip=skip, limit=limit
+        db, subject_id=subject_id, skip=skip, limit=limit, category_id=category_id
     )
-    return tags
+    total = await crud.tag.count_by_subject(db, subject_id=subject_id, category_id=category_id)
+    return {
+        "items": tags,
+        "total": total,
+        "page": 1 if limit is None else page,
+        "size": size,
+        "pages": 1 if limit is None else (math.ceil(total / size) if size > 0 else 0),
+    }
 
 @router.post("", response_model=schemas.Tag)
 async def create_tag(
