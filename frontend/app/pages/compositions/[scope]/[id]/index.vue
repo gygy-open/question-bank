@@ -214,6 +214,8 @@ async function saveNodes(opts?: { silent?: boolean }) {
     return
   }
   savingNodes.value = true
+  // 快照送存前的规范化形态：静默保存据此更新 savedSnapshot，避免把 await 期间的新输入误判为已保存。
+  const sentSnapshot = snapshotDocument(document.value)
   try {
     const batchId = globalThis.crypto?.randomUUID?.()
     const payload = documentToReplaceRequest(document.value, composition.value.revision, batchId)
@@ -223,9 +225,15 @@ async function saveNodes(opts?: { silent?: boolean }) {
       composition.value.id,
       payload,
     )
-    document.value = documentFromNodes(resp.nodes)
+    // 静默自动保存只回填元数据（revision/快照），不把服务端规范化副本回灌进编辑器——
+    // 否则会触发整篇 setContent，打断连续输入并丢失光标。手动保存仍回灌做一次规范化对齐。
+    if (opts?.silent) {
+      savedSnapshot.value = sentSnapshot
+    } else {
+      document.value = documentFromNodes(resp.nodes)
+      savedSnapshot.value = snapshotDocument(document.value)
+    }
     composition.value = { ...composition.value, revision: resp.revision }
-    savedSnapshot.value = snapshotDocument(document.value)
     editConflict.value = false
     if (!opts?.silent) toast.success('已保存内容')
     await loadQuestionStatus()

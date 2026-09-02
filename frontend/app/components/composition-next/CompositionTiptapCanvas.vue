@@ -407,7 +407,15 @@ watch(
     if (!inst) return
     const current = pmDocToEditorDocument(inst.getJSON() as never)
     if (JSON.stringify(current) === JSON.stringify(next)) return
+    // 兜底：整篇 setContent 会复位选区；若替换时正在聚焦编辑（如冲突重载），跨重建保留光标与焦点。
+    const wasFocused = inst.isFocused
+    const { from, to } = inst.state.selection
     inst.commands.setContent(editorDocumentToPmDoc(next), { emitUpdate: false })
+    if (wasFocused) {
+      const size = inst.state.doc.content.size
+      inst.commands.setTextSelection({ from: Math.min(from, size), to: Math.min(to, size) })
+      inst.commands.focus()
+    }
   },
 )
 </script>
