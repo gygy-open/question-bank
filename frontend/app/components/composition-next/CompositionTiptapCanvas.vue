@@ -575,7 +575,8 @@ watch(
   left: 0;
   right: 0.5rem;
   height: 0;
-  z-index: 20;
+  /* 低于题目卡片浮动工具条（z-10），避免线条压在工具条上；工具条不透明背景会遮住穿过的线段。 */
+  z-index: 5;
   display: flex;
   align-items: center;
   /* 线条为装饰，不拦截块体点击；仅「+」按钮可点。 */

@@ -7,10 +7,13 @@ import AnswerDisplay from '@/components/AnswerDisplay.vue'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+  Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue,
 } from '@/components/ui/select'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
-import { Trash2, Eye, ScanEye, AlertTriangle, RefreshCw } from '@lucide/vue'
+import {
+  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
+import { Trash2, Eye, Maximize2, Ellipsis, AlertTriangle, RefreshCw, Columns3 } from '@lucide/vue'
 import { questionTypeLabel } from '@/lib/answerFormat'
 import {
   effectiveQuestionField, questionNodeStatus, questionNumberOf, questionOptionLayoutOf,
@@ -76,9 +79,9 @@ const questionScore = computed<number | null>({
 
 const OPTION_LAYOUT_ITEMS: { value: OptionLayout; label: string }[] = [
   { value: 'auto', label: '自动' },
-  { value: 1, label: '1 列' },
-  { value: 2, label: '2 列' },
-  { value: 4, label: '4 列' },
+  { value: 1, label: '每行 1 个' },
+  { value: 2, label: '每行 2 个' },
+  { value: 4, label: '每行 4 个' },
 ]
 const optionLayout = computed<string>({
   get: () => String(questionOptionLayoutOf(shim.value)),
@@ -91,6 +94,11 @@ const optionColumns = computed(() => resolveOptionColumns(snapshot.value?.option
 
 const FIELD_LABELS: Record<AnswerFieldKey, string> = { answer: '答案', thinking: '思路', analysis: '解析', summary: '小结' }
 const previewAll = ref(false)
+// 任一浮层（排版/字段/更多）打开时，portal 到 body 会带走 hover/focus，需强制保持工具条可见。
+const optionLayoutOpen = ref(false)
+const fieldsOpen = ref(false)
+const moreOpen = ref(false)
+const overlayOpen = computed(() => optionLayoutOpen.value || fieldsOpen.value || moreOpen.value)
 
 function fieldVisible(key: AnswerFieldKey): boolean {
   if (previewAll.value) return true
@@ -137,35 +145,40 @@ const scoreDisplay = computed(() => `（${questionScore.value != null ? `${quest
     :class="selected ? 'border-border bg-card' : ''"
     contenteditable="false"
   >
-    <!-- 浮动控制条：悬浮/选中时浮现 -->
+    <!-- 浮动控制条：悬浮/选中时浮现。左段=只读状态，右段=操作，中间分隔。 -->
     <div
       class="absolute -top-3 right-2 z-10 flex items-center gap-1 rounded-md border bg-card px-1.5 py-0.5 shadow-sm transition-opacity"
-      :class="selected ? 'opacity-100' : 'opacity-0 group-hover:opacity-100 focus-within:opacity-100'"
+      :class="selected || overlayOpen ? 'opacity-100' : 'opacity-0 group-hover:opacity-100 focus-within:opacity-100'"
     >
+      <!-- 状态段（只读） -->
+      <span class="text-[11px] text-muted-foreground">r{{ node.attrs.questionRevision }}</span>
       <Badge variant="secondary" class="text-[11px]">{{ typeLabel }}</Badge>
-      <span class="text-[11px] text-muted-foreground">#{{ node.attrs.questionId }} · r{{ node.attrs.questionRevision }}</span>
       <Badge v-if="isStale" variant="outline" class="gap-1 border-amber-400 text-[11px] text-amber-600 dark:text-amber-400">
         <AlertTriangle class="h-3 w-3" /> 题库有更新
       </Badge>
       <Badge v-else-if="isDeleted" variant="outline" class="gap-1 border-destructive text-[11px] text-destructive">
         <AlertTriangle class="h-3 w-3" /> 题库已删除
       </Badge>
-      <Button
-        v-if="isStale" variant="ghost" size="sm" class="h-6 gap-1 px-2 text-[11px]"
-        :disabled="syncDisabled" title="把此题更新为题库最新内容"
-        @click="syncThis"
-      >
-        <RefreshCw class="h-3 w-3" /> 同步此题
-      </Button>
-      <Select v-if="snapshot?.options?.length" v-model="optionLayout">
-        <SelectTrigger class="h-6 w-20 text-[11px]"><SelectValue /></SelectTrigger>
+
+      <div class="mx-0.5 h-4 w-px bg-border" aria-hidden="true" />
+
+      <!-- 操作段 -->
+      <Select v-if="snapshot?.options?.length" v-model="optionLayout" v-model:open="optionLayoutOpen">
+        <SelectTrigger class="h-6 w-auto gap-1 px-2 text-[11px]" title="选项排版：每行显示几个选项">
+          <Columns3 class="h-3 w-3 text-muted-foreground" />
+          <span class="text-muted-foreground">选项排版</span>
+          <SelectValue />
+        </SelectTrigger>
         <SelectContent>
-          <SelectItem v-for="it in OPTION_LAYOUT_ITEMS" :key="String(it.value)" :value="String(it.value)">选项 {{ it.label }}</SelectItem>
+          <SelectGroup>
+            <SelectLabel class="text-[11px] text-muted-foreground">选项排版（每行显示几个）</SelectLabel>
+            <SelectItem v-for="it in OPTION_LAYOUT_ITEMS" :key="String(it.value)" :value="String(it.value)">{{ it.label }}</SelectItem>
+          </SelectGroup>
         </SelectContent>
       </Select>
-      <Popover>
+      <Popover v-model:open="fieldsOpen">
         <PopoverTrigger as-child>
-          <Button variant="ghost" size="sm" class="h-6 gap-1 px-2 text-[11px]"><Eye class="h-3 w-3" /> 显示</Button>
+          <Button variant="ghost" size="sm" class="h-6 gap-1 px-2 text-[11px]"><Eye class="h-3 w-3" /> 字段</Button>
         </PopoverTrigger>
         <PopoverContent align="end" class="w-52 space-y-2" data-rich-overlay>
           <p class="text-xs font-medium text-muted-foreground">此题字段显示</p>
@@ -183,16 +196,32 @@ const scoreDisplay = computed(() => `（${questionScore.value != null ? `${quest
         </PopoverContent>
       </Popover>
       <Button
-        variant="ghost" size="icon" class="h-7 w-7"
+        variant="ghost" size="icon" class="h-6 w-6"
         :class="previewAll ? 'text-primary' : ''"
-        title="临时预览全部内容"
+        :aria-label="previewAll ? '退出预览全部内容' : '临时预览全部内容'"
+        :title="previewAll ? '退出预览全部内容' : '临时预览全部内容'"
         @click="previewAll = !previewAll"
       >
-        <ScanEye class="h-3.5 w-3.5" />
+        <Maximize2 class="h-3.5 w-3.5" />
       </Button>
-      <Button variant="ghost" size="icon" class="h-7 w-7 text-destructive hover:text-destructive" title="删除" @click="deleteNode()">
-        <Trash2 class="h-3.5 w-3.5" />
-      </Button>
+
+      <!-- 更多：低频/危险操作收纳，避免与常用操作误触 -->
+      <DropdownMenu v-model:open="moreOpen">
+        <DropdownMenuTrigger as-child>
+          <Button variant="ghost" size="icon" class="h-6 w-6" aria-label="更多操作" title="更多操作">
+            <Ellipsis class="h-3.5 w-3.5" />
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end" class="w-40">
+          <DropdownMenuItem v-if="isStale" :disabled="syncDisabled" @click="syncThis">
+            <RefreshCw class="mr-2 h-4 w-4" /> 同步此题
+          </DropdownMenuItem>
+          <DropdownMenuSeparator v-if="isStale" />
+          <DropdownMenuItem class="text-destructive focus:text-destructive" @click="deleteNode()">
+            <Trash2 class="mr-2 h-4 w-4" /> 删除
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
     </div>
 
     <div v-if="!snapshot" class="flex items-center gap-2 py-2 text-sm text-destructive">
