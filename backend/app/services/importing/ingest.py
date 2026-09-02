@@ -191,9 +191,11 @@ class DocxIngestor:
             await asyncio.to_thread(
                 pypandoc.convert_file,
                 glob.escape(str(file_path.resolve())),
-                "markdown",
+                # 只保留 pipe 表格(禁用 grid/multiline/simple):下游 markdown-it 仅解析 pipe 表格。
+                "markdown-grid_tables-multiline_tables-simple_tables",
                 outputfile=str(output_path),
-                extra_args=[f"--extract-media={str(task_dir)}", "--mathml"],
+                # --wrap=none:避免 pandoc 把表格行硬换行,破坏 pipe 表格结构。
+                extra_args=[f"--extract-media={str(task_dir)}", "--mathml", "--wrap=none"],
             )
         except Exception as e:
             raise RuntimeError(f"Pandoc conversion failed: {e}") from e

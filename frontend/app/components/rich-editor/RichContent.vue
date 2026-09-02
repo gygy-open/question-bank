@@ -51,4 +51,27 @@ const html = computed(() => renderRichContentToHTML(props.content))
     border-bottom: 1px solid currentColor;
     vertical-align: baseline;
 }
+
+/* 只读表格：与编辑器 ProseMirror 表格样式保持一致（prose 默认只有底边线，需补全网格线）。 */
+.rich-content :deep(table) {
+    border-collapse: collapse;
+    table-layout: fixed;
+    width: 100%;
+    overflow: hidden;
+}
+
+.rich-content :deep(td),
+.rich-content :deep(th) {
+    vertical-align: top;
+    box-sizing: border-box;
+    border: 1px solid var(--border);
+    padding: 0.35em 0.6em;
+}
+
+.rich-content :deep(th) {
+    background-color: var(--muted);
+    font-weight: 600;
+    text-align: left;
+}
+
 </style>

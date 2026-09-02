@@ -13,6 +13,7 @@ from app.services.question_content_converter import (
     merge_rich_docs,
     rich_doc_to_plain_text,
 )
+from app.services.question_render import rich_doc_to_markdown
 # --------------------------------------------------------------------------- #
 def test_empty_field_returns_none():
     assert markdown_to_rich_doc(None) is None
@@ -181,6 +182,53 @@ def test_ordered_list():
     node = doc["content"][0]
     assert node["type"] == "orderedList"
     assert len(node["content"]) == 2
+
+
+# --------------------------------------------------------------------------- #
+# tables (pipe)
+# --------------------------------------------------------------------------- #
+def test_table_basic_structure():
+    doc, needs_review = markdown_to_rich_doc_with_review(
+        "| A | B |\n| --- | --- |\n| 1 | 2 |\n| 3 | 4 |"
+    )
+    table = doc["content"][0]
+    assert table["type"] == "table"
+    # 1 header row + 2 body rows
+    assert len(table["content"]) == 3
+    header_row = table["content"][0]
+    assert header_row["type"] == "tableRow"
+    assert [c["type"] for c in header_row["content"]] == ["tableHeader", "tableHeader"]
+    body_cell = table["content"][1]["content"][0]
+    assert body_cell["type"] == "tableCell"
+    assert body_cell["attrs"] == {"colspan": 1, "rowspan": 1, "colwidth": None}
+    # cell content is a paragraph wrapping the inline text
+    assert body_cell["content"][0]["type"] == "paragraph"
+    assert body_cell["content"][0]["content"][0]["text"] == "1"
+    # a well-formed table must not trigger manual review
+    assert needs_review is False
+
+
+def test_table_preserves_inline_math_in_cell():
+    doc = markdown_to_rich_doc("| x | y |\n| --- | --- |\n| $a^2$ | b |")
+    cell = doc["content"][0]["content"][1]["content"][0]
+    para = cell["content"][0]
+    assert para["content"][0]["type"] == "inlineMath"
+    assert para["content"][0]["attrs"]["latex"] == "a^2"
+
+
+def test_table_empty_cell_yields_empty_paragraph():
+    doc = markdown_to_rich_doc("| A | B |\n| --- | --- |\n|  | 2 |")
+    empty_cell = doc["content"][0]["content"][1]["content"][0]
+    assert empty_cell["type"] == "tableCell"
+    assert empty_cell["content"][0]["type"] == "paragraph"
+    assert "content" not in empty_cell["content"][0]
+
+
+def test_table_roundtrips_back_to_markdown():
+    doc = markdown_to_rich_doc("| A | B |\n| --- | --- |\n| 1 | 2 |")
+    md = rich_doc_to_markdown(doc)
+    assert "| A | B |" in md
+    assert "| 1 | 2 |" in md
 
 
 # --------------------------------------------------------------------------- #

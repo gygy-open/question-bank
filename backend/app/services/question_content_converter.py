@@ -37,6 +37,7 @@ AnswerSpec = dict[str, Any]
 _MD_PARSER = (
     MarkdownIt("commonmark", {"html": True})
     .enable("strikethrough")
+    .enable("table")
     .use(dollarmath_plugin, double_inline=True)
     .use(attrs_plugin, after=("image",), allowed=("width", "height"))
 )
@@ -147,6 +148,10 @@ def _convert_block(node: SyntaxTreeNode, needs_review: list[bool]) -> list[Node]
         text = node.content.strip()
         return [_paragraph([_text(text)] if text else [])]
 
+    if t == "table":
+        table = _convert_table(node, needs_review)
+        return [table] if table else []
+
     # 未知块:优先展开子节点,否则把可见内容塞进段落,绝不丢字符。
     needs_review[0] = True
     if node.children:
@@ -157,6 +162,32 @@ def _convert_block(node: SyntaxTreeNode, needs_review: list[bool]) -> list[Node]
     if node.content:
         return [_paragraph([_text(node.content)])]
     return []
+
+
+def _convert_table(node: SyntaxTreeNode, needs_review: list[bool]) -> Optional[Node]:
+    """把 markdown-it 表格(table>thead/tbody>tr>th/td)转成 Tiptap table 节点;空表 → None。"""
+    rows: list[Node] = []
+    # thead/tbody 是中间层,直接下钻到 tr;th → tableHeader,td → tableCell。
+    for section in node.children:
+        for tr in section.children:
+            if tr.type != "tr":
+                continue
+            cells: list[Node] = []
+            for cell in tr.children:
+                cell_type = "tableHeader" if cell.type == "th" else "tableCell"
+                inline = _convert_inline(cell.children, needs_review)
+                cells.append(
+                    {
+                        "type": cell_type,
+                        "attrs": {"colspan": 1, "rowspan": 1, "colwidth": None},
+                        "content": [_paragraph(inline)],
+                    }
+                )
+            if cells:
+                rows.append({"type": "tableRow", "content": cells})
+    if not rows:
+        return None
+    return {"type": "table", "content": rows}
 
 
 def _convert_inline(
