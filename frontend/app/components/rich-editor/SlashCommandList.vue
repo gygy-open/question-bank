@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, watch } from 'vue'
+import { nextTick, ref, watch } from 'vue'
 import type { SuggestionKeyDownProps } from '@tiptap/suggestion'
 import type { SlashCommandItem } from './SlashCommand'
 
@@ -9,6 +9,7 @@ const props = defineProps<{
 }>()
 
 const selectedIndex = ref(0)
+const itemRefs = ref<HTMLButtonElement[]>([])
 
 watch(
     () => props.items,
@@ -16,6 +17,11 @@ watch(
         selectedIndex.value = 0
     },
 )
+
+// 键盘上下移动选中项时，让选中项滚动进可视区域
+watch(selectedIndex, (index) => {
+    nextTick(() => itemRefs.value[index]?.scrollIntoView({ block: 'nearest' }))
+})
 
 function selectItem(index: number) {
     const item = props.items[index]
@@ -62,6 +68,7 @@ defineExpose({ onKeyDown })
                 </div>
                 <button
                     type="button"
+                    :ref="(el) => { if (el) itemRefs[index] = el as HTMLButtonElement }"
                     :class="[
                         'flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-left text-sm transition-colors',
                         index === selectedIndex ? 'bg-accent text-accent-foreground' : 'hover:bg-accent/50',
