@@ -8,7 +8,7 @@ import { useEditor, EditorContent } from '@tiptap/vue-3'
 import Placeholder from '@tiptap/extension-placeholder'
 import { NodeRange } from '@tiptap/extension-node-range'
 import { DragHandle } from '@tiptap/extension-drag-handle-vue-3'
-import { GripVertical, FileQuestion, Files, ListChecks, RefreshCw, Loader2, Copy, Trash2 } from '@lucide/vue'
+import { GripVertical, FileQuestion, Files, ListChecks, RefreshCw, Loader2, Copy, Trash2, Plus, ArrowUpToLine, ArrowDownToLine } from '@lucide/vue'
 import { Button } from '@/components/ui/button'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import {
@@ -36,6 +36,7 @@ import {
 import type { CompositionDetail, CompositionScope, Question } from '@/types'
 import type { AnswerFieldKey, QuestionRevisionStatus } from '@/types/composition'
 import { getCompositionExtensions } from './schema'
+import { BlockInsertKeymap } from './blockInsert'
 import { CompositionSlashCommand } from './CompositionSlashCommand'
 import { editorDocumentToPmDoc, pmDocToEditorDocument } from './convert'
 import {
@@ -272,6 +273,64 @@ function duplicateHandleNode() {
   if (json?.attrs) delete json.attrs.uid // 让 UniqueId 重新分配，避免 uid 冲突
   editor.value.chain().focus().insertContentAt(pos + node.nodeSize, json).run()
 }
+// 在拖拽手柄指向块的上/下方插入空段落并聚焦，供无文本可落脚的相邻块间快速起行。
+function insertRowRelative(before: boolean) {
+  const node = handleNode.value
+  const pos = handlePos.value
+  if (!node || pos < 0 || !editor.value) return
+  const at = before ? pos : pos + node.nodeSize
+  editor.value.chain().insertContentAt(at, { type: 'paragraph' }).setTextSelection(at + 1).focus().run()
+}
+
+// --- 块间悬浮「+」插入条：靠近块边界时显示，点击在该缝隙插入空段落 ---
+const editorWrapRef = ref<HTMLElement | null>(null)
+// 显示时携带插入位置（PM doc 位置）与容器内纵向偏移（px）。
+const insertBar = ref<{ pos: number; top: number } | null>(null)
+const INSERT_BAR_THRESHOLD = 14
+
+function updateInsertBar(clientY: number) {
+  const view = editor.value?.view
+  const container = editorWrapRef.value
+  if (!view || !container) { insertBar.value = null; return }
+  const containerRect = container.getBoundingClientRect()
+  const doc = view.state.doc
+  const blocks: { pos: number; size: number; top: number; bottom: number }[] = []
+  doc.forEach((node, offset) => {
+    const dom = view.nodeDOM(offset) as HTMLElement | null
+    if (!dom || dom.nodeType !== 1 || typeof dom.getBoundingClientRect !== 'function') return
+    const r = dom.getBoundingClientRect()
+    blocks.push({ pos: offset, size: node.nodeSize, top: r.top, bottom: r.bottom })
+  })
+  if (!blocks.length) { insertBar.value = null; return }
+
+  let chosen: { pos: number; top: number } | null = null
+  for (const b of blocks) {
+    if (clientY < b.top || clientY > b.bottom) continue
+    if (clientY - b.top <= INSERT_BAR_THRESHOLD) chosen = { pos: b.pos, top: b.top }
+    else if (b.bottom - clientY <= INSERT_BAR_THRESHOLD) chosen = { pos: b.pos + b.size, top: b.bottom }
+    break
+  }
+  if (!chosen) {
+    const first = blocks[0]!
+    const last = blocks[blocks.length - 1]!
+    if (clientY < first.top && first.top - clientY <= INSERT_BAR_THRESHOLD) chosen = { pos: first.pos, top: first.top }
+    else if (clientY > last.bottom && clientY - last.bottom <= INSERT_BAR_THRESHOLD) chosen = { pos: last.pos + last.size, top: last.bottom }
+  }
+  insertBar.value = chosen ? { pos: chosen.pos, top: chosen.top - containerRect.top } : null
+}
+
+function onCanvasMouseMove(event: MouseEvent) {
+  updateInsertBar(event.clientY)
+}
+function onCanvasMouseLeave() {
+  insertBar.value = null
+}
+function onInsertBarClick() {
+  const pos = insertBar.value?.pos
+  if (pos == null || !editor.value) return
+  editor.value.chain().insertContentAt(pos, { type: 'paragraph' }).setTextSelection(pos + 1).focus().run()
+  insertBar.value = null
+}
 
 const editor = useEditor({
   content: editorDocumentToPmDoc(model.value),
@@ -282,6 +341,8 @@ const editor = useEditor({
       blankNodeView: createBlankNodeView(),
     }),
     ResetFormatOnEnter,
+    // atom 块整块选中时 Enter/Shift+Enter 下方/上方插入空段落。
+    BlockInsertKeymap,
     // 按住 Mod（Cmd/Ctrl）拖拽跨块选区；配合 DragHandle 做可视化整块拖动。
     NodeRange,
     Placeholder.configure({ placeholder: '输入内容，或输入 “/” 唤起命令菜单…', showOnlyCurrent: false }),
@@ -407,7 +468,7 @@ watch(
       </RichEditorToolbar>
     </div>
 
-    <div class="relative overflow-hidden rounded-b-md">
+    <div ref="editorWrapRef" class="relative overflow-hidden rounded-b-md" @mousemove="onCanvasMouseMove" @mouseleave="onCanvasMouseLeave">
       <DragHandle
         v-if="editor"
         :editor="editor"
@@ -421,6 +482,12 @@ watch(
             </button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="start" side="bottom" class="w-40">
+            <DropdownMenuItem @click="insertRowRelative(true)">
+              <ArrowUpToLine class="mr-2 size-4" />在上方插入行
+            </DropdownMenuItem>
+            <DropdownMenuItem @click="insertRowRelative(false)">
+              <ArrowDownToLine class="mr-2 size-4" />在下方插入行
+            </DropdownMenuItem>
             <DropdownMenuItem @click="duplicateHandleNode">
               <Copy class="mr-2 size-4" />复制
             </DropdownMenuItem>
@@ -430,6 +497,20 @@ watch(
           </DropdownMenuContent>
         </DropdownMenu>
       </DragHandle>
+      <div
+        v-if="insertBar"
+        class="composition-insert-bar"
+        :style="{ top: `${insertBar.top}px` }"
+      >
+        <button
+          type="button"
+          class="composition-insert-plus"
+          aria-label="在此处插入行"
+          @click="onInsertBarClick"
+        >
+          <Plus class="size-3.5" />
+        </button>
+      </div>
       <EditorContent :editor="editor" />
     </div>
 
@@ -486,6 +567,60 @@ watch(
 
 .composition-drag-handle:active {
   cursor: grabbing;
+}
+
+/* 块间悬浮「+」插入条：一条横线 + 左侧圆形加号按钮，居中对齐到目标边界 */
+.composition-insert-bar {
+  position: absolute;
+  left: 0;
+  right: 0.5rem;
+  height: 0;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  /* 线条为装饰，不拦截块体点击；仅「+」按钮可点。 */
+  pointer-events: none;
+}
+
+.composition-insert-bar::after {
+  content: '';
+  position: absolute;
+  left: 1.75rem;
+  right: 0.5rem;
+  top: -1px;
+  height: 2px;
+  border-radius: 1px;
+  background: var(--primary);
+  opacity: 0.45;
+  transition: opacity 0.12s ease;
+}
+
+.composition-insert-plus {
+  position: absolute;
+  left: 50%;
+  top: 0;
+  z-index: 1;
+  transform: translate(-50%, -50%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.25rem;
+  height: 1.25rem;
+  border-radius: 9999px;
+  color: var(--primary-foreground);
+  background: var(--primary);
+  box-shadow: 0 1px 2px rgb(0 0 0 / 0.15);
+  cursor: pointer;
+  pointer-events: auto;
+  transition: transform 0.12s ease;
+}
+
+.composition-insert-plus:hover {
+  transform: translate(-50%, -50%) scale(1.12);
+}
+
+.composition-insert-bar:hover::after {
+  opacity: 1;
 }
 
 :deep(.ProseMirror) {
