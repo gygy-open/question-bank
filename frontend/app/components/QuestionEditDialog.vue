@@ -3,7 +3,6 @@ import { ref, computed, watch } from 'vue'
 import type {
   Question,
   KnowledgePoint,
-  ImportItem,
   TagCategory,
   TagPage,
   Subject,
@@ -43,16 +42,17 @@ import { Badge } from '@/components/ui/badge'
 import { cn } from '@/lib/utils'
 import { toast } from 'vue-sonner'
 import KnowledgePointSelector from './KnowledgePointSelector.vue'
-import MarkdownPreview from './MarkdownPreview.vue'
-import TiptapEditor from './TiptapEditor.vue'
 import AnswerEditor from './AnswerEditor.vue'
 import AnswerDisplay from './AnswerDisplay.vue'
 import RichEditor from './rich-editor/RichEditor.vue'
 import RichContent from './rich-editor/RichContent.vue'
 import {
   type QuestionDraft,
+  type ImportDraft,
   buildQuestionPayload,
+  cloneImportDraft,
   createDefaultOptions,
+  createEmptyDraft,
   dbQuestionToDraft,
   generateOptionId,
   isChoiceType,
@@ -63,7 +63,7 @@ import {
 
 interface Props {
   open: boolean
-  question?: ImportItem | Question | Partial<Question> | null
+  question?: ImportDraft | Question | Partial<Question> | null
   knowledgePoints?: KnowledgePoint[]
   subjects?: Subject[]
   mode?: 'import' | 'create' | 'edit'
@@ -78,16 +78,17 @@ const props = withDefaults(defineProps<Props>(), {
 const emit = defineEmits<{
   (e: 'update:open', value: boolean): void
   (e: 'success', data: Question): void
-  (e: 'save', question: ImportItem): void
+  (e: 'save', question: ImportDraft): void
 }>()
 
 const { $api } = useNuxtApp()
 
 const isImportMode = computed(() => props.mode === 'import')
 
-// 两套互斥的编辑态：import 走旧 Markdown 字符串 ImportItem；create/edit 走 v2 RichDoc 草稿。
-const importItem = ref<ImportItem | null>(null)
+// 所有模式统一走 v2 RichDoc 草稿；import 模式只是不落库，保存时把草稿回抛给评审列表。
 const draft = ref<QuestionDraft | null>(null)
+// import 模式下随草稿一起回抛的列表态（列表 key / 选中 / 警告 / AI 建议标签）。
+const importMeta = ref<Pick<ImportDraft, 'uid' | 'selected' | 'warnings' | 'ai_suggested_tags'> | null>(null)
 
 const isSubmitting = ref(false)
 const openTagSelect = ref(false)
@@ -95,7 +96,6 @@ const openTagSelect = ref(false)
 const activeSubjectId = computed<number | undefined>(
   () =>
     draft.value?.subject_id
-    ?? importItem.value?.subject_id
     ?? props.autoFillSubjectId
     ?? undefined,
 )
@@ -127,32 +127,32 @@ const availableKnowledgePoints = computed(() => {
   return []
 })
 
-// --- shared field accessors (map to whichever edit state is active) ---
+// --- shared field accessors (draft is the single edit state for all modes) ---
 const qType = computed<QuestionType>({
-  get: () => (isImportMode.value ? importItem.value?.q_type : draft.value?.q_type) ?? 'single_choice',
+  get: () => draft.value?.q_type ?? 'single_choice',
   set: (v) => {
-    if (isImportMode.value) {
-      if (importItem.value) importItem.value.q_type = v
-    } else if (draft.value) {
-      switchDraftType(draft.value, v)
-    }
+    if (draft.value) switchDraftType(draft.value, v)
   },
 })
 
 const difficulty = computed<number>({
-  get: () => (isImportMode.value ? importItem.value?.difficulty : draft.value?.difficulty) ?? 3,
+  get: () => draft.value?.difficulty ?? 3,
   set: (v) => {
-    if (isImportMode.value) { if (importItem.value) importItem.value.difficulty = v }
-    else if (draft.value) draft.value.difficulty = v
+    if (draft.value) draft.value.difficulty = v
   },
 })
 
 const knowledgePointIds = computed<number[]>({
-  get: () =>
-    (isImportMode.value ? importItem.value?.knowledge_point_ids : draft.value?.knowledge_point_ids) ?? [],
+  get: () => draft.value?.knowledge_point_ids ?? [],
   set: (v) => {
-    if (isImportMode.value) { if (importItem.value) importItem.value.knowledge_point_ids = v }
-    else if (draft.value) draft.value.knowledge_point_ids = v
+    if (draft.value) draft.value.knowledge_point_ids = v
+  },
+})
+
+const parentId = computed<number | undefined>({
+  get: () => draft.value?.parent_id ?? undefined,
+  set: (v) => {
+    if (draft.value) draft.value.parent_id = v == null || Number.isNaN(v) ? null : Number(v)
   },
 })
 
@@ -170,41 +170,22 @@ function switchDraftType(d: QuestionDraft, newType: QuestionType) {
 const initState = () => {
   openTagSelect.value = false
   if (isImportMode.value) {
-    draft.value = null
-    const src = props.question as ImportItem | null
-    const item: ImportItem = src
-      ? JSON.parse(JSON.stringify(src))
-      : {
-          id: 'temp-' + Date.now(),
-          selected: true,
-          content: '',
-          q_type: 'single_choice',
-          options: [
-            { label: 'A', content: '' },
-            { label: 'B', content: '' },
-            { label: 'C', content: '' },
-            { label: 'D', content: '' },
-          ],
-          answer: '',
-          thinking: '',
-          analysis: '',
-          difficulty: 3,
-          knowledge_point_ids: [],
-          subject_id: props.autoFillSubjectId ?? undefined,
-        }
-    item.content = item.content || ''
-    item.answer = typeof item.answer === 'string' ? item.answer : ''
-    item.thinking = item.thinking || ''
-    item.analysis = item.analysis || ''
-    item.options = item.options || []
-    item.knowledge_point_ids = item.knowledge_point_ids || []
-    if (!item.subject_id && props.autoFillSubjectId) item.subject_id = props.autoFillSubjectId
-    importItem.value = item
+    const fallbackSubject = props.autoFillSubjectId ?? undefined
+    const src = props.question as ImportDraft | null
+    const item = src ? cloneImportDraft(src) : { ...createEmptyDraft({ subjectId: fallbackSubject }), uid: 'temp-' + Date.now(), selected: true, warnings: [] } as ImportDraft
+    if (!item.subject_id && fallbackSubject) item.subject_id = fallbackSubject
+    importMeta.value = {
+      uid: item.uid,
+      selected: item.selected,
+      warnings: item.warnings,
+      ai_suggested_tags: item.ai_suggested_tags,
+    }
+    draft.value = item
   } else {
-    importItem.value = null
+    importMeta.value = null
     const fallbackSubject =
       props.autoFillSubjectId
-      ?? (props.subjects && props.subjects.length === 1 ? props.subjects[0].id : undefined)
+      ?? (props.subjects && props.subjects.length === 1 ? props.subjects[0]?.id : undefined)
       ?? undefined
     draft.value = dbQuestionToDraft(
       (props.question as Partial<Question>) ?? {},
@@ -218,15 +199,6 @@ watch(() => props.open, (isOpen) => { if (isOpen) initState() })
 watch(() => props.mode, initState)
 
 const title = computed(() => (props.mode === 'edit' ? '编辑题目' : '新增题目'))
-
-// --- import option handlers (legacy string options) ---
-const importAddOption = () => {
-  if (!importItem.value) return
-  importItem.value.options.push({ label: nextOptionLabel(importItem.value.options.length), content: '' })
-}
-const importRemoveOption = (index: number) => {
-  importItem.value?.options.splice(index, 1)
-}
 
 // --- db draft option handlers (v2 OptionSpec with stable ids) ---
 const draftAddOption = () => {
@@ -247,9 +219,10 @@ const draftRemoveOption = (index: number) => {
 }
 
 // --- save flows ---
+// 导入评审保存不做硬校验：最终「确认导入」时再统一校验/降级，允许中途保存不完整草稿。
 const handleSaveImport = () => {
-  if (!importItem.value) return
-  emit('save', importItem.value)
+  if (!draft.value || !importMeta.value) return
+  emit('save', { ...(draft.value as ImportDraft), ...importMeta.value })
   emit('update:open', false)
 }
 
@@ -377,7 +350,7 @@ const toggleTag = (tagId: number) => {
                   </div>
                   <div v-if="!isImportMode && draft" class="space-y-2">
                     <Label>父题目 ID (可选)</Label>
-                    <Input v-model.number="draft.parent_id" type="number" placeholder="输入原题 ID" />
+                    <Input v-model.number="parentId" type="number" placeholder="输入原题 ID" />
                   </div>
                 </div>
 
@@ -461,48 +434,8 @@ const toggleTag = (tagId: number) => {
                   </Popover>
                 </div>
 
-                <!-- ================= IMPORT (legacy) editors ================= -->
-                <template v-if="isImportMode && importItem">
-                  <div class="space-y-2">
-                    <Label>题干</Label>
-                    <TiptapEditor v-model="importItem.content" />
-                  </div>
-
-                  <div v-if="qType === 'single_choice' || qType === 'multiple_choice'" class="space-y-2">
-                    <Label>选项</Label>
-                    <div class="grid grid-cols-1 gap-4">
-                      <div v-for="(opt, optIndex) in importItem.options" :key="optIndex" class="flex gap-2 items-start">
-                        <div class="w-8 h-9 flex items-center justify-center bg-muted rounded font-medium shrink-0 mt-0.5">{{ opt.label }}</div>
-                        <div class="flex-1">
-                          <TiptapEditor v-model="opt.content" min-height="min-h-[100px]" />
-                        </div>
-                        <Button variant="ghost" size="icon" class="h-8 w-8 mt-0.5" @click="importRemoveOption(optIndex)">
-                          <Trash2 class="h-3 w-3" />
-                        </Button>
-                      </div>
-                      <Button variant="outline" class="w-full border-dashed" @click="importAddOption">
-                        <Plus class="h-4 w-4 mr-2" /> 添加选项
-                      </Button>
-                    </div>
-                  </div>
-
-                  <div class="space-y-2">
-                    <Label>答案</Label>
-                    <TiptapEditor v-model="importItem.answer" />
-                  </div>
-
-                  <div class="space-y-2">
-                    <Label>分析</Label>
-                    <TiptapEditor v-model="importItem.thinking" />
-                  </div>
-                  <div class="space-y-2">
-                    <Label>解析</Label>
-                    <TiptapEditor v-model="importItem.analysis" />
-                  </div>
-                </template>
-
-                <!-- ================= CREATE/EDIT (v2) editors ================= -->
-                <template v-else-if="draft">
+                <!-- ================= v2 editors (all modes) ================= -->
+                <template v-if="draft">
                   <div class="space-y-2">
                     <Label>题干</Label>
                     <RichEditor v-model="draft.content" :allow-blank="qType === 'fill_in_the_blank'" />
@@ -553,47 +486,8 @@ const toggleTag = (tagId: number) => {
             <aside class="border-t border-border/50 bg-muted/20 px-6 py-6 lg:border-t-0 lg:border-l lg:h-full lg:overflow-y-auto">
               <div class="mx-auto max-w-3xl space-y-6">
 
-                <!-- IMPORT preview: legacy Markdown -->
-                <template v-if="isImportMode && importItem">
-                  <div class="space-y-2">
-                    <h3 class="font-semibold text-sm text-muted-foreground">题目预览</h3>
-                    <div class="prose prose-sm max-w-none dark:prose-invert bg-background p-4 rounded border border-border">
-                      <MarkdownPreview :content="importItem.content || '（空）'" />
-                    </div>
-                  </div>
-                  <div v-if="(qType === 'single_choice' || qType === 'multiple_choice') && importItem.options.length > 0" class="space-y-2">
-                    <h3 class="font-semibold text-sm text-muted-foreground">选项预览</h3>
-                    <div class="space-y-2 bg-background p-4 rounded border border-border">
-                      <div v-for="opt in importItem.options" :key="opt.label" class="flex gap-2">
-                        <span class="font-bold text-muted-foreground shrink-0">{{ opt.label }}.</span>
-                        <div class="flex-1 prose prose-sm [&_.prose]:my-0 [&_.prose>p]:my-0">
-                          <MarkdownPreview :content="opt.content" />
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                  <div class="space-y-2">
-                    <h3 class="font-semibold text-sm text-muted-foreground">答案</h3>
-                    <div class="prose prose-sm max-w-none dark:prose-invert bg-background p-4 rounded border border-border">
-                      <MarkdownPreview :content="importItem.answer || '（未填写）'" />
-                    </div>
-                  </div>
-                  <div v-if="importItem.thinking" class="space-y-2">
-                    <h3 class="font-semibold text-sm text-muted-foreground">分析</h3>
-                    <div class="prose prose-sm max-w-none dark:prose-invert bg-background p-4 rounded border border-border">
-                      <MarkdownPreview :content="importItem.thinking" />
-                    </div>
-                  </div>
-                  <div v-if="importItem.analysis" class="space-y-2">
-                    <h3 class="font-semibold text-sm text-muted-foreground">解析</h3>
-                    <div class="prose prose-sm max-w-none dark:prose-invert bg-background p-4 rounded border border-border">
-                      <MarkdownPreview :content="importItem.analysis" />
-                    </div>
-                  </div>
-                </template>
-
-                <!-- CREATE/EDIT preview: v2 RichContent -->
-                <template v-else-if="draft">
+                <!-- v2 preview: RichContent (all modes) -->
+                <template v-if="draft">
                   <div class="space-y-2">
                     <h3 class="font-semibold text-sm text-muted-foreground">题目预览</h3>
                     <div class="bg-background p-4 rounded border border-border">

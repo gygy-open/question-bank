@@ -62,3 +62,4 @@ async def test_legacy_batch_partially_succeeds_without_persisting_unresolved(
     assert rows[0].needs_review is False
     assert json.loads(rows[0].content)["type"] == "doc"
     assert json.loads(rows[0].answer)["kind"] == "free_response"
+

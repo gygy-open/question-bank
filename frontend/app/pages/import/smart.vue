@@ -14,13 +14,20 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import TiptapEditor from '@/components/TiptapEditor.vue'
+import { Textarea } from '@/components/ui/textarea'
 import QuestionListItem from '@/components/QuestionListItem.vue'
 import QuestionEditDialog from '@/components/QuestionEditDialog.vue'
 import PageHeader from '@/components/PageHeader.vue'
 import { toast } from 'vue-sonner'
 import { zipFolder } from '@/lib/zipFolder'
-import type { KnowledgePoint, Subject, ImportItem } from '@/types'
+import type { KnowledgePoint, Subject } from '@/types'
+import {
+  type ImportDraft,
+  type ExtractedQuestionItem,
+  extractedItemToDraft,
+  buildQuestionPayload,
+  validateQuestionDraft,
+} from '@/lib/questionModel'
 
 definePageMeta({
   layout: 'default',
@@ -40,7 +47,7 @@ const pastedImage = ref<string | null>(null)
 const isUploading = ref(false)
 const isImporting = ref(false)
 const error = ref<string | null>(null)
-const importList = ref<ImportItem[]>([])
+const importList = ref<ImportDraft[]>([])
 const editingItemId = ref<string | null>(null)
 const importedTaskId = ref<number | null>(null)
 const uploadedFilePath = ref<string | null>(null)
@@ -168,76 +175,10 @@ const handleAutoUpload = () => {
     }
 }
 
-const parseOptions = (rawOptions: string[] | null): { label: string, content: string }[] => {
-    if (!rawOptions || rawOptions.length === 0) {
-        return [
-            { label: 'A', content: '' },
-            { label: 'B', content: '' },
-            { label: 'C', content: '' },
-            { label: 'D', content: '' }
-        ]
-    }
-    
-    return rawOptions.map((opt, index) => {
-        const match = opt.match(/^([A-Z])[\.、\s]\s*(.*)$/)
-        if (match) {
-            return { label: match[1], content: match[2] }
-        }
-        const labels = ['A', 'B', 'C', 'D', 'E', 'F', 'G']
-        return { label: labels[index] || '?', content: opt }
-    })
-}
+// /upload/* 已返回可编辑的 v2 抽取项（后端清洗+转换），前端直接映射为草稿。
+const toDrafts = (items: ExtractedQuestionItem[] | undefined | null): ImportDraft[] =>
+    (items ?? []).map((it) => extractedItemToDraft(it, { subjectId: globalSettings.value.subject_id }))
 
-const transformQuestionsData = (questions: any[]) => {
-    return questions.map((q: any, index: number) => {
-        let q_type: ImportItem['q_type'] = ''
-        if (q.q_type) {
-            q_type = q.q_type as ImportItem['q_type']
-        } else if (q.type === '选择题') {
-            q_type = 'single_choice'
-        }
-        
-        const cleanContent = q.content.replace(/^(\d+[\.、\s]\s*|\(\d+\)\s*)/, '')
-
-        // Extract AI suggested tags
-        const ai_suggested_tags: Record<string, string[]> = {}
-        const tagCategories = ['year', 'source', 'grade', 'semester', 'exam_type', 'feature']
-        
-        tagCategories.forEach(cat => {
-            if (q[cat]) {
-                // Ensure it's an array
-                const val = q[cat]
-                if (Array.isArray(val)) {
-                    ai_suggested_tags[cat] = val
-                } else if (typeof val === 'string') {
-                    ai_suggested_tags[cat] = [val]
-                }
-            }
-        })
-
-        // Handle generic 'tags' field from AI
-        if (q.tags && Array.isArray(q.tags) && q.tags.length > 0) {
-             // Merge with existing ai_extracted or create new
-             const existing = ai_suggested_tags['ai_extracted'] || []
-             ai_suggested_tags['ai_extracted'] = [...new Set([...existing, ...q.tags])]
-        }
-
-        return {
-            id: `temp-${index}`,
-            selected: true,
-            content: cleanContent,
-            q_type: q_type,
-            options: (q_type === 'single_choice' || q_type === 'multiple_choice') ? parseOptions(q.options) : [],
-            answer: q.answer || '',
-            thinking: q.thinking || '',
-            analysis: q.analysis || '',
-            difficulty: q.difficulty || 1,
-            knowledge_point_ids: q.knowledge_point_ids || [],
-            ai_suggested_tags,
-            warnings: Array.isArray(q.warnings) ? q.warnings : []
-        }
-    })
-}
 
 const handleUploadDocx = async () => {
     if (!file.value) return
@@ -253,7 +194,7 @@ const handleUploadDocx = async () => {
             body: formData,
         })
 
-        importList.value = transformQuestionsData(data.questions)
+        importList.value = toDrafts(data.questions)
         if (data.file_path) {
             uploadedFilePath.value = data.file_path
         }
@@ -294,7 +235,7 @@ const handleUploadMarkdown = async (isFile: boolean = false) => {
         }
         }
 
-        importList.value = transformQuestionsData(data.questions)
+        importList.value = toDrafts(data.questions)
         step.value = 'review'
     } catch (e: any) {
         error.value = e.message
@@ -320,7 +261,7 @@ const handleUploadMarkdownArchive = async () => {
         if (data.file_path) {
             uploadedFilePath.value = data.file_path
         }
-        importList.value = transformQuestionsData(data.questions)
+        importList.value = toDrafts(data.questions)
         step.value = 'review'
     } catch (e: any) {
         error.value = e.message
@@ -343,7 +284,7 @@ const handleUploadImage = async () => {
             body: formData,
         })
 
-        importList.value = transformQuestionsData(data.questions)
+        importList.value = toDrafts(data.questions)
         step.value = 'review'
     } catch (e: any) {
         error.value = e.message
@@ -351,6 +292,9 @@ const handleUploadImage = async () => {
         isUploading.value = false
     }
 }
+
+// 抽取结果由 /upload/* 直接返回 v2 草稿项，无需再单独转换。
+
 
 const handleImport = async () => {
     if (!globalSettings.value.subject_id) {
@@ -366,44 +310,48 @@ const handleImport = async () => {
 
     isImporting.value = true
     try {
-        // 智能导入是 legacy 路径：直接发送旧字符串字段，由后端 adapter 统一转 v2，
-        // 前端不复制后端答案解析/稳定 id 规则。
-        const questions = selectedItems.map(item => ({
-            content: item.content,
-            q_type: item.q_type,
-            options: (item.q_type === 'single_choice' || item.q_type === 'multiple_choice') ? item.options : [],
-            answer: item.answer,
-            thinking: item.thinking,
-            analysis: item.analysis,
-            difficulty: item.difficulty,
-            knowledge_point_ids: item.knowledge_point_ids,
-            tag_ids: [],
-            status: globalSettings.value.status,
-            subject_id: item.subject_id || globalSettings.value.subject_id,
-            ai_suggested_tags: item.ai_suggested_tags,
-            source: globalSettings.value.source || undefined
+        // 逐条应用全局设置并校验；缺答案的题降级为草稿（对齐后端 adapter），
+        // 否则整批会因待审核/发布完整性校验失败。
+        const valid: ImportDraft[] = []
+        let invalidCount = 0
+        for (const item of selectedItems) {
+            const d: ImportDraft = JSON.parse(JSON.stringify(item))
+            d.subject_id = d.subject_id || globalSettings.value.subject_id
+            d.source = globalSettings.value.source || ''
+            d.status = d.answer ? globalSettings.value.status : 'draft'
+            if (validateQuestionDraft(d)) {
+                invalidCount++
+                continue
+            }
+            valid.push(d)
+        }
+
+        if (valid.length === 0) {
+            toast.error('选中的题目均未通过校验，请补全后再导入')
+            return
+        }
+
+        const questions = valid.map(d => ({
+            ...buildQuestionPayload(d),
+            ai_suggested_tags: d.ai_suggested_tags,
         }))
 
         const payload = {
             filename: file.value?.name,
             file_path: uploadedFilePath.value,
-            questions: questions
+            questions,
         }
 
-        const result = await $api<{
-            import_task_id: number | null
-            created: { import_task_id?: number }[]
-            failed: { index: number, message: string }[]
-        }>('/questions/batch-legacy', {
+        const created = await $api<{ import_task_id?: number }[]>('/questions/batch', {
             method: 'POST',
-            body: payload
+            body: payload,
         })
 
-        importedTaskId.value = result.import_task_id
+        importedTaskId.value = created?.[0]?.import_task_id ?? null
 
-        const createdCount = result.created.length
-        if (result.failed.length > 0) {
-            toast.warning(`${result.failed.length} 道题目无法解析已跳过，成功导入 ${createdCount} 道`)
+        const createdCount = Array.isArray(created) ? created.length : 0
+        if (invalidCount > 0) {
+            toast.warning(`${invalidCount} 道题目未通过校验已跳过，成功导入 ${createdCount} 道`)
         } else {
             toast.success(`成功导入 ${createdCount} 道题目`)
         }
@@ -419,30 +367,20 @@ const removeItem = (index: number) => {
     importList.value.splice(index, 1)
 }
 
-const addOption = (item: ImportItem) => {
-    const labels = ['A', 'B', 'C', 'D', 'E', 'F', 'G']
-    const nextLabel = labels[item.options.length] || '?'
-    item.options.push({ label: nextLabel, content: '' })
-}
-
-const removeOption = (item: ImportItem, optIndex: number) => {
-    item.options.splice(optIndex, 1)
-}
-
 const duplicateItem = (index: number) => {
     const item = importList.value[index]
-    const newItem = JSON.parse(JSON.stringify(item))
-    newItem.id = `temp-${Date.now()}`
+    const newItem: ImportDraft = JSON.parse(JSON.stringify(item))
+    newItem.uid = `imp-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
     importList.value.splice(index + 1, 0, newItem)
 }
 
-const editItem = (id: string) => {
-    editingItemId.value = id
+const editItem = (uid: string) => {
+    editingItemId.value = uid
 }
 
-const handleEditSuccess = (updatedQuestion: ImportItem) => {
+const handleEditSuccess = (updatedQuestion: ImportDraft) => {
     if (editingItemId.value) {
-        const index = importList.value.findIndex(i => i.id === editingItemId.value)
+        const index = importList.value.findIndex(i => i.uid === editingItemId.value)
         if (index !== -1) {
             importList.value[index] = updatedQuestion
         }
@@ -451,7 +389,7 @@ const handleEditSuccess = (updatedQuestion: ImportItem) => {
 }
 
 const getEditingItem = () => {
-    return importList.value.find(item => item.id === editingItemId.value)
+    return importList.value.find(item => item.uid === editingItemId.value)
 }
 
 const reset = () => {
@@ -589,10 +527,10 @@ const reset = () => {
                     </TabsContent>
                     <TabsContent value="text" class="mt-4">
                         <div class="border rounded-xl bg-background p-4 min-h-[320px] flex flex-col shadow-sm">
-                            <TiptapEditor 
-                                v-model="markdownContent" 
+                            <Textarea
+                                v-model="markdownContent"
                                 placeholder="将含有题目的文档内容或纯文本直接粘贴到此处..."
-                                min-height="min-h-[250px]"
+                                class="min-h-[250px] flex-1 resize-y font-mono text-sm"
                             />
                         </div>
                     </TabsContent>
@@ -758,11 +696,11 @@ const reset = () => {
 
                 <QuestionListItem 
                     v-for="(item, index) in importList"
-                    :key="item.id"
+                    :key="item.uid"
                     :item="item"
                     :index="index"
                     :all-knowledge-points="knowledgePoints"
-                    @edit="editItem(item.id)"
+                    @edit="editItem(item.uid)"
                     @delete="removeItem(index)"
                     @duplicate="duplicateItem(index)"
                 />

@@ -10,9 +10,16 @@ from pydantic import BaseModel
 from app.api import deps
 from app.core.config import settings
 from app.services.doc_processor import doc_processor
+from app.services.importing.review import extracted_to_v2_review
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
+
+
+def _as_review(result: dict, subject_id: int | None) -> dict:
+    """把抽取产物就地转成可编辑的 v2 草稿（同步复核路径）。"""
+    result["questions"] = extracted_to_v2_review(result.get("questions", []), subject_id=subject_id)
+    return result
 
 class MarkdownContentRequest(BaseModel):
     content: str
@@ -46,6 +53,7 @@ async def upload_docx(
     
     try:
         result = await doc_processor.process_docx(file_path, db=db, mode=mode, method=method, subject_id=subject_id)
+        _as_review(result, subject_id)
         result["file_path"] = str(file_path)
         return result
     except Exception as e:
@@ -88,6 +96,7 @@ async def upload_markdown(
     
     try:
         result = await doc_processor.process_markdown(markdown_content, db=db, filename=file.filename, mode=mode, method=method, subject_id=subject_id)
+        _as_review(result, subject_id)
         result["file_path"] = str(file_path)
         return result
     except Exception as e:
@@ -108,6 +117,7 @@ async def upload_markdown_text(
     """Process markdown content from text input."""
     try:
         result = await doc_processor.process_markdown(request.content, db=db, filename=request.filename, mode=request.mode, method=request.method, subject_id=request.subject_id)
+        _as_review(result, request.subject_id)
         return result
     except Exception as e:
         logger.exception(
@@ -141,6 +151,7 @@ async def upload_markdown_archive(
 
     try:
         result = await doc_processor.process_markdown_archive(file_path, db=db, mode=mode, method=method, subject_id=subject_id)
+        _as_review(result, subject_id)
         result["file_path"] = str(file_path)
         return result
     except ValueError as e:
@@ -168,6 +179,7 @@ async def upload_image_recognition(
     
     try:
         result = await doc_processor.process_image(file.file, db=db, mode=mode, subject_id=subject_id)
+        _as_review(result, subject_id)
         return result
     except Exception as e:
         logger.exception(

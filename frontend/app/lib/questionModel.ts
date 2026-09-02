@@ -161,6 +161,79 @@ export function dbQuestionToDraft(
     return draft
 }
 
+/** 智能导入评审项：v2 编辑草稿 + 列表态（选中/警告/AI 建议标签）。 */
+export interface ImportDraft extends QuestionDraft {
+    uid: string
+    selected: boolean
+    warnings: string[]
+    ai_suggested_tags?: Record<string, string[]>
+}
+
+/** /upload/* 返回的单条已转 v2 抽取项（后端已清洗题号/标签并转 RichDoc）。 */
+export interface ExtractedQuestionItem {
+    q_type: QuestionType
+    content: RichDoc
+    options?: OptionSpec[] | null
+    answer?: AnswerSpec | null
+    thinking?: RichDoc
+    analysis?: RichDoc
+    summary?: RichDoc
+    difficulty: number
+    status: QuestionStatus
+    knowledge_point_ids: number[]
+    subject_id?: number | null
+    ai_suggested_tags?: Record<string, string[]> | null
+    warnings?: string[]
+}
+
+function generateImportUid(): string {
+    const g = globalThis as { crypto?: { randomUUID?: () => string } }
+    if (g.crypto?.randomUUID) return `imp_${g.crypto.randomUUID()}`
+    return `imp_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 10)}`
+}
+
+/** 把 /upload/* 的抽取项映射成可编辑的导入评审草稿。 */
+export function extractedItemToDraft(
+    item: ExtractedQuestionItem,
+    opts: { subjectId?: number } = {},
+): ImportDraft {
+    const qType = (item.q_type ?? 'single_choice') as QuestionType
+    const options: OptionSpec[] = (item.options ?? []).map((o, i) => ({
+        id: o.id || generateOptionId(),
+        label: o.label || nextOptionLabel(i),
+        content: cloneRich(o.content),
+    }))
+    const draft: ImportDraft = {
+        uid: generateImportUid(),
+        selected: true,
+        warnings: item.warnings ?? [],
+        ai_suggested_tags: item.ai_suggested_tags ?? undefined,
+        content: cloneRich(item.content),
+        q_type: qType,
+        status: (item.status ?? 'draft') as QuestionStatus,
+        difficulty: item.difficulty ?? 3,
+        options,
+        answer: item.answer ? (JSON.parse(JSON.stringify(item.answer)) as AnswerSpec) : null,
+        thinking: cloneRich(item.thinking),
+        analysis: cloneRich(item.analysis),
+        summary: cloneRich(item.summary),
+        source: '',
+        knowledge_point_ids: item.knowledge_point_ids ?? [],
+        tag_ids: [],
+        subject_id: item.subject_id ?? opts.subjectId ?? undefined,
+        parent_id: null,
+    }
+    if (isChoiceType(qType) && draft.options.length === 0) {
+        draft.options = createDefaultOptions()
+    }
+    return draft
+}
+
+/** 深拷贝一个导入评审草稿（编辑弹窗用，避免直接改动列表项）。 */
+export function cloneImportDraft(item: ImportDraft): ImportDraft {
+    return JSON.parse(JSON.stringify(item)) as ImportDraft
+}
+
 /** 删除某个选项后，同步清除 answer 中对它的引用。 */
 export function pruneAnswerOptionRef(answer: AnswerSpec | null, removedId: string): AnswerSpec | null {
     if (!answer) return answer

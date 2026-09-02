@@ -263,24 +263,6 @@ export interface Question {
   children?: Question[]
 }
 
-// 导入工作台条目：保持旧的 Markdown 字符串格式（题干/选项/答案均为字符串），
-// 由旧 TiptapEditor/MarkdownPreview 服务，落库前才转换为 v2 RichDoc。
-export interface ImportItem {
-  id: string
-  selected: boolean
-  content: string
-  q_type: QuestionType
-  options: { label: string, content: string }[]
-  answer: string
-  thinking?: string
-  analysis: string
-  difficulty: number
-  knowledge_point_ids: number[]
-  subject_id?: number
-  ai_suggested_tags?: Record<string, string[]>
-  warnings?: string[]
-}
-
 export interface QuestionPage {
   items: Question[]
   total: number

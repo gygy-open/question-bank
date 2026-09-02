@@ -11,25 +11,18 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { Pencil, Trash2, Copy, ChevronDown, Star, ShoppingBasket, CheckCircle, History, Workflow, CornerDownRight, GitFork, FileText, AlertTriangle, MoreVertical } from '@lucide/vue'
-import MarkdownPreview from './MarkdownPreview.vue'
 import RichContent from './rich-editor/RichContent.vue'
 import AnswerDisplay from './AnswerDisplay.vue'
 import { isEmptyRichDoc, richDocToPlainText } from './rich-editor/richDoc'
 import CompositionQuickAdd from './CompositionQuickAdd.vue'
 import { useQuestionBasket } from '@/composables/useQuestionBasket'
-import type { Question as DbQuestion, KnowledgePoint, ImportItem, OptionSpec } from '@/types'
+import type { Question as DbQuestion, KnowledgePoint, OptionSpec } from '@/types'
+import type { ImportDraft } from '@/lib/questionModel'
 import { toast } from 'vue-sonner'
 
-// Support both import items and database questions
-interface BaseItem {
-    id: string | number
-    content: string
-    q_type: string
-    difficulty: number
-}
-
+// Support both import drafts (v2, not yet persisted) and database questions
 interface Props {
-  item: ImportItem | DbQuestion
+  item: ImportDraft | DbQuestion
   index?: number
   mode?: 'import' | 'library'
   allKnowledgePoints?: KnowledgePoint[]
@@ -107,18 +100,8 @@ const typeColor = computed(() => {
 
 const warnings = computed<string[]>(() => {
   if (props.mode !== 'import') return []
-  const w = (props.item as ImportItem).warnings
+  const w = (props.item as ImportDraft).warnings
   return Array.isArray(w) ? w : []
-})
-
-// import 模式题干是 Markdown 字符串，截断做摘要预览。
-const contentPreview = computed(() => {
-  const raw = (props.item as ImportItem).content || ''
-  const text = raw
-    .replace(/<[^>]*>/g, '')
-    .replace(/[\n\r]+/g, ' ')
-    .substring(0, 100)
-  return text + (raw.length > 100 ? '...' : '')
 })
 
 const difficultyLabel = computed(() => {
@@ -173,7 +156,7 @@ const statusBadgeProps = computed(() => {
 })
 
 const isSelected = computed(() => {
-  const item = props.item as ImportItem
+  const item = props.item as ImportDraft
   return item.selected !== false
 })
 
@@ -188,25 +171,11 @@ const tags = computed(() => {
 })
 
 const dbOptions = computed<OptionSpec[]>(() => (props.item as DbQuestion).options || [])
-const importOptions = computed(() => (props.item as ImportItem).options || [])
+const importOptions = computed<OptionSpec[]>(() => (props.item as ImportDraft).options || [])
 
 const knowledgePointIds = computed(() => {
-  const item = props.item as ImportItem
+  const item = props.item as ImportDraft
   return item.knowledge_point_ids || []
-})
-
-// 仅 import 模式：旧填空答案可能是 JSON 数组字符串，解析用于展示。
-const parsedAnswer = computed(() => {
-  if (props.mode !== 'import' || props.item.q_type !== 'fill_in_the_blank') return null
-  const ans = (props.item as ImportItem).answer
-  try {
-    if (typeof ans === 'string' && ans.trim().startsWith('[')) {
-      return JSON.parse(ans)
-    }
-    return []
-  } catch (e) {
-    return []
-  }
 })
 
 const isChecked = computed({
@@ -409,8 +378,8 @@ const sourceFileUrl = computed(() => {
           <div v-if="mode === 'library'" class="prose prose-sm max-w-none dark:prose-invert">
             <RichContent :content="(item as DbQuestion).content" empty-text="（空）" />
           </div>
-          <div v-else class="text-sm text-muted-foreground mb-2">
-            <MarkdownPreview :content="contentPreview" />
+          <div v-else class="prose prose-sm max-w-none dark:prose-invert text-sm mb-2">
+            <RichContent :content="(item as ImportDraft).content" empty-text="（空）" />
           </div>
           
           <!-- Options for choice questions -->
@@ -423,10 +392,10 @@ const sourceFileUrl = computed(() => {
             </div>
           </div>
           <div v-else-if="mode !== 'library' && importOptions.length > 0 && (item.q_type === 'single_choice' || item.q_type === 'multiple_choice')" class="mt-2 mb-3 flex flex-wrap gap-x-6 gap-y-1.5">
-            <div v-for="(opt, oi) in importOptions" :key="oi" class="flex max-w-full gap-2 items-baseline text-xs">
+            <div v-for="opt in importOptions" :key="opt.id" class="flex max-w-full gap-2 items-baseline text-xs">
               <span class="font-bold text-muted-foreground shrink-0">{{ opt.label }}.</span>
               <div class="min-w-0 text-foreground/80 [&_.prose]:my-0 [&_.prose_p]:my-0 [&_.prose]:text-xs [&_.prose]:leading-normal">
-                <MarkdownPreview :content="opt.content" />
+                <RichContent :content="opt.content" />
               </div>
             </div>
           </div>
@@ -483,39 +452,21 @@ const sourceFileUrl = computed(() => {
         <div class="space-y-2">
           <div class="text-sm font-semibold text-foreground">答案</div>
           <div class="text-sm bg-muted/30 p-2 rounded">
-            <div v-if="item.q_type === 'fill_in_the_blank' && parsedAnswer && parsedAnswer.length > 0" class="flex flex-col gap-2">
-              <div v-for="(blank, index) in parsedAnswer" :key="index" class="flex items-start gap-2">
-                <span v-if="parsedAnswer.length > 1" class="font-mono text-muted-foreground shrink-0 mt-1.5">{{ Number(index) + 1 }}.</span>
-                <div class="flex flex-wrap gap-2 items-center">
-                  <template v-if="Array.isArray(blank)">
-                    <template v-for="(ans, ansIdx) in blank" :key="ansIdx">
-                      <div class="text-xs bg-background px-2 py-1 rounded border font-medium [&_.prose]:my-0 [&_.prose>p]:my-0 [&_.prose]:text-xs">
-                        <MarkdownPreview :content="ans" />
-                      </div>
-                      <span v-if="ansIdx < blank.length - 1" class="text-xs text-muted-foreground">或</span>
-                    </template>
-                  </template>
-                  <div v-else class="text-xs bg-background px-2 py-1 rounded border font-medium [&_.prose]:my-0 [&_.prose>p]:my-0 [&_.prose]:text-xs">
-                    <MarkdownPreview :content="blank" />
-                  </div>
-                </div>
-              </div>
-            </div>
-            <MarkdownPreview v-else :content="(item as ImportItem).answer || '未填写'" />
+            <AnswerDisplay :answer="(item as ImportDraft).answer" :options="(item as ImportDraft).options" empty-text="未填写" />
           </div>
         </div>
 
-        <div v-if="(item as ImportItem).thinking" class="space-y-2">
+        <div v-if="!isEmptyRichDoc((item as ImportDraft).thinking)" class="space-y-2">
           <div class="text-sm font-semibold text-foreground">分析</div>
-          <div class="text-sm bg-muted/20 p-3 rounded [&_.prose]:my-0 [&_.prose>p]:my-0">
-            <MarkdownPreview :content="(item as ImportItem).thinking || ''" />
+          <div class="text-sm bg-muted/20 p-3 rounded [&_.prose]:my-0 [&_.prose_p]:my-0">
+            <RichContent :content="(item as ImportDraft).thinking" />
           </div>
         </div>
 
-        <div v-if="(item as ImportItem).analysis" class="space-y-2">
+        <div v-if="!isEmptyRichDoc((item as ImportDraft).analysis)" class="space-y-2">
           <div class="text-sm font-semibold text-foreground">解析</div>
-          <div class="text-sm bg-muted/20 p-3 rounded [&_.prose]:my-0 [&_.prose>p]:my-0">
-            <MarkdownPreview :content="(item as ImportItem).analysis || ''" />
+          <div class="text-sm bg-muted/20 p-3 rounded [&_.prose]:my-0 [&_.prose_p]:my-0">
+            <RichContent :content="(item as ImportDraft).analysis" />
           </div>
         </div>
       </div>

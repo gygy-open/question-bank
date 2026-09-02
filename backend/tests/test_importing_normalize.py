@@ -9,20 +9,20 @@ from app.models.user import User
 from app.services.importing.contracts import ImportDefaults
 from app.services.importing.normalize import (
     QuestionImporter,
-    _coerce_kp_ids,
-    _coerce_q_type,
+    coerce_kp_ids,
+    coerce_q_type,
     _coerce_status,
     _resolve_ai_tags,
 )
 
 
 def test_coerce_q_type_from_legacy_strings():
-    assert _coerce_q_type("multiple_choice") == QuestionType.MULTIPLE_CHOICE
-    assert _coerce_q_type("填空题") == QuestionType.FILL_IN_THE_BLANK
-    assert _coerce_q_type("解答") == QuestionType.FREE_RESPONSE
-    assert _coerce_q_type(None) == QuestionType.SINGLE_CHOICE
+    assert coerce_q_type("multiple_choice") == QuestionType.MULTIPLE_CHOICE
+    assert coerce_q_type("填空题") == QuestionType.FILL_IN_THE_BLANK
+    assert coerce_q_type("解答") == QuestionType.FREE_RESPONSE
+    assert coerce_q_type(None) == QuestionType.SINGLE_CHOICE
     # 已是枚举则原样返回。
-    assert _coerce_q_type(QuestionType.TRUE_FALSE) == QuestionType.TRUE_FALSE
+    assert coerce_q_type(QuestionType.TRUE_FALSE) == QuestionType.TRUE_FALSE
 
 
 def test_coerce_status_falls_back_on_unknown():
@@ -32,8 +32,8 @@ def test_coerce_status_falls_back_on_unknown():
 
 
 def test_coerce_kp_ids_skips_non_ints():
-    assert _coerce_kp_ids(["1", 2, "x", None]) == [1, 2]
-    assert _coerce_kp_ids(None) == []
+    assert coerce_kp_ids(["1", 2, "x", None]) == [1, 2]
+    assert coerce_kp_ids(None) == []
 
 
 def test_resolve_ai_tags_prefers_explicit_over_tags():

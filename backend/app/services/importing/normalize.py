@@ -26,7 +26,7 @@ from .contracts import FailedItem, ImportDefaults, NormalizeReport
 logger = logging.getLogger(__name__)
 
 
-def _coerce_q_type(raw: Any) -> QuestionType:
+def coerce_q_type(raw: Any) -> QuestionType:
     if isinstance(raw, QuestionType):
         return raw
     s = str(raw or "single_choice").lower()
@@ -52,7 +52,7 @@ def _coerce_status(raw: Any, default: QuestionStatus) -> QuestionStatus:
         return default
 
 
-def _coerce_kp_ids(raw: Any) -> list[int]:
+def coerce_kp_ids(raw: Any) -> list[int]:
     if not raw:
         return []
     out: list[int] = []
@@ -88,7 +88,7 @@ class QuestionImporter:
         report = NormalizeReport()
 
         for index, raw in enumerate(raws):
-            q_type = _coerce_q_type(raw.get("q_type", raw.get("type")))
+            q_type = coerce_q_type(raw.get("q_type", raw.get("type")))
             status = _coerce_status(raw.get("status"), defaults.status)
 
             try:
@@ -122,7 +122,7 @@ class QuestionImporter:
                     status=v2_fields["status"],
                     difficulty=raw.get("difficulty", 1) or 1,
                     subject_id=subject_id,
-                    knowledge_point_ids=_coerce_kp_ids(raw.get("knowledge_point_ids")),
+                    knowledge_point_ids=coerce_kp_ids(raw.get("knowledge_point_ids")),
                     tag_ids=raw.get("tag_ids") or [],
                     ai_suggested_tags=_resolve_ai_tags(raw),
                     source=source,
