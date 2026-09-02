@@ -19,6 +19,7 @@ import QuestionListItem from '@/components/QuestionListItem.vue'
 import QuestionEditDialog from '@/components/QuestionEditDialog.vue'
 import PageHeader from '@/components/PageHeader.vue'
 import { toast } from 'vue-sonner'
+import { zipFolder } from '@/lib/zipFolder'
 import type { KnowledgePoint, Subject, ImportItem } from '@/types'
 
 definePageMeta({
@@ -33,6 +34,7 @@ const activeTab = ref('docx')
 const parseMethod = ref<'ai' | 'structured'>('ai')
 const importMode = ref<'extract' | 'solve'>('extract')
 const file = ref<File | null>(null)
+const folderInput = ref<HTMLInputElement | null>(null)
 const markdownContent = ref('')
 const pastedImage = ref<string | null>(null)
 const isUploading = ref(false)
@@ -112,6 +114,20 @@ const handleFileChange = (e: Event) => {
     }
 }
 
+const handleFolderChange = async (e: Event) => {
+    const target = e.target as HTMLInputElement
+    if (!target.files || target.files.length === 0) return
+    try {
+        pastedImage.value = null
+        file.value = await zipFolder(target.files, 'markdown-folder.zip')
+        error.value = null
+    } catch (err: any) {
+        toast.error('打包文件夹失败: ' + (err?.message ?? err))
+    } finally {
+        target.value = ''
+    }
+}
+
 const handlePaste = async (e: ClipboardEvent) => {
     const items = e.clipboardData?.items
     if (!items) return
@@ -143,6 +159,8 @@ const handleAutoUpload = () => {
     // Auto-detect based on file type or pasted image
     if (pastedImage.value || (file.value && file.value.type.startsWith('image/'))) {
         handleUploadImage();
+    } else if (file.value && file.value.name.endsWith('.zip')) {
+        handleUploadMarkdownArchive();
     } else if (file.value && file.value.name.endsWith('.md')) {
         handleUploadMarkdown(true);
     } else {
@@ -276,6 +294,32 @@ const handleUploadMarkdown = async (isFile: boolean = false) => {
         }
         }
 
+        importList.value = transformQuestionsData(data.questions)
+        step.value = 'review'
+    } catch (e: any) {
+        error.value = e.message
+    } finally {
+        isUploading.value = false
+    }
+}
+
+const handleUploadMarkdownArchive = async () => {
+    if (!file.value) return
+    isUploading.value = true
+    error.value = null
+
+    const formData = new FormData()
+    formData.append('file', file.value)
+
+    try {
+        const data = await $api<any>(`/upload/markdown-archive?mode=${importMode.value}&method=${parseMethod.value}&subject_id=${globalSettings.value.subject_id}`, {
+            method: 'POST',
+            body: formData,
+        })
+
+        if (data.file_path) {
+            uploadedFilePath.value = data.file_path
+        }
         importList.value = transformQuestionsData(data.questions)
         step.value = 'review'
     } catch (e: any) {
@@ -476,7 +520,7 @@ const reset = () => {
                                 type="file"
                                 id="mega-file-upload"
                                 class="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
-                                accept=".docx,.md,image/*"
+                                accept=".docx,.md,.zip,image/*"
                                 @change="handleFileChange"
                                 :disabled="isUploading"
                                 title="点击上传文件"
@@ -493,7 +537,7 @@ const reset = () => {
                                 </div>
                                 <div class="flex items-center justify-center gap-4 text-xs text-muted-foreground mt-4">
                                     <span class="flex items-center gap-1"><FileText class="h-3 w-3"/> Word (.docx)</span>
-                                    <span class="flex items-center gap-1"><FileCode class="h-3 w-3"/> Markdown (.md)</span>
+                                    <span class="flex items-center gap-1"><FileCode class="h-3 w-3"/> Markdown (.md / .zip)</span>
                                     <span class="flex items-center gap-1"><ImageIcon class="h-3 w-3"/> 图片提取</span>
                                 </div>
                             </div>
@@ -528,9 +572,21 @@ const reset = () => {
                                 </div>
                             </div>
                         </div>
+                        <!-- Markdown 含本地图片:上传 .zip 或整个文件夹 -->
+                        <div class="mt-3 text-center text-xs text-muted-foreground">
+                            Markdown 引用了本地图片？上传 <span class="font-medium">.zip</span> 压缩包，或
+                            <button type="button" class="underline hover:text-primary" :disabled="isUploading" @click="folderInput?.click()">选择整个文件夹</button>
+                            <input
+                                ref="folderInput"
+                                type="file"
+                                class="hidden"
+                                webkitdirectory
+                                directory
+                                multiple
+                                @change="handleFolderChange"
+                            />
+                        </div>
                     </TabsContent>
-                    
-                    <!-- Text Textarea -->
                     <TabsContent value="text" class="mt-4">
                         <div class="border rounded-xl bg-background p-4 min-h-[320px] flex flex-col shadow-sm">
                             <TiptapEditor 

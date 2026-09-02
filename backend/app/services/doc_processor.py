@@ -3,7 +3,7 @@ from pathlib import Path
 from typing import BinaryIO, Optional
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.services.importing.extract import AIExtractor, ExtractionStrategy, TemplateExtractor
-from app.services.importing.ingest import DocxIngestor, ImageIngestor, MarkdownIngestor
+from app.services.importing.ingest import DocxIngestor, ImageIngestor, MarkdownArchiveIngestor, MarkdownIngestor
 
 logger = logging.getLogger(__name__)
 
@@ -14,6 +14,7 @@ class DocProcessor:
         self._template_extractor = TemplateExtractor()
         self._docx_ingestor = DocxIngestor()
         self._markdown_ingestor = MarkdownIngestor()
+        self._markdown_archive_ingestor = MarkdownArchiveIngestor()
         self._image_ingestor = ImageIngestor()
 
     def _extractor_for(self, method: str) -> ExtractionStrategy:
@@ -35,6 +36,22 @@ class DocProcessor:
             Dict with task_id, content, and extracted questions
         """
         doc = await self._markdown_ingestor.ingest(content, task_id=task_id, filename=filename)
+        extracted_questions = await self._extractor_for(method).extract(
+            doc.markdown, db, filename=doc.filename, mode=mode, subject_id=subject_id
+        )
+        return {
+            "task_id": doc.task_id,
+            "content": doc.markdown,
+            "questions": extracted_questions,
+        }
+
+    async def process_markdown_archive(self, file_path: Path, db: AsyncSession, task_id: str = None, mode: str = "extract", method: str = "ai", subject_id: Optional[int] = None) -> dict:
+        """Extract a markdown archive (zip with local images) and parse questions.
+
+        Local image refs are rewritten to /static/media/{task_id}/... before extraction; multiple
+        .md files in the archive are concatenated into one document.
+        """
+        doc = await self._markdown_archive_ingestor.ingest(file_path, task_id=task_id)
         extracted_questions = await self._extractor_for(method).extract(
             doc.markdown, db, filename=doc.filename, mode=mode, subject_id=subject_id
         )

@@ -39,6 +39,7 @@ import {
 } from '@/components/ui/select'
 import PageHeader from '@/components/PageHeader.vue'
 import { toast } from 'vue-sonner'
+import { zipFolder } from '@/lib/zipFolder'
 
 definePageMeta({
     layout: 'default',
@@ -74,6 +75,7 @@ const tasks = ref<ImportTask[]>([])
 const queueStats = ref<QueueStats>({ pending: 0, processing: 0, completed: 0, failed: 0, cancelled: 0 })
 const isUploading = ref(false)
 const isDragging = ref(false)
+const folderInput = ref<HTMLInputElement | null>(null)
 const pollingInterval = ref<NodeJS.Timeout | null>(null)
 const page = ref(1)
 const pageSize = ref(10)
@@ -201,6 +203,21 @@ const handleFileChange = async (event: Event) => {
     if (target.files && target.files.length > 0) {
         await uploadFiles(Array.from(target.files))
         target.value = '' // Reset input
+    }
+}
+
+const handleFolderChange = async (event: Event) => {
+    const target = event.target as HTMLInputElement
+    if (!target.files || target.files.length === 0) return
+    try {
+        isUploading.value = true
+        const zipped = await zipFolder(target.files, 'markdown-folder.zip')
+        await uploadFiles([zipped])
+    } catch (err: any) {
+        toast.error('打包文件夹失败', { description: String(err?.message ?? err) })
+    } finally {
+        isUploading.value = false
+        target.value = ''
     }
 }
 
@@ -467,8 +484,10 @@ const getResultCount = (summaryJson?: string) => {
                     @dragover.prevent="handleDragOver"
                     @dragleave.prevent="handleDragLeave"
                     @drop.prevent="handleDrop">
-                    <input type="file" multiple accept=".docx,.md" class="hidden" id="file-upload"
+                    <input type="file" multiple accept=".docx,.md,.zip" class="hidden" id="file-upload"
                         @change="handleFileChange" :disabled="isUploading">
+                    <input ref="folderInput" type="file" webkitdirectory directory multiple class="hidden"
+                        @change="handleFolderChange" :disabled="isUploading">
                     <label for="file-upload"
                         class="cursor-pointer flex flex-col items-center gap-4 w-full h-full justify-center">
                         <div class="p-4 bg-primary/10 rounded-full">
@@ -476,9 +495,13 @@ const getResultCount = (summaryJson?: string) => {
                         </div>
                         <div class="space-y-1">
                             <span class="text-lg font-medium block">点击选择文件 (支持多选)</span>
-                            <span class="text-sm text-muted-foreground">支持拖拽上传，支持批量上传 .docx, .md 格式。上传文件后，系统将自动处理，不需要一直👀着。</span>
+                            <span class="text-sm text-muted-foreground">支持拖拽上传，支持批量上传 .docx, .md, .zip 格式。上传文件后，系统将自动处理，不需要一直👀着。</span>
                         </div>
                     </label>
+                    <div class="mt-2 text-xs text-muted-foreground">
+                        Markdown 引用了本地图片？上传 <span class="font-medium">.zip</span> 压缩包，或
+                        <button type="button" class="underline hover:text-primary" :disabled="isUploading" @click="folderInput?.click()">选择整个文件夹</button>
+                    </div>
                     <div v-if="isUploading" class="mt-4 flex items-center text-sm text-muted-foreground">
                         <Loader2 class="mr-2 h-4 w-4 animate-spin" /> 正在上传...
                     </div>

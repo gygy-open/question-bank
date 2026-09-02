@@ -7,8 +7,10 @@ from app import models, schemas
 from app.api import deps
 from app.core.config import settings
 from app.models.import_task import ImportTask, ImportTaskStatus
+from app.services.importing.ingest import extract_archive_and_rewrite
 import shutil
 import uuid
+import zipfile
 from pathlib import Path
 import asyncio
 from datetime import datetime
@@ -155,6 +157,43 @@ async def create_import_tasks(
     for file in files:
         # Determine file type
         ext = Path(file.filename).suffix.lower()
+
+        # A .zip is a markdown archive: extract + rewrite local image paths, then fan out into one
+        # markdown task per contained .md (all sharing one /static/media/{media_id}/ directory).
+        if ext == '.zip':
+            zip_path = upload_dir / file.filename
+            content = await file.read()
+            await asyncio.to_thread(zip_path.write_bytes, content)
+
+            archive_media_id = str(uuid.uuid4())
+            try:
+                parts = await asyncio.to_thread(
+                    extract_archive_and_rewrite, zip_path, media_id=archive_media_id
+                )
+            except (ValueError, zipfile.BadZipFile):
+                continue
+
+            archive_stem = Path(file.filename).stem
+            for md_name, rewritten in parts:
+                md_path = upload_dir / archive_media_id / md_name
+                md_path.parent.mkdir(parents=True, exist_ok=True)
+                await asyncio.to_thread(md_path.write_text, rewritten, encoding="utf-8")
+
+                original_filename = f"{archive_stem}/{md_name}"
+                task = ImportTask(
+                    user_id=current_user.id,
+                    file_path=str(md_path),
+                    original_filename=original_filename,
+                    file_type='markdown',
+                    status=ImportTaskStatus.PENDING,
+                    source="batch_upload",
+                    description=f"Import {original_filename}",
+                    mode=mode
+                )
+                db.add(task)
+                created_tasks.append(task)
+            continue
+
         if ext == '.docx':
             file_type = 'docx'
         elif ext == '.md':
@@ -184,7 +223,7 @@ async def create_import_tasks(
         created_tasks.append(task)
     
     if not created_tasks:
-         raise HTTPException(status_code=400, detail="No valid files found (supported: .docx, .md)")
+         raise HTTPException(status_code=400, detail="No valid files found (supported: .docx, .md, .zip)")
 
     await db.commit()
     

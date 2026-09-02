@@ -43,6 +43,7 @@
     "date-fns": "^4.1.0",
     "docx-preview": "^0.3.7",
     "embla-carousel-vue": "^8.6.0",
+    "jszip": "^3.10.1",
     "katex": "^0.16.47",
     "markdown-it": "^14.1.0",
     "markdown-it-texmath": "^1.0.0",

@@ -119,6 +119,42 @@ async def upload_markdown_text(
         )
         raise HTTPException(status_code=500, detail=str(e)) from e
 
+@router.post("/markdown-archive")
+async def upload_markdown_archive(
+    db: deps.SessionDep,
+    file: UploadFile = File(...),
+    mode: str = "extract",
+    method: str = "ai",
+    subject_id: int = None,
+):
+    """Process a zip archive containing markdown file(s) plus their local images."""
+    if not file.filename.endswith('.zip'):
+        raise HTTPException(status_code=400, detail="Only .zip archives are supported")
+
+    upload_session_id = str(uuid.uuid4())
+    upload_dir = settings.UPLOAD_DIR / upload_session_id
+    upload_dir.mkdir(parents=True, exist_ok=True)
+    file_path = upload_dir / file.filename
+
+    content = await file.read()
+    await asyncio.to_thread(file_path.write_bytes, content)
+
+    try:
+        result = await doc_processor.process_markdown_archive(file_path, db=db, mode=mode, method=method, subject_id=subject_id)
+        result["file_path"] = str(file_path)
+        return result
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+    except Exception as e:
+        logger.exception(
+            "Failed to process Markdown archive: filename=%s mode=%s method=%s subject_id=%s",
+            file.filename,
+            mode,
+            method,
+            subject_id,
+        )
+        raise HTTPException(status_code=500, detail=str(e)) from e
+
 @router.post("/image-recognition")
 async def upload_image_recognition(
     db: deps.SessionDep,
