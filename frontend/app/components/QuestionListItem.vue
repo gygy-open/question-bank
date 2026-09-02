@@ -230,11 +230,6 @@ const statusAccentClass = computed(() => {
   }
 })
 
-const copyId = (id: string | number) => {
-  navigator.clipboard.writeText(String(id))
-  toast.success('ID 已复制')
-}
-
 const sourceFileUrl = computed(() => {
   const item = props.item as DbQuestion
   if (item.import_task?.file_path) {
@@ -284,12 +279,6 @@ const sourceFileUrl = computed(() => {
                   class="h-3 w-3"
                   :class="i <= item.difficulty ? 'fill-primary text-primary' : 'fill-none text-muted-foreground/30'" />
               </div>
-
-              <span 
-                class="text-xs font-mono text-muted-foreground bg-muted px-1.5 py-0.5 rounded cursor-pointer hover:bg-accent hover:text-accent-foreground transition-colors"
-                title="点击复制 ID"
-                @click="copyId(item.id)"
-              >ID: {{ item.id }}</span>
             </div>
           </div>
 
