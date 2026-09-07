@@ -170,6 +170,10 @@ watch(
   },
 )
 
+function isChoiceType(qType: string) {
+  return qType === 'single_choice' || qType === 'multiple_choice'
+}
+
 function toggleSelect(q: Question) {
   if (selected.value.has(q.id)) selected.value.delete(q.id)
   else selected.value.set(q.id, q)
@@ -280,9 +284,9 @@ function confirmInsert() {
             <Checkbox :checked="selected.has(q.id)" class="mt-1 shrink-0" @click.stop="toggleSelect(q)" />
             <div class="min-w-0 flex-1">
               <div class="mb-1 flex flex-wrap items-center gap-1.5">
+                <Badge variant="outline" class="text-xs text-muted-foreground">#{{ q.id }}</Badge>
                 <Badge variant="secondary" class="text-xs">{{ questionTypeLabel(q.q_type) }}</Badge>
                 <Badge variant="outline" class="text-xs">难度 {{ q.difficulty }}</Badge>
-                <span class="text-xs text-muted-foreground">#{{ q.id }}</span>
                 <Badge v-for="kp in q.knowledge_points" :key="`kp-${kp.id}`" variant="outline" class="text-xs">
                   {{ kp.name }}
                 </Badge>
@@ -293,8 +297,17 @@ function confirmInsert() {
               <RichContent
                 :content="q.content"
                 empty-text="（无题干文本）"
-                class="line-clamp-2 text-sm [&_.prose]:my-0"
+                class="text-sm [&_.prose]:my-0"
               />
+              <div
+                v-if="isChoiceType(q.q_type) && (q.options?.length ?? 0) > 0"
+                class="mt-1.5 space-y-1 pl-4"
+              >
+                <div v-for="opt in q.options" :key="opt.id" class="flex gap-1.5 text-sm">
+                  <span class="shrink-0 text-muted-foreground">{{ opt.label }}.</span>
+                  <RichContent :content="opt.content" class="min-w-0 flex-1 [&_.prose]:my-0" />
+                </div>
+              </div>
             </div>
           </button>
         </div>
