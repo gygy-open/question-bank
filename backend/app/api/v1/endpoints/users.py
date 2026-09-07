@@ -28,13 +28,12 @@ async def read_users(
     session: deps.SessionDep,
     skip: int = 0,
     limit: int = 100,
-    subject_id: int | None = None,
     current_user: User = Depends(deps.get_current_active_user),
 ) -> Any:
     """
     Retrieve users.
     """
-    users = await crud_user.user.get_multi(session, skip=skip, limit=limit, subject_id=subject_id)
+    users = await crud_user.user.get_multi(session, skip=skip, limit=limit)
     return users
 
 @router.post("", response_model=User)

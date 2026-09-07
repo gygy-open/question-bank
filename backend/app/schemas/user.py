@@ -8,7 +8,6 @@ class UserBase(BaseModel):
     avatar_url: str | None = None
     is_active: bool = True
     is_superuser: bool = False
-    subject_id: int | None = None
     last_active_subject_id: int | None = None
 
 class UserCreate(UserBase):
@@ -21,7 +20,6 @@ class UserUpdate(BaseModel):
     avatar_url: str | None = None
     is_active: bool | None = None
     is_superuser: bool | None = None
-    subject_id: int | None = None
     last_active_subject_id: int | None = None
 
 class UserUpdateLastSubject(BaseModel):

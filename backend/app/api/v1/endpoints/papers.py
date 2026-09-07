@@ -99,7 +99,7 @@ async def create_paper(
     current_user: models.User = Depends(deps.get_current_active_user),
 ) -> Any:
     if not paper_in.subject_id:
-        paper_in.subject_id = current_user.last_active_subject_id or current_user.subject_id
+        paper_in.subject_id = current_user.last_active_subject_id
     paper = await crud.paper.create_for_owner(db, obj_in=paper_in, owner_id=current_user.id)
     return _to_read(paper)
 

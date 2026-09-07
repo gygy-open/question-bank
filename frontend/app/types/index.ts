@@ -200,14 +200,6 @@ export interface TagPage {
   pages: number
 }
 
-export interface User {
-  id: number
-  username: string
-  full_name?: string
-  avatar_url?: string
-  is_superuser?: boolean
-}
-
 export interface ActivityLog {
   id: number
   user_id?: number
@@ -317,7 +309,6 @@ export interface User {
   avatar_url?: string
   is_active: boolean
   is_superuser: boolean
-  subject_id?: number
   last_active_subject_id?: number
 }
 

@@ -442,7 +442,7 @@ async def propose_question_draft(db: AsyncSession, args: Dict[str, Any]) -> str:
     if user_id:
         user = await crud_user.get(db, id=user_id)
         if user:
-            subject_id = user.last_active_subject_id or user.subject_id
+            subject_id = user.last_active_subject_id
 
     try:
         # Enrich with knowledge points
@@ -506,7 +506,7 @@ async def propose_questions_batch(db: AsyncSession, args: Dict[str, Any]) -> str
     if user_id:
         user = await crud_user.get(db, id=user_id)
         if user:
-            subject_id = user.last_active_subject_id or user.subject_id
+            subject_id = user.last_active_subject_id
             
     created_ids = []
     summaries = []

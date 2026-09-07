@@ -24,12 +24,9 @@ class CRUDUser(CRUDBase[User, UserCreate, UserUpdate]):
         return result.scalars().first()
 
     async def get_multi(
-        self, db: AsyncSession, *, skip: int = 0, limit: int = 100, subject_id: Optional[int] = None
+        self, db: AsyncSession, *, skip: int = 0, limit: int = 100
     ) -> list[User]:
-        query = select(self.model)
-        if subject_id is not None:
-            query = query.filter(self.model.subject_id == subject_id)
-        query = query.offset(skip).limit(limit)
+        query = select(self.model).offset(skip).limit(limit)
         result = await db.execute(query)
         return result.scalars().all()
 
@@ -41,7 +38,6 @@ class CRUDUser(CRUDBase[User, UserCreate, UserUpdate]):
             hashed_password=get_password_hash(obj_in.password),
             is_active=obj_in.is_active,
             is_superuser=obj_in.is_superuser,
-            subject_id=obj_in.subject_id,
         )
         db.add(db_obj)
         await db.commit()
