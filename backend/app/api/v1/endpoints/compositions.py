@@ -34,7 +34,7 @@ from app.schemas.composition import (
     FolderUpdateRequest,
     QuestionRevisionStatus,
 )
-from app.schemas.paper import OutputFormat
+from app.schemas.export import OutputFormat
 from app.services import composition_service
 from app.services.exporting.composition_assemble import CompositionAssembler, CompositionExportError
 from app.services.exporting.composition_registry import composition_renderer_for

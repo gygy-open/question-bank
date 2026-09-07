@@ -6,7 +6,7 @@ import zipfile
 from docx import Document
 from docx.oxml.ns import qn
 
-from app.schemas.paper import OutputFormat
+from app.schemas.export import OutputFormat
 from app.services.exporting.composition_assemble import CompositionAssembler
 from app.services.exporting.composition_contracts import (
     CompositionExportDoc,

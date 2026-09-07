@@ -28,7 +28,7 @@ from app.models.composition import (
     REFERENCE_NODE_TYPES,
     ScopeType,
 )
-from app.schemas.paper import OutputFormat
+from app.schemas.export import OutputFormat
 from app.schemas.user import User
 from app.services.question_content import validate_rich_doc
 

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Protocol
 
-from app.schemas.paper import OutputFormat
+from app.schemas.export import OutputFormat
 from app.services.exporting.composition_contracts import CompositionExportDoc
 from app.services.exporting.renderers.composition_docx import CompositionDocxRenderer
 from app.services.exporting.renderers.composition_latex import CompositionLatexRenderer

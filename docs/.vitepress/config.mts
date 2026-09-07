@@ -111,7 +111,6 @@ export default defineConfig({
             { text: '题库管理', link: '/features/questions' },
             { text: '知识点体系', link: '/features/knowledge-points' },
             { text: '审核工作流', link: '/features/review-workflow' },
-            { text: '组卷 / 试题篮', link: '/features/papers' },
             { text: 'AI 对话', link: '/features/chat' },
             { text: '学科与标签', link: '/features/subjects-and-tags' },
             { text: '文件预览', link: '/features/preview' },

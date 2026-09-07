@@ -10,7 +10,7 @@
 4. **录入题目**：
    - 手动新建，或
    - 用 [智能导入](/features/import) 上传 Word / Markdown / 图片，由 AI 抽取。
-5. **管理与组卷**：在 [题库管理](/features/questions) 中筛选、编辑、审核，用 [组卷 / 试题篮](/features/papers) 导出试卷。
+5. **管理与组卷**：在 [题库管理](/features/questions) 中筛选、编辑、审核，用组稿工作台组卷并导出。
 
 ## 数据存放
 

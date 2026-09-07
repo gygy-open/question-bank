@@ -1,7 +1,6 @@
-"""Phase 4 聚焦测试:后端 v2 运行时适配(legacy adapter / 渲染 / Paper 导出)。"""
+"""Phase 4 聚焦测试:后端 v2 运行时适配(legacy adapter / 渲染)。"""
 
 import json
-import types
 
 import pytest
 from types import SimpleNamespace
@@ -26,8 +25,6 @@ from app.services.question_render import (
     rich_doc_to_markdown,
     rich_doc_to_plain_text,
 )
-from app.schemas.paper import OutputFormat
-from app.services.paper_generator import PaperGenerator
 
 
 # --------------------------------------------------------------------------- #
@@ -370,100 +367,3 @@ def test_answer_formatter_free_and_legacy():
 def test_answer_formatter_accepts_json_string():
     answer_json = to_db_json({"kind": "true_false", "correct": True})
     assert answer_spec_to_plain_text(answer_json) == "对"
-
-
-# --------------------------------------------------------------------------- #
-# 6. Paper 导出:RichDoc → LaTeX / DOCX 直连(无 pandoc、无 JSON 泄漏)
-# --------------------------------------------------------------------------- #
-def _make_question(**overrides):
-    q = types.SimpleNamespace(
-        id=1,
-        q_type="single_choice",
-        difficulty=1,
-        content=to_db_json(markdown_to_rich_doc("题干 $x^2$")),
-        options=[
-            {"id": "opt_a", "label": "A", "content": markdown_to_rich_doc("**甲**")},
-            {"id": "opt_b", "label": "B", "content": markdown_to_rich_doc("乙")},
-        ],
-        answer=to_db_json({"kind": "single_choice", "correct": "opt_b"}),
-        thinking=to_db_json(markdown_to_rich_doc("思路")),
-        analysis=to_db_json(markdown_to_rich_doc("解析")),
-        summary=None,
-        source=None,
-    )
-    for k, v in overrides.items():
-        setattr(q, k, v)
-    return q
-
-
-def _read_zip_tex(path: str) -> str:
-    import zipfile
-
-    with zipfile.ZipFile(path) as zf:
-        name = next(n for n in zf.namelist() if n.endswith(".tex"))
-        return zf.read(name).decode("utf-8")
-
-
-def _read_docx_xml(path: str) -> str:
-    import zipfile
-
-    with zipfile.ZipFile(path) as zf:
-        return zf.read("word/document.xml").decode("utf-8")
-
-
-def test_paper_generate_latex_renders_v2():
-    import os
-
-    gen = PaperGenerator()
-    q = _make_question()
-    path = gen.generate_file("卷子", [q], OutputFormat.LATEX)
-    try:
-        tex = _read_zip_tex(path)
-    finally:
-        os.remove(path)
-    # 题干/选项/公式/答案均已渲染,无 JSON 原文泄漏,走 exam choices 环境。
-    assert "题干" in tex
-    assert "$x^2$" in tex
-    assert "\\begin{choices}" in tex
-    assert "【答案】" in tex and "B" in tex
-    assert '"type": "doc"' not in tex
-    assert '{"kind"' not in tex
-
-
-def test_paper_generate_latex_fill_answer():
-    import os
-
-    gen = PaperGenerator()
-    answer = {
-        "kind": "fill_in_the_blank",
-        "blanks": [{"id": "blk_1", "accept": [markdown_to_rich_doc("42")]}],
-    }
-    q = _make_question(
-        q_type="fill_in_the_blank",
-        options=None,
-        content=to_db_json(markdown_to_rich_doc("答案是___")),
-        answer=to_db_json(answer),
-    )
-    path = gen.generate_file("卷子", [q], OutputFormat.LATEX)
-    try:
-        tex = _read_zip_tex(path)
-    finally:
-        os.remove(path)
-    assert "42" in tex
-
-
-def test_paper_generate_docx_has_omml_and_no_json():
-    import os
-
-    gen = PaperGenerator()
-    q = _make_question()
-    path = gen.generate_file("卷子", [q], OutputFormat.DOCX)
-    try:
-        xml = _read_docx_xml(path)
-    finally:
-        os.remove(path)
-    # 题干文本进 run、行内公式 $x^2$ 变成 OMML,绝无 JSON 原文泄漏。
-    assert "题干" in xml
-    assert "oMath" in xml
-    assert '"type": "doc"' not in xml
-    assert '{"kind"' not in xml
