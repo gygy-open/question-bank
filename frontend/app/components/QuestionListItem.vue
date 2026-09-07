@@ -108,6 +108,15 @@ const difficultyLabel = computed(() => {
   return `难度 ${props.item.difficulty}`
 })
 
+const copyId = async () => {
+  try {
+    await navigator.clipboard.writeText(String(props.item.id))
+    toast.success(`已复制题目ID：${props.item.id}`)
+  } catch {
+    toast.error('复制失败，请手动选中复制')
+  }
+}
+
 const basket = useQuestionBasket()
 const inBasket = computed(() => basket.has(Number(props.item.id)))
 const toggleBasket = () => {
@@ -228,6 +237,15 @@ const sourceFileUrl = computed(() => {
 
             <!-- Type & Status (library mode) -->
             <div v-else class="flex gap-2 items-center flex-wrap">
+              <Badge
+                variant="outline"
+                role="button"
+                tabindex="0"
+                class="font-mono text-xs cursor-pointer select-none hover:bg-muted"
+                :title="`点击复制题目ID：${item.id}`"
+                @click="copyId"
+                @keydown.enter="copyId"
+              >#{{ item.id }}</Badge>
               <Badge v-if="(item as DbQuestion).status" :variant="statusBadgeProps.variant" :class="['text-xs', statusBadgeProps.class]">
                 {{ statusLabel }}
               </Badge>

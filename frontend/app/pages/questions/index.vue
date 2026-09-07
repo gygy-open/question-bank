@@ -142,12 +142,9 @@ const queryParams = computed(() => {
     page: page.value,
     size: pageSize.value
   }
-  if (filters.id) {
-    params.id = filters.id
-  } else {
-    if (filters.subject_id && filters.subject_id !== '0') params.subject_id = filters.subject_id
-  }
-  
+  if (filters.subject_id && filters.subject_id !== '0') params.subject_id = filters.subject_id
+  if (filters.id) params.id = filters.id
+
   if (filters.knowledge_point_ids && filters.knowledge_point_ids.length > 0) params.knowledge_point_ids = filters.knowledge_point_ids
   if (filters.tag_ids && filters.tag_ids.length > 0) params.tag_ids = filters.tag_ids
   if (filters.q_type && filters.q_type !== '0') params.q_type = filters.q_type
@@ -554,11 +551,17 @@ const viewStructure = (question: Question) => {
           <div class="space-y-6">
               <!-- Filters: only the high-frequency fields stay always visible to reduce visual clutter -->
               <div class="space-y-4 p-4 rounded-lg bg-muted/40">
-                <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
                   <!-- Keyword Filter -->
                   <div class="space-y-2 sm:col-span-2 xl:col-span-1">
                     <Label class="text-xs font-medium">关键词</Label>
                     <ClearableInput v-model="filters.keyword" placeholder="搜索题目内容..." />
+                  </div>
+
+                  <!-- ID Filter: exact match, scoped to the current subject like every other filter here -->
+                  <div class="space-y-2">
+                    <Label class="text-xs font-medium">题目ID</Label>
+                    <ClearableInput v-model="filters.id" type="number" placeholder="按ID精确查找" />
                   </div>
 
                   <!-- Status Filter -->
