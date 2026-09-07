@@ -4,11 +4,8 @@ import type { KnowledgePoint } from '~/types'
 import { Folder, Search } from '@lucide/vue'
 import { cn } from '@/lib/utils'
 import ClearableInput from './ClearableInput.vue'
-import KnowledgePointTreeItemSelector from './KnowledgePointTreeItemSelector.vue'
-
-interface KnowledgePointNode extends KnowledgePoint {
-  children: KnowledgePointNode[]
-}
+import KnowledgePointTreeItem from './KnowledgePointTreeItem.vue'
+import { buildKnowledgePointTree, filterKnowledgePointTree } from '@/lib/knowledgePointTree'
 
 const props = defineProps<{
   knowledgePoints: KnowledgePoint[]
@@ -21,51 +18,8 @@ const emit = defineEmits<{
 }>()
 
 const searchQuery = ref('')
-
-const tree = computed<KnowledgePointNode[]>(() => {
-  if (!props.knowledgePoints) return []
-  const map = new Map<number, KnowledgePointNode>()
-  const roots: KnowledgePointNode[] = []
-  
-  // Clone to avoid mutation issues if reused
-  props.knowledgePoints.forEach(kp => {
-    map.set(kp.id, { ...kp, children: [] })
-  })
-  
-  props.knowledgePoints.forEach(kp => {
-    const node = map.get(kp.id)!
-    if (kp.parent_id) {
-      const parent = map.get(kp.parent_id)
-      if (parent) {
-        parent.children.push(node)
-      } else {
-        roots.push(node)
-      }
-    } else {
-      roots.push(node)
-    }
-  })
-  return roots
-})
-
-// Keep a node's ancestor chain visible even when only a descendant matches the query.
-function filterNode(node: KnowledgePointNode, query: string): KnowledgePointNode | null {
-  const selfMatches = node.name.toLowerCase().includes(query)
-  const filteredChildren = node.children
-    .map(child => filterNode(child, query))
-    .filter((n): n is KnowledgePointNode => n !== null)
-
-  if (!selfMatches && filteredChildren.length === 0) return null
-  return { ...node, children: filteredChildren }
-}
-
-const filteredTree = computed(() => {
-  const query = searchQuery.value.trim().toLowerCase()
-  if (!query) return tree.value
-  return tree.value
-    .map(node => filterNode(node, query))
-    .filter((n): n is KnowledgePointNode => n !== null)
-})
+const tree = computed(() => buildKnowledgePointTree(props.knowledgePoints ?? []))
+const filteredTree = computed(() => filterKnowledgePointTree(tree.value, searchQuery.value))
 </script>
 
 <template>
@@ -87,7 +41,7 @@ const filteredTree = computed(() => {
         <span>全部知识点</span>
       </div>
       
-      <KnowledgePointTreeItemSelector 
+      <KnowledgePointTreeItem
         v-for="node in filteredTree" 
         :key="node.id" 
         :node="node" 
