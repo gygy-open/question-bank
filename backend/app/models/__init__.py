@@ -1,6 +1,7 @@
 from .base import Base
 from .user import User
 from .subject import Subject
+from .subject_member import SubjectMember
 from .knowledge_point import KnowledgePoint
 from .tag import Tag
 from .tag_category import TagCategory

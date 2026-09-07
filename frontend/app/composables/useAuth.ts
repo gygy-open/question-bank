@@ -21,6 +21,7 @@ export const useAuth = () => {
       loading.value = true
       const data = await $api<User>('/users/me')
       user.value = data
+      await usePermissions().fetchPermissions()
       return data
     } catch (error) {
       console.error('Failed to fetch user', error)
@@ -72,6 +73,7 @@ export const useAuth = () => {
     } finally {
       token.value = null
       user.value = null
+      usePermissions().permissions.value = null
       navigateTo('/login')
     }
   }

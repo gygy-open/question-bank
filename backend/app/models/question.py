@@ -43,6 +43,10 @@ class QuestionStatus(str, enum.Enum):
     PUBLISHED = "published"
     ARCHIVED = "archived"
 
+class QuestionVisibility(str, enum.Enum):
+    PUBLIC = "public"    # 学科内共享
+    PRIVATE = "private"  # 仅创建者 + 超管可见
+
 class Question(Base):
     """题目表"""
     __tablename__ = 'questions'
@@ -72,6 +76,11 @@ class Question(Base):
     
     q_type = Column(Enum(QuestionType, values_callable=lambda obj: [e.value for e in obj]), nullable=False) # 题目类型
     status = Column(String(20), default=QuestionStatus.DRAFT.value, nullable=False) # 状态
+    # 可见性:public=学科内共享;private=仅创建者+超管可见。存字符串以便 v2 追加 group 值。
+    visibility = Column(
+        String(20), nullable=False, default=QuestionVisibility.PUBLIC.value,
+        server_default=QuestionVisibility.PUBLIC.value, index=True,
+    )
     difficulty = Column(Integer, default=1) # 难度 1-5
     review_count = Column(Integer, default=0) # 审核次数
 

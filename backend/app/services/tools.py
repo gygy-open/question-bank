@@ -221,17 +221,22 @@ async def search_questions(db: AsyncSession, args: Dict[str, Any]) -> str:
     """
     Implementation of search_questions tool.
     """
+    user_id = args.pop("_user_id", None)
     keyword = args.get("keyword")
     difficulty = args.get("difficulty")
     q_type = args.get("q_type")
     limit = args.get("limit", 5)
+
+    # 套用与题库列表相同的可见性过滤,避免 AI 泄漏他人私有题/越权学科题。
+    viewer = await crud_user.get_with_memberships(db, id=user_id) if user_id else None
 
     questions = await crud_question.get_multi_with_filters(
         db,
         keyword=keyword,
         difficulty=difficulty,
         q_type=q_type,
-        limit=limit
+        limit=limit,
+        viewer=viewer
     )
 
     if not questions:

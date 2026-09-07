@@ -4,6 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
 from fastapi.responses import StreamingResponse
 from app import crud, schemas, models
 from app.api import deps
+from app.core.permissions import Capability
 from app.services import tag_import_service
 
 router = APIRouter()
@@ -17,8 +18,10 @@ async def read_tags(
     page: int = 1,
     size: int = 20,
     category_id: Optional[int] = None,
+    current_user: models.User = Depends(deps.get_current_active_user),
 ) -> Any:
     """Set size to -1 to retrieve all tags for the subject (used by tag-picker UIs)."""
+    deps.require(current_user, Capability.VIEW_QUESTION, subject_id=subject_id)
     limit = None if size == -1 else size
     skip = 0 if limit is None else (page - 1) * size
     tags = await crud.tag.get_multi_by_subject(
@@ -40,6 +43,7 @@ async def create_tag(
     tag_in: schemas.TagCreate,
     current_user: models.User = Depends(deps.get_current_active_user),
 ) -> Any:
+    deps.require(current_user, Capability.MANAGE_SUBJECT, subject_id=tag_in.subject_id)
     # Check if tag exists within the same subject
     existing = await crud.tag.get_by_name_in_subject(
         db, name=tag_in.name, subject_id=tag_in.subject_id
@@ -73,6 +77,7 @@ async def import_tags(
     current_user: models.User = Depends(deps.get_current_active_user),
 ) -> Any:
     """Batch import tags from an .xlsx file for a subject."""
+    deps.require(current_user, Capability.MANAGE_SUBJECT, subject_id=subject_id)
     if not file.filename or not file.filename.lower().endswith(".xlsx"):
         raise HTTPException(status_code=400, detail="仅支持 .xlsx 格式的文件")
 
@@ -95,6 +100,7 @@ async def update_tag(
     tag = await crud.tag.get(db=db, id=id)
     if not tag:
         raise HTTPException(status_code=404, detail="Tag not found")
+    deps.require(current_user, Capability.MANAGE_SUBJECT, subject_id=tag.subject_id)
     tag = await crud.tag.update(db=db, db_obj=tag, obj_in=tag_in, user_id=current_user.id)
     return tag
 
@@ -103,10 +109,12 @@ async def read_tag(
     *,
     db: deps.SessionDep,
     id: int,
+    current_user: models.User = Depends(deps.get_current_active_user),
 ) -> Any:
     tag = await crud.tag.get(db=db, id=id)
     if not tag:
         raise HTTPException(status_code=404, detail="Tag not found")
+    deps.require(current_user, Capability.VIEW_QUESTION, subject_id=tag.subject_id)
     return tag
 
 @router.delete("/{id}", response_model=schemas.Tag)
@@ -119,5 +127,6 @@ async def delete_tag(
     tag = await crud.tag.get(db=db, id=id)
     if not tag:
         raise HTTPException(status_code=404, detail="Tag not found")
+    deps.require(current_user, Capability.MANAGE_SUBJECT, subject_id=tag.subject_id)
     tag = await crud.tag.remove(db=db, id=id, user_id=current_user.id)
     return tag

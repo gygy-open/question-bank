@@ -6,7 +6,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { SidebarMenuButton, useSidebar } from '@/components/ui/sidebar'
-import { ChevronsUpDown, AlertTriangle } from '@lucide/vue'
+import { ChevronsUpDown, AlertTriangle, Info } from '@lucide/vue'
 import { toast } from 'vue-sonner'
 
 // Cycle a fixed palette by subject id so each subject keeps a stable color.
@@ -19,6 +19,7 @@ const getSubjectColor = (id: number) => SUBJECT_COLORS[id % SUBJECT_COLORS.lengt
 const getSubjectInitial = (name: string) => name.trim().charAt(0) || '?'
 
 const { currentSubject, subjects, hasSubjects, setSubject } = useSubjectContext()
+const { isAdmin } = usePermissions()
 const router = useRouter()
 const config = useRuntimeConfig()
 const { state } = useSidebar()
@@ -72,8 +73,9 @@ const goCreateSubject = () => router.push('/subjects?create=true')
     </DropdownMenuContent>
   </DropdownMenu>
 
+  <!-- 管理员且系统尚无学科:引导创建第一个学科 -->
   <SidebarMenuButton
-    v-else
+    v-else-if="isAdmin"
     size="lg"
     aria-label="请先创建学科"
     class="text-destructive hover:bg-destructive/10 hover:text-destructive"
@@ -84,6 +86,22 @@ const goCreateSubject = () => router.push('/subjects?create=true')
     </div>
     <div class="flex flex-col gap-0.5 leading-none">
       <span class="truncate font-semibold">请先创建学科</span>
+    </div>
+  </SidebarMenuButton>
+
+  <!-- 普通用户未被分配学科:提示联系管理员(无创建权限) -->
+  <SidebarMenuButton
+    v-else
+    size="lg"
+    aria-label="暂无可用学科"
+    class="text-muted-foreground"
+  >
+    <div class="flex aspect-square size-8 items-center justify-center rounded-lg border bg-muted">
+      <Info class="size-4" />
+    </div>
+    <div class="flex min-w-0 flex-col gap-0.5 leading-none">
+      <span class="truncate font-semibold">暂无可用学科</span>
+      <span class="truncate text-xs text-muted-foreground">请联系管理员开通</span>
     </div>
   </SidebarMenuButton>
 </template>

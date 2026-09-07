@@ -5,6 +5,7 @@ from fastapi.responses import StreamingResponse
 from sqlalchemy.exc import IntegrityError
 from app import crud, schemas, models
 from app.api import deps
+from app.core.permissions import Capability
 from app.core.vector_store import VectorStore
 from app.services import kp_import_service
 
@@ -19,6 +20,7 @@ async def read_knowledge_points(
     skip: int = 0,
     limit: int = 100,
     subject_id: Optional[int] = None,
+    current_user: models.User = Depends(deps.get_current_active_user),
 ) -> Any:
     """
     Retrieve knowledge points.
@@ -26,8 +28,9 @@ async def read_knowledge_points(
     """
     if limit == -1:
         limit = None
-        
+
     if subject_id:
+        deps.require(current_user, Capability.VIEW_QUESTION, subject_id=subject_id)
         knowledge_points = await crud.knowledge_point.get_by_subject(db, subject_id=subject_id, skip=skip, limit=limit)
     else:
         knowledge_points = await crud.knowledge_point.get_multi(db, skip=skip, limit=limit)
@@ -200,6 +203,7 @@ async def create_knowledge_point(
     knowledge_point_in: schemas.KnowledgePointCreate,
     current_user: models.User = Depends(deps.get_current_active_user),
 ) -> Any:
+    deps.require(current_user, Capability.MANAGE_SUBJECT, subject_id=knowledge_point_in.subject_id)
     try:
         knowledge_point = await crud.knowledge_point.create(db=db, obj_in=knowledge_point_in, user_id=current_user.id)
         return knowledge_point
@@ -217,6 +221,7 @@ async def update_knowledge_point(
     knowledge_point = await crud.knowledge_point.get(db=db, id=id)
     if not knowledge_point:
         raise HTTPException(status_code=404, detail="Knowledge point not found")
+    deps.require(current_user, Capability.MANAGE_SUBJECT, subject_id=knowledge_point.subject_id)
     knowledge_point = await crud.knowledge_point.update(db=db, db_obj=knowledge_point, obj_in=knowledge_point_in, user_id=current_user.id)
     return knowledge_point
 
@@ -225,6 +230,7 @@ async def read_knowledge_point(
     *,
     db: deps.SessionDep,
     id: int,
+    current_user: models.User = Depends(deps.get_current_active_user),
 ) -> Any:
     """
     Get knowledge point by ID.
@@ -232,6 +238,7 @@ async def read_knowledge_point(
     knowledge_point = await crud.knowledge_point.get(db=db, id=id)
     if not knowledge_point:
         raise HTTPException(status_code=404, detail="Knowledge point not found")
+    deps.require(current_user, Capability.VIEW_QUESTION, subject_id=knowledge_point.subject_id)
     return knowledge_point
 
 @router.delete("/{id}", response_model=schemas.KnowledgePoint)
@@ -247,5 +254,6 @@ async def delete_knowledge_point(
     knowledge_point = await crud.knowledge_point.get(db=db, id=id)
     if not knowledge_point:
         raise HTTPException(status_code=404, detail="Knowledge point not found")
+    deps.require(current_user, Capability.MANAGE_SUBJECT, subject_id=knowledge_point.subject_id)
     knowledge_point = await crud.knowledge_point.remove(db=db, id=id, user_id=current_user.id)
     return knowledge_point

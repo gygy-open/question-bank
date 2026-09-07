@@ -34,6 +34,7 @@ const props = withDefaults(defineProps<SidebarProps>(), {
 
 const route = useRoute()
 const { user, logout } = useAuth()
+const { isAdmin, isManagerSomewhere } = usePermissions()
 const router = useRouter()
 const chat = useGlobalChat()
 const isProfileOpen = ref(false)
@@ -189,7 +190,7 @@ const navActiveClass = 'border-l-2 border-transparent data-[active=true]:border-
                   </NuxtLink>
                 </SidebarMenuButton>
               </SidebarMenuItem>
-              <SidebarMenuItem>
+              <SidebarMenuItem v-if="isAdmin || isManagerSomewhere">
                 <SidebarMenuButton as-child :is-active="route.path === '/subjects'" :class="navActiveClass">
                   <NuxtLink to="/subjects">
                     <Library />

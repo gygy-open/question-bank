@@ -7,6 +7,8 @@ from pydantic import ValidationError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
+from app.core import permissions
+from app.core.permissions import Capability
 from app.crud import crud_user
 from app.db.session import SessionLocal
 from app.models.user import User
@@ -37,7 +39,7 @@ async def get_current_user(session: SessionDep, token: TokenDep) -> User:
     if not token_data.sub:
         raise HTTPException(status_code=404, detail="User not found")
         
-    user = await crud_user.user.get(session, id=int(token_data.sub))
+    user = await crud_user.user.get_with_memberships(session, id=int(token_data.sub))
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
     return user
@@ -55,3 +57,18 @@ def get_current_active_superuser(current_user: CurrentUser) -> User:
             status_code=400, detail="The user doesn't have enough privileges"
         )
     return current_user
+
+
+def require(
+    user: User,
+    capability: Capability,
+    *,
+    subject_id: int | None = None,
+    resource=None,
+) -> None:
+    """能力断言:不满足则抛 403。端点内联调用,与现有 inline 鉴权风格一致。"""
+    if not permissions.can(user, capability, subject_id=subject_id, resource=resource):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="The user doesn't have enough privileges",
+        )

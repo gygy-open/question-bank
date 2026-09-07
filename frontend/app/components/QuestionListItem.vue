@@ -10,7 +10,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
-import { Pencil, Trash2, Copy, ChevronDown, Star, ShoppingBasket, CheckCircle, History, Workflow, CornerDownRight, GitFork, FileText, AlertTriangle, MoreVertical } from '@lucide/vue'
+import { Pencil, Trash2, Copy, ChevronDown, Star, ShoppingBasket, CheckCircle, History, Workflow, CornerDownRight, GitFork, FileText, AlertTriangle, MoreVertical, Lock } from '@lucide/vue'
 import RichContent from './rich-editor/RichContent.vue'
 import AnswerDisplay from './AnswerDisplay.vue'
 import { isEmptyRichDoc, richDocToPlainText } from './rich-editor/richDoc'
@@ -232,6 +232,11 @@ const sourceFileUrl = computed(() => {
                 {{ statusLabel }}
               </Badge>
               <Badge variant="outline">{{ typeLabel }}</Badge>
+
+              <!-- 私有题标记 -->
+              <Badge v-if="(item as DbQuestion).visibility === 'private'" variant="secondary" class="flex items-center gap-1 px-1.5 bg-amber-50 text-amber-700 hover:bg-amber-100 dark:bg-amber-500/10 dark:text-amber-400">
+                <Lock class="w-3 h-3" /> 私有
+              </Badge>
 
               <!-- Structure Badges -->
               <Badge v-if="(item as DbQuestion).parent_id" variant="secondary" class="flex items-center gap-1 px-1.5 bg-indigo-50 text-indigo-700 hover:bg-indigo-100 dark:bg-indigo-500/10 dark:text-indigo-400">

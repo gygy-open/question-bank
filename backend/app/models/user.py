@@ -49,3 +49,8 @@ class User(Base):
 
     # Paper
     papers = relationship("Paper", back_populates="owner", cascade="all, delete-orphan")
+
+    # 学科成员关系(承载学科作用域角色)
+    subject_memberships = relationship(
+        "SubjectMember", back_populates="user", cascade="all, delete-orphan"
+    )

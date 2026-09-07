@@ -6,6 +6,7 @@ from fastapi.responses import StreamingResponse
 
 from app.api import deps
 from app.crud import crud_user
+from app.core import permissions as perm
 from app.schemas.user import (
     User,
     UserCreate,
@@ -14,6 +15,7 @@ from app.schemas.user import (
     UserUpdateLastSubject,
     UserImportResult,
 )
+from app.schemas.subject_member import MyPermissions, SubjectMembershipMini
 from app.core import security
 from app.services import user_import_service
 
@@ -94,6 +96,29 @@ async def read_user_me(
     Get current user.
     """
     return current_user
+
+@router.get("/me/permissions", response_model=MyPermissions)
+async def read_my_permissions(
+    current_user: User = Depends(deps.get_current_active_user),
+) -> Any:
+    """前端权限判定的单一真源:每学科角色 + 生效能力集。"""
+    memberships = [
+        SubjectMembershipMini(subject_id=m.subject_id, role=m.role)
+        for m in current_user.subject_memberships
+    ]
+    capabilities = {
+        str(m.subject_id): [
+            c.value for c in perm.capabilities_for(current_user, subject_id=m.subject_id)
+        ]
+        for m in current_user.subject_memberships
+    }
+    acc = perm.accessible_subject_ids(current_user)
+    return MyPermissions(
+        is_superuser=bool(current_user.is_superuser),
+        accessible_subject_ids=(None if acc is None else sorted(acc)),
+        memberships=memberships,
+        capabilities=capabilities,
+    )
 
 @router.put("/me", response_model=User)
 async def update_user_me(

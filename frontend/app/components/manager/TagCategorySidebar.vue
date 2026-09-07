@@ -10,8 +10,10 @@ import { Plus, Pencil, Trash2, Info, Tag } from '@lucide/vue'
 const props = withDefaults(defineProps<{
     categories: TagCategory[]
     disabled?: boolean
+    canManage?: boolean
 }>(), {
     disabled: false,
+    canManage: true,
 })
 
 const emit = defineEmits<{
@@ -68,7 +70,7 @@ const cancelAdd = () => {
             </div>
             <Popover :open="isAdding" @update:open="(v) => !v && cancelAdd()">
                 <PopoverTrigger as-child>
-                    <Button variant="ghost" size="icon" class="h-5 w-5" :disabled="disabled" aria-label="新建分类" title="新建分类" @click="isAdding = true">
+                    <Button v-if="canManage" variant="ghost" size="icon" class="h-5 w-5" :disabled="disabled" aria-label="新建分类" title="新建分类" @click="isAdding = true">
                         <Plus class="h-3.5 w-3.5" />
                     </Button>
                 </PopoverTrigger>
@@ -123,17 +125,17 @@ const cancelAdd = () => {
                         <TooltipProvider :delay-duration="300">
                             <Tooltip>
                                 <TooltipTrigger as-child>
-                                    <Button variant="ghost" size="icon" class="h-6 w-6" :aria-label="`在｜${cat.name}｜下新建标签`" @click.stop="emit('create-tag', cat.id)">
+                                    <Button v-if="canManage" variant="ghost" size="icon" class="h-6 w-6" :aria-label="`在｜${cat.name}｜下新建标签`" @click.stop="emit('create-tag', cat.id)">
                                         <Tag class="h-3 w-3" />
                                     </Button>
                                 </TooltipTrigger>
                                 <TooltipContent side="right">在此分类下新建标签</TooltipContent>
                             </Tooltip>
                         </TooltipProvider>
-                        <Button variant="ghost" size="icon" class="h-6 w-6" :aria-label="`编辑分类 ${cat.name}`" @click.stop="startEdit(cat)">
+                        <Button v-if="canManage" variant="ghost" size="icon" class="h-6 w-6" :aria-label="`编辑分类 ${cat.name}`" @click.stop="startEdit(cat)">
                             <Pencil class="h-3 w-3" />
                         </Button>
-                        <Button variant="ghost" size="icon" class="h-6 w-6 text-destructive hover:text-destructive" :aria-label="`删除分类 ${cat.name}`" @click.stop="emit('delete', cat.id)">
+                        <Button v-if="canManage" variant="ghost" size="icon" class="h-6 w-6 text-destructive hover:text-destructive" :aria-label="`删除分类 ${cat.name}`" @click.stop="emit('delete', cat.id)">
                             <Trash2 class="h-3 w-3" />
                         </Button>
                     </div>

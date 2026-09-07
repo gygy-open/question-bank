@@ -29,6 +29,8 @@ const isSuperuser = computed(() => !!currentUser.value?.is_superuser)
 
 // Subject is driven by the global subject context (sidebar selector).
 const { currentSubjectId, setSubject } = useSubjectContext()
+const { can } = usePermissions()
+const canManage = computed(() => can(Capability.MANAGE_SUBJECT, currentSubjectId.value))
 const selectedSubjectId = computed<string>({
   get: () => (currentSubjectId.value != null ? String(currentSubjectId.value) : ''),
   set: (val) => {
@@ -282,7 +284,7 @@ onMounted(fetchVectorStatus)
                   <Upload class="w-4 h-4 mr-2" />批量导入
                 </Button>
               </template>
-              <Button v-if="!isCreatingRoot" size="sm" @click="isCreatingRoot = true">
+              <Button v-if="canManage && !isCreatingRoot" size="sm" @click="isCreatingRoot = true">
                 <Plus class="w-4 h-4 mr-2" />
                 添加根目录
               </Button>
@@ -336,7 +338,7 @@ onMounted(fetchVectorStatus)
               该学科暂无知识点。
             </div>
 
-            <ManagerKnowledgePointTreeItem v-for="node in knowledgePointTree" :key="node.id" :knowledge-point="node"
+            <ManagerKnowledgePointTreeItem v-for="node in knowledgePointTree" :key="node.id" :knowledge-point="node" :editable="canManage"
               @update="handleUpdate" @delete="handleDelete" @create="handleCreateChild" @move="handleMove" />
           </div>
         </div>

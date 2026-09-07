@@ -1,3 +1,5 @@
+import { toast } from 'vue-sonner'
+
 export default defineNuxtPlugin((nuxtApp) => {
   const api = $fetch.create({
     baseURL: '/api/v1',
@@ -23,6 +25,9 @@ export default defineNuxtPlugin((nuxtApp) => {
           useCookie('token').value = null
           return navigateTo('/login')
         })
+      }
+      if (response.status === 403) {
+        toast.error('您没有权限执行此操作')
       }
     }
   })

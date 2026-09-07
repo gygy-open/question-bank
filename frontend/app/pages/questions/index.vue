@@ -118,6 +118,8 @@ const { data: subjects, refresh: refreshSubjects } = await useAPI<Subject[]>('/s
 
 // Subject is now driven by the global subject context (sidebar selector).
 const { currentSubjectId, setSubject } = useSubjectContext()
+const { can } = usePermissions()
+const canEditCurrentSubject = computed(() => can(Capability.EDIT_QUESTION, currentSubjectId.value))
 const selectedSubjectId = computed<string>({
   get: () => (currentSubjectId.value != null ? String(currentSubjectId.value) : '0'),
   set: (val) => {
@@ -530,7 +532,7 @@ const viewStructure = (question: Question) => {
   <!-- Header -->
   <PageHeader title="题目管理">
     <template #actions>
-      <Button size="sm" @click="createQuestion">
+      <Button v-if="canEditCurrentSubject" size="sm" @click="createQuestion">
         <Plus class="mr-2 h-4 w-4" />
         创建题目
       </Button>

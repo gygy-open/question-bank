@@ -245,6 +245,7 @@ export interface Question {
   q_type: QuestionType
   status: QuestionStatus
   difficulty: number
+  visibility: 'public' | 'private'
   knowledge_points: KnowledgePoint[]
   tags: Tag[]
   created_at: string

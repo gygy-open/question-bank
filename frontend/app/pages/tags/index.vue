@@ -53,6 +53,8 @@ import { toast } from 'vue-sonner'
 // State
 const { $api } = useNuxtApp()
 const { currentSubjectId, currentSubject, hasSubjects } = useSubjectContext()
+const { can } = usePermissions()
+const canManage = computed(() => can(Capability.MANAGE_SUBJECT, currentSubjectId.value))
 
 const page = ref(1)
 const pageSize = ref(20)
@@ -292,11 +294,11 @@ const deleteCategory = async (id: number) => {
 <template>
     <PageHeader title="标签管理">
         <template #actions>
-            <Button variant="outline" :disabled="!hasSubjects" @click="isImportOpen = true">
+            <Button v-if="canManage" variant="outline" :disabled="!hasSubjects" @click="isImportOpen = true">
                 <Upload class="w-4 h-4 mr-2" />
                 批量导入
             </Button>
-            <Button :disabled="!hasSubjects" @click="openCreateDialog">
+            <Button v-if="canManage" :disabled="!hasSubjects" @click="openCreateDialog">
                 <Plus class="w-4 h-4 mr-2" />
                 新建标签
             </Button>
@@ -314,6 +316,7 @@ const deleteCategory = async (id: number) => {
                     v-model:new-category-form="newCategory"
                     :categories="tagCategories || []"
                     :disabled="!hasSubjects"
+                    :can-manage="canManage"
                     @create="createCategory"
                     @save-edit="saveCategory"
                     @delete="deleteCategory"
@@ -345,6 +348,7 @@ const deleteCategory = async (id: number) => {
                                     v-model:new-category-form="newCategory"
                                     :categories="tagCategories || []"
                                     :disabled="!hasSubjects"
+                                    :can-manage="canManage"
                                     @create="createCategory"
                                     @save-edit="saveCategory"
                                     @delete="deleteCategory"
@@ -357,7 +361,7 @@ const deleteCategory = async (id: number) => {
                         {{ currentCategoryLabel }}
                     </h2>
                     <span class="hidden text-sm text-muted-foreground md:block">共 {{ total }} 个标签</span>
-                    <Button v-if="selectedTags.length > 0" variant="destructive" size="sm" @click="batchDelete">
+                    <Button v-if="canManage && selectedTags.length > 0" variant="destructive" size="sm" @click="batchDelete">
                         <Trash2 class="w-4 h-4 mr-2" />
                         批量删除 ({{ selectedTags.length }})
                     </Button>
@@ -407,10 +411,10 @@ const deleteCategory = async (id: number) => {
                                 </TableCell>
                                 <TableCell class="text-right">
                                     <div class="flex justify-end gap-2">
-                                        <Button variant="ghost" size="icon" @click="openEditDialog(tag)">
+                                        <Button v-if="canManage" variant="ghost" size="icon" @click="openEditDialog(tag)">
                                             <Pencil class="w-4 h-4" />
                                         </Button>
-                                        <Button variant="ghost" size="icon" class="text-destructive"
+                                        <Button v-if="canManage" variant="ghost" size="icon" class="text-destructive"
                                             @click="deleteTag(tag.id)">
                                             <Trash2 class="w-4 h-4" />
                                         </Button>

@@ -6,9 +6,15 @@ import { toast } from 'vue-sonner'
 import { useLocalStorage, useSessionStorage } from '@vueuse/core'
 
 const { fetchUser, token, user } = useAuth()
+const { hasSubjects } = useSubjectContext()
 const { state: updateState, check: checkUpdate } = useUpdateCheck()
 const ignoredVersion = useLocalStorage('ignored-update-version', '')
 const hasPrompted = useSessionStorage('update-prompted', false)
+
+// 普通用户未被分配任何学科时的空状态提示(管理员不受限)。
+const showNoSubjectHint = computed(
+  () => !!token.value && !user.value?.is_superuser && !hasSubjects.value,
+)
 
 onMounted(async () => {
   // 学科上下文已由 auth.global.ts 中间件在进入本布局前初始化完毕
@@ -57,6 +63,12 @@ onMounted(async () => {
   <SidebarProvider>
     <AppSidebar />
     <SidebarInset>
+      <div
+        v-if="showNoSubjectHint"
+        class="m-4 rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-300"
+      >
+        您还没有被分配任何学科，暂时看不到题库内容。请联系管理员在“学科管理 → 成员管理”中为您开通。
+      </div>
       <slot />
     </SidebarInset>
     <FloatingChatWidget />

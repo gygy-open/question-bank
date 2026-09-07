@@ -3,6 +3,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import select, delete
 from app import crud, schemas, models
 from app.api import deps
+from app.core.permissions import Capability
 from app.models.tag import Tag
 from app.models.question import question_tags
 
@@ -14,11 +15,13 @@ async def read_tag_categories(
     subject_id: int | None = None,
     skip: int = 0,
     limit: int = 100,
+    current_user: models.User = Depends(deps.get_current_active_user),
 ) -> Any:
     """
     Retrieve tag categories.
     """
     if subject_id is not None:
+        deps.require(current_user, Capability.VIEW_QUESTION, subject_id=subject_id)
         tag_categories = await crud.tag_category.get_multi_by_subject(db, subject_id=subject_id, skip=skip, limit=limit)
     else:
         tag_categories = await crud.tag_category.get_multi(db, skip=skip, limit=limit)
@@ -29,14 +32,15 @@ async def create_tag_category(
     *,
     db: deps.SessionDep,
     tag_category_in: schemas.TagCategoryCreate,
-    current_user: models.User = Depends(deps.get_current_active_superuser),
+    current_user: models.User = Depends(deps.get_current_active_user),
 ) -> Any:
     """
     Create new tag category.
     """
     if not tag_category_in.subject_id:
         raise HTTPException(status_code=400, detail="subject_id is required")
-        
+    deps.require(current_user, Capability.MANAGE_SUBJECT, subject_id=tag_category_in.subject_id)
+
     existing = await crud.tag_category.get_by_name_in_subject(db, name=tag_category_in.name, subject_id=tag_category_in.subject_id)
     if existing:
         raise HTTPException(status_code=400, detail="Tag category with this name already exists in this subject")
@@ -50,7 +54,7 @@ async def update_tag_category(
     db: deps.SessionDep,
     id: int,
     tag_category_in: schemas.TagCategoryUpdate,
-    current_user: models.User = Depends(deps.get_current_active_superuser),
+    current_user: models.User = Depends(deps.get_current_active_user),
 ) -> Any:
     """
     Update a tag category.
@@ -58,6 +62,7 @@ async def update_tag_category(
     tag_category = await crud.tag_category.get(db=db, id=id)
     if not tag_category:
         raise HTTPException(status_code=404, detail="Tag category not found")
+    deps.require(current_user, Capability.MANAGE_SUBJECT, subject_id=tag_category.subject_id)
     tag_category = await crud.tag_category.update(db=db, db_obj=tag_category, obj_in=tag_category_in)
     return tag_category
 
@@ -66,7 +71,7 @@ async def delete_tag_category(
     *,
     db: deps.SessionDep,
     id: int,
-    current_user: models.User = Depends(deps.get_current_active_superuser),
+    current_user: models.User = Depends(deps.get_current_active_user),
 ) -> Any:
     """
     Delete a tag category.
@@ -74,6 +79,7 @@ async def delete_tag_category(
     tag_category = await crud.tag_category.get(db=db, id=id)
     if not tag_category:
         raise HTTPException(status_code=404, detail="Tag category not found")
+    deps.require(current_user, Capability.MANAGE_SUBJECT, subject_id=tag_category.subject_id)
     
     # Find all tags in this category
     result = await db.execute(select(Tag).where(Tag.category_id == id))

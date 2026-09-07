@@ -21,19 +21,30 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
-import { Plus, Pencil, Trash2 } from '@lucide/vue'
+import { Plus, Pencil, Trash2, Users } from '@lucide/vue'
+import SubjectMembersDialog from '~/components/manager/SubjectMembersDialog.vue'
 
 // State
 const { $api } = useNuxtApp()
 const { data: subjects, refresh } = await useAPI<Subject[]>('/api/v1/subjects')
 const isDialogOpen = ref(false)
 const isEditing = ref(false)
+const membersDialogOpen = ref(false)
+const membersSubject = ref<Subject | null>(null)
 const currentSubject = ref<Partial<Subject>>({
   name: '',
   slug: '',
   description: '',
   required_review_count: 1
 })
+
+const openMembersDialog = (subject: Subject) => {
+  membersSubject.value = subject
+  membersDialogOpen.value = true
+}
+
+const { can, isAdmin } = usePermissions()
+const canManageMembers = (subjectId: number) => can(Capability.MANAGE_MEMBERS, subjectId)
 
 // Actions
 const openCreateDialog = () => {
@@ -82,7 +93,7 @@ const deleteSubject = async (id: number) => {
 <template>
   <PageHeader title="学科管理">
     <template #actions>
-      <Button @click="openCreateDialog">
+      <Button v-if="isAdmin" @click="openCreateDialog">
         <Plus class="w-4 h-4 mr-2" />
         新建学科
       </Button>
@@ -113,10 +124,13 @@ const deleteSubject = async (id: number) => {
               <TableCell class="text-muted-foreground">{{ subject.description || '-' }}</TableCell>
               <TableCell class="text-right">
                 <div class="flex justify-end gap-2">
-                  <Button variant="ghost" size="icon" @click="openEditDialog(subject)">
+                  <Button v-if="canManageMembers(subject.id)" variant="ghost" size="icon" title="成员管理" @click="openMembersDialog(subject)">
+                    <Users class="w-4 h-4" />
+                  </Button>
+                  <Button v-if="isAdmin" variant="ghost" size="icon" @click="openEditDialog(subject)">
                     <Pencil class="w-4 h-4" />
                   </Button>
-                  <Button variant="ghost" size="icon" class="text-destructive" @click="deleteSubject(subject.id)">
+                  <Button v-if="isAdmin" variant="ghost" size="icon" class="text-destructive" @click="deleteSubject(subject.id)">
                     <Trash2 class="w-4 h-4" />
                   </Button>
                 </div>
@@ -173,4 +187,6 @@ const deleteSubject = async (id: number) => {
         </DialogFooter>
       </DialogContent>
     </Dialog>
+
+    <SubjectMembersDialog v-model:open="membersDialogOpen" :subject="membersSubject" />
 </template>

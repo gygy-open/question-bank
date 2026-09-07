@@ -13,6 +13,7 @@ interface KnowledgePointNode extends KnowledgePoint {
 const props = defineProps<{
   knowledgePoint: KnowledgePointNode
   level?: number
+  editable?: boolean
 }>()
 
 const emit = defineEmits<{
@@ -181,7 +182,7 @@ watch(newName, (val) => {
       </span>
 
       <!-- Actions (Visible on Hover) -->
-      <div v-if="!isEditing" class="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+      <div v-if="!isEditing && editable !== false" class="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
         <Button 
           variant="ghost" 
           size="icon" 
@@ -220,6 +221,7 @@ watch(newName, (val) => {
         :key="child.id"
         :knowledge-point="child"
         :level="(level || 0) + 1"
+        :editable="editable"
         @update="(id, data) => $emit('update', id, data)"
         @delete="(id) => $emit('delete', id)"
         @create="(pid, data) => $emit('create', pid, data)"

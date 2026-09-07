@@ -1,10 +1,10 @@
 from typing import List, Optional, Union, Dict, Any
 from datetime import datetime
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func, or_
+from sqlalchemy import select, func, or_, and_, true, false
 from sqlalchemy.orm import selectinload
 from app.crud.base import CRUDBase
-from app.models.question import Question, QuestionStatus, QuestionType
+from app.models.question import Question, QuestionStatus, QuestionType, QuestionVisibility
 from app.models.tag import Tag
 from app.schemas.question import QuestionCreate, QuestionUpdate
 from app.crud.crud_knowledge_point import knowledge_point as knowledge_point_crud
@@ -20,6 +20,46 @@ from app.services.question_content import (
 from app.models.knowledge_point import KnowledgePoint
 from app.models.import_task import ImportTask
 from app.models.activity_log import ActivityLog
+
+
+def visible_questions_filter(viewer):
+    """题目可见性统一过滤条件。所有读路径(list/search/export/chat tools)都应套用。
+
+    规则: 只能看到可访问学科内、且 公开或自己创建的题。admin(accessible=None)不受限。
+    v2 在此追加 `OR (visibility='group' AND question_group_id IN my_groups)` 即可。
+    """
+    from app.core import permissions
+
+    if viewer is None:
+        return true()
+    subject_ids = permissions.accessible_subject_ids(viewer)
+    if subject_ids is None:
+        return true()
+    if not subject_ids:
+        return false()
+    return and_(
+        Question.subject_id.in_(subject_ids),
+        or_(
+            Question.visibility == QuestionVisibility.PUBLIC.value,
+            Question.created_by == viewer.id,
+        ),
+    )
+
+
+def is_question_visible(question, viewer) -> bool:
+    """visible_questions_filter 的单对象 Python 版(逐题判定)。二者规则必须保持一致。"""
+    from app.core import permissions
+
+    if viewer is None:
+        return True
+    subject_ids = permissions.accessible_subject_ids(viewer)
+    if subject_ids is None:
+        return True
+    if question.subject_id not in subject_ids:
+        return False
+    if question.visibility != QuestionVisibility.PUBLIC.value and question.created_by != viewer.id:
+        return False
+    return True
 
 class CRUDQuestion(CRUDBase[Question, QuestionCreate, QuestionUpdate]):
     async def get(self, db: AsyncSession, id: Any) -> Optional[Question]:
@@ -80,7 +120,8 @@ class CRUDQuestion(CRUDBase[Question, QuestionCreate, QuestionUpdate]):
         id: Optional[int] = None,
         ids: Optional[List[int]] = None,
         source: Optional[str] = None,
-        root_only: bool = False
+        root_only: bool = False,
+        viewer=None,
     ):
         # Define recursive loading paths
         l1 = selectinload(self.model.children)
@@ -179,7 +220,10 @@ class CRUDQuestion(CRUDBase[Question, QuestionCreate, QuestionUpdate]):
                 ActivityLog.action == 'review'
             ).distinct()
             query = query.filter(self.model.id.in_(subquery))
-            
+
+        if viewer is not None:
+            query = query.filter(visible_questions_filter(viewer))
+
         return query
 
     async def get_multi_with_filters(
@@ -203,7 +247,8 @@ class CRUDQuestion(CRUDBase[Question, QuestionCreate, QuestionUpdate]):
         id: Optional[int] = None,
         ids: Optional[List[int]] = None,
         source: Optional[str] = None,
-        root_only: bool = False
+        root_only: bool = False,
+        viewer=None
     ) -> List[Question]:
         query = await self._get_filter_query(
             db,
@@ -222,7 +267,8 @@ class CRUDQuestion(CRUDBase[Question, QuestionCreate, QuestionUpdate]):
             id=id,
             ids=ids,
             source=source,
-            root_only=root_only
+            root_only=root_only,
+            viewer=viewer
         )
         query = query.offset(skip).limit(limit).order_by(self.model.created_at.desc())
         result = await db.execute(query)
@@ -255,7 +301,8 @@ class CRUDQuestion(CRUDBase[Question, QuestionCreate, QuestionUpdate]):
         id: Optional[int] = None,
         ids: Optional[List[int]] = None,
         source: Optional[str] = None,
-        root_only: bool = False
+        root_only: bool = False,
+        viewer=None
     ) -> int:
         query = await self._get_filter_query(
             db,
@@ -274,7 +321,8 @@ class CRUDQuestion(CRUDBase[Question, QuestionCreate, QuestionUpdate]):
             id=id,
             ids=ids,
             source=source,
-            root_only=root_only
+            root_only=root_only,
+            viewer=viewer
         )
         # Use subquery for count to handle joins correctly
         subquery = query.subquery()

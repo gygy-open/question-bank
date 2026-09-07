@@ -1,4 +1,7 @@
 from .subject import Subject, SubjectCreate, SubjectUpdate
+from .subject_member import (
+    SubjectMemberSetRole, SubjectMemberOut, SubjectMembershipMini, MyPermissions,
+)
 from .knowledge_point import (
     KnowledgePoint, KnowledgePointCreate, KnowledgePointUpdate,
     VectorStatus, ReindexResult,

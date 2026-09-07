@@ -1,4 +1,5 @@
 from .crud_subject import subject
+from .crud_subject_member import subject_member
 from .crud_knowledge_point import knowledge_point
 from .crud_tag import tag
 from .crud_tag_category import tag_category

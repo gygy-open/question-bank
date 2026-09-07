@@ -5,6 +5,9 @@ from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 from app import crud, schemas, models
 from app.api import deps
+from app.core import permissions
+from app.core.permissions import Capability
+from app.crud.crud_question import is_question_visible
 from app.models.question import QuestionType, Question, QuestionStatus
 from app.models.import_task import ImportTask, ImportTaskStatus
 from app.services.question_service import question_service
@@ -13,6 +16,15 @@ from app.services.importing.normalize import question_importer
 from app.services.activity_logger import log_activity
 
 router = APIRouter()
+
+
+def _can_delete_question(question, user) -> bool:
+    """删除权限:创建者 / 学科负责人 / 超管,且需对该题可见。"""
+    if not is_question_visible(question, user):
+        return False
+    if user.is_superuser or question.created_by == user.id:
+        return True
+    return permissions.can(user, Capability.MANAGE_SUBJECT, subject_id=question.subject_id)
 
 @router.get("", response_model=schemas.QuestionPage)
 async def read_questions(
@@ -35,6 +47,7 @@ async def read_questions(
     ids: List[int] = Query(None),
     source: Optional[str] = None,
     root_only: bool = False,
+    current_user: models.User = Depends(deps.get_current_active_user),
 ) -> Any:
     skip = (page - 1) * size
     questions = await crud.question.get_multi_with_filters(
@@ -56,7 +69,8 @@ async def read_questions(
         id=id,
         ids=ids,
         source=source,
-        root_only=root_only
+        root_only=root_only,
+        viewer=current_user
     )
     total = await crud.question.count_with_filters(
         db,
@@ -75,7 +89,8 @@ async def read_questions(
         id=id,
         ids=ids,
         source=source,
-        root_only=root_only
+        root_only=root_only,
+        viewer=current_user
     )
     
     import math
@@ -96,6 +111,7 @@ async def create_question(
 ) -> Any:
     if not question_in.subject_id:
         question_in.subject_id = current_user.last_active_subject_id or current_user.subject_id
+    deps.require(current_user, Capability.EDIT_QUESTION, subject_id=question_in.subject_id)
     question = await crud.question.create_with_tags(db=db, obj_in=question_in, user_id=current_user.id)
     return question
 
@@ -221,6 +237,8 @@ async def read_question(
     question = await crud.question.get(db=db, id=id)
     if not question:
         raise HTTPException(status_code=404, detail="Question not found")
+    if not is_question_visible(question, current_user):
+        raise HTTPException(status_code=404, detail="Question not found")
     return question
 
 @router.put("/{id}", response_model=schemas.Question)
@@ -234,12 +252,11 @@ async def update_question(
     question = await crud.question.get(db=db, id=id)
     if not question:
         raise HTTPException(status_code=404, detail="Question not found")
-    
-    # Check permissions
-    if not current_user.is_superuser and question.created_by != current_user.id:
-        # Allow reviewers to update status?
-        pass
-        
+    if not is_question_visible(question, current_user):
+        raise HTTPException(status_code=404, detail="Question not found")
+
+    deps.require(current_user, Capability.EDIT_QUESTION, subject_id=question.subject_id)
+
     question = await crud.question.update_with_tags(db=db, db_obj=question, obj_in=question_in, user_id=current_user.id)
     return question
 
@@ -293,10 +310,12 @@ async def delete_question(
     question = await crud.question.get(db=db, id=id)
     if not question:
         raise HTTPException(status_code=404, detail="Question not found")
-        
-    if not current_user.is_superuser and question.created_by != current_user.id:
+
+    if not is_question_visible(question, current_user):
+        raise HTTPException(status_code=404, detail="Question not found")
+    if not _can_delete_question(question, current_user):
         raise HTTPException(status_code=403, detail="Not enough permissions")
-        
+
     question = await crud.question.remove(db=db, id=id)
     
     # Log activity
@@ -327,7 +346,7 @@ async def delete_questions_batch(
 
     deleted_count = 0
     for question in questions:
-        if not current_user.is_superuser and question.created_by != current_user.id:
+        if not _can_delete_question(question, current_user):
             # Skip questions user doesn't have permission to delete
             continue
             

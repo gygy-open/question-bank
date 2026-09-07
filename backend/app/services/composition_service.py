@@ -39,7 +39,7 @@ from app.models.composition import (
     NODE_TYPE_RICH_TEXT,
     ScopeType,
 )
-from app.models.question import Question, QuestionType
+from app.models.question import Question, QuestionType, QuestionVisibility
 from app.models.user import User
 from app.schemas.composition import (
     ANSWER_FIELD_KEYS,
@@ -603,10 +603,12 @@ async def _load_scoped_question(
     *,
     question_id: int,
     subject_id: int,
+    scope_type: ScopeType,
 ) -> Question:
     """校验 question 节点引用并返回实时题目。
 
     缺失 / 软删除 / 跨学科统一 422(不信任客户端传入的 revision/快照)。
+    私有题禁止进入共享(shared)组稿:快照会冻结题面,泄漏私有内容。
     """
     result = await db.execute(
         select(Question).where(
@@ -619,6 +621,8 @@ async def _load_scoped_question(
         raise _unprocessable(f"question {question_id} not found or deleted")
     if question.subject_id != subject_id:
         raise _unprocessable(f"question {question_id} belongs to a different subject")
+    if scope_type == ScopeType.SHARED and question.visibility == QuestionVisibility.PRIVATE.value:
+        raise _unprocessable(f"private question {question_id} cannot be added to a shared composition")
     return question
 
 
@@ -790,7 +794,8 @@ async def replace_nodes(
             question_plan[it.id] = None  # 保留 DB 快照与 revision
         else:
             question = await _load_scoped_question(
-                db, question_id=it.question_id, subject_id=comp.subject_id
+                db, question_id=it.question_id, subject_id=comp.subject_id,
+                scope_type=comp.scope_type,
             )
             question_plan[it.id] = (
                 int(question.content_revision or 1),

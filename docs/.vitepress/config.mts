@@ -127,7 +127,8 @@ export default defineConfig({
             { text: 'AI 供应商与模型', link: '/admin/ai-config' },
             { text: 'Prompt 模板', link: '/admin/prompts' },
             { text: '系统参数', link: '/admin/system-settings' },
-            { text: '用户与权限', link: '/admin/users' }
+            { text: '用户管理', link: '/admin/users' },
+            { text: '权限与角色', link: '/admin/permissions' }
           ]
         }
       ],

@@ -2,6 +2,7 @@ from typing import Any, Dict, Optional, Union
 
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
+from sqlalchemy.orm import selectinload
 
 from app.core.security import get_password_hash, verify_password
 from app.crud.base import CRUDBase
@@ -11,6 +12,15 @@ from app.schemas.user import UserCreate, UserUpdate
 class CRUDUser(CRUDBase[User, UserCreate, UserUpdate]):
     async def get_by_username(self, db: AsyncSession, *, username: str) -> Optional[User]:
         result = await db.execute(select(User).filter(User.username == username))
+        return result.scalars().first()
+
+    async def get_with_memberships(self, db: AsyncSession, *, id: int) -> Optional[User]:
+        """鉴权需要在内存里读 subject_memberships,故此处预加载。"""
+        result = await db.execute(
+            select(User)
+            .options(selectinload(User.subject_memberships))
+            .filter(User.id == id)
+        )
         return result.scalars().first()
 
     async def get_multi(

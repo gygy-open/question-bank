@@ -46,6 +46,7 @@ export interface QuestionDraft {
     q_type: QuestionType
     status: QuestionStatus
     difficulty: number
+    visibility: 'public' | 'private'
     options: OptionSpec[]
     answer: AnswerSpec | null
     thinking: RichDoc
@@ -107,6 +108,7 @@ export function createEmptyDraft(opts: {
         q_type: 'single_choice',
         status: 'draft',
         difficulty: 3,
+        visibility: 'public',
         options,
         answer: null,
         thinking: null,
@@ -141,9 +143,9 @@ export function dbQuestionToDraft(
         q_type: qType,
         status: (q.status ?? 'draft') as QuestionStatus,
         difficulty: q.difficulty ?? 3,
+        visibility: (q.visibility ?? 'public') as 'public' | 'private',
         options,
         answer: q.answer ? (JSON.parse(JSON.stringify(q.answer)) as AnswerSpec) : null,
-        thinking: cloneRich(q.thinking),
         analysis: cloneRich(q.analysis),
         summary: cloneRich(q.summary),
         source: q.source ?? '',
@@ -212,6 +214,7 @@ export function extractedItemToDraft(
         q_type: qType,
         status: (item.status ?? 'draft') as QuestionStatus,
         difficulty: item.difficulty ?? 3,
+        visibility: 'public',
         options,
         answer: item.answer ? (JSON.parse(JSON.stringify(item.answer)) as AnswerSpec) : null,
         thinking: cloneRich(item.thinking),
@@ -261,6 +264,7 @@ export interface QuestionWritePayload {
     status: QuestionStatus
     subject_id?: number
     parent_id: number | null
+    visibility: 'public' | 'private'
 }
 
 /** 构造发往后端的写请求 payload：直接传对象，不做任何 JSON.stringify。 */
@@ -280,6 +284,7 @@ export function buildQuestionPayload(draft: QuestionDraft): QuestionWritePayload
         status: draft.status,
         subject_id: draft.subject_id,
         parent_id: draft.parent_id ?? null,
+        visibility: draft.visibility,
     }
 }
 

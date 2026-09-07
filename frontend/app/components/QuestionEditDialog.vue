@@ -360,6 +360,18 @@ const toggleTag = (tagId: number) => {
                   <Input v-model="draft.source" placeholder="输入题目来源" />
                 </div>
 
+                <!-- Visibility (db only) -->
+                <div v-if="!isImportMode && draft" class="space-y-2">
+                  <Label>可见性</Label>
+                  <Select v-model="draft.visibility">
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="public">公开（学科内共享）</SelectItem>
+                      <SelectItem value="private">私有（仅自己可见）</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
                 <!-- Knowledge Points -->
                 <div class="space-y-2">
                   <Label>所属知识点</Label>

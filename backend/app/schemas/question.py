@@ -1,7 +1,7 @@
 from pydantic import BaseModel, BeforeValidator, Field, field_validator, model_validator
 from typing import Optional, List, Any, Dict, Literal, Annotated, Union
 from datetime import datetime
-from app.models.question import QuestionType, QuestionStatus
+from app.models.question import QuestionType, QuestionStatus, QuestionVisibility
 from app.services.question_content import (
     normalize_options,
     parse_json_field,
@@ -124,6 +124,7 @@ class QuestionBase(BaseModel):
     q_type: QuestionType
     status: QuestionStatus = QuestionStatus.DRAFT
     difficulty: int = 1
+    visibility: QuestionVisibility = QuestionVisibility.PUBLIC
     source: Optional[str] = None
     parent_id: Optional[int] = None
 
