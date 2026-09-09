@@ -13,6 +13,8 @@ from starlette.background import BackgroundTask
 
 from app import crud, models
 from app.api import deps
+from app import capabilities
+from app.capabilities import compositions as composition_caps
 from app.crud import crud_composition
 from app.models.composition import ScopeType
 from app.schemas.composition import (
@@ -82,16 +84,17 @@ async def create_folder(
     scope: ScopeType = Query(...),
     current_user: models.User = Depends(deps.get_current_active_user),
 ) -> Any:
-    await _ensure_subject(db, subject_id)
     scope_type, owner_id = _resolve_scope(scope, current_user)
-    return await composition_service.create_folder(
-        db,
-        subject_id=subject_id,
-        scope_type=scope_type,
-        owner_id=owner_id,
-        actor=current_user,
-        name=payload.name,
-        parent_id=payload.parent_id,
+    return await capabilities.run(
+        "composition.create_folder",
+        deps.api_context(db, current_user, subject_id=subject_id),
+        composition_caps.FolderCreateInput(
+            subject_id=subject_id,
+            scope_type=scope_type,
+            owner_id=owner_id,
+            name=payload.name,
+            parent_id=payload.parent_id,
+        ),
     )
 
 
@@ -104,24 +107,19 @@ async def update_folder(
     scope: ScopeType = Query(...),
     current_user: models.User = Depends(deps.get_current_active_user),
 ) -> Any:
-    await _ensure_subject(db, subject_id)
     scope_type, owner_id = _resolve_scope(scope, current_user)
-    folder = await crud_composition.folder.get_scoped(
-        db,
-        folder_id=folder_id,
-        subject_id=subject_id,
-        scope_type=scope_type,
-        owner_id=owner_id,
-    )
-    if folder is None:
-        raise HTTPException(status_code=404, detail="Folder not found")
-    return await composition_service.update_folder(
-        db,
-        folder=folder,
-        actor=current_user,
-        name=payload.name,
-        parent_id=payload.parent_id,
-        parent_id_provided="parent_id" in payload.model_fields_set,
+    return await capabilities.run(
+        "composition.update_folder",
+        deps.api_context(db, current_user, subject_id=subject_id),
+        composition_caps.FolderUpdateInput(
+            subject_id=subject_id,
+            scope_type=scope_type,
+            owner_id=owner_id,
+            folder_id=folder_id,
+            name=payload.name,
+            parent_id=payload.parent_id,
+            parent_id_provided="parent_id" in payload.model_fields_set,
+        ),
     )
 
 
@@ -133,18 +131,17 @@ async def delete_folder(
     scope: ScopeType = Query(...),
     current_user: models.User = Depends(deps.get_current_active_user),
 ) -> None:
-    await _ensure_subject(db, subject_id)
     scope_type, owner_id = _resolve_scope(scope, current_user)
-    folder = await crud_composition.folder.get_scoped(
-        db,
-        folder_id=folder_id,
-        subject_id=subject_id,
-        scope_type=scope_type,
-        owner_id=owner_id,
+    await capabilities.run(
+        "composition.delete_folder",
+        deps.api_context(db, current_user, subject_id=subject_id),
+        composition_caps.FolderRefInput(
+            subject_id=subject_id,
+            scope_type=scope_type,
+            owner_id=owner_id,
+            folder_id=folder_id,
+        ),
     )
-    if folder is None:
-        raise HTTPException(status_code=404, detail="Folder not found")
-    await composition_service.delete_folder(db, folder=folder, actor=current_user)
 
 
 # --------------------------------------------------------------------------- #
@@ -189,17 +186,18 @@ async def create_composition(
     scope: ScopeType = Query(...),
     current_user: models.User = Depends(deps.get_current_active_user),
 ) -> Any:
-    await _ensure_subject(db, subject_id)
     scope_type, owner_id = _resolve_scope(scope, current_user)
-    return await composition_service.create_composition(
-        db,
-        subject_id=subject_id,
-        scope_type=scope_type,
-        owner_id=owner_id,
-        actor=current_user,
-        title=payload.title,
-        description=payload.description,
-        folder_id=payload.folder_id,
+    return await capabilities.run(
+        "composition.create",
+        deps.api_context(db, current_user, subject_id=subject_id),
+        composition_caps.CompositionCreateInput(
+            subject_id=subject_id,
+            scope_type=scope_type,
+            owner_id=owner_id,
+            title=payload.title,
+            description=payload.description,
+            folder_id=payload.folder_id,
+        ),
     )
 
 
@@ -237,30 +235,25 @@ async def update_composition(
     scope: ScopeType = Query(...),
     current_user: models.User = Depends(deps.get_current_active_user),
 ) -> Any:
-    await _ensure_subject(db, subject_id)
     scope_type, owner_id = _resolve_scope(scope, current_user)
-    comp = await crud_composition.composition.get_scoped(
-        db,
-        composition_id=composition_id,
-        subject_id=subject_id,
-        scope_type=scope_type,
-        owner_id=owner_id,
-    )
-    if comp is None:
-        raise HTTPException(status_code=404, detail="Composition not found")
-    return await composition_service.update_composition(
-        db,
-        comp=comp,
-        actor=current_user,
-        expected_revision=payload.expected_revision,
-        title=payload.title,
-        description=payload.description,
-        status_value=payload.status.value if payload.status is not None else None,
-        folder_id=payload.folder_id,
-        folder_id_provided="folder_id" in payload.model_fields_set,
-        numbering_enabled=payload.numbering_enabled,
-        scoring_enabled=payload.scoring_enabled,
-        question_display=payload.question_display,
+    return await capabilities.run(
+        "composition.update",
+        deps.api_context(db, current_user, subject_id=subject_id),
+        composition_caps.CompositionUpdateInput(
+            subject_id=subject_id,
+            scope_type=scope_type,
+            owner_id=owner_id,
+            composition_id=composition_id,
+            expected_revision=payload.expected_revision,
+            title=payload.title,
+            description=payload.description,
+            status_value=payload.status.value if payload.status is not None else None,
+            folder_id=payload.folder_id,
+            folder_id_provided="folder_id" in payload.model_fields_set,
+            numbering_enabled=payload.numbering_enabled,
+            scoring_enabled=payload.scoring_enabled,
+            question_display=payload.question_display,
+        ),
     )
 
 
@@ -276,26 +269,20 @@ async def replace_composition_nodes(
     scope: ScopeType = Query(...),
     current_user: models.User = Depends(deps.get_current_active_user),
 ) -> Any:
-    await _ensure_subject(db, subject_id)
     scope_type, owner_id = _resolve_scope(scope, current_user)
-    comp = await crud_composition.composition.get_scoped(
-        db,
-        composition_id=composition_id,
-        subject_id=subject_id,
-        scope_type=scope_type,
-        owner_id=owner_id,
+    return await capabilities.run(
+        "composition.replace_nodes",
+        deps.api_context(db, current_user, subject_id=subject_id),
+        composition_caps.CompositionReplaceNodesInput(
+            subject_id=subject_id,
+            scope_type=scope_type,
+            owner_id=owner_id,
+            composition_id=composition_id,
+            expected_revision=payload.expected_revision,
+            batch_id=payload.batch_id,
+            items=payload.nodes,
+        ),
     )
-    if comp is None:
-        raise HTTPException(status_code=404, detail="Composition not found")
-    revision, nodes = await composition_service.replace_nodes(
-        db,
-        comp=comp,
-        actor=current_user,
-        expected_revision=payload.expected_revision,
-        batch_id=payload.batch_id,
-        items=payload.nodes,
-    )
-    return CompositionNodesReplaceResponse(revision=revision, nodes=nodes)
 
 
 @router.get(
@@ -335,25 +322,19 @@ async def sync_question_nodes(
     scope: ScopeType = Query(...),
     current_user: models.User = Depends(deps.get_current_active_user),
 ) -> Any:
-    await _ensure_subject(db, subject_id)
     scope_type, owner_id = _resolve_scope(scope, current_user)
-    comp = await crud_composition.composition.get_scoped(
-        db,
-        composition_id=composition_id,
-        subject_id=subject_id,
-        scope_type=scope_type,
-        owner_id=owner_id,
+    return await capabilities.run(
+        "composition.sync_question_nodes",
+        deps.api_context(db, current_user, subject_id=subject_id),
+        composition_caps.CompositionSyncNodesInput(
+            subject_id=subject_id,
+            scope_type=scope_type,
+            owner_id=owner_id,
+            composition_id=composition_id,
+            expected_revision=payload.expected_revision,
+            node_ids=payload.node_ids,
+        ),
     )
-    if comp is None:
-        raise HTTPException(status_code=404, detail="Composition not found")
-    revision, nodes = await composition_service.sync_question_nodes(
-        db,
-        comp=comp,
-        actor=current_user,
-        expected_revision=payload.expected_revision,
-        node_ids=payload.node_ids,
-    )
-    return CompositionQuestionNodesSyncResponse(revision=revision, nodes=nodes)
 
 
 @router.delete(
@@ -368,19 +349,17 @@ async def delete_composition(
     scope: ScopeType = Query(...),
     current_user: models.User = Depends(deps.get_current_active_user),
 ) -> None:
-    await _ensure_subject(db, subject_id)
     scope_type, owner_id = _resolve_scope(scope, current_user)
-    comp = await crud_composition.composition.get_scoped(
-        db,
-        composition_id=composition_id,
-        subject_id=subject_id,
-        scope_type=scope_type,
-        owner_id=owner_id,
-    )
-    if comp is None:
-        raise HTTPException(status_code=404, detail="Composition not found")
-    await composition_service.delete_composition(
-        db, comp=comp, actor=current_user, expected_revision=expected_revision
+    await capabilities.run(
+        "composition.delete",
+        deps.api_context(db, current_user, subject_id=subject_id),
+        composition_caps.CompositionRevisionInput(
+            subject_id=subject_id,
+            scope_type=scope_type,
+            owner_id=owner_id,
+            composition_id=composition_id,
+            expected_revision=expected_revision,
+        ),
     )
 
 
@@ -396,20 +375,17 @@ async def restore_composition(
     scope: ScopeType = Query(...),
     current_user: models.User = Depends(deps.get_current_active_user),
 ) -> Any:
-    await _ensure_subject(db, subject_id)
     scope_type, owner_id = _resolve_scope(scope, current_user)
-    comp = await crud_composition.composition.get_scoped(
-        db,
-        composition_id=composition_id,
-        subject_id=subject_id,
-        scope_type=scope_type,
-        owner_id=owner_id,
-        include_deleted=True,
-    )
-    if comp is None or comp.deleted_at is None:
-        raise HTTPException(status_code=404, detail="Composition not found")
-    return await composition_service.restore_composition(
-        db, comp=comp, actor=current_user, expected_revision=expected_revision
+    return await capabilities.run(
+        "composition.restore",
+        deps.api_context(db, current_user, subject_id=subject_id),
+        composition_caps.CompositionRevisionInput(
+            subject_id=subject_id,
+            scope_type=scope_type,
+            owner_id=owner_id,
+            composition_id=composition_id,
+            expected_revision=expected_revision,
+        ),
     )
 
 
@@ -425,18 +401,17 @@ async def duplicate_composition(
     scope: ScopeType = Query(...),
     current_user: models.User = Depends(deps.get_current_active_user),
 ) -> Any:
-    await _ensure_subject(db, subject_id)
     scope_type, owner_id = _resolve_scope(scope, current_user)
-    comp = await crud_composition.composition.get_scoped(
-        db,
-        composition_id=composition_id,
-        subject_id=subject_id,
-        scope_type=scope_type,
-        owner_id=owner_id,
+    return await capabilities.run(
+        "composition.duplicate",
+        deps.api_context(db, current_user, subject_id=subject_id),
+        composition_caps.CompositionRefInput(
+            subject_id=subject_id,
+            scope_type=scope_type,
+            owner_id=owner_id,
+            composition_id=composition_id,
+        ),
     )
-    if comp is None:
-        raise HTTPException(status_code=404, detail="Composition not found")
-    return await composition_service.duplicate_composition(db, source=comp, actor=current_user)
 
 
 # --------------------------------------------------------------------------- #
@@ -482,19 +457,18 @@ async def create_composition_version(
     scope: ScopeType = Query(...),
     current_user: models.User = Depends(deps.get_current_active_user),
 ) -> Any:
-    comp = await _scoped_composition_for_versions(
-        db,
-        subject_id=subject_id,
-        composition_id=composition_id,
-        scope=scope,
-        current_user=current_user,
-    )
-    return await composition_service.finalize_version(
-        db,
-        comp=comp,
-        actor=current_user,
-        expected_revision=payload.expected_revision,
-        label=payload.label,
+    scope_type, owner_id = _resolve_scope(scope, current_user)
+    return await capabilities.run(
+        "composition.finalize_version",
+        deps.api_context(db, current_user, subject_id=subject_id),
+        composition_caps.CompositionFinalizeInput(
+            subject_id=subject_id,
+            scope_type=scope_type,
+            owner_id=owner_id,
+            composition_id=composition_id,
+            expected_revision=payload.expected_revision,
+            label=payload.label,
+        ),
     )
 
 

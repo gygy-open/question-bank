@@ -22,6 +22,18 @@ UNGATED_ALLOWLIST: frozenset[str] = frozenset(
         "question.batch_create",
         "question.review",
         "question.batch_confirm",
+        # 组稿域整体尚未做学科隔离 / 角色门禁，只靠 scope/owner 可见性。
+        "composition.create_folder",
+        "composition.update_folder",
+        "composition.delete_folder",
+        "composition.create",
+        "composition.update",
+        "composition.replace_nodes",
+        "composition.sync_question_nodes",
+        "composition.delete",
+        "composition.restore",
+        "composition.duplicate",
+        "composition.finalize_version",
     }
 )
 
