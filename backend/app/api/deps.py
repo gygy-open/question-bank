@@ -8,7 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
 from app.core import permissions
-from app.core.permissions import Capability
+from app.core.permissions import Permission
 from app.crud import crud_user
 from app.db.session import SessionLocal
 from app.models.user import User
@@ -61,13 +61,13 @@ def get_current_active_superuser(current_user: CurrentUser) -> User:
 
 def require(
     user: User,
-    capability: Capability,
+    permission: Permission,
     *,
     subject_id: int | None = None,
     resource=None,
 ) -> None:
-    """能力断言:不满足则抛 403。端点内联调用,与现有 inline 鉴权风格一致。"""
-    if not permissions.can(user, capability, subject_id=subject_id, resource=resource):
+    """权限断言:不满足则抛 403。端点内联调用,与现有 inline 鉴权风格一致。"""
+    if not permissions.can(user, permission, subject_id=subject_id, resource=resource):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="The user doesn't have enough privileges",

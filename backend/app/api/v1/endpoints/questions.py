@@ -6,7 +6,7 @@ from sqlalchemy.orm import selectinload
 from app import crud, schemas, models
 from app.api import deps
 from app.core import permissions
-from app.core.permissions import Capability
+from app.core.permissions import Permission
 from app.crud.crud_question import is_question_visible
 from app.models.question import QuestionType, Question, QuestionStatus
 from app.models.import_task import ImportTask, ImportTaskStatus
@@ -24,7 +24,7 @@ def _can_delete_question(question, user) -> bool:
         return False
     if user.is_superuser or question.created_by == user.id:
         return True
-    return permissions.can(user, Capability.MANAGE_SUBJECT, subject_id=question.subject_id)
+    return permissions.can(user, Permission.MANAGE_SUBJECT, subject_id=question.subject_id)
 
 @router.get("", response_model=schemas.QuestionPage)
 async def read_questions(
@@ -111,7 +111,7 @@ async def create_question(
 ) -> Any:
     if not question_in.subject_id:
         question_in.subject_id = current_user.last_active_subject_id
-    deps.require(current_user, Capability.EDIT_QUESTION, subject_id=question_in.subject_id)
+    deps.require(current_user, Permission.EDIT_QUESTION, subject_id=question_in.subject_id)
     question = await crud.question.create_with_tags(db=db, obj_in=question_in, user_id=current_user.id)
     return question
 
@@ -255,7 +255,7 @@ async def update_question(
     if not is_question_visible(question, current_user):
         raise HTTPException(status_code=404, detail="Question not found")
 
-    deps.require(current_user, Capability.EDIT_QUESTION, subject_id=question.subject_id)
+    deps.require(current_user, Permission.EDIT_QUESTION, subject_id=question.subject_id)
 
     question = await crud.question.update_with_tags(db=db, db_obj=question, obj_in=question_in, user_id=current_user.id)
     return question

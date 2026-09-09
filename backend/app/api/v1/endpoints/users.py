@@ -107,7 +107,7 @@ async def read_my_permissions(
     ]
     capabilities = {
         str(m.subject_id): [
-            c.value for c in perm.capabilities_for(current_user, subject_id=m.subject_id)
+            c.value for c in perm.permissions_for(current_user, subject_id=m.subject_id)
         ]
         for m in current_user.subject_memberships
     }

@@ -3,7 +3,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from app import crud, schemas, models
 from app.api import deps
 from app.crud import crud_user
-from app.core.permissions import Capability
+from app.core.permissions import Permission
 
 router = APIRouter()
 
@@ -87,7 +87,7 @@ async def list_subject_members(
     subject_id: int,
     current_user: models.User = Depends(deps.get_current_active_user),
 ) -> Any:
-    deps.require(current_user, Capability.MANAGE_MEMBERS, subject_id=subject_id)
+    deps.require(current_user, Permission.MANAGE_MEMBERS, subject_id=subject_id)
     members = await crud.subject_member.list_by_subject(db, subject_id=subject_id)
     return [_member_out(m) for m in members]
 
@@ -101,7 +101,7 @@ async def set_subject_member(
     body: schemas.SubjectMemberSetRole,
     current_user: models.User = Depends(deps.get_current_active_user),
 ) -> Any:
-    deps.require(current_user, Capability.MANAGE_MEMBERS, subject_id=subject_id)
+    deps.require(current_user, Permission.MANAGE_MEMBERS, subject_id=subject_id)
     subject = await crud.subject.get(db=db, id=subject_id)
     if not subject:
         raise HTTPException(status_code=404, detail="Subject not found")
@@ -123,7 +123,7 @@ async def remove_subject_member(
     user_id: int,
     current_user: models.User = Depends(deps.get_current_active_user),
 ) -> Any:
-    deps.require(current_user, Capability.MANAGE_MEMBERS, subject_id=subject_id)
+    deps.require(current_user, Permission.MANAGE_MEMBERS, subject_id=subject_id)
     ok = await crud.subject_member.remove_member(db, user_id=user_id, subject_id=subject_id)
     if not ok:
         raise HTTPException(status_code=404, detail="Member not found")
