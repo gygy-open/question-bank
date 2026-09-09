@@ -2,7 +2,7 @@
 import pytest
 
 from app import capabilities
-from app.capabilities.base import Scope
+from app.capabilities.base import Authz, Scope
 from app.capabilities.errors import (
     Conflict,
     DomainError,
@@ -34,19 +34,34 @@ def test_every_capability_declares_an_input_model():
         assert hasattr(cap.input_model, "model_json_schema"), cap.name
 
 
+def test_permission_authz_declares_a_permission():
+    for cap in capabilities.all_capabilities():
+        if cap.authz is Authz.PERMISSION:
+            assert cap.permission is not None, cap.name
+        else:
+            assert cap.permission is None, f"{cap.name}: 非 PERMISSION 鉴权不应声明 permission"
+
+
 def test_ungated_capabilities_are_exactly_the_allowlist():
-    """permission=None 的能力必须在白名单里,且白名单不许有多余条目。
+    """authz=NONE 的能力必须在白名单里,且白名单不许有多余条目。
 
     集合相等(而非包含)是关键:新增一个漏权限的能力会失败,
     修好某个已知缺口后忘了摘白名单也会失败。
     """
-    ungated = {cap.name for cap in capabilities.all_capabilities() if cap.permission is None}
+    ungated = {cap.name for cap in capabilities.all_capabilities() if cap.authz is Authz.NONE}
     assert ungated == set(UNGATED_ALLOWLIST)
+
+
+def test_custom_authz_capabilities_do_their_own_checks():
+    """CUSTOM 要么覆写 authorize,要么在 execute 里逐条判 —— 总之不能是默认实现配空 permission。"""
+    for cap in capabilities.all_capabilities():
+        if cap.authz is Authz.CUSTOM:
+            assert cap.name not in UNGATED_ALLOWLIST, cap.name
 
 
 def test_subject_scoped_capabilities_are_gated_or_allowlisted():
     for cap in capabilities.all_capabilities():
-        if cap.scope is Scope.SUBJECT and cap.permission is None:
+        if cap.scope is Scope.SUBJECT and cap.authz is Authz.NONE:
             assert cap.name in UNGATED_ALLOWLIST, cap.name
 
 

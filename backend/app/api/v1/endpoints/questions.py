@@ -1,30 +1,17 @@
 from typing import Any, List, Optional
-from datetime import datetime
 from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy import select
-from sqlalchemy.orm import selectinload
 from app import crud, schemas, models
 from app.api import deps
-from app.core import permissions
-from app.core.permissions import Permission
+from app import capabilities
+from app.capabilities import questions as question_caps
 from app.crud.crud_question import is_question_visible
-from app.models.question import QuestionType, Question, QuestionStatus
+from app.models.question import QuestionType, QuestionStatus
 from app.models.import_task import ImportTask, ImportTaskStatus
-from app.services.question_service import question_service
 from app.services.importing.contracts import ImportDefaults
 from app.services.importing.normalize import question_importer
-from app.services.activity_logger import log_activity
 
 router = APIRouter()
 
-
-def _can_delete_question(question, user) -> bool:
-    """删除权限:创建者 / 学科负责人 / 超管,且需对该题可见。"""
-    if not is_question_visible(question, user):
-        return False
-    if user.is_superuser or question.created_by == user.id:
-        return True
-    return permissions.can(user, Permission.MANAGE_SUBJECT, subject_id=question.subject_id)
 
 @router.get("", response_model=schemas.QuestionPage)
 async def read_questions(
@@ -109,11 +96,9 @@ async def create_question(
     question_in: schemas.QuestionCreate,
     current_user: models.User = Depends(deps.get_current_active_user),
 ) -> Any:
-    if not question_in.subject_id:
-        question_in.subject_id = current_user.last_active_subject_id
-    deps.require(current_user, Permission.EDIT_QUESTION, subject_id=question_in.subject_id)
-    question = await crud.question.create_with_tags(db=db, obj_in=question_in, user_id=current_user.id)
-    return question
+    return await capabilities.run(
+        "question.create", deps.api_context(db, current_user), question_in
+    )
 
 @router.post("/batch", response_model=List[schemas.Question])
 async def create_questions_batch(
@@ -122,59 +107,9 @@ async def create_questions_batch(
     batch_in: schemas.QuestionBatchCreate,
     current_user: models.User = Depends(deps.get_current_active_user),
 ) -> Any:
-    if not batch_in.questions:
-        return []
-        
-    # Create Import Task
-    description = batch_in.filename if batch_in.filename else f"Batch import of {len(batch_in.questions)} questions"
-    
-    import_task = ImportTask(
-        user_id=current_user.id,
-        description=description,
-        source="smart_import",
-        file_path=batch_in.file_path or "virtual",
-        original_filename=batch_in.filename or "smart_import.json",
-        file_type="json",
-        status=ImportTaskStatus.COMPLETED
+    return await capabilities.run(
+        "question.batch_create", deps.api_context(db, current_user), batch_in
     )
-    db.add(import_task)
-    await db.commit()
-    await db.refresh(import_task)
-
-    created_questions = []
-    
-    async def create_recursive(question_in: schemas.QuestionCreate, parent_id: Optional[int] = None) -> models.Question:
-        # Handle children separately
-        children_in = question_in.children or []
-        
-        # Set parent_id if provided (overriding whatever was in question_in)
-        if parent_id is not None:
-            question_in.parent_id = parent_id
-            
-        if not question_in.subject_id:
-            question_in.subject_id = current_user.last_active_subject_id
-            
-        if not question_in.source and batch_in.filename:
-            question_in.source = batch_in.filename
-
-        question = await question_service.create_question(
-            db=db,
-            question_in=question_in,
-            user_id=current_user.id,
-            import_task_id=import_task.id
-        )
-        
-        # Process children
-        for child_in in children_in:
-            await create_recursive(child_in, parent_id=question.id)
-            
-        return question
-
-    for question_in in batch_in.questions:
-        question = await create_recursive(question_in)
-        created_questions.append(question)
-        
-    return created_questions
 
 @router.post("/batch-legacy", response_model=schemas.LegacyBatchResult)
 async def create_questions_batch_legacy(
@@ -249,16 +184,11 @@ async def update_question(
     question_in: schemas.QuestionUpdate,
     current_user: models.User = Depends(deps.get_current_active_user),
 ) -> Any:
-    question = await crud.question.get(db=db, id=id)
-    if not question:
-        raise HTTPException(status_code=404, detail="Question not found")
-    if not is_question_visible(question, current_user):
-        raise HTTPException(status_code=404, detail="Question not found")
-
-    deps.require(current_user, Permission.EDIT_QUESTION, subject_id=question.subject_id)
-
-    question = await crud.question.update_with_tags(db=db, db_obj=question, obj_in=question_in, user_id=current_user.id)
-    return question
+    return await capabilities.run(
+        "question.update",
+        deps.api_context(db, current_user),
+        question_caps.QuestionUpdateInput(id=id, data=question_in),
+    )
 
 @router.post("/{id}/review", response_model=schemas.Question)
 async def review_question(
@@ -268,37 +198,11 @@ async def review_question(
     review_in: schemas.QuestionReview,
     current_user: models.User = Depends(deps.get_current_active_user),
 ) -> Any:
-    question = await crud.question.get(db=db, id=id)
-    if not question:
-        raise HTTPException(status_code=404, detail="Question not found")
-
-    if review_in.action == "approve":
-        question.review_count = (question.review_count or 0) + 1
-        # 是否发布由后端依据学科所需审核次数决定，前端不感知审核进度。
-        required_count = question.subject.required_review_count if question.subject else 1
-        if question.review_count >= required_count:
-            question.status = QuestionStatus.PUBLISHED.value
-        elif question.status == QuestionStatus.DRAFT.value:
-            question.status = QuestionStatus.PENDING.value
-    else:
-        # 驳回:退回草稿重新编辑，审核次数清零重新计数。
-        question.status = QuestionStatus.DRAFT.value
-        question.review_count = 0
-
-    question.updated_by = current_user.id
-    db.add(question)
-
-    await log_activity(
-        db,
-        current_user.id,
-        action="review",
-        resource_type="question",
-        resource_id=id,
-        details={"action": review_in.action, "comment": review_in.comment, "resulting_status": question.status},
+    return await capabilities.run(
+        "question.review",
+        deps.api_context(db, current_user),
+        question_caps.QuestionReviewInput(id=id, data=review_in),
     )
-
-    await db.commit()
-    return await crud.question.get(db=db, id=id)
 
 @router.delete("/{id}", response_model=schemas.Question)
 async def delete_question(
@@ -307,21 +211,11 @@ async def delete_question(
     id: int,
     current_user: models.User = Depends(deps.get_current_active_user),
 ) -> Any:
-    question = await crud.question.get(db=db, id=id)
-    if not question:
-        raise HTTPException(status_code=404, detail="Question not found")
-
-    if not is_question_visible(question, current_user):
-        raise HTTPException(status_code=404, detail="Question not found")
-    if not _can_delete_question(question, current_user):
-        raise HTTPException(status_code=403, detail="Not enough permissions")
-
-    question = await crud.question.remove(db=db, id=id)
-    
-    # Log activity
-    await log_activity(db, current_user.id, action="delete", resource_type="question", resource_id=id, details={"message": f"Deleted question {id}"})
-    
-    return question
+    return await capabilities.run(
+        "question.delete",
+        deps.api_context(db, current_user),
+        question_caps.QuestionIdInput(id=id),
+    )
 
 @router.post("/batch-delete", response_model=Any)
 async def delete_questions_batch(
@@ -330,40 +224,9 @@ async def delete_questions_batch(
     delete_data: schemas.QuestionBatchDelete,
     current_user: models.User = Depends(deps.get_current_active_user),
 ) -> Any:
-    """
-    Batch delete questions.
-    """
-    if not delete_data.ids:
-        return {"message": "No question IDs provided.", "deleted_count": 0}
-
-    # Fetch questions to check permissions
-    stmt = select(Question).where(Question.id.in_(delete_data.ids), Question.deleted_at.is_(None))
-    result = await db.execute(stmt)
-    questions = result.scalars().all()
-
-    if not questions:
-        return {"message": "No questions found with provided IDs.", "deleted_count": 0}
-
-    deleted_count = 0
-    for question in questions:
-        if not _can_delete_question(question, current_user):
-            # Skip questions user doesn't have permission to delete
-            continue
-            
-        question.deleted_at = datetime.utcnow()
-        question.updated_by = current_user.id
-        db.add(question)
-        deleted_count += 1
-        
-        # Log activity
-        await log_activity(db, current_user.id, action="delete", resource_type="question", resource_id=question.id, details={"message": f"Batch deleted question {question.id}"})
-    
-    await db.commit()
-    
-    return {
-        "message": f"Successfully deleted {deleted_count} questions.",
-        "deleted_count": deleted_count
-    }
+    return await capabilities.run(
+        "question.batch_delete", deps.api_context(db, current_user), delete_data
+    )
 
 @router.post("/batch-update", response_model=Any)
 async def update_questions_batch(
@@ -372,40 +235,9 @@ async def update_questions_batch(
     update_data: schemas.QuestionBatchUpdate,
     current_user: models.User = Depends(deps.get_current_active_user),
 ) -> Any:
-    """
-    Batch update questions.
-    """
-    if not update_data.ids:
-        return {"message": "No question IDs provided.", "updated_count": 0}
-
-    # Fetch questions to check permissions
-    stmt = select(Question).where(Question.id.in_(update_data.ids), Question.deleted_at.is_(None))
-    result = await db.execute(stmt)
-    questions = result.scalars().all()
-
-    if not questions:
-        return {"message": "No questions found with provided IDs.", "updated_count": 0}
-
-    updated_count = 0
-    for question in questions:
-        if not current_user.is_superuser and question.created_by != current_user.id:
-            # Skip questions user doesn't have permission to update
-            continue
-            
-        if update_data.source is not None:
-            question.source = update_data.source
-            
-        updated_count += 1
-        
-        # Log activity
-        await log_activity(db, current_user.id, action="update", resource_type="question", resource_id=question.id, details={"message": f"Batch updated question {question.id}"})
-    
-    await db.commit()
-    
-    return {
-        "message": f"Successfully updated {updated_count} questions.",
-        "updated_count": updated_count
-    }
+    return await capabilities.run(
+        "question.batch_update", deps.api_context(db, current_user), update_data
+    )
 
 @router.post("/batch-confirm", response_model=Any)
 async def batch_confirm_questions(
@@ -414,38 +246,6 @@ async def batch_confirm_questions(
     confirm_data: schemas.QuestionBatchConfirm,
     current_user: models.User = Depends(deps.get_current_active_user),
 ) -> Any:
-    """
-    Batch confirm or reject question proposals.
-    """
-    if confirm_data.action not in ["approve", "reject"]:
-        raise HTTPException(status_code=400, detail="Invalid action. Must be 'approve' or 'reject'.")
-
-    if not confirm_data.question_ids:
-        return {"message": "No question IDs provided."}
-
-    # Fetch questions
-    stmt = select(Question).where(Question.id.in_(confirm_data.question_ids), Question.deleted_at.is_(None))
-    result = await db.execute(stmt)
-    questions = result.scalars().all()
-
-    if not questions:
-        raise HTTPException(status_code=404, detail="No questions found with provided IDs.")
-
-    processed_count = 0
-    for question in questions:
-        # Only process DRAFT questions to avoid accidental modification of existing questions
-        if question.status == QuestionStatus.DRAFT:
-            if confirm_data.action == "approve":
-                question.status = QuestionStatus.PENDING
-            elif confirm_data.action == "reject":
-                question.deleted_at = datetime.utcnow()
-                question.updated_by = current_user.id
-                db.add(question)
-            processed_count += 1
-    
-    await db.commit()
-    
-    return {
-        "message": f"Successfully {confirm_data.action}d {processed_count} questions.",
-        "processed_count": processed_count
-    }
+    return await capabilities.run(
+        "question.batch_confirm", deps.api_context(db, current_user), confirm_data
+    )

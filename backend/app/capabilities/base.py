@@ -36,11 +36,19 @@ class Scope(str, enum.Enum):
     GLOBAL = "global"    # 与学科无关
 
 
+class Authz(str, enum.Enum):
+    """鉴权方式。显式声明,才能在测试里把「故意自定义」与「完全无门禁」区分开。"""
+    PERMISSION = "permission"  # 由基类按 permission + scope 判定
+    CUSTOM = "custom"          # 能力自己判(如逐条判的批量操作)
+    NONE = "none"              # 已知缺口,必须登记在 UNGATED_ALLOWLIST
+
+
 class Capability(ABC, Generic[TInput, TOutput]):
     name: ClassVar[str]
     description: ClassVar[str]
     input_model: ClassVar[type[BaseModel]]
-    permission: ClassVar[Permission | None]
+    authz: ClassVar[Authz]
+    permission: ClassVar[Permission | None] = None
     scope: ClassVar[Scope]
     mutating: ClassVar[bool]
 
@@ -49,8 +57,9 @@ class Capability(ABC, Generic[TInput, TOutput]):
         return None
 
     async def authorize(self, ctx: ExecutionContext, inp: TInput, target: Any) -> None:
-        if self.permission is None:
+        if self.authz is not Authz.PERMISSION:
             return
+        assert self.permission is not None
         subject_id = self.subject_for(ctx, inp, target) if self.scope is Scope.SUBJECT else None
         if not permissions.can(ctx.actor, self.permission, subject_id=subject_id):
             raise Forbidden(FORBIDDEN_DETAIL)
