@@ -8,7 +8,8 @@ from app.models.chat import ChatSession as ChatSessionModel, ChatMessage as Chat
 from app.models.ai_config import AIModel
 from app.crud.crud_chat import chat_session, chat_message
 from app.services.ai_provider import get_ai_provider, ToolCall
-from app.services.tools import TOOLS_SCHEMA, TOOL_MAP
+from app.ai import tools as ai_tools
+from app.capabilities.context import ExecutionContext, Surface
 from app.services.prompt_utils import render_subject_prompt
 from app.services.prompts import CHAT_SYSTEM_PROMPT
 from app.models.subject import Subject
@@ -20,8 +21,6 @@ import aiofiles
 from typing import List, Dict, Any, Optional
 
 from app.models.user import User
-
-import re
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -192,7 +191,7 @@ async def chat_generator(session_id: str, new_user_message: ChatMessageCreate, m
         tool_calls = []
         current_content_buffer = ""
         
-        async for chunk in service_provider.chat_stream(ai_messages, provider_config, tools=TOOLS_SCHEMA):
+        async for chunk in service_provider.chat_stream(ai_messages, provider_config, tools=ai_tools.openai_schemas()):
             if isinstance(chunk, str):
                 content_buffer += chunk
                 current_content_buffer += chunk
@@ -244,35 +243,19 @@ async def chat_generator(session_id: str, new_user_message: ChatMessageCreate, m
             
             yield sse_pack("action", {"tool": tc.name, "input": args_obj})
 
-            tool_func = TOOL_MAP.get(tc.name)
-            if tool_func:
-                try:
-                    args = json.loads(tc.arguments)
-                    args["_user_id"] = current_user.id
-                    result = await tool_func(db, args)
-                except Exception as e:
-                    logger.error(f"Tool execution error: {e}")
-                    result = f"Error executing tool: {str(e)}"
-            else:
-                result = f"Error: Tool {tc.name} not found"
-            
-            # Check for proposal tags in result
-            str_result = str(result)
-            
-            # Parse [CONFIRM_IMPORT:id]
-            single_match = re.search(r"\[CONFIRM_IMPORT:(\d+)\]", str_result)
-            if single_match:
-                yield sse_pack("proposal", {"type": "single", "ids": [int(single_match.group(1))]})
-                
-            # Parse [CONFIRM_IMPORT_BATCH:ids]
-            batch_match = re.search(r"\[CONFIRM_IMPORT_BATCH:([\d,]+)\]", str_result)
-            if batch_match:
-                ids = [int(x) for x in batch_match.group(1).split(",")]
-                yield sse_pack("proposal", {"type": "batch", "ids": ids})
+            tool_ctx = ExecutionContext(
+                db=db, actor=current_user, surface=Surface.CHAT, subject_id=subject_id
+            )
+            result = await ai_tools.dispatch(tc.name, tool_ctx, args_obj if isinstance(args_obj, dict) else {})
+
+            # 结构化的 UI 指令(如题目导入确认卡片),替代此前在返回文本里塞
+            # [CONFIRM_IMPORT:id] 再正则抠出来的做法。
+            for directive in result.ui:
+                yield sse_pack(directive.kind, directive.payload)
 
             # Notify frontend about action result
             # We might want to truncate result if it's too long for the UI log
-            preview_result = str_result[:200] + "..." if len(str_result) > 200 else str_result
+            preview_result = result.content[:200] + "..." if len(result.content) > 200 else result.content
             yield sse_pack("action_result", {"tool": tc.name, "output": preview_result})
 
             # DO NOT Save tool result to DB as per user request
@@ -281,7 +264,7 @@ async def chat_generator(session_id: str, new_user_message: ChatMessageCreate, m
             ai_messages.append({
                 "role": "tool",
                 "tool_call_id": tc.id,
-                "content": str(result)
+                "content": result.content
             })
 
     # 6. Save final assistant message (if no tools or after tools)

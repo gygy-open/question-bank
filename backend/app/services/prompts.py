@@ -1,6 +1,6 @@
 """硬编码的对话系统提示词。
 
-工具调用策略与代码里注册的工具（app/services/tools.py 的 TOOLS_SCHEMA / TOOL_MAP）强耦合，
+工具调用策略与代码里注册的工具（app/ai/tools 注册表）强耦合，
 属于代码契约而非用户配置，因此写死在这里、随代码演进，不放入可编辑的 system_settings。
 人设部分保留 {subject_name}/{subject_description} 占位符，运行时用 render_subject_prompt 注入。
 """
