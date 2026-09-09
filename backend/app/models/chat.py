@@ -21,10 +21,12 @@ class ChatMessage(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     session_id = Column(String(36), ForeignKey("chat_sessions.id"), nullable=False)
-    role = Column(String(50), nullable=False)  # user, assistant, system
+    role = Column(String(50), nullable=False)  # user, assistant, system, tool
     content = Column(Text, nullable=True)
     images = Column(JSON, nullable=True)  # List of file paths
     tool_calls = Column(JSON, nullable=True) # Store tool calls
+    tool_call_id = Column(String(64), nullable=True)  # role=tool 时回指发起调用的 tool_call
+    run_id = Column(String(36), ForeignKey("agent_runs.id"), nullable=True, index=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
     session = relationship("ChatSession", back_populates="messages")

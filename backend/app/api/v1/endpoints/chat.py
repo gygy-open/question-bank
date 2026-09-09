@@ -4,17 +4,18 @@ from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 from app.api import deps
 from app.schemas.chat import ChatRequest, ChatSession, ChatSessionCreate, ChatSessionUpdate, ChatMessageCreate, ChatMessage, ChatSessionSummary, ChatMessageUpdate
-from app.models.chat import ChatSession as ChatSessionModel, ChatMessage as ChatMessageModel
+from app.models.chat import ChatMessage as ChatMessageModel
 from app.models.ai_config import AIModel
 from app.crud.crud_chat import chat_session, chat_message
-from app.services.ai_provider import get_ai_provider, ToolCall
-from app.ai import tools as ai_tools
+from app.services.ai_provider import get_ai_provider
+from app.ai.adapters.sse import sse_pack, to_sse
+from app.ai.events import AssistantTurn, RunFinished, ToolCallFinished
+from app.ai.runtime import AgentRunner
 from app.capabilities.context import ExecutionContext, Surface
 from app.services.prompt_utils import render_subject_prompt
 from app.services.prompts import CHAT_SYSTEM_PROMPT
 from app.models.subject import Subject
 from fastapi.responses import StreamingResponse
-import json
 import logging
 import base64
 import aiofiles
@@ -25,8 +26,8 @@ from app.models.user import User
 logger = logging.getLogger(__name__)
 router = APIRouter()
 
-def sse_pack(event: str, data: Any) -> str:
-    return f"event: {event}\ndata: {json.dumps(data, ensure_ascii=False)}\n\n"
+# 只有最近这么多个 run 的工具结果保留完整内容,更早的截断,防止历史无限膨胀。
+_FULL_TOOL_RESULT_RUNS = 2
 
 async def get_image_base64(file_path: str) -> str:
     try:
@@ -93,48 +94,41 @@ async def generate_session_title(session_id: str, messages: List[Dict], db: Asyn
     except Exception as e:
         logger.error(f"Error generating title for session {session_id}: {e}")
 
-async def chat_generator(session_id: str, new_user_message: ChatMessageCreate, model_id: int, db: AsyncSession, current_user: User, background_tasks: BackgroundTasks, subject_id: Optional[int] = None):
-    # 1. Save user message
-    user_msg_data = new_user_message.model_dump()
-    user_msg_data["session_id"] = session_id
-    user_msg = await chat_message.create(db, obj_in=user_msg_data)
-    
-    # Send user message ID to frontend
-    yield sse_pack("message_meta", {"role": "user", "id": user_msg.id})
-    
-    # 2. Fetch history
-    # We need to fetch all messages for the session to send context
-    # But we should probably limit context window? For now, send all.
-    history = await chat_message.get_by_session(db, session_id=session_id)
-    
-    # 3. Prepare messages for AI
-    ai_messages = []
-    
-    # Inject System Prompt to control tool usage.
+async def build_provider_messages(
+    db: AsyncSession, *, session_id: str, subject: Optional[Subject]
+) -> List[Dict[str, Any]]:
+    """把落库的会话重建成 provider 的 messages。
+
+    工具调用与工具结果都在库里(role=assistant 带 tool_calls / role=tool),成对还原,
+    模型才看得见自己上一轮做过什么。此前它们只活在内存、重建时被整条跳过,
+    导致多轮对话里 AI 反复重复同一次工具调用。
+
+    上下文压缩:只有最近 _FULL_TOOL_RESULT_RUNS 个 run 保留完整工具结果,
+    更早的截断成一行占位,避免历史无限膨胀。
+    """
     # 工具调用策略与已注册工具强耦合，硬编码随代码演进，不做成用户可编辑配置。
-    system_prompt = CHAT_SYSTEM_PROMPT
+    system_prompt = render_subject_prompt(CHAT_SYSTEM_PROMPT, subject)
+    messages: List[Dict[str, Any]] = [{"role": "system", "content": system_prompt}]
 
-    # Resolve subject placeholders so one generic template fits any subject
-    subject = None
-    if subject_id:
-        subj_res = await db.execute(select(Subject).where(Subject.id == subject_id))
-        subject = subj_res.scalar_one_or_none()
-    system_prompt = render_subject_prompt(system_prompt, subject)
-
-    ai_messages.append({"role": "system", "content": system_prompt})
+    history = await chat_message.get_by_session(db, session_id=session_id)
+    recent_runs = _recent_run_ids(history)
 
     for msg in history:
-        # Skip messages with tool_calls because we don't save the corresponding tool responses
-        # This prevents the "tool_calls must be followed by tool messages" error
-        if msg.tool_calls:
+        if msg.role == "tool":
+            content = msg.content or ""
+            if msg.run_id not in recent_runs:
+                content = "[工具已执行，结果已省略]"
+            messages.append({
+                "role": "tool",
+                "tool_call_id": msg.tool_call_id,
+                "content": content,
+            })
             continue
-            
-        message_dict = {
-            "role": msg.role,
-            "content": msg.content,
-        }
+
+        message_dict: Dict[str, Any] = {"role": msg.role, "content": msg.content}
+        if msg.tool_calls:
+            message_dict["tool_calls"] = msg.tool_calls
         if msg.images:
-            # Convert file paths to base64
             images_b64 = []
             for img_path in msg.images:
                 b64 = await get_image_base64(img_path)
@@ -142,28 +136,36 @@ async def chat_generator(session_id: str, new_user_message: ChatMessageCreate, m
                     images_b64.append(b64)
             if images_b64:
                 message_dict["images"] = images_b64
-        
-        if msg.tool_calls:
-             message_dict["tool_calls"] = msg.tool_calls
-             
-        # If this message has tool calls, we MUST skip it if we don't have the corresponding tool responses
-        # Because we decided NOT to save tool responses to DB.
-        # So if we load a message with tool_calls from DB, the next messages in DB will NOT be the tool responses.
-        # This breaks the conversation history for the AI provider (it expects tool_calls -> tool response).
-        
-        # Solution: If we encounter a message with tool_calls in history, we should probably filter it out 
-        # OR we should have saved the tool responses.
-        # Since the user requested NOT to save tool responses, we must also NOT save the tool call request itself to DB
-        # to maintain consistency.
-        
-        # Let's check where we save the assistant message with tool calls.
-        # It's in the loop below: `await chat_message.create(db, obj_in=assistant_msg_data)`
-        
-        # We should modify that part to NOT save if it has tool calls.
-        
-        ai_messages.append(message_dict)
+        messages.append(message_dict)
 
-    # 4. Get Provider
+    return messages
+
+
+def _recent_run_ids(history: List[ChatMessageModel]) -> set:
+    seen = []
+    for msg in reversed(history):
+        if msg.run_id and msg.run_id not in seen:
+            seen.append(msg.run_id)
+        if len(seen) >= _FULL_TOOL_RESULT_RUNS:
+            break
+    return set(seen)
+
+
+async def chat_generator(session_id: str, new_user_message: ChatMessageCreate, model_id: int, db: AsyncSession, current_user: User, background_tasks: BackgroundTasks, subject_id: Optional[int] = None):
+    user_msg_data = new_user_message.model_dump()
+    user_msg_data["session_id"] = session_id
+    user_msg = await chat_message.create(db, obj_in=user_msg_data)
+    yield sse_pack("message_meta", {"role": "user", "id": user_msg.id})
+
+    history_len = len(await chat_message.get_by_session(db, session_id=session_id))
+
+    subject = None
+    if subject_id:
+        subj_res = await db.execute(select(Subject).where(Subject.id == subject_id))
+        subject = subj_res.scalar_one_or_none()
+
+    ai_messages = await build_provider_messages(db, session_id=session_id, subject=subject)
+
     result = await db.execute(
         select(AIModel)
         .options(selectinload(AIModel.provider))
@@ -174,132 +176,61 @@ async def chat_generator(session_id: str, new_user_message: ChatMessageCreate, m
         yield "Error: Model not found"
         return
 
-    provider_config = {}
-    provider_config["MODEL_NAME"] = ai_model.name
-    provider_config["API_KEY"] = ai_model.provider.api_key
+    provider_config = {
+        "MODEL_NAME": ai_model.name,
+        "API_KEY": ai_model.provider.api_key,
+    }
     if ai_model.provider.base_url:
         provider_config["BASE_URL"] = ai_model.provider.base_url
-    
+
     service_provider = get_ai_provider(ai_model.provider.interface_type)
+    runner = AgentRunner(service_provider, provider_config)
+    ctx = ExecutionContext(
+        db=db, actor=current_user, surface=Surface.CHAT, subject_id=subject_id
+    )
 
-    # 5. Stream response
-    content_buffer = ""
-    tool_calls = []
-    
-    # Limit max turns to prevent infinite loops
-    for _ in range(5):
-        tool_calls = []
-        current_content_buffer = ""
-        
-        async for chunk in service_provider.chat_stream(ai_messages, provider_config, tools=ai_tools.openai_schemas()):
-            if isinstance(chunk, str):
-                content_buffer += chunk
-                current_content_buffer += chunk
-                yield sse_pack("message", chunk)
-            elif isinstance(chunk, ToolCall):
-                tool_calls.append(chunk)
-        
-        if not tool_calls:
-            break
-            
-        # Handle tool calls (same as before)
-        # ... (omitted for brevity, but should be included if we support tools in sessions)
-        # For now, let's assume we just want basic chat, but if tools are used, we need to save them too.
-        
-        # Save assistant message with tool calls
-        assistant_msg_data = {
-            "session_id": session_id,
-            "role": "assistant",
-            "content": current_content_buffer if current_content_buffer else None,
-            "tool_calls": [tc.model_dump() for tc in tool_calls]
-        }
-        # DO NOT Save assistant message with tool calls to DB as per user request
-        # await chat_message.create(db, obj_in=assistant_msg_data)
-        
-        # Add to ai_messages for next turn
-        ai_messages.append({
-            "role": "assistant",
-            "content": current_content_buffer,
-            "tool_calls": [
-                {
-                    "id": tc.id,
-                    "type": "function",
-                    "function": {
-                        "name": tc.name,
-                        "arguments": tc.arguments
-                    },
-                    "metadata": tc.metadata
-                } for tc in tool_calls
-            ]
-        })
-
-        # Execute tools
-        for tc in tool_calls:
-            # Notify frontend about action start
-            try:
-                args_obj = json.loads(tc.arguments)
-            except:
-                args_obj = tc.arguments
-            
-            yield sse_pack("action", {"tool": tc.name, "input": args_obj})
-
-            tool_ctx = ExecutionContext(
-                db=db, actor=current_user, surface=Surface.CHAT, subject_id=subject_id
-            )
-            result = await ai_tools.dispatch(tc.name, tool_ctx, args_obj if isinstance(args_obj, dict) else {})
-
-            # 结构化的 UI 指令(如题目导入确认卡片),替代此前在返回文本里塞
-            # [CONFIRM_IMPORT:id] 再正则抠出来的做法。
-            for directive in result.ui:
-                yield sse_pack(directive.kind, directive.payload)
-
-            # Notify frontend about action result
-            # We might want to truncate result if it's too long for the UI log
-            preview_result = result.content[:200] + "..." if len(result.content) > 200 else result.content
-            yield sse_pack("action_result", {"tool": tc.name, "output": preview_result})
-
-            # DO NOT Save tool result to DB as per user request
-            # We only keep it in memory for the current turn context
-            
-            ai_messages.append({
-                "role": "tool",
-                "tool_call_id": tc.id,
-                "content": result.content
+    final_text = ""
+    async for event in runner.run(
+        ctx, ai_messages, session_id=session_id, model_id=model_id
+    ):
+        # 工具往返落库,供下一轮重建上下文;它们不进用户可见的对话记录(见 API 层过滤)。
+        if isinstance(event, AssistantTurn):
+            await chat_message.create(db, obj_in={
+                "session_id": session_id,
+                "role": "assistant",
+                "content": event.text or None,
+                "tool_calls": event.tool_calls,
+                "run_id": event.run_id,
             })
+        elif isinstance(event, ToolCallFinished):
+            await chat_message.create(db, obj_in={
+                "session_id": session_id,
+                "role": "tool",
+                "content": event.content,
+                "tool_call_id": event.tool_call_id,
+                "run_id": event.run_id,
+            })
+        elif isinstance(event, RunFinished):
+            final_text = event.text if event.stop_reason == "completed" else ""
 
-    # 6. Save final assistant message (if no tools or after tools)
-    # If we had tool calls, we already saved the intermediate messages.
-    # If we didn't have tool calls, we need to save the content.
-    # Or if we finished the loop.
-    
-    # Actually, the loop logic above saves assistant message ONLY if there are tool calls.
-    # We need to save the final response.
-    
-    if content_buffer and not tool_calls:
-         assistant_msg = await chat_message.create(db, obj_in={
+        for frame in to_sse(event):
+            yield frame
+
+    if final_text:
+        assistant_msg = await chat_message.create(db, obj_in={
             "session_id": session_id,
             "role": "assistant",
-            "content": content_buffer
+            "content": final_text,
         })
-         yield sse_pack("message_meta", {"role": "assistant", "id": assistant_msg.id})
-    
+        yield sse_pack("message_meta", {"role": "assistant", "id": assistant_msg.id})
+
     yield sse_pack("done", {})
 
-    # 7. Generate Title if needed
-    # Check if this is the first exchange (2 messages: 1 user, 1 assistant)
-    # We can check the length of history before we added the new user message.
-    # If history was empty, then now we have 1 user + 1 assistant (after this finishes).
-    if len(history) == 1: # history includes the user message we just added? No, get_by_session was called after adding user msg.
-        # So history has 1 message (the user message).
-        # After this response, we have 2.
-        # So we can trigger title generation.
-        # We need to pass the messages to the background task.
-        # The messages are: history[0] (user) and the content_buffer (assistant).
-        
-        # We need to reconstruct the messages for the title generator
+    # 首轮问答后自动起标题(此时库里只有刚存的那条用户消息)。
+    if history_len == 1:
         msgs_for_title = [
-            {"role": "user", "content": history[0].content},
-            {"role": "assistant", "content": content_buffer}
+            {"role": "user", "content": user_msg.content},
+            {"role": "assistant", "content": final_text},
         ]
         background_tasks.add_task(generate_session_title, session_id, msgs_for_title, db, service_provider, provider_config)
 
@@ -331,11 +262,12 @@ async def get_session(
     current_user: User = Depends(deps.get_current_active_user),
 ):
     """Get a chat session."""
-    session = await chat_session.get_with_messages(db, id=session_id)
+    session = await chat_session.get(db, id=session_id)
     if not session:
         raise HTTPException(status_code=404, detail="Session not found")
     if session.user_id != current_user.id:
         raise HTTPException(status_code=403, detail="Not authorized")
+    session.messages = await chat_message.get_transcript(db, session_id=session_id)
     return session
 
 @router.patch("/sessions/{session_id}", response_model=ChatSessionSummary)

@@ -12,6 +12,7 @@ from .system_setting import SystemSetting
 from .subject_prompt import SubjectPrompt
 from .ai_config import AIProvider, AIModel
 from .chat import ChatSession, ChatMessage
+from .agent import AgentRun, AgentStep
 from .prompt import PromptTemplate
 from .paper import Paper, PaperQuestion
 from .composition import (
