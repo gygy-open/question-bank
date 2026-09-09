@@ -6,6 +6,7 @@ from jose import jwt, JWTError
 from pydantic import ValidationError
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.capabilities.context import ExecutionContext, Surface
 from app.core.config import settings
 from app.core import permissions
 from app.core.permissions import Permission
@@ -72,3 +73,13 @@ def require(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="The user doesn't have enough privileges",
         )
+
+
+def api_context(
+    db: AsyncSession,
+    user: User,
+    *,
+    subject_id: int | None = None,
+) -> ExecutionContext:
+    """HTTP 入口的能力执行上下文。"""
+    return ExecutionContext(db=db, actor=user, surface=Surface.API, subject_id=subject_id)

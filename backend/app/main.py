@@ -11,6 +11,7 @@ from fastapi.responses import JSONResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
 from app._version import __version__
 from app.api.v1.api import api_router
+from app.capabilities.errors import DomainError, status_for
 from app.core.config import settings, is_configured
 from app.services.embedding import reload_embedding_function
 
@@ -30,6 +31,12 @@ async def lifespan(app: FastAPI):
     # Shutdown
 
 app = FastAPI(title="Question Bank API", version=__version__, lifespan=lifespan)
+
+
+@app.exception_handler(DomainError)
+async def domain_error_handler(_request: Request, exc: DomainError) -> JSONResponse:
+    """领域错误 → HTTP。端点因此可以直接 await capabilities.run(...) 而不用 try/except。"""
+    return JSONResponse(status_code=status_for(exc), content={"detail": exc.detail})
 
 
 _SETUP_PREFIX = f"{settings.API_V1_STR}/setup"
