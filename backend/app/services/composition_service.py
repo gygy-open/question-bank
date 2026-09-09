@@ -11,18 +11,20 @@
 - 版本冲突 / 删除非空目录 → 409。
 - 结构非法(自引用父、祖先环、AST 违规)→ 400。
 - 引用题目缺失/跨学科 → 422。
+载体是 `app.capabilities.errors` 的 DomainError,不是 HTTPException —— 同一套逻辑
+要能被 AI 工具与 worker 调用;状态码由 app.main 的 exception handler 映射。
 """
 from collections import defaultdict
 from datetime import datetime
 from typing import Any, Dict, List, Optional
 import uuid
 
-from fastapi import HTTPException, status
 from pydantic import ValidationError
 from sqlalchemy import delete, select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.capabilities.errors import Conflict, Invalid, NotFound, Unprocessable
 from app.crud import crud_composition
 from app.models.composition import (
     BODY_SLOT,
@@ -55,20 +57,20 @@ SNAPSHOT_SCHEMA_VERSION = 2
 # --------------------------------------------------------------------------- #
 # 内部工具
 # --------------------------------------------------------------------------- #
-def _not_found(what: str) -> HTTPException:
-    return HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"{what} not found")
+def _not_found(what: str) -> NotFound:
+    return NotFound(f"{what} not found")
 
 
-def _conflict(detail: str) -> HTTPException:
-    return HTTPException(status_code=status.HTTP_409_CONFLICT, detail=detail)
+def _conflict(detail: str) -> Conflict:
+    return Conflict(detail)
 
 
-def _bad_request(detail: str) -> HTTPException:
-    return HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=detail)
+def _bad_request(detail: str) -> Invalid:
+    return Invalid(detail)
 
 
-def _unprocessable(detail: str) -> HTTPException:
-    return HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=detail)
+def _unprocessable(detail: str) -> Unprocessable:
+    return Unprocessable(detail)
 
 
 async def _resolve_scoped_parent(
