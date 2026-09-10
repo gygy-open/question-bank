@@ -4,9 +4,10 @@
 输入的收敛;解析结果作为入参传进来。subject 存在性与 scoped 可见性判定属于领域前置条件,
 放在各能力的 `load` 里。
 
-鉴权现状:组稿域历史上就没有 Permission 门禁(只要求登录),本期只做搬迁不改行为,
-因此全部声明 `Authz.NONE` 并登记在 UNGATED_ALLOWLIST。补门禁需要同时给既有组稿测试
-补学科成员关系,另开一期。
+鉴权:组稿写路径统一按学科作用域的 EDIT_QUESTION 判权。personal 稿也不例外 ——
+归属某个学科的稿件就应该要求该学科的成员身份,owner_id 只决定可见性不决定权限。
+注意 `load` 先于 `authorize`,所以跨学科/跨 scope 仍是 404(不可见),仅已定位到实体
+但权限不够时才是 403。
 """
 from __future__ import annotations
 
@@ -15,6 +16,7 @@ from typing import Any, Dict, List, Optional
 from pydantic import BaseModel
 
 from app import crud
+from app.core.permissions import Permission
 from app.crud import crud_composition
 from app.models.composition import Composition, Folder, ScopeType
 from app.schemas.composition import (
@@ -100,7 +102,8 @@ class CreateFolder(Capability[FolderCreateInput, Folder]):
     name = "composition.create_folder"
     description = "在指定学科与范围下新建组稿目录。"
     input_model = FolderCreateInput
-    authz = Authz.NONE
+    authz = Authz.PERMISSION
+    permission = Permission.EDIT_QUESTION
     scope = Scope.SUBJECT
     mutating = True
 
@@ -124,7 +127,8 @@ class UpdateFolder(Capability[FolderUpdateInput, Folder]):
     name = "composition.update_folder"
     description = "重命名组稿目录或将其移动到另一个父目录。"
     input_model = FolderUpdateInput
-    authz = Authz.NONE
+    authz = Authz.PERMISSION
+    permission = Permission.EDIT_QUESTION
     scope = Scope.SUBJECT
     mutating = True
 
@@ -147,7 +151,8 @@ class DeleteFolder(Capability[FolderRefInput, None]):
     name = "composition.delete_folder"
     description = "删除组稿目录;目录非空时拒绝。"
     input_model = FolderRefInput
-    authz = Authz.NONE
+    authz = Authz.PERMISSION
+    permission = Permission.EDIT_QUESTION
     scope = Scope.SUBJECT
     mutating = True
 
@@ -204,7 +209,8 @@ class CreateComposition(Capability[CompositionCreateInput, Composition]):
     name = "composition.create"
     description = "新建一份稿件(试卷草稿)。"
     input_model = CompositionCreateInput
-    authz = Authz.NONE
+    authz = Authz.PERMISSION
+    permission = Permission.EDIT_QUESTION
     scope = Scope.SUBJECT
     mutating = True
 
@@ -231,7 +237,8 @@ class UpdateComposition(Capability[CompositionUpdateInput, Composition]):
     name = "composition.update"
     description = "更新稿件元信息(标题/描述/状态/所在目录/编号与分值开关/题目字段显示)。"
     input_model = CompositionUpdateInput
-    authz = Authz.NONE
+    authz = Authz.PERMISSION
+    permission = Permission.EDIT_QUESTION
     scope = Scope.SUBJECT
     mutating = True
 
@@ -262,7 +269,8 @@ class ReplaceCompositionNodes(Capability[CompositionReplaceNodesInput, Compositi
     name = "composition.replace_nodes"
     description = "整份替换稿件的节点树(排版内容)。带乐观锁,revision 不匹配会冲突。"
     input_model = CompositionReplaceNodesInput
-    authz = Authz.NONE
+    authz = Authz.PERMISSION
+    permission = Permission.EDIT_QUESTION
     scope = Scope.SUBJECT
     mutating = True
 
@@ -290,7 +298,8 @@ class SyncCompositionQuestionNodes(
     name = "composition.sync_question_nodes"
     description = "把稿件里已过期的题目节点重新同步为题库中的最新内容。"
     input_model = CompositionSyncNodesInput
-    authz = Authz.NONE
+    authz = Authz.PERMISSION
+    permission = Permission.EDIT_QUESTION
     scope = Scope.SUBJECT
     mutating = True
 
@@ -315,7 +324,8 @@ class DeleteComposition(Capability[CompositionRevisionInput, None]):
     name = "composition.delete"
     description = "软删除一份稿件。"
     input_model = CompositionRevisionInput
-    authz = Authz.NONE
+    authz = Authz.PERMISSION
+    permission = Permission.EDIT_QUESTION
     scope = Scope.SUBJECT
     mutating = True
 
@@ -335,7 +345,8 @@ class RestoreComposition(Capability[CompositionRevisionInput, Composition]):
     name = "composition.restore"
     description = "从回收站恢复一份被软删除的稿件。"
     input_model = CompositionRevisionInput
-    authz = Authz.NONE
+    authz = Authz.PERMISSION
+    permission = Permission.EDIT_QUESTION
     scope = Scope.SUBJECT
     mutating = True
 
@@ -358,7 +369,8 @@ class DuplicateComposition(Capability[CompositionRefInput, Composition]):
     name = "composition.duplicate"
     description = "创建一份稿件的副本(节点内容按原样复制,不重新同步题目)。"
     input_model = CompositionRefInput
-    authz = Authz.NONE
+    authz = Authz.PERMISSION
+    permission = Permission.EDIT_QUESTION
     scope = Scope.SUBJECT
     mutating = True
 
@@ -378,7 +390,8 @@ class FinalizeCompositionVersion(Capability[CompositionFinalizeInput, Any]):
     name = "composition.finalize_version"
     description = "定稿:冻结当前节点树为一个不可变版本快照。"
     input_model = CompositionFinalizeInput
-    authz = Authz.NONE
+    authz = Authz.PERMISSION
+    permission = Permission.EDIT_QUESTION
     scope = Scope.SUBJECT
     mutating = True
 

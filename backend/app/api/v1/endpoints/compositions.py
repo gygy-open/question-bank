@@ -15,6 +15,7 @@ from app import crud, models
 from app.api import deps
 from app import capabilities
 from app.capabilities import compositions as composition_caps
+from app.core.permissions import Permission
 from app.crud import crud_composition
 from app.models.composition import ScopeType
 from app.schemas.composition import (
@@ -53,10 +54,14 @@ def _resolve_scope(
     return scope, None
 
 
-async def _ensure_subject(db: deps.SessionDep, subject_id: int) -> None:
+async def _require_subject_access(
+    db: deps.SessionDep, subject_id: int, current_user: models.User
+) -> None:
+    """组稿读路径的统一门禁。与 capability 层同序:先 404 学科不存在,再 403 无成员身份。"""
     subject = await crud.subject.get(db, id=subject_id)
     if not subject:
         raise HTTPException(status_code=404, detail="Subject not found")
+    deps.require(current_user, Permission.VIEW_QUESTION, subject_id=subject_id)
 
 
 # --------------------------------------------------------------------------- #
@@ -69,7 +74,7 @@ async def list_folders(
     scope: ScopeType = Query(...),
     current_user: models.User = Depends(deps.get_current_active_user),
 ) -> Any:
-    await _ensure_subject(db, subject_id)
+    await _require_subject_access(db, subject_id, current_user)
     scope_type, owner_id = _resolve_scope(scope, current_user)
     return await crud_composition.folder.list_scoped(
         db, subject_id=subject_id, scope_type=scope_type, owner_id=owner_id
@@ -159,7 +164,7 @@ async def list_compositions(
     keyword: Optional[str] = None,
     current_user: models.User = Depends(deps.get_current_active_user),
 ) -> Any:
-    await _ensure_subject(db, subject_id)
+    await _require_subject_access(db, subject_id, current_user)
     scope_type, owner_id = _resolve_scope(scope, current_user)
     return await crud_composition.composition.list_scoped(
         db,
@@ -210,7 +215,7 @@ async def get_composition(
     include_deleted: bool = False,
     current_user: models.User = Depends(deps.get_current_active_user),
 ) -> Any:
-    await _ensure_subject(db, subject_id)
+    await _require_subject_access(db, subject_id, current_user)
     scope_type, owner_id = _resolve_scope(scope, current_user)
     comp = await crud_composition.composition.get_scoped(
         db,
@@ -296,7 +301,7 @@ async def get_question_revisions(
     scope: ScopeType = Query(...),
     current_user: models.User = Depends(deps.get_current_active_user),
 ) -> Any:
-    await _ensure_subject(db, subject_id)
+    await _require_subject_access(db, subject_id, current_user)
     scope_type, owner_id = _resolve_scope(scope, current_user)
     comp = await crud_composition.composition.get_scoped(
         db,
@@ -429,7 +434,7 @@ async def _scoped_composition_for_versions(
 
     软删除稿仍可见(允许查看历史版本);是否允许新定稿由 service 层进一步裁决。
     """
-    await _ensure_subject(db, subject_id)
+    await _require_subject_access(db, subject_id, current_user)
     scope_type, owner_id = _resolve_scope(scope, current_user)
     comp = await crud_composition.composition.get_scoped(
         db,
