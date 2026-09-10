@@ -353,6 +353,7 @@ const sendMessage = async () => {
 
         // 3. Stream response.
         const token = useCookie('token').value
+        const aiScene = useAiScene()
         const response = await fetch(`/api/v1/chat/sessions/${currentSessionId.value}/messages`, {
             method: 'POST',
             headers: {
@@ -367,6 +368,8 @@ const sendMessage = async () => {
                     images: uploadedImagePaths.length > 0 ? uploadedImagePaths : undefined,
                 },
                 subject_id: useSubjectContext().currentSubjectId.value ?? undefined,
+                scene: aiScene.scene.value ?? undefined,
+                scene_context: aiScene.context.value ?? undefined,
                 stream: true,
             }),
         })
@@ -415,6 +418,12 @@ const sendMessage = async () => {
                         }
                     } else if (event === 'proposal') {
                         last.proposal = data
+                    } else if (event === 'client_tool') {
+                        // Fire-and-forget: the backend is parked on a ticket with its own
+                        // timeout, so awaiting here would stall SSE reading.
+                        if (!last.actions) last.actions = []
+                        last.actions.push({ tool: data.tool, input: data.input, status: 'running' })
+                        useAiClientTools().handleRequest(data)
                     } else if (event === 'message_meta') {
                         if (data.role === 'user' && messages.value.length >= 2) {
                             messages.value[messages.value.length - 2].id = data.id

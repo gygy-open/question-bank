@@ -41,6 +41,19 @@ class ToolCallFinished(BaseModel):
     ui: List[UIDirective] = Field(default_factory=list)
 
 
+class ClientToolRequested(BaseModel):
+    """请前端执行一个工具,并把结果回传到 `ticket`。
+
+    必须是独立事件而不是 `UIDirective`:directive 只在 ToolCallFinished 里发出,
+    而前端工具必须在「开始等待之前」就把请求推出去。"""
+    type: Literal["client_tool.requested"] = "client_tool.requested"
+    run_id: str
+    tool_call_id: str
+    name: str
+    arguments: Any
+    ticket: str
+
+
 class RunFinished(BaseModel):
     type: Literal["run.finished"] = "run.finished"
     run_id: str
@@ -55,5 +68,11 @@ class RunFailed(BaseModel):
 
 
 AgentEvent = Union[
-    TextDelta, ToolCallStarted, AssistantTurn, ToolCallFinished, RunFinished, RunFailed
+    TextDelta,
+    ToolCallStarted,
+    AssistantTurn,
+    ToolCallFinished,
+    ClientToolRequested,
+    RunFinished,
+    RunFailed,
 ]

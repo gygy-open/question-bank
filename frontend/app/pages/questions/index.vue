@@ -72,6 +72,7 @@ const compositionPickerQuestionIds = ref<number[]>([])
 
 // --- Question basket (staging path) ---
 const questionBasket = useQuestionBasket()
+useAiScene().useSceneWhileMounted('question_library')
 const basketPanelOpen = ref(false)
 
 // --- Filters ---

@@ -18,9 +18,12 @@ from dataclasses import dataclass
 from typing import Any, AsyncIterator, Dict, List, Optional
 
 from app.ai import tools as ai_tools
+from app.ai import client_channel
+from app.ai.contracts import AgentScene, ToolResult
 from app.ai.events import (
     AgentEvent,
     AssistantTurn,
+    ClientToolRequested,
     RunFailed,
     RunFinished,
     TextDelta,
@@ -32,6 +35,17 @@ from app.models.agent import AgentRun, AgentRunStatus, AgentStep
 from app.services.ai_provider import AIProvider, ToolCall
 
 logger = logging.getLogger(__name__)
+
+
+def _client_tool_result(payload: Optional[Dict[str, Any]]) -> ToolResult:
+    """把前端回传(或超时)转成回喂模型的结果。超时不能挂死 run。"""
+    if payload is None:
+        return ToolResult.text(
+            "客户端未在超时时间内响应(用户可能已离开页面)。请不要重试,改为用文字告知用户下一步该怎么做。"
+        )
+    ok = payload.get("ok", True)
+    content = payload.get("content") or ("已完成。" if ok else "客户端执行失败。")
+    return ToolResult(content=content, data=payload.get("data"))
 
 
 @dataclass(frozen=True)
@@ -54,6 +68,7 @@ class AgentRunner:
         *,
         session_id: Optional[str] = None,
         model_id: Optional[int] = None,
+        scene: AgentScene = AgentScene.UNSCOPED,
     ) -> AsyncIterator[AgentEvent]:
         run = AgentRun(
             id=str(uuid.uuid4()),
@@ -79,7 +94,7 @@ class AgentRunner:
                 tool_calls: List[ToolCall] = []
 
                 async for chunk in self.provider.chat_stream(
-                    messages, self.provider_config, tools=ai_tools.openai_schemas()
+                    messages, self.provider_config, tools=ai_tools.openai_schemas(scene)
                 ):
                     if isinstance(chunk, str):
                         full_text += chunk
@@ -113,10 +128,23 @@ class AgentRunner:
                 for tc in tool_calls:
                     tool_calls_used += 1
                     args = _parse_arguments(tc.arguments)
+                    call_args = args if isinstance(args, dict) else {}
                     yield ToolCallStarted(tool_call_id=tc.id, name=tc.name, arguments=args)
 
                     began = time.monotonic()
-                    result = await ai_tools.dispatch(tc.name, ctx, args if isinstance(args, dict) else {})
+                    spec = ai_tools.get(tc.name)
+                    if spec is not None and spec.executor == "client" and spec.available_in(scene):
+                        # 暂停前必须先提交:SQLAlchemy 在 commit 时把连接还池。
+                        # 若带着未结事务等待,十几个并发流就能耗尽连接池并锁死整个 API。
+                        await ctx.db.commit()
+                        ticket = client_channel.open_ticket(run.id)
+                        yield ClientToolRequested(
+                            run_id=run.id, tool_call_id=tc.id, name=tc.name,
+                            arguments=call_args, ticket=ticket,
+                        )
+                        result = _client_tool_result(await client_channel.wait_for(ticket))
+                    else:
+                        result = await ai_tools.dispatch(tc.name, ctx, call_args, scene=scene)
                     latency_ms = int((time.monotonic() - began) * 1000)
 
                     ctx.db.add(AgentStep(

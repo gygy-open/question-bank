@@ -41,6 +41,28 @@ CHAT_SYSTEM_PROMPT = """你是一名资深{subject_name}教研员。{subject_des
 """
 
 
+# 页面场景 → 追加到系统提示词末尾的一段上下文。只放轻量标识，不放文档内容。
+# 这些值来自客户端自报，仅作提示，不能当作权限或事实依据。
+_SCENE_HINTS = {
+    "question_library": "用户当前在题库列表页。",
+    "composition_editor": "用户当前正在组稿编辑器里编辑一份稿件。",
+    "import_review": "用户当前在文档导入的审阅页。",
+}
+
+
+def render_scene_context(scene: str | None, context: dict | None) -> str:
+    """把页面场景渲染成一小段上下文；无可用信息时返回空串。"""
+    hint = _SCENE_HINTS.get(scene or "")
+    if not hint:
+        return ""
+    lines = [f"## 当前位置\n{hint}"]
+    if context:
+        details = "、".join(f"{k}={v}" for k, v in context.items() if v is not None)
+        if details:
+            lines.append(f"页面上下文：{details}")
+    lines.append("这只是背景信息；用户没有明确要求时不要据此擅自调用工具。")
+    return "\n".join(lines)
+
 # 以下两个提示词是"内容处理规范"，允许用户按学科覆盖（存 subject_prompts 表）。
 # 这里的常量是代码默认值：未被学科覆盖时回退到此，不写入数据库。
 # 保留 {subject_name}/{subject_description} 占位符（render_subject_prompt 注入），

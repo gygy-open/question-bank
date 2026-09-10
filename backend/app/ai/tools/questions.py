@@ -7,12 +7,12 @@ from typing import List, Optional, Dict, Any
 import logging
 from sqlalchemy.ext.asyncio import AsyncSession
 from app import capabilities
-from app.ai.contracts import ToolResult, ToolSpec, proposal_directive
+from app.ai.contracts import AgentScene, ToolResult, ToolSpec, proposal_directive
 from app.ai.tools.registry import register
 from app.capabilities.context import ExecutionContext
 from app.crud.crud_question import question as crud_question
 from app.schemas.question import QuestionCreate
-from app.models.question import QuestionStatus
+from app.models.question import QuestionStatus, QuestionType
 from app.services.kp_retriever import KnowledgePointRetriever
 from app.services.ai_provider import get_ai_provider
 from app.crud.crud_system_setting import system_setting
@@ -32,6 +32,9 @@ from sqlalchemy.orm import selectinload
 
 logger = logging.getLogger(__name__)
 
+# 工具 schema 与 DB 枚举共用一份真源 —— 二者漂移时 q_type 筛选会在参数绑定期就报错。
+_QUESTION_TYPE_VALUES = frozenset(t.value for t in QuestionType)
+
 # Define Question Schema Properties for reuse
 QUESTION_SCHEMA_PROPERTIES = {
     "content": {
@@ -40,7 +43,7 @@ QUESTION_SCHEMA_PROPERTIES = {
     },
     "q_type": {
         "type": "string",
-        "enum": ["single_choice", "multiple_choice", "true_false", "fill_in_the_blank", "free_response"],
+        "enum": sorted(_QUESTION_TYPE_VALUES),
         "description": "题目类型。'single_choice' 代表单选题，'multiple_choice' 代表多选题，'true_false' 代表判断题，'fill_in_the_blank' 代表填空题，'free_response' 代表解答题。"
     },
     "options": {
@@ -146,41 +149,84 @@ SEARCH_QUESTIONS_PARAMS = {
     "properties": {
         "keyword": {
             "type": "string",
-            "description": "在题目内容中搜索的关键词。"
+            "description": "在题目内容中搜索的关键词。可与知识点/标签筛选组合使用。"
+        },
+        "knowledge_point_ids": {
+            "type": "array",
+            "items": {"type": "integer"},
+            "description": (
+                "按知识点筛选,取并集(命中任一即可),且自动包含每个知识点的所有下级知识点。"
+                "请先用 search_knowledge_points 拿到 id。"
+            )
+        },
+        "tag_ids": {
+            "type": "array",
+            "items": {"type": "integer"},
+            "description": "按标签筛选,取并集(命中任一即可)。请先用 get_available_tags 拿到 id。"
         },
         "difficulty": {
             "type": "integer",
-            "description": "难度等级 (1-5)。",
+            "description": "难度等级 (1-5),精确匹配。",
             "minimum": 1,
             "maximum": 5
         },
-        "q_type": {
+        "q_type": QUESTION_SCHEMA_PROPERTIES["q_type"],
+        "status": {
             "type": "string",
-            "description": "题目类型。",
-            "enum": ["选择题", "填空题", "解答题"]
+            "enum": ["draft", "pending", "published", "archived"],
+            "description": "题目状态。不传则不限状态。"
         },
         "limit": {
             "type": "integer",
-            "description": "返回结果的数量 (默认为 5)。",
-            "default": 5
+            "description": "返回结果的数量 (默认 5,最多 50)。",
+            "default": 5,
+            "minimum": 1,
+            "maximum": 50
         }
     },
-    "required": ["keyword"]
+    "required": []
 }
+
+_SEARCH_LIMIT_MAX = 50
 
 
 async def search_questions(ctx: ExecutionContext, args: Dict[str, Any]) -> ToolResult:
     keyword = args.get("keyword")
+    knowledge_point_ids = args.get("knowledge_point_ids")
+    tag_ids = args.get("tag_ids")
     difficulty = args.get("difficulty")
     q_type = args.get("q_type")
-    limit = args.get("limit", 5)
+    status = args.get("status")
+
+    if not (keyword or knowledge_point_ids or tag_ids):
+        return ToolResult.text(
+            "请至少提供 keyword、knowledge_point_ids、tag_ids 三者之一,否则会返回整个题库。"
+        )
+
+    if q_type is not None and q_type not in _QUESTION_TYPE_VALUES:
+        return ToolResult.text(
+            f"未知的 q_type: {q_type}。可选值为 {', '.join(sorted(_QUESTION_TYPE_VALUES))}。"
+        )
+
+    try:
+        limit = int(args.get("limit") or 5)
+    except (TypeError, ValueError):
+        limit = 5
+    limit = max(1, min(limit, _SEARCH_LIMIT_MAX))
+
+    # 只在当前学科内检索,否则模型会拿到其它学科的题去组稿。
+    subject_id = ctx.subject_id or ctx.actor.last_active_subject_id
 
     # 套用与题库列表相同的可见性过滤,避免 AI 泄漏他人私有题/越权学科题。
     questions = await crud_question.get_multi_with_filters(
         ctx.db,
         keyword=keyword,
+        knowledge_point_ids=knowledge_point_ids,
+        tag_ids=tag_ids,
         difficulty=difficulty,
         q_type=q_type,
+        status=status,
+        subject_id=subject_id,
         limit=limit,
         viewer=ctx.actor,
     )
@@ -192,8 +238,11 @@ async def search_questions(ctx: ExecutionContext, args: Dict[str, Any]) -> ToolR
     for q in questions:
         content_text = rich_doc_to_plain_text(parse_json_field(q.content))[:200]
         answer_text = answer_spec_to_plain_text(q.answer, q.options)
+        kp_names = "、".join(kp.name for kp in (q.knowledge_points or [])) or "无"
+        tag_names = "、".join(t.name for t in (q.tags or [])) or "无"
         results.append(
             f"ID: {q.id}\nType: {q.q_type}\nDifficulty: {q.difficulty}\n"
+            f"KnowledgePoints: {kp_names}\nTags: {tag_names}\n"
             f"Content: {content_text}...\nAnswer: {answer_text}\n"
         )
 
@@ -480,6 +529,9 @@ async def propose_questions_batch(ctx: ExecutionContext, args: Dict[str, Any]) -
     )
 
 
+# 两个 propose_* 的嵌套 schema 占全量工具载荷约 88%，只在真正会建题的页面暴露。
+_AUTHORING_SCENES = frozenset({AgentScene.QUESTION_LIBRARY, AgentScene.IMPORT_REVIEW})
+
 register(ToolSpec(
     name="propose_question_draft",
     description="向用户提议创建一个新的题目草稿。此工具不会直接发布题目，而是生成一个待确认的提案。仅当用户明确请求“保存”或“导入”时使用。",
@@ -487,6 +539,7 @@ register(ToolSpec(
     handler=propose_question_draft,
     capability="question.create",
     mutating=True,
+    scenes=_AUTHORING_SCENES,
 ))
 
 register(ToolSpec(
@@ -496,11 +549,12 @@ register(ToolSpec(
     handler=propose_questions_batch,
     capability="question.create",
     mutating=True,
+    scenes=_AUTHORING_SCENES,
 ))
 
 register(ToolSpec(
     name="search_questions",
-    description="根据关键词和其他筛选条件在题库中搜索题目。",
+    description="根据关键词、知识点、标签等筛选条件在题库中搜索题目。只返回当前学科、且当前用户有权查看的题目。",
     parameters=SEARCH_QUESTIONS_PARAMS,
     handler=search_questions,
 ))

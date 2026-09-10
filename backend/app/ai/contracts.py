@@ -6,11 +6,40 @@
 """
 from __future__ import annotations
 
-from typing import Any, Awaitable, Callable, Dict, List, Literal, Optional
+import enum
+from typing import Any, Awaitable, Callable, Dict, FrozenSet, List, Literal, Optional
 
 from pydantic import BaseModel, Field
 
 from app.capabilities.context import ExecutionContext
+
+
+class AgentScene(str, enum.Enum):
+    """前端发起对话的页面场景,决定这一轮暴露哪些工具。
+
+    与 `Surface`(api/chat/worker)正交:后者是「从哪个入口进来」,属于审计语义,不要混用。
+
+    `UNSCOPED` 是「页面没声明场景」,此时暴露全部工具(与引入本机制前行为一致);
+    只有页面显式声明了场景,才会按 `ToolSpec.scenes` 减面。
+
+    它只用于减面(缩小攻击面 + 省 token),**不是授权机制** ——
+    scene 由客户端自报且不可信,真正的门禁在 capability 层。
+    """
+
+    UNSCOPED = "unscoped"
+    QUESTION_LIBRARY = "question_library"
+    COMPOSITION_EDITOR = "composition_editor"
+    IMPORT_REVIEW = "import_review"
+
+    @classmethod
+    def parse(cls, value: str | None) -> "AgentScene":
+        """未知 scene 回落 UNSCOPED 而不是报错 —— 前后端版本漂移不能把聊天打挂。"""
+        if not value:
+            return cls.UNSCOPED
+        try:
+            return cls(value)
+        except ValueError:
+            return cls.UNSCOPED
 
 
 class UIDirective(BaseModel):
@@ -44,15 +73,25 @@ class ToolSpec(BaseModel):
     Gemini 的 FunctionDeclaration 不吃 `$ref`/`$defs`/`anyOf`,手写 schema 更可控。
 
     `capability` 记录写操作最终落到哪个能力上;为 None 表示这是 AI 专属的只读工具。
+
+    `scenes` 为 None 表示处处可用;给定集合则仅在这些页面场景下暴露。
     """
     model_config = {"arbitrary_types_allowed": True}
 
     name: str
     description: str
     parameters: Dict[str, Any]
-    handler: ToolHandler
+    handler: Optional[ToolHandler] = None
     capability: Optional[str] = None
     mutating: bool = False
+    scenes: Optional[FrozenSet[AgentScene]] = None
+    # client 工具没有服务端 handler:运行时把请求推给前端,等它回传结果。
+    executor: Literal["server", "client"] = "server"
+
+    def available_in(self, scene: AgentScene) -> bool:
+        if self.scenes is None or scene is AgentScene.UNSCOPED:
+            return True
+        return scene in self.scenes
 
     def to_openai_schema(self) -> Dict[str, Any]:
         return {

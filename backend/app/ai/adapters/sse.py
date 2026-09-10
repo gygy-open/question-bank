@@ -11,6 +11,7 @@ from typing import Any, Iterator
 
 from app.ai.events import (
     AgentEvent,
+    ClientToolRequested,
     RunFailed,
     RunFinished,
     TextDelta,
@@ -30,6 +31,13 @@ def to_sse(event: AgentEvent) -> Iterator[str]:
         yield sse_pack("message", event.text)
     elif isinstance(event, ToolCallStarted):
         yield sse_pack("action", {"tool": event.name, "input": event.arguments})
+    elif isinstance(event, ClientToolRequested):
+        yield sse_pack("client_tool", {
+            "run_id": event.run_id,
+            "ticket": event.ticket,
+            "tool": event.name,
+            "input": event.arguments,
+        })
     elif isinstance(event, ToolCallFinished):
         for directive in event.ui:
             yield sse_pack(directive.kind, directive.payload)

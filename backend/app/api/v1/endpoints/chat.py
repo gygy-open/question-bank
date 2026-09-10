@@ -3,7 +3,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 from app.api import deps
-from app.schemas.chat import ChatRequest, ChatSession, ChatSessionCreate, ChatSessionUpdate, ChatMessageCreate, ChatMessage, ChatSessionSummary, ChatMessageUpdate
+from app.schemas.chat import ChatRequest, ChatSession, ChatSessionCreate, ChatSessionUpdate, ChatMessageCreate, ChatMessage, ChatSessionSummary, ChatMessageUpdate, ClientToolResult
 from app.models.chat import ChatMessage as ChatMessageModel
 from app.models.ai_config import AIModel
 from app.crud.crud_chat import chat_session, chat_message
@@ -11,9 +11,12 @@ from app.services.ai_provider import get_ai_provider
 from app.ai.adapters.sse import sse_pack, to_sse
 from app.ai.events import AssistantTurn, RunFinished, ToolCallFinished
 from app.ai.runtime import AgentRunner
+from app.ai.contracts import AgentScene
+from app.ai import client_channel
+from app.models.agent import AgentRun
 from app.capabilities.context import ExecutionContext, Surface
 from app.services.prompt_utils import render_subject_prompt
-from app.services.prompts import CHAT_SYSTEM_PROMPT
+from app.services.prompts import CHAT_SYSTEM_PROMPT, render_scene_context
 from app.models.subject import Subject
 from fastapi.responses import StreamingResponse
 import logging
@@ -95,7 +98,12 @@ async def generate_session_title(session_id: str, messages: List[Dict], db: Asyn
         logger.error(f"Error generating title for session {session_id}: {e}")
 
 async def build_provider_messages(
-    db: AsyncSession, *, session_id: str, subject: Optional[Subject]
+    db: AsyncSession,
+    *,
+    session_id: str,
+    subject: Optional[Subject],
+    scene: Optional[str] = None,
+    scene_context: Optional[Dict[str, Any]] = None,
 ) -> List[Dict[str, Any]]:
     """把落库的会话重建成 provider 的 messages。
 
@@ -108,6 +116,9 @@ async def build_provider_messages(
     """
     # 工具调用策略与已注册工具强耦合，硬编码随代码演进，不做成用户可编辑配置。
     system_prompt = render_subject_prompt(CHAT_SYSTEM_PROMPT, subject)
+    scene_block = render_scene_context(scene, scene_context)
+    if scene_block:
+        system_prompt = f"{system_prompt}\n\n{scene_block}"
     messages: List[Dict[str, Any]] = [{"role": "system", "content": system_prompt}]
 
     history = await chat_message.get_by_session(db, session_id=session_id)
@@ -151,7 +162,7 @@ def _recent_run_ids(history: List[ChatMessageModel]) -> set:
     return set(seen)
 
 
-async def chat_generator(session_id: str, new_user_message: ChatMessageCreate, model_id: int, db: AsyncSession, current_user: User, background_tasks: BackgroundTasks, subject_id: Optional[int] = None):
+async def chat_generator(session_id: str, new_user_message: ChatMessageCreate, model_id: int, db: AsyncSession, current_user: User, background_tasks: BackgroundTasks, subject_id: Optional[int] = None, scene: Optional[str] = None, scene_context: Optional[Dict[str, Any]] = None):
     user_msg_data = new_user_message.model_dump()
     user_msg_data["session_id"] = session_id
     user_msg = await chat_message.create(db, obj_in=user_msg_data)
@@ -164,7 +175,13 @@ async def chat_generator(session_id: str, new_user_message: ChatMessageCreate, m
         subj_res = await db.execute(select(Subject).where(Subject.id == subject_id))
         subject = subj_res.scalar_one_or_none()
 
-    ai_messages = await build_provider_messages(db, session_id=session_id, subject=subject)
+    ai_messages = await build_provider_messages(
+        db,
+        session_id=session_id,
+        subject=subject,
+        scene=scene,
+        scene_context=scene_context,
+    )
 
     result = await db.execute(
         select(AIModel)
@@ -191,7 +208,8 @@ async def chat_generator(session_id: str, new_user_message: ChatMessageCreate, m
 
     final_text = ""
     async for event in runner.run(
-        ctx, ai_messages, session_id=session_id, model_id=model_id
+        ctx, ai_messages, session_id=session_id, model_id=model_id,
+        scene=AgentScene.parse(scene),
     ):
         # 工具往返落库,供下一轮重建上下文;它们不进用户可见的对话记录(见 API 层过滤)。
         if isinstance(event, AssistantTurn):
@@ -334,9 +352,30 @@ async def create_message(
         raise HTTPException(status_code=403, detail="Not authorized")
 
     return StreamingResponse(
-        chat_generator(session_id, request.message, request.model_id, db, current_user, background_tasks, request.subject_id),
+        chat_generator(session_id, request.message, request.model_id, db, current_user, background_tasks, request.subject_id, request.scene, request.scene_context),
         media_type="text/event-stream"
     )
+
+
+@router.post("/runs/{run_id}/client-tool-result", status_code=204)
+async def submit_client_tool_result(
+    run_id: str,
+    payload: ClientToolResult,
+    db: AsyncSession = Depends(deps.get_db),
+    current_user: User = Depends(deps.get_current_active_user),
+):
+    """前端执行完 client 工具后回传结果,唤醒仍挂在 SSE 上的那个 run。
+
+    票据本身不可猜且一次性,但仍要校验 run 归属 —— 注册表是任何已登录请求都能打到的内存。
+    """
+    run = await db.get(AgentRun, run_id)
+    if run is None or run.user_id != current_user.id:
+        raise HTTPException(status_code=404, detail="Run not found")
+
+    if not client_channel.resolve(payload.ticket, run_id, payload.model_dump()):
+        # 票据不存在/已消费/不属于该 run:多半是超时之后才回来的。
+        raise HTTPException(status_code=409, detail="Ticket is no longer pending")
+    return None
 
 @router.patch("/messages/{message_id}", response_model=ChatMessage)
 async def update_message(

@@ -8,7 +8,17 @@ from typing import Any, AsyncGenerator, Dict, List, Union
 import pytest
 from sqlalchemy import select
 
-from app.ai.events import AssistantTurn, RunFinished, TextDelta, ToolCallFinished, ToolCallStarted
+from app.ai import client_channel
+from app.ai import tools as ai_tools
+from app.ai.contracts import AgentScene
+from app.ai.events import (
+    AssistantTurn,
+    ClientToolRequested,
+    RunFinished,
+    TextDelta,
+    ToolCallFinished,
+    ToolCallStarted,
+)
 from app.ai.runtime import AgentRunner, RunBudget
 from app.capabilities.context import ExecutionContext, Surface
 from app.crud.crud_user import user as crud_user
@@ -185,3 +195,71 @@ async def test_run_and_steps_are_persisted(db_session, ctx):
     assert [s.type for s in steps] == ["assistant", "tool_call"]
     assert steps[1].tool_name == "get_available_tags"
     assert steps[1].latency_ms is not None
+
+
+# --------------------------------------------------------------------------- #
+# 前端工具:请求 → 等待 → 回传/超时
+# --------------------------------------------------------------------------- #
+async def test_client_tool_parks_the_run_and_resumes_on_reply(ctx):
+    """运行时必须在等待前就把请求推出去,否则前端永远收不到。"""
+    provider = FakeProvider([
+        [_tool_call("c1", "open_composition", '{"composition_id": 7, "scope": "personal"}')],
+        ["已经帮你打开了"],
+    ])
+    runner = AgentRunner(provider, {})
+
+    events: List[Any] = []
+    async for event in runner.run(ctx, [{"role": "user", "content": "打开稿件"}]):
+        events.append(event)
+        if isinstance(event, ClientToolRequested):
+            # 前端在收到帧之后才回传 —— 生成器此刻正挂在票据上。
+            assert client_channel.resolve(
+                event.ticket, event.run_id, {"ok": True, "content": "已打开"}
+            )
+
+    requested = [e for e in events if isinstance(e, ClientToolRequested)]
+    assert len(requested) == 1
+    assert requested[0].name == "open_composition"
+    assert requested[0].arguments == {"composition_id": 7, "scope": "personal"}
+
+    finished = [e for e in events if isinstance(e, ToolCallFinished)]
+    assert finished[0].content == "已打开"
+    # 结果回喂后模型继续说话,run 正常收尾。
+    assert events[-1].stop_reason == "completed"
+    assert client_channel.pending_count() == 0
+
+
+async def test_client_tool_timeout_does_not_hang_the_run(ctx, monkeypatch):
+    """用户关掉标签页就没人回传了 —— run 必须优雅收尾而不是挂到 nginx 超时。"""
+    monkeypatch.setattr(client_channel, "DEFAULT_TIMEOUT_S", 0.01)
+    provider = FakeProvider([
+        [_tool_call("c1", "open_composition", '{"composition_id": 7, "scope": "personal"}')],
+        ["那你自己点一下吧"],
+    ])
+    events = await _drain(AgentRunner(provider, {}), ctx, [{"role": "user", "content": "x"}])
+
+    finished = [e for e in events if isinstance(e, ToolCallFinished)]
+    assert "不要重试" in finished[0].content
+    assert events[-1].stop_reason == "completed"
+    assert client_channel.pending_count() == 0
+
+
+async def test_client_tool_is_blocked_out_of_scene(ctx):
+    """越界的前端工具不能触发等待,否则模型可以让整条流卡住。"""
+    provider = FakeProvider([[_tool_call("c1", "open_composition", "{}")], ["ok"]])
+    runner = AgentRunner(provider, {})
+    spec = ai_tools.get("open_composition")
+    monkey = spec.scenes
+    object.__setattr__(spec, "scenes", frozenset({AgentScene.QUESTION_LIBRARY}))
+    try:
+        events = [
+            e async for e in runner.run(
+                ctx, [{"role": "user", "content": "x"}], scene=AgentScene.COMPOSITION_EDITOR
+            )
+        ]
+    finally:
+        object.__setattr__(spec, "scenes", monkey)
+
+    assert not [e for e in events if isinstance(e, ClientToolRequested)]
+    finished = [e for e in events if isinstance(e, ToolCallFinished)]
+    assert "not available on the current page" in finished[0].content

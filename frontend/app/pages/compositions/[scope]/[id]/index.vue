@@ -50,8 +50,7 @@ const { currentSubjectId, currentSubject } = useSubjectContext()
 const scope = computed<CompositionScope>(() => normalizeScope(route.params.scope))
 const compositionId = computed(() => Number(route.params.id))
 
-const composition = ref<CompositionDetail | null>(null)
-const loading = ref(true)
+const composition = ref<CompositionDetail | null>(null)const loading = ref(true)
 const savingMeta = ref(false)
 const savingNodes = ref(false)
 const title = ref('')
@@ -60,6 +59,13 @@ const description = ref('')
 const document = ref<EditorDocument>({ nodes: [] })
 const savedSnapshot = ref('')
 const editConflict = ref(false)
+
+useAiScene().useSceneWhileMounted('composition_editor', () => ({
+  composition_id: compositionId.value,
+  scope: scope.value,
+  title: composition.value?.title ?? null,
+  revision: composition.value?.revision ?? null,
+}))
 
 // 题目版本状态（question_id → 实时 revision/可用性），只用于 stale/deleted 标记，不渲染内容。
 const questionStatus = ref<Map<number, QuestionRevisionStatus>>(new Map())

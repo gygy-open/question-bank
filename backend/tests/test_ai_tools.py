@@ -8,7 +8,7 @@ import json
 import pytest
 
 from app.ai import tools as ai_tools
-from app.ai.contracts import ToolResult
+from app.ai.contracts import AgentScene, ToolResult
 from app.capabilities.context import ExecutionContext, Surface
 from app.crud.crud_user import user as crud_user
 from app.models.question import Question, QuestionStatus
@@ -65,7 +65,18 @@ def test_registry_exposes_the_expected_tools():
         "search_questions",
         "search_knowledge_points",
         "get_available_tags",
+        "create_composition",
+        "write_composition_nodes",
+        "open_composition",
     }
+
+
+def test_client_tools_have_no_server_handler():
+    """client 工具由 AgentRunner 推给前端执行,服务端不该有 handler 偷偷跑。"""
+    for spec in ai_tools.all_tools():
+        if spec.executor == "client":
+            assert spec.handler is None, spec.name
+            assert not spec.mutating, spec.name
 
 
 def test_mutating_tools_delegate_to_a_capability():
@@ -85,6 +96,62 @@ def test_openai_schemas_are_wellformed():
         assert params["type"] == "object"
         # Gemini 的 FunctionDeclaration 不吃 $ref/$defs,schema 必须是完全内联的。
         assert "$ref" not in json.dumps(params)
+
+
+# --------------------------------------------------------------------------- #
+# 页面作用域
+# --------------------------------------------------------------------------- #
+def _names_for(scene):
+    return {spec.name for spec in ai_tools.tools_for(scene)}
+
+
+def test_unscoped_exposes_every_tool():
+    """页面没声明场景时行为与引入作用域前一致,不能悄悄少给工具。"""
+    assert _names_for(AgentScene.UNSCOPED) == {spec.name for spec in ai_tools.all_tools()}
+
+
+def test_unknown_scene_falls_back_to_unscoped():
+    """前后端版本漂移时不能把聊天打挂。"""
+    assert AgentScene.parse("no-such-page") is AgentScene.UNSCOPED
+    assert AgentScene.parse(None) is AgentScene.UNSCOPED
+
+
+def test_composition_editor_drops_the_authoring_tools():
+    """两个 propose_* 的嵌套 schema 占全量载荷约 88%,组稿页不该带上它们。"""
+    names = _names_for(AgentScene.COMPOSITION_EDITOR)
+    assert "propose_question_draft" not in names
+    assert "propose_questions_batch" not in names
+    assert {"search_questions", "search_knowledge_points", "get_available_tags"} <= names
+
+
+def test_question_library_keeps_the_authoring_tools():
+    names = _names_for(AgentScene.QUESTION_LIBRARY)
+    assert {"propose_question_draft", "propose_questions_batch"} <= names
+
+
+def test_scoping_actually_shrinks_the_payload():
+    """作用域的全部意义就是省下这段 —— 退化成不省了要能被发现。
+
+    实测(7 个工具):unscoped 12746 字符 → composition_editor 4485,约 -65%。
+    两个 propose_* 的嵌套 schema 就占了 7922。
+    """
+    full = len(json.dumps(ai_tools.openai_schemas(AgentScene.UNSCOPED), ensure_ascii=False))
+    scoped = len(json.dumps(
+        ai_tools.openai_schemas(AgentScene.COMPOSITION_EDITOR), ensure_ascii=False
+    ))
+    assert scoped < full * 0.5
+
+
+async def test_out_of_scene_dispatch_is_blocked_without_side_effects(db_session, ctx):
+    """光不广播不够 —— 模型可能从历史消息里学到工具名,dispatch 必须自己拦。"""
+    ec = await _ctx_for(db_session, ctx["editor"], ctx["subject"].id)
+    result = await ai_tools.dispatch(
+        "propose_question_draft", ec, dict(_DRAFT_ARGS),
+        scene=AgentScene.COMPOSITION_EDITOR,
+    )
+    assert "not available on the current page" in result.content
+    assert result.ui == []
+    assert len((await db_session.execute(select(Question))).scalars().all()) == 0
 
 
 async def test_unknown_tool_returns_error_text(db_session, ctx):
@@ -147,6 +214,28 @@ async def test_batch_emits_one_proposal_for_all_ids(db_session, ctx):
     assert len(result.ui[0].payload["ids"]) == 2
 
 
+def _doc(text: str) -> str:
+    return json.dumps(
+        {"type": "doc", "content": [{"type": "paragraph", "content": [{"type": "text", "text": text}]}]},
+        ensure_ascii=False,
+    )
+
+
+async def _seed_question(db_session, *, subject_id, created_by, text="抛物线", **kw) -> Question:
+    q = Question(
+        content=_doc(text),
+        q_type=kw.pop("q_type", "free_response"),
+        subject_id=subject_id,
+        created_by=created_by,
+        visibility="public",
+        **kw,
+    )
+    db_session.add(q)
+    await db_session.commit()
+    await db_session.refresh(q)
+    return q
+
+
 async def test_search_questions_uses_actor_as_viewer(db_session, ctx):
     """检索必须套用调用者的可见性,否则 AI 成了越权读取的旁路。"""
     other_subject = Subject(name="物理", slug="phys")
@@ -154,15 +243,111 @@ async def test_search_questions_uses_actor_as_viewer(db_session, ctx):
     await db_session.commit()
     await db_session.refresh(other_subject)
 
-    db_session.add(Question(
-        content=json.dumps({"type": "doc", "content": [{"type": "paragraph"}]}),
-        q_type="free_response",
-        subject_id=other_subject.id,
-        created_by=ctx["editor"].id,
-        visibility="public",
-    ))
+    await _seed_question(
+        db_session, subject_id=other_subject.id, created_by=ctx["editor"].id, text="抛物线"
+    )
+
+    ec = await _ctx_for(db_session, ctx["editor"], ctx["subject"].id)
+    result = await ai_tools.dispatch("search_questions", ec, {"keyword": "抛物线"})
+    assert result.content == "No questions found matching the criteria."
+
+
+async def test_search_questions_requires_at_least_one_filter(db_session, ctx):
+    """没有任何筛选条件时不能把整个题库倒给模型。"""
+    ec = await _ctx_for(db_session, ctx["editor"], ctx["subject"].id)
+    result = await ai_tools.dispatch("search_questions", ec, {})
+    assert "至少提供" in result.content
+
+
+async def test_search_questions_q_type_uses_db_enum_values(db_session, ctx):
+    """q_type 必须用 DB 枚举值;历史 schema 给的是中文标签,绑定期就会炸。"""
+    await _seed_question(
+        db_session, subject_id=ctx["subject"].id, created_by=ctx["editor"].id,
+        text="抛物线", q_type="single_choice",
+    )
+    ec = await _ctx_for(db_session, ctx["editor"], ctx["subject"].id)
+
+    hit = await ai_tools.dispatch(
+        "search_questions", ec, {"keyword": "抛物线", "q_type": "single_choice"}
+    )
+    assert "ID:" in hit.content
+
+    miss = await ai_tools.dispatch(
+        "search_questions", ec, {"keyword": "抛物线", "q_type": "free_response"}
+    )
+    assert miss.content == "No questions found matching the criteria."
+
+    bad = await ai_tools.dispatch(
+        "search_questions", ec, {"keyword": "抛物线", "q_type": "选择题"}
+    )
+    assert "未知的 q_type" in bad.content
+
+
+async def test_search_questions_scopes_to_current_subject(db_session, ctx):
+    """同一道题只在其所属学科的上下文里可见。"""
+    other_subject = Subject(name="物理", slug="phys")
+    db_session.add(other_subject)
+    await db_session.commit()
+    await db_session.refresh(other_subject)
+    db_session.add(
+        SubjectMember(user_id=ctx["editor"].id, subject_id=other_subject.id, role="editor")
+    )
+    await db_session.commit()
+
+    await _seed_question(
+        db_session, subject_id=ctx["subject"].id, created_by=ctx["editor"].id, text="抛物线"
+    )
+
+    in_scope = await _ctx_for(db_session, ctx["editor"], ctx["subject"].id)
+    assert "ID:" in (await ai_tools.dispatch(
+        "search_questions", in_scope, {"keyword": "抛物线"}
+    )).content
+
+    out_scope = await _ctx_for(db_session, ctx["editor"], other_subject.id)
+    assert (await ai_tools.dispatch(
+        "search_questions", out_scope, {"keyword": "抛物线"}
+    )).content == "No questions found matching the criteria."
+
+
+async def test_search_questions_filters_by_knowledge_point_with_descendants(db_session, ctx):
+    """知识点筛选自动含下级 —— 传父节点应能命中挂在子节点上的题。"""
+    from app.models.knowledge_point import KnowledgePoint
+
+    parent = KnowledgePoint(name="函数", slug="func", subject_id=ctx["subject"].id)
+    db_session.add(parent)
+    await db_session.commit()
+    await db_session.refresh(parent)
+    child = KnowledgePoint(
+        name="二次函数", slug="quadratic", subject_id=ctx["subject"].id, parent_id=parent.id
+    )
+    db_session.add(child)
+    await db_session.commit()
+    await db_session.refresh(child)
+
+    q = await _seed_question(
+        db_session, subject_id=ctx["subject"].id, created_by=ctx["editor"].id, text="抛物线"
+    )
+    await db_session.refresh(q, attribute_names=["knowledge_points"])
+    q.knowledge_points.append(child)
     await db_session.commit()
 
     ec = await _ctx_for(db_session, ctx["editor"], ctx["subject"].id)
-    result = await ai_tools.dispatch("search_questions", ec, {"keyword": ""})
-    assert result.content == "No questions found matching the criteria."
+    result = await ai_tools.dispatch(
+        "search_questions", ec, {"knowledge_point_ids": [parent.id]}
+    )
+    assert f"ID: {q.id}" in result.content
+    assert "二次函数" in result.content
+
+
+async def test_search_questions_clamps_limit(db_session, ctx):
+    """模型可以传 limit: 100000,服务端必须钳住。"""
+    for i in range(3):
+        await _seed_question(
+            db_session, subject_id=ctx["subject"].id, created_by=ctx["editor"].id,
+            text=f"抛物线{i}",
+        )
+    ec = await _ctx_for(db_session, ctx["editor"], ctx["subject"].id)
+    result = await ai_tools.dispatch(
+        "search_questions", ec, {"keyword": "抛物线", "limit": 100000}
+    )
+    assert len(result.data["ids"]) == 3

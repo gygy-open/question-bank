@@ -72,6 +72,7 @@ interface User {
 }
 
 const tasks = ref<ImportTask[]>([])
+useAiScene().useSceneWhileMounted('import_review')
 const queueStats = ref<QueueStats>({ pending: 0, processing: 0, completed: 0, failed: 0, cancelled: 0 })
 const isUploading = ref(false)
 const isDragging = ref(false)
