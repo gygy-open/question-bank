@@ -73,11 +73,15 @@ def _auth(user: User) -> dict:
 
 
 @pytest.fixture
-async def ctx(db_session):
+async def ctx(db_session, grant_role):
     user = await _seed_user(db_session, username="alice")
     other = await _seed_user(db_session, username="bob")
     subject = await _seed_subject(db_session)
     subject2 = await _seed_subject(db_session, name="物理", slug="phys")
+    # 两个学科都授权:跨学科用例断言的 404 必须来自 scoped 查询,而不是被门禁抢先变 403。
+    for u in (user, other):
+        for s in (subject, subject2):
+            await grant_role(u, s)
     return {"user": user, "other": other, "subject": subject, "subject2": subject2}
 
 

@@ -50,6 +50,21 @@ async def db_session(engine):
 
 
 @pytest_asyncio.fixture
+def grant_role(db_session):
+    """给用户授予学科角色。组稿域补门禁后，既有测试的 alice/bob 都需要成员身份。"""
+    from app.core.permissions import SubjectRole
+    from app.models.subject_member import SubjectMember
+
+    async def _grant(user, subject, role: SubjectRole = SubjectRole.EDITOR) -> None:
+        db_session.add(
+            SubjectMember(user_id=user.id, subject_id=subject.id, role=role.value)
+        )
+        await db_session.commit()
+
+    return _grant
+
+
+@pytest_asyncio.fixture
 async def client(engine):
     # Imported lazily so the settings env above is applied first.
     from app.api import deps
