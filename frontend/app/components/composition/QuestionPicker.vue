@@ -15,7 +15,7 @@ import KnowledgePointTreeSelector from '@/components/KnowledgePointTreeSelector.
 import TagFilter from '@/components/TagFilter.vue'
 import ClearableSelect from '@/components/ClearableSelect.vue'
 import { questionTypeLabel } from '@/lib/answerFormat'
-import type { Question, KnowledgePoint, Tag, TagCategory } from '@/types'
+import type { Question, KnowledgePoint, Tag, TagCategory, TagPage } from '@/types'
 
 const props = defineProps<{
   open: boolean
@@ -109,11 +109,12 @@ async function loadFilterOptions() {
   try {
     const [kpRes, tagRes, catRes] = await Promise.all([
       $api<KnowledgePoint[]>('/knowledge-points', { query: { limit: -1 } }),
-      $api<Tag[]>('/tags', { query: { subject_id: props.subjectId } }),
+      // 标签筛选需要该学科全部标签,size=-1 走仓库既有的"不分页"约定。
+      $api<TagPage>('/tags', { query: { subject_id: props.subjectId, size: -1 } }),
       $api<TagCategory[]>('/tag-categories', { query: { subject_id: props.subjectId } }),
     ])
     knowledgePoints.value = kpRes
-    tags.value = tagRes
+    tags.value = tagRes.items
     tagCategories.value = catRes
   } catch {
     // 筛选选项加载失败不影响基础检索，静默忽略
