@@ -104,10 +104,16 @@ graph LR
 
 要点：
 
-- **手写的**，不是 autogenerate —— `alembic revision --autogenerate` 会去连生产 MySQL 而挂死。已用 `tests/test_migrations.py` 的 `command.check` 验证与模型零漂移。
+- **手写的**，不是 autogenerate。当时 MySQL 没起，`alembic revision --autogenerate` 连不上会一直挂住；后来 MySQL 起来后复核过，autogenerate 也**不会**生成正确的 downgrade（见下条），所以保持手写 + `command.check` 守门。
+- 与模型零漂移由 `tests/test_migrations.py::test_no_model_migration_drift`（`alembic check`）保证。
 - JSON 列一律 `sa.JSON()`（SQLite 桌面/测试 + MySQL 服务端双目标）。
-- downgrade 直接 `op.drop_table`，不先单独 drop FK 依赖的索引（MySQL 1553）。
-- 已跑通 upgrade → downgrade → upgrade。
+- **`downgrade()` 里 `chat_messages` 的三步顺序是被两个方言夹出来的，别乱动**：
+  1. `drop_constraint(FK)` —— MySQL 要求先删外键，否则删索引报 `1553: Cannot drop index ... needed in a foreign key constraint`
+  2. `drop_index` —— SQLite 的 batch 重建要求先删索引，否则重建时索引指向已删列
+  3. `drop_column`
+  最初写成「先删索引再删外键」，SQLite 测试全绿但**在 MySQL 上必炸** —— SQLite 的 batch 是整表重建，顺序无所谓，掩盖了问题。
+- 两张 agent 表的 downgrade 直接 `op.drop_table`，不先单独 drop FK 依赖的索引（同样是 1553）。
+- 已在 **SQLite 与真实 MySQL 两边**都跑通 upgrade → downgrade → upgrade。
 - **不需要数据迁移**：旧代码从未写入过带 `tool_calls` 的 assistant 行（那段 `create` 一直是注释掉的），没有孤儿工具消息。
 
 ## 6. 已知鉴权缺口（本期只登记，未修）
@@ -147,8 +153,10 @@ backend $ uv run python -m pytest -q
   - `test_capability_permissions.py`（16）—— 题目 update/delete/batch 权限矩阵，含「不可见 → 404」与批量跳过语义
   - `test_ai_tools.py`（9）—— 工具注册表契约 + AI 侧权限矩阵
   - `test_agent_runtime.py`（8）—— 脚本化 `FakeProvider` 驱动：多轮、上下文成对、权限拒绝不中断、工具不存在、两种预算耗尽、run/step 落库
-- 迁移：SQLite 上 upgrade / downgrade / upgrade 通过；`command.check` 零漂移。
+- 迁移：SQLite 与真实 MySQL 两边都跑通 upgrade → downgrade → upgrade；`command.check` 零漂移。
 - 冷导入注册表非空：19 个 capability、5 个 tool。
+
+> `tests/test_migrations.py::test_upgrade_head_on_mysql` 仍是 skip —— 它需要 `MYSQL_TEST_URL` 指向一个**可建库的**测试库，而应用账号 `question_bank` 只有本库权限（建 scratch 库会 `1044 Access denied`）。这条留给 CI。
 
 ---
 
@@ -275,4 +283,5 @@ git checkout main
 
 - [ ] downgrade 成功（`agent_runs` / `agent_steps` 被删除，`chat_messages` 两列被删除）
 
-> ⚠️ downgrade 会丢弃已落库的工具往返记录与 run 历史，但不影响用户可见的对话内容（那些是普通 `assistant` / `user` 行）。MySQL 的 DDL 非事务，若 downgrade 中途失败会留半迁移态，需手动 ALTER 对齐后再 stamp。
+> 已在真实 MySQL 上验证过。downgrade 会丢弃已落库的工具往返记录与 run 历史，但不影响用户可见的对话内容（那些是普通 `assistant` / `user` 行）。
+> ⚠️ MySQL 的 DDL 非事务，若 downgrade 中途失败会留半迁移态，需手动 ALTER 对齐后再 stamp。

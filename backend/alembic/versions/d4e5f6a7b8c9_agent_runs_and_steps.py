@@ -90,8 +90,11 @@ def upgrade() -> None:
 
 def downgrade() -> None:
     with op.batch_alter_table("chat_messages") as batch_op:
-        batch_op.drop_index(op.f("ix_chat_messages_run_id"))
+        # 顺序有讲究,两个方言的约束叠在一起只有这一种排法成立:
+        #   MySQL 要求先删外键再删索引(否则 1553:索引被外键依赖);
+        #   SQLite 的 batch 重建要求先删索引再删列(否则重建时索引指向已删列)。
         batch_op.drop_constraint(op.f("fk_chat_messages_run_id_agent_runs"), type_="foreignkey")
+        batch_op.drop_index(op.f("ix_chat_messages_run_id"))
         batch_op.drop_column("run_id")
         batch_op.drop_column("tool_call_id")
 
