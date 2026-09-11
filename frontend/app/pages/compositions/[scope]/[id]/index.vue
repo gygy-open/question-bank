@@ -27,8 +27,11 @@ import CompositionScoringPanel from '~/components/composition/CompositionScoring
 import CompositionQuestionDisplayPanel from '~/components/composition/CompositionQuestionDisplayPanel.vue'
 import CompositionVersionsSheet from '~/components/composition/CompositionVersionsSheet.vue'
 import CompositionTimelineSheet from '~/components/composition/CompositionTimelineSheet.vue'
+import CompositionAiChangesBar from '~/components/composition/CompositionAiChangesBar.vue'
 import { useCompositionExport } from '~/composables/useCompositionExport'
 import { useCompositions, CompositionConflictError } from '~/composables/useCompositions'
+import { useCompositionAiTools } from '~/composables/useCompositionAiTools'
+import { Capability, usePermissions } from '~/composables/usePermissions'
 import { folderBreadcrumb, normalizeScope } from '~/lib/compositions'
 import {
   applyQuestionNumbers, collectDocumentIssues, collectStaleQuestionNodeIds, documentFromNodes,
@@ -36,15 +39,18 @@ import {
   questionPropsWithScore, snapshotDocument, totalScore,
 } from '~/lib/compositionDocument'
 import type { EditorDocument, NumberingMode } from '~/lib/compositionDocument'
+import type { DocumentChange } from '~/lib/compositionDiff'
 import type {
   AnswerFieldKey, CompositionDetail, CompositionExportFormat, CompositionFolder, CompositionScope,
-  CompositionVersionSummary, QuestionRevisionStatus,
+  CompositionVersionSummary, QuestionPage, QuestionRevisionStatus,
 } from '~/types'
 
 const route = useRoute()
 const router = useRouter()
 const api = useCompositions()
 const exportApi = useCompositionExport()
+const { $api } = useNuxtApp()
+const { can } = usePermissions()
 const { currentSubjectId, currentSubject } = useSubjectContext()
 
 const scope = computed<CompositionScope>(() => normalizeScope(route.params.scope))
@@ -67,6 +73,45 @@ useAiScene().useSceneWhileMounted('composition_editor', () => ({
   title: composition.value?.title ?? null,
   revision: composition.value?.revision ?? null,
 }))
+
+// --- AI 待确认改动 ---
+// 画布直接切到 after 文档（所见即所得的预览），这里只额外记住 before 快照与变更清单，
+// 供「放弃」还原与横幅展示。pending 期间自动保存被挂起，用户点「应用」才真正落库。
+const pendingAiEdit = ref<{ before: EditorDocument; changes: DocumentChange[]; summary: string } | null>(null)
+
+function stagePendingAiEdit(next: EditorDocument, changes: DocumentChange[], summary: string) {
+  pendingAiEdit.value = { before: document.value, changes, summary }
+  document.value = next
+}
+
+function applyPendingAiEdit() {
+  pendingAiEdit.value = null
+  // 交还给自动保存，与用户手动编辑走完全相同的落库路径。
+  autosaveNodes()
+}
+
+function discardPendingAiEdit() {
+  const pending = pendingAiEdit.value
+  if (!pending) return
+  document.value = pending.before
+  pendingAiEdit.value = null
+}
+
+useCompositionAiTools({
+  getDocument: () => document.value,
+  getTitle: () => title.value,
+  getQuestionDisplay: () => questionDisplay.value,
+  getNumberingEnabled: () => numberingEnabled.value,
+  getScoringEnabled: () => scoringEnabled.value,
+  canEdit: () => can(Capability.EDIT_QUESTION, currentSubjectId.value),
+  hasPending: () => pendingAiEdit.value != null,
+  stagePending: stagePendingAiEdit,
+  loadQuestions: async (ids) => {
+    // 冻结进节点前必须取实时题目内容（同 useAddQuestionsToComposition 的规则）。
+    const page = await $api<QuestionPage>('/questions', { query: { ids, size: ids.length } })
+    return page.items
+  },
+})
 
 // 题目版本状态（question_id → 实时 revision/可用性），只用于 stale/deleted 标记，不渲染内容。
 const questionStatus = ref<Map<number, QuestionRevisionStatus>>(new Map())
@@ -118,6 +163,8 @@ const autosaveMeta = useDebounceFn(() => {
 
 const autosaveNodes = useDebounceFn(() => {
   if (!composition.value || saving.value || !nodesDirty.value) return
+  // AI 改动等着用户确认时绝不能落库 —— 否则「放弃」按钮形同虚设。
+  if (pendingAiEdit.value) return
   if (collectDocumentIssues(document.value).length) return
   saveNodes({ silent: true })
 }, 1400)
@@ -137,6 +184,8 @@ async function load() {
     return
   }
   loading.value = true
+  // 重新加载会整份换掉文档，未确认的 AI 改动随之作废。
+  pendingAiEdit.value = null
   try {
     const data = await api.getComposition(currentSubjectId.value, scope.value, compositionId.value)
     composition.value = data
@@ -681,6 +730,14 @@ onBeforeRouteLeave(() => {
       <!-- 画布 + 题号面板 -->
       <div class="flex flex-col gap-6 lg:flex-row lg:items-start">
         <div class="flex min-w-0 flex-1 flex-col gap-6">
+          <CompositionAiChangesBar
+            v-if="pendingAiEdit"
+            :summary="pendingAiEdit.summary"
+            :changes="pendingAiEdit.changes"
+            @apply="applyPendingAiEdit"
+            @discard="discardPendingAiEdit"
+          />
+
           <CompositionTiptapCanvas
             v-model:document="document"
             :subject-id="currentSubjectId"
