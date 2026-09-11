@@ -9,7 +9,7 @@
 // layer on the server.
 
 // Vue imports are explicit (not Nuxt auto-imports) so this is unit-testable.
-import { ref, readonly, onMounted, onUnmounted, watchEffect } from 'vue'
+import { ref, readonly, onActivated, onDeactivated, onMounted, onUnmounted, watchEffect } from 'vue'
 
 export type AiScene = 'question_library' | 'composition_editor' | 'import_review'
 
@@ -35,15 +35,28 @@ export function useAiScene() {
         context.value = null
     }
 
-    /** Declare the scene for as long as the calling component is mounted. */
+    /**
+     * Declare the scene for as long as the calling page is the one on screen.
+     *
+     * onMounted/onUnmounted alone is not enough: app.vue uses a global
+     * <NuxtPage keepalive />, so a page the user navigated away from stays mounted and
+     * would keep claiming the scene — offering the model tools for a page nobody is on.
+     */
     const useSceneWhileMounted = (next: AiScene, ctx?: () => AiSceneContext) => {
-        onMounted(() => setScene(next, ctx?.()))
+        const claim = () => setScene(next, ctx?.())
+        const release = () => {
+            if (scene.value === next) clearScene()
+        }
+        onMounted(claim)
         if (ctx) {
             watchEffect(() => {
                 if (scene.value === next) context.value = ctx()
             })
         }
-        onUnmounted(clearScene)
+        // onActivated also fires on the initial mount; setScene is idempotent.
+        onActivated(claim)
+        onDeactivated(release)
+        onUnmounted(release)
     }
 
     return {

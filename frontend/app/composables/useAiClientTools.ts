@@ -32,7 +32,8 @@ const PAGE_ROUTES: Record<string, string> = {
     dashboard: '/',
 }
 
-const handlers: Record<string, ClientToolHandler> = {
+// Always available: navigation works from anywhere.
+const builtins: Record<string, ClientToolHandler> = {
     async open_composition(args) {
         const id = Number(args?.composition_id)
         const scope = String(args?.scope ?? '')
@@ -58,9 +59,28 @@ const handlers: Record<string, ClientToolHandler> = {
     },
 }
 
+// Page-scoped tools, registered while the owning page is active. Module-scoped so the
+// chat stream (which lives outside any component) can reach them.
+//
+// Tools that act on a specific page's live state MUST be registered/unregistered on
+// activate/deactivate rather than mount/unmount: app.vue uses a global
+// <NuxtPage keepalive />, so a page that the user navigated away from is still mounted
+// and would otherwise keep answering — editing a canvas nobody is looking at.
+const registered = new Map<string, ClientToolHandler>()
+
+export function registerClientTool(name: string, handler: ClientToolHandler): void {
+    registered.set(name, handler)
+}
+
+export function unregisterClientTool(name: string): void {
+    registered.delete(name)
+}
+
 export function useAiClientTools() {
     const run = async (name: string, args: Record<string, any>): Promise<ClientToolResult> => {
-        const handler = handlers[name]
+        const handler = builtins[name] ?? registered.get(name)
+        // Not registered is a normal outcome, not a bug: the user may have navigated away
+        // mid-run. Fail fast with a readable message instead of letting the run hang.
         if (!handler) return { ok: false, content: `前端没有实现工具 ${name}。` }
         try {
             return await handler(args ?? {})
