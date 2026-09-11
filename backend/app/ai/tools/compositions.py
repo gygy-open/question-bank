@@ -266,7 +266,10 @@ async def write_composition_nodes(ctx: ExecutionContext, args: Dict[str, Any]) -
 
 register(ToolSpec(
     name="create_composition",
-    description="在当前学科下新建一份空白稿件(试卷/讲义)。新建后用 write_composition_nodes 写入内容。",
+    description=(
+        "在当前学科下新建一份空白稿件(试卷/讲义)。新建后用 write_composition_nodes 写入内容。"
+        "仅当用户明确要求生成/制作稿件时使用，不要自作主张新建。"
+    ),
     parameters=CREATE_COMPOSITION_PARAMS,
     handler=create_composition,
     capability="composition.create",
@@ -280,6 +283,7 @@ register(ToolSpec(
         "**这是整份替换:调用后稿件里原有的内容会被 nodes 完全取代**,"
         "因此只应在刚新建的空白稿件上使用。"
         "不要用它做局部修改(插入/删除/移动某一题),那些操作请让用户在组稿编辑器里完成。"
+        "仅当用户明确要求生成/写入稿件内容时使用。"
     ),
     parameters=WRITE_COMPOSITION_NODES_PARAMS,
     handler=write_composition_nodes,

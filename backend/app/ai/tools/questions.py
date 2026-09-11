@@ -84,14 +84,14 @@ QUESTION_SCHEMA_PROPERTIES = {
         "items": {
             "type": "string"
         },
-        "description": "关联的知识点列表（字符串）。如果AI通过 search_knowledge_points 找到了确切的知识点名称，请在此处提供。如果不提供，系统将尝试根据内容自动匹配。"
+        "description": "关联的知识点列表（字符串）。提交前请先调用 search_knowledge_points 搜索题目涉及的知识点，使用搜索结果中的准确名称；仅在确实搜不到时留空，由系统按内容自动匹配（准确率低于人工核实）。"
     },
     "tags": {
         "type": "array",
         "items": {
             "type": "string"
         },
-        "description": "关联的标签列表（字符串）。请使用 get_available_tags 工具获取的准确标签名称。"
+        "description": "关联的标签列表（字符串）。提交前请先调用 get_available_tags 获取系统中实际存在的标签名称，不要凭空编造。"
     }
 }
 
@@ -119,7 +119,7 @@ level1_props["children"] = {
         "properties": level2_props,
         "description": "子题目 (Level 2)"
     },
-    "description": "子题目列表"
+    "description": "子题目列表。只要根题目带有 children，就必须通过 propose_questions_batch 提交（即使只有一个根题目），不要用 propose_question_draft。"
 }
 
 # Tool Definitions
@@ -534,7 +534,11 @@ _AUTHORING_SCENES = frozenset({AgentScene.QUESTION_LIBRARY, AgentScene.IMPORT_RE
 
 register(ToolSpec(
     name="propose_question_draft",
-    description="向用户提议创建一个新的题目草稿。此工具不会直接发布题目，而是生成一个待确认的提案。仅当用户明确请求“保存”或“导入”时使用。",
+    description=(
+        "向用户提议创建一个新的题目草稿。此工具不会直接发布题目，而是生成一个待确认的提案。仅当用户明确请求“保存”或“导入”时使用。"
+        "若题目带有子题目(children)，请改用 propose_questions_batch。"
+        "录入时必须原样保留用户提供的 answer/thinking/analysis/summary，不得修改或摘要。"
+    ),
     parameters=PROPOSE_DRAFT_PARAMS,
     handler=propose_question_draft,
     capability="question.create",
@@ -544,7 +548,12 @@ register(ToolSpec(
 
 register(ToolSpec(
     name="propose_questions_batch",
-    description="向用户提议批量导入题目。此工具不会直接发布题目，而是生成一组待确认的提案。当有多个题目需要处理时，必须优先使用此工具而不是逐个提议。",
+    description=(
+        "向用户提议批量导入题目。此工具不会直接发布题目，而是生成一组待确认的提案。"
+        "仅当用户明确请求“保存”或“导入”时使用。"
+        "当有多个题目需要处理，或题目带有子题目(children，即使只有一个根题目)时，必须使用此工具而不是逐个调用 propose_question_draft。"
+        "录入时必须原样保留用户提供的 answer/thinking/analysis/summary，不得修改或摘要。"
+    ),
     parameters=PROPOSE_BATCH_PARAMS,
     handler=propose_questions_batch,
     capability="question.create",
