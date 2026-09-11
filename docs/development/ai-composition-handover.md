@@ -268,6 +268,9 @@ for s in AgentScene:
 
 ### 4.1 本期明确不做（原方案第 4-5 步，下一期）
 
+> **已完成**，见 [组稿 AI 增量编辑 —— 交接文档](./ai-composition-incremental-edit.md)。
+> 一处偏差：`wrapInModule` 在本仓库的 AST 里不成立（`question_details` 不包含它描述的题目），已删除。
+
 | 项 | 说明 |
 |---|---|
 | **AST 增量原语** | `insertNodes` / `removeNodes` / `moveNode` / `setNodeProps` / `wrapInModule`，在前端实现 |
