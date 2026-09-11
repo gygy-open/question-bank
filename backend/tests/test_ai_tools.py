@@ -67,6 +67,8 @@ def test_registry_exposes_the_expected_tools():
         "get_available_tags",
         "create_composition",
         "write_composition_nodes",
+        "read_composition_outline",
+        "edit_composition",
         "open_composition",
         "open_page",
     }
@@ -133,14 +135,22 @@ def test_question_library_keeps_the_authoring_tools():
 def test_scoping_actually_shrinks_the_payload():
     """作用域的全部意义就是省下这段 —— 退化成不省了要能被发现。
 
-    实测(7 个工具):unscoped 12746 字符 → composition_editor 4485,约 -65%。
-    两个 propose_* 的嵌套 schema 就占了 7922。
+    不用「占比低于 X%」断言:组稿页专属工具(read_composition_outline / edit_composition)
+    会把分子分母同时抬高,占比会随工具集演进漂移。真正的不变量是
+    「组稿页省下的至少是两个 propose_* 的体量」—— 它们的嵌套 schema 是载荷大头。
     """
-    full = len(json.dumps(ai_tools.openai_schemas(AgentScene.UNSCOPED), ensure_ascii=False))
+    full_schemas = ai_tools.openai_schemas(AgentScene.UNSCOPED)
+    full = len(json.dumps(full_schemas, ensure_ascii=False))
     scoped = len(json.dumps(
         ai_tools.openai_schemas(AgentScene.COMPOSITION_EDITOR), ensure_ascii=False
     ))
-    assert scoped < full * 0.5
+    propose = sum(
+        len(json.dumps(s, ensure_ascii=False))
+        for s in full_schemas
+        if s["function"]["name"].startswith("propose_")
+    )
+    assert propose > 0
+    assert full - scoped >= propose
 
 
 async def test_out_of_scene_dispatch_is_blocked_without_side_effects(db_session, ctx):

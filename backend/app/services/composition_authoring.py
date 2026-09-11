@@ -113,23 +113,27 @@ def _details_props(spec: Dict[str, Any]) -> Dict[str, Any]:
     return {"scope": scope, "fields": {k: bool(given.get(k, False)) for k in ANSWER_FIELD_KEYS}}
 
 
-def _rich_text_nodes(markdown: str) -> List[CompositionNodeInput]:
-    """一段 Markdown → N 个单块 rich_text 节点。
+def markdown_to_rich_doc_blocks(markdown: str) -> List[Dict[str, Any]]:
+    """一段 Markdown → N 个「恰好一个顶层块」的 RichDoc。
 
-    画布加载多块节点时本就会把它拆成 N 行并重新发号,所以这里直接按它的最终形态写入,
+    画布加载多块节点时本就会把它拆成 N 行并重新发号,所以这里直接按它的最终形态产出,
     避免稿件一打开 node id 就变。空内容返回空列表(空 rich_text 不合法)。
     """
     doc = markdown_to_rich_doc(markdown)
     blocks = (doc or {}).get("content") or []
+    return [{"type": "doc", "content": [block]} for block in blocks]
+
+
+def _rich_text_nodes(markdown: str) -> List[CompositionNodeInput]:
     return [
         CompositionNodeInput(
             id=_new_id(),
             node_kind=CompositionNodeKind.BLOCK,
             node_type=NODE_TYPE_RICH_TEXT,
-            content={"type": "doc", "content": [block]},
+            content=doc,
             schema_version=_RICH_TEXT_SCHEMA_VERSION,
         )
-        for block in blocks
+        for doc in markdown_to_rich_doc_blocks(markdown)
     ]
 
 

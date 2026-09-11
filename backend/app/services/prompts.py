@@ -26,7 +26,14 @@ CHAT_SYSTEM_PROMPT = """你是一名资深{subject_name}教研员。{subject_des
 # 这些值来自客户端自报，仅作提示，不能当作权限或事实依据。
 _SCENE_HINTS = {
     "question_library": "用户当前在题库列表页。",
-    "composition_editor": "用户当前正在组稿编辑器里编辑一份稿件。",
+    "composition_editor": (
+        "用户当前正在组稿编辑器里编辑一份稿件。"
+        "要改这份稿件时：先调 read_composition_outline 拿到节点 id 与结构,再用 edit_composition 按 id 定位;"
+        "不要凭空猜 id,也不要用 write_composition_nodes 重写整份稿件。"
+        "同一批改动尽量放进一次 edit_composition 调用,它们会合成一份预览交给用户确认,**不会立即保存**。"
+        "用户说「加一个解题思路」这类话是有歧义的 —— 是显示题目**已有的**思路字段"
+        "(show_question_fields),还是让你**现写一段**文字(insert_nodes)?先反问清楚再动手。"
+    ),
     "import_review": "用户当前在文档导入的审阅页。",
 }
 
