@@ -281,3 +281,55 @@ async def test_client_tool_is_blocked_out_of_scene(ctx):
     assert not [e for e in events if isinstance(e, ClientToolRequested)]
     finished = [e for e in events if isinstance(e, ToolCallFinished)]
     assert "not available on the current page" in finished[0].content
+
+
+# --------------------------------------------------------------------------- #
+# 前端工具的服务端预处理(prepare)
+# --------------------------------------------------------------------------- #
+async def test_prepare_rewrites_the_arguments_pushed_to_the_client(ctx):
+    """prepare 的产物才是前端看到的入参 —— 原始入参不该漏过去。"""
+    spec = ai_tools.get("open_composition")
+
+    async def _prepare(_ctx, args):
+        return {**args, "scope": "shared"}
+
+    provider = FakeProvider([
+        [_tool_call("c1", "open_composition", '{"composition_id": 7, "scope": "personal"}')],
+        ["好了"],
+    ])
+    object.__setattr__(spec, "prepare", _prepare)
+    try:
+        events: List[Any] = []
+        async for event in AgentRunner(provider, {}).run(ctx, [{"role": "user", "content": "x"}]):
+            events.append(event)
+            if isinstance(event, ClientToolRequested):
+                client_channel.resolve(event.ticket, event.run_id, {"ok": True, "content": "ok"})
+    finally:
+        object.__setattr__(spec, "prepare", None)
+
+    requested = [e for e in events if isinstance(e, ClientToolRequested)]
+    assert requested[0].arguments == {"composition_id": 7, "scope": "shared"}
+
+
+async def test_prepare_failure_does_not_open_a_ticket(ctx):
+    """入参就不合法时不能开票 —— 请求推不出去,前端无从回传,只会白等满一轮超时。"""
+    spec = ai_tools.get("open_composition")
+
+    async def _prepare(_ctx, _args):
+        raise ValueError("composition_id 必须是整数")
+
+    provider = FakeProvider([[_tool_call("c1", "open_composition", "{}")], ["那我换个说法"]])
+    object.__setattr__(spec, "prepare", _prepare)
+    try:
+        events = await _drain(AgentRunner(provider, {}), ctx, [{"role": "user", "content": "x"}])
+    finally:
+        object.__setattr__(spec, "prepare", None)
+
+    assert not [e for e in events if isinstance(e, ClientToolRequested)]
+    assert client_channel.pending_count() == 0
+    # 失败也要配一张完整的动作卡片,否则前端的 action_result 找不到对应的 action。
+    assert len([e for e in events if isinstance(e, ToolCallStarted)]) == 1
+    finished = [e for e in events if isinstance(e, ToolCallFinished)]
+    assert "composition_id 必须是整数" in finished[0].content
+    assert events[-1].stop_reason == "completed"
+

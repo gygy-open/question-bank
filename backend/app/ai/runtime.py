@@ -48,6 +48,14 @@ def _client_tool_result(payload: Optional[Dict[str, Any]]) -> ToolResult:
     return ToolResult(content=content, data=payload.get("data"))
 
 
+async def _prepare_client_args(
+    spec: Any, ctx: ExecutionContext, call_args: Dict[str, Any]
+) -> Dict[str, Any]:
+    if spec.prepare is None:
+        return call_args
+    return await spec.prepare(ctx, call_args)
+
+
 @dataclass(frozen=True)
 class RunBudget:
     max_turns: int = 5
@@ -136,14 +144,21 @@ class AgentRunner:
                         # 暂停前必须先提交:SQLAlchemy 在 commit 时把连接还池。
                         # 若带着未结事务等待,十几个并发流就能耗尽连接池并锁死整个 API。
                         await ctx.db.commit()
-                        ticket = client_channel.open_ticket(run.id)
-                        # ClientToolRequested 本身就是前端的"已开始"信号,不再重复发 ToolCallStarted,
-                        # 否则前端会渲染出两张卡片,且第一张永远等不到收尾。
-                        yield ClientToolRequested(
-                            run_id=run.id, tool_call_id=tc.id, name=tc.name,
-                            arguments=call_args, ticket=ticket,
-                        )
-                        result = _client_tool_result(await client_channel.wait_for(ticket))
+                        try:
+                            prepared = await _prepare_client_args(spec, ctx, call_args)
+                        except Exception as exc:  # noqa: BLE001 - 模型需要看到失败原因
+                            # 入参就不合法,不开票 —— 否则请求推不出去,白等满一轮超时。
+                            yield ToolCallStarted(tool_call_id=tc.id, name=tc.name, arguments=args)
+                            result = ToolResult.text(f"Error preparing tool {tc.name}: {exc}")
+                        else:
+                            ticket = client_channel.open_ticket(run.id)
+                            # ClientToolRequested 本身就是前端的"已开始"信号,不再重复发 ToolCallStarted,
+                            # 否则前端会渲染出两张卡片,且第一张永远等不到收尾。
+                            yield ClientToolRequested(
+                                run_id=run.id, tool_call_id=tc.id, name=tc.name,
+                                arguments=prepared, ticket=ticket,
+                            )
+                            result = _client_tool_result(await client_channel.wait_for(ticket))
                     else:
                         yield ToolCallStarted(tool_call_id=tc.id, name=tc.name, arguments=args)
                         result = await ai_tools.dispatch(tc.name, ctx, call_args, scene=scene)

@@ -63,6 +63,9 @@ class ToolResult(BaseModel):
 
 ToolHandler = Callable[[ExecutionContext, Dict[str, Any]], Awaitable[ToolResult]]
 
+# client 工具的入参预处理器:在服务端校验/归一/富化后再推给前端。抛异常表示模型给的参数不合法。
+ToolPreparer = Callable[[ExecutionContext, Dict[str, Any]], Awaitable[Dict[str, Any]]]
+
 
 class ToolSpec(BaseModel):
     """一个暴露给模型的工具。
@@ -87,6 +90,9 @@ class ToolSpec(BaseModel):
     scenes: Optional[FrozenSet[AgentScene]] = None
     # client 工具没有服务端 handler:运行时把请求推给前端,等它回传结果。
     executor: Literal["server", "client"] = "server"
+    # 仅 client 工具:开票之前在服务端跑一遍(校验 + 归一 + 富化,如 Markdown → RichDoc),
+    # 让前端只做结构操作,也避免把必挂的请求推出去白等一轮超时。
+    prepare: Optional[ToolPreparer] = None
 
     def available_in(self, scene: AgentScene) -> bool:
         if self.scenes is None or scene is AgentScene.UNSCOPED:
