@@ -311,7 +311,8 @@ const handlePromptSelect = (content: string) => {
 // instance, so an in-flight generation keeps updating `messages` even after
 // the widget is closed/unmounted.
 const sendMessage = async () => {
-    const { $api } = useNuxtApp()
+    const nuxtApp = useNuxtApp()
+    const { $api } = nuxtApp
     if ((!input.value.trim() && selectedFiles.value.length === 0) || !selectedModelId.value || loading.value) return
 
     const userMessageContent = input.value.trim()
@@ -423,7 +424,9 @@ const sendMessage = async () => {
                         // timeout, so awaiting here would stall SSE reading.
                         if (!last.actions) last.actions = []
                         last.actions.push({ tool: data.tool, input: data.input, status: 'running' })
-                        useAiClientTools().handleRequest(data)
+                        // Re-establish Nuxt's async context: we're deep inside raw stream reads here,
+                        // which already crossed several awaits outside Nuxt's composable tracking.
+                        nuxtApp.runWithContext(() => useAiClientTools().handleRequest(data))
                     } else if (event === 'message_meta') {
                         if (data.role === 'user' && messages.value.length >= 2) {
                             messages.value[messages.value.length - 2].id = data.id

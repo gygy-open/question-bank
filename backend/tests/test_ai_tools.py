@@ -68,6 +68,7 @@ def test_registry_exposes_the_expected_tools():
         "create_composition",
         "write_composition_nodes",
         "open_composition",
+        "open_page",
     }
 
 

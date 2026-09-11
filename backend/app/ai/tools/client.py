@@ -26,6 +26,30 @@ OPEN_COMPOSITION_PARAMS = {
     "required": ["composition_id", "scope"],
 }
 
+# 枚举值,不是路径 —— 前端(useAiClientTools.ts 的 PAGE_ROUTES)据此映射真实路由,两侧手工保持一致。
+PAGE_KEYS = (
+    "question_library",
+    "knowledge_points",
+    "subjects",
+    "tags",
+    "compositions_shared",
+    "compositions_personal",
+    "import_review",
+    "dashboard",
+)
+
+OPEN_PAGE_PARAMS = {
+    "type": "object",
+    "properties": {
+        "page": {
+            "type": "string",
+            "enum": list(PAGE_KEYS),
+            "description": "要打开的页面标识。",
+        },
+    },
+    "required": ["page"],
+}
+
 
 if client_channel.is_enabled():
     register(ToolSpec(
@@ -35,5 +59,15 @@ if client_channel.is_enabled():
             "通常在用 write_composition_nodes 写完内容后调用,好让用户直接看到成果。"
         ),
         parameters=OPEN_COMPOSITION_PARAMS,
+        executor="client",
+    ))
+
+    register(ToolSpec(
+        name="open_page",
+        description=(
+            "在用户的浏览器里跳转到题库、知识点、学科、标签、组稿列表、导入审阅或首页等"
+            "列表/管理类页面。若要打开某一份具体的稿件,应使用 open_composition 而不是这个工具。"
+        ),
+        parameters=OPEN_PAGE_PARAMS,
         executor="client",
     ))

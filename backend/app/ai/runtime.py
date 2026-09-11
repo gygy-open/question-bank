@@ -129,7 +129,6 @@ class AgentRunner:
                     tool_calls_used += 1
                     args = _parse_arguments(tc.arguments)
                     call_args = args if isinstance(args, dict) else {}
-                    yield ToolCallStarted(tool_call_id=tc.id, name=tc.name, arguments=args)
 
                     began = time.monotonic()
                     spec = ai_tools.get(tc.name)
@@ -138,12 +137,15 @@ class AgentRunner:
                         # 若带着未结事务等待,十几个并发流就能耗尽连接池并锁死整个 API。
                         await ctx.db.commit()
                         ticket = client_channel.open_ticket(run.id)
+                        # ClientToolRequested 本身就是前端的"已开始"信号,不再重复发 ToolCallStarted,
+                        # 否则前端会渲染出两张卡片,且第一张永远等不到收尾。
                         yield ClientToolRequested(
                             run_id=run.id, tool_call_id=tc.id, name=tc.name,
                             arguments=call_args, ticket=ticket,
                         )
                         result = _client_tool_result(await client_channel.wait_for(ticket))
                     else:
+                        yield ToolCallStarted(tool_call_id=tc.id, name=tc.name, arguments=args)
                         result = await ai_tools.dispatch(tc.name, ctx, call_args, scene=scene)
                     latency_ms = int((time.monotonic() - began) * 1000)
 

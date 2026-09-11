@@ -244,6 +244,24 @@ async def test_client_tool_timeout_does_not_hang_the_run(ctx, monkeypatch):
     assert client_channel.pending_count() == 0
 
 
+async def test_client_tool_does_not_also_emit_tool_call_started(ctx):
+    """ClientToolRequested 已经是前端的"已开始"信号 —— 重复发 ToolCallStarted 会让前端
+    渲染出两张动作卡片,且第一张永远收不到 action_result 而卡在 loading。"""
+    provider = FakeProvider([
+        [_tool_call("c1", "open_composition", '{"composition_id": 7, "scope": "personal"}')],
+        ["好了"],
+    ])
+    events: List[Any] = []
+    async for event in AgentRunner(provider, {}).run(ctx, [{"role": "user", "content": "x"}]):
+        events.append(event)
+        if isinstance(event, ClientToolRequested):
+            client_channel.resolve(event.ticket, event.run_id, {"ok": True, "content": "已打开"})
+
+    assert not any(isinstance(e, ToolCallStarted) for e in events)
+    assert len([e for e in events if isinstance(e, ClientToolRequested)]) == 1
+    assert len([e for e in events if isinstance(e, ToolCallFinished)]) == 1
+
+
 async def test_client_tool_is_blocked_out_of_scene(ctx):
     """越界的前端工具不能触发等待,否则模型可以让整条流卡住。"""
     provider = FakeProvider([[_tool_call("c1", "open_composition", "{}")], ["ok"]])

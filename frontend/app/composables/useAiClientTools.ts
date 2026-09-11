@@ -20,6 +20,18 @@ type ClientToolHandler = (args: Record<string, any>) => Promise<ClientToolResult
 
 const COMPOSITION_SCOPES = new Set(['shared', 'personal'])
 
+// Keys must match PAGE_KEYS in backend/app/ai/tools/client.py exactly.
+const PAGE_ROUTES: Record<string, string> = {
+    question_library: '/questions',
+    knowledge_points: '/knowledge-points',
+    subjects: '/subjects',
+    tags: '/tags',
+    compositions_shared: '/compositions/shared',
+    compositions_personal: '/compositions/personal',
+    import_review: '/imports',
+    dashboard: '/',
+}
+
 const handlers: Record<string, ClientToolHandler> = {
     async open_composition(args) {
         const id = Number(args?.composition_id)
@@ -33,6 +45,16 @@ const handlers: Record<string, ClientToolHandler> = {
         // URL is built here from validated parts; the model never supplies a path.
         await navigateTo(`/compositions/${scope}/${id}`)
         return { ok: true, content: '已在浏览器中打开该稿件。', data: { composition_id: id } }
+    },
+
+    async open_page(args) {
+        const page = String(args?.page ?? '')
+        const path = PAGE_ROUTES[page]
+        if (!path) {
+            return { ok: false, content: `未知的页面标识：${page}` }
+        }
+        await navigateTo(path)
+        return { ok: true, content: '已在浏览器中打开该页面。', data: { page } }
     },
 }
 
@@ -54,8 +76,12 @@ export function useAiClientTools() {
         tool: string
         input?: Record<string, any>
     }) => {
+        // Captured before navigating: a route change crosses an await, and Nuxt's
+        // composable context does not survive that, so useCookie() must run wrapped
+        // in this reference rather than being called fresh afterwards.
+        const nuxtApp = useNuxtApp()
         const result = await run(payload.tool, payload.input ?? {})
-        const token = useCookie('token').value
+        const token = nuxtApp.runWithContext(() => useCookie('token').value)
         try {
             await $fetch(`/api/v1/chat/runs/${payload.run_id}/client-tool-result`, {
                 method: 'POST',
