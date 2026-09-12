@@ -10,8 +10,12 @@ import {
     finalizeChatStream,
     type ChatAction,
 } from '@/lib/chatStream'
+import { applyChatMessageMeta, nextChatMessageUiId } from '@/lib/chatMessages'
 
 export interface ChatMessage {
+    // Stable client-side identity, assigned at creation and never changed — used
+    // to key the list so an optimistic message survives the `message_meta` id update.
+    uiId: string
     id?: number
     role: 'user' | 'assistant' | 'system' | 'tool'
     content: string
@@ -140,6 +144,7 @@ const loadSession = async (sessionId: string) => {
         await $api<any>(`/chat/sessions/${sessionId}`)
         const msgs = await $api<any[]>(`/chat/sessions/${sessionId}/messages?skip=0&limit=${MESSAGE_LIMIT}`)
         messages.value = msgs.map((m: any) => ({
+            uiId: nextChatMessageUiId(),
             id: m.id,
             role: m.role,
             content: m.content || '',
@@ -164,6 +169,7 @@ const loadMore = async () => {
         const msgs = await $api<any[]>(`/chat/sessions/${currentSessionId.value}/messages?skip=${skip}&limit=${MESSAGE_LIMIT}`)
         if (msgs.length < MESSAGE_LIMIT) hasMore.value = false
         const newMessages = msgs.map((m: any) => ({
+            uiId: nextChatMessageUiId(),
             id: m.id,
             role: m.role,
             content: m.content || '',
@@ -344,11 +350,12 @@ const sendMessage = async () => {
 
         // Optimistic messages.
         messages.value.push({
+            uiId: nextChatMessageUiId(),
             role: 'user',
             content: userMessageContent,
             images: userImagesPreviews.length > 0 ? userImagesPreviews : undefined,
         })
-        messages.value.push({ role: 'assistant', content: '', actions: [] })
+        messages.value.push({ uiId: nextChatMessageUiId(), role: 'assistant', content: '', actions: [] })
 
         // 2. Upload images.
         const uploadedImagePaths: string[] = []
@@ -428,11 +435,8 @@ const sendMessage = async () => {
                     // which already crossed several awaits outside Nuxt's composable tracking.
                     nuxtApp.runWithContext(() => useAiClientTools().handleRequest(data))
                 } else if (event === 'message_meta') {
-                    if (data.role === 'user' && messages.value.length >= 2) {
-                        messages.value[messages.value.length - 2].id = data.id
-                    } else if (data.role === 'assistant') {
-                        last.id = data.id
-                    }
+                    // Attach the backend id to the optimistic message; uiId stays put.
+                    applyChatMessageMeta(messages.value, data)
                 } else if (event === 'done') {
                     receivedDone = true
                 }
