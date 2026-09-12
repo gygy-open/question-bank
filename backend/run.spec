@@ -56,12 +56,11 @@ for pkg in [
         # be absent; skip them rather than failing the whole build.
         pass
 
-# Alembic migration scripts, mail/doc templates and the built frontend must be
-# shipped as data (they are read at runtime, not imported).
+# Alembic migration scripts and the built frontend must be shipped as data
+# (they are read at runtime, not imported).
 datas += [
     ("alembic", "alembic"),
     ("alembic.ini", "."),
-    ("app/templates", "app/templates"),
     ("../frontend/.output/public", "frontend"),
 ]
 
