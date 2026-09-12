@@ -56,7 +56,6 @@ class ChatRequest(BaseModel):
     model_id: int
     message: ChatMessageCreate # The new message to add
     stream: bool = True
-    temperature: Optional[float] = 0.7
     subject_id: Optional[int] = None # Current working subject, used to render subject-specific prompts
     # 客户端自报的页面场景与轻量上下文:只用于挑工具和拼提示词,不可信,绝不用于授权。
     scene: Optional[str] = None

@@ -14,8 +14,10 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import type { Subject } from '~/types'
+import { filterPromptManageableSubjects } from '@/lib/subjectPromptAccess'
 
 const { $api } = useNuxtApp()
+const { permissions } = usePermissions()
 
 interface SubjectPrompt {
   key: string
@@ -32,7 +34,10 @@ const iconMap: Record<string, any> = {
   AI_SOLVE_PROMPT: BrainCircuit,
 }
 
-const subjects = ref<Subject[]>([])
+const availableSubjects = ref<Subject[]>([])
+const subjects = computed(() =>
+  filterPromptManageableSubjects(availableSubjects.value, permissions.value),
+)
 const selectedSubjectId = ref<string>('')
 const prompts = ref<SubjectPrompt[]>([])
 const drafts = reactive<Record<string, string>>({})
@@ -41,7 +46,7 @@ const saving = reactive<Record<string, boolean>>({})
 
 const fetchSubjects = async () => {
   try {
-    subjects.value = await $api<Subject[]>('/subjects')
+    availableSubjects.value = await $api<Subject[]>('/subjects')
     if (subjects.value.length && !selectedSubjectId.value) {
       selectedSubjectId.value = String(subjects.value[0].id)
     }
@@ -106,6 +111,10 @@ const reset = async (p: SubjectPrompt) => {
 }
 
 watch(selectedSubjectId, fetchPrompts)
+watch(subjects, (manageable) => {
+  if (manageable.some(subject => String(subject.id) === selectedSubjectId.value)) return
+  selectedSubjectId.value = manageable.length ? String(manageable[0].id) : ''
+})
 
 onMounted(async () => {
   await fetchSubjects()
@@ -117,7 +126,7 @@ onMounted(async () => {
 <template>
   <div class="space-y-6">
     <!-- 学科选择 -->
-    <div class="flex items-center gap-3 max-w-4xl">
+    <div v-if="subjects.length" class="flex items-center gap-3 max-w-4xl">
       <span class="text-sm font-medium shrink-0">配置学科</span>
       <Select v-model="selectedSubjectId">
         <SelectTrigger class="w-64">
@@ -138,7 +147,7 @@ onMounted(async () => {
       <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
     </div>
 
-    <div v-else class="max-w-4xl">
+    <div v-else-if="subjects.length" class="max-w-4xl">
       <Accordion type="single" collapsible class="w-full space-y-4">
         <AccordionItem
           v-for="p in prompts"
@@ -218,6 +227,12 @@ onMounted(async () => {
         <h3 class="text-lg font-medium">暂无可配置的提示词</h3>
         <p class="text-sm text-muted-foreground mt-1">请先选择一个学科</p>
       </div>
+    </div>
+
+    <div v-else class="flex max-w-4xl flex-col items-center justify-center rounded-lg border border-dashed p-12 text-center">
+      <MessageSquareText class="mb-4 h-8 w-8 text-muted-foreground/50" />
+      <h3 class="text-lg font-medium">暂无可管理的学科</h3>
+      <p class="mt-1 text-sm text-muted-foreground">需要学科负责人权限才能配置提示词</p>
     </div>
   </div>
 </template>

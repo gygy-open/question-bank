@@ -3,6 +3,13 @@
 // streaming requests survive component unmount — closing the floating widget
 // must NOT interrupt an ongoing generation.
 import { useLocalStorage } from '@vueuse/core'
+import {
+    completeChatAction,
+    createChatAction,
+    failRunningChatActions,
+    finalizeChatStream,
+    type ChatAction,
+} from '@/lib/chatStream'
 
 export interface ChatMessage {
     id?: number
@@ -10,7 +17,7 @@ export interface ChatMessage {
     content: string
     images?: string[]
     tool_calls?: any[]
-    actions?: any[]
+    actions?: ChatAction[]
     proposal?: any
 }
 
@@ -382,6 +389,7 @@ const sendMessage = async () => {
         const decoder = new TextDecoder()
         let buffer = ''
         let assistantMessage = ''
+        let receivedDone = false
 
         while (true) {
             const { done, value } = await reader.read()
@@ -397,47 +405,43 @@ const sendMessage = async () => {
 
                 const event = eventMatch[1].trim()
                 const dataStr = dataMatch[1].trim()
-                try {
-                    const data = JSON.parse(dataStr)
-                    if (messages.value.length === 0) continue
-                    const last = messages.value[messages.value.length - 1]
+                const data = JSON.parse(dataStr)
+                if (messages.value.length === 0) continue
+                const last = messages.value[messages.value.length - 1]
 
-                    if (event === 'message') {
-                        assistantMessage += data
-                        last.content = assistantMessage
-                    } else if (event === 'action') {
-                        if (!last.actions) last.actions = []
-                        last.actions.push({ tool: data.tool, input: data.input, status: 'running' })
-                    } else if (event === 'action_result') {
-                        const actions = last.actions
-                        if (actions && actions.length > 0) {
-                            const lastAction = actions[actions.length - 1]
-                            if (lastAction.tool === data.tool) {
-                                lastAction.status = 'completed'
-                                lastAction.output = data.output
-                            }
-                        }
-                    } else if (event === 'proposal') {
-                        last.proposal = data
-                    } else if (event === 'client_tool') {
-                        // Fire-and-forget: the backend is parked on a ticket with its own
-                        // timeout, so awaiting here would stall SSE reading.
-                        if (!last.actions) last.actions = []
-                        last.actions.push({ tool: data.tool, input: data.input, status: 'running' })
-                        // Re-establish Nuxt's async context: we're deep inside raw stream reads here,
-                        // which already crossed several awaits outside Nuxt's composable tracking.
-                        nuxtApp.runWithContext(() => useAiClientTools().handleRequest(data))
-                    } else if (event === 'message_meta') {
-                        if (data.role === 'user' && messages.value.length >= 2) {
-                            messages.value[messages.value.length - 2].id = data.id
-                        } else if (data.role === 'assistant') {
-                            last.id = data.id
-                        }
+                if (event === 'message') {
+                    assistantMessage += data
+                    last.content = assistantMessage
+                } else if (event === 'action') {
+                    if (!last.actions) last.actions = []
+                    last.actions.push(createChatAction(data))
+                } else if (event === 'action_result') {
+                    if (last.actions) completeChatAction(last.actions, data)
+                } else if (event === 'proposal') {
+                    last.proposal = data
+                } else if (event === 'client_tool') {
+                    // Fire-and-forget: the backend is parked on a ticket with its own
+                    // timeout, so awaiting here would stall SSE reading.
+                    if (!last.actions) last.actions = []
+                    last.actions.push(createChatAction(data))
+                    // Re-establish Nuxt's async context: we're deep inside raw stream reads here,
+                    // which already crossed several awaits outside Nuxt's composable tracking.
+                    nuxtApp.runWithContext(() => useAiClientTools().handleRequest(data))
+                } else if (event === 'message_meta') {
+                    if (data.role === 'user' && messages.value.length >= 2) {
+                        messages.value[messages.value.length - 2].id = data.id
+                    } else if (data.role === 'assistant') {
+                        last.id = data.id
                     }
-                } catch (e) {
-                    console.error('SSE parse error', e)
+                } else if (event === 'done') {
+                    receivedDone = true
                 }
             }
+        }
+
+        const last = messages.value[messages.value.length - 1]
+        if (!finalizeChatStream(last?.actions ?? [], receivedDone)) {
+            throw new Error('SSE stream ended before done')
         }
 
         fetchSessions()
@@ -446,7 +450,10 @@ const sendMessage = async () => {
     } catch (e) {
         console.error('Chat error', e)
         if (messages.value.length > 0) {
-            messages.value[messages.value.length - 1].content += '\n[Error: Failed to generate response]'
+            const last = messages.value[messages.value.length - 1]
+            if (last.actions) failRunningChatActions(last.actions)
+            const interruption = '[Error: 连接提前中断，请重试]'
+            if (!last.content.includes(interruption)) last.content += `\n${interruption}`
         }
     } finally {
         loading.value = false

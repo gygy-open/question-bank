@@ -21,6 +21,7 @@ import { Label } from '@/components/ui/label'
 
 const { $api } = useNuxtApp()
 const { user } = useAuth()
+const { permissions, isAdmin, isManagerSomewhere } = usePermissions()
 const router = useRouter()
 
 // Navigation State
@@ -29,10 +30,12 @@ const updateActiveTab = (tab: string) => {
   activeTab.value = tab
 }
 
-// Redirect if not superuser
 watchEffect(() => {
-  if (user.value && !user.value.is_superuser) {
+  if (!user.value || !permissions.value) return
+  if (!isAdmin.value && !isManagerSomewhere.value) {
     router.push('/')
+  } else if (!isAdmin.value) {
+    activeTab.value = 'prompts'
   }
 })
 
@@ -127,13 +130,14 @@ onMounted(() => {
 </script>
 
 <template>
-  <PageHeader title="系统设置" />
+  <PageHeader :title="isAdmin ? '系统设置' : '提示词配置'" />
   
   <div class="flex flex-col md:flex-row max-w-7xl mx-auto w-full items-stretch min-h-[calc(100vh-4rem)]">
     <!-- Left Sidebar Navigation -->
     <aside class="w-full md:w-56 shrink-0 md:border-r border-border p-4 md:pr-6 md:pt-8 bg-muted/20 md:bg-transparent">
       <nav class="flex flex-row md:flex-col gap-1 overflow-x-auto md:overflow-visible pb-2 md:pb-0 md:sticky md:top-8">
-        <Button 
+        <Button
+          v-if="isAdmin"
           :variant="activeTab === 'general' ? 'secondary' : 'ghost'" 
           class="justify-start gap-2 whitespace-nowrap lg:w-full"
           @click="updateActiveTab('general')"
@@ -141,7 +145,8 @@ onMounted(() => {
           <Settings class="w-4 h-4" />
           常规设置
         </Button>
-        <Button 
+        <Button
+          v-if="isAdmin"
           :variant="activeTab === 'ai' ? 'secondary' : 'ghost'" 
           class="justify-start gap-2 whitespace-nowrap lg:w-full"
           @click="updateActiveTab('ai')"
@@ -149,7 +154,7 @@ onMounted(() => {
           <Cpu class="w-4 h-4" />
           AI 大脑核心
         </Button>
-        <Button 
+        <Button
           :variant="activeTab === 'prompts' ? 'secondary' : 'ghost'" 
           class="justify-start gap-2 whitespace-nowrap lg:w-full"
           @click="updateActiveTab('prompts')"
@@ -157,7 +162,8 @@ onMounted(() => {
           <MessageSquareText class="w-4 h-4" />
           提示词配置
         </Button>
-        <Button 
+        <Button
+          v-if="isAdmin"
           :variant="activeTab === 'registration' ? 'secondary' : 'ghost'" 
           class="justify-start gap-2 whitespace-nowrap lg:w-full"
           @click="updateActiveTab('registration')"

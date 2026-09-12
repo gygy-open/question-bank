@@ -4,6 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException
 
 from app import models
 from app.api import deps
+from app.core.permissions import Permission
 from app.crud.crud_subject import subject as crud_subject
 from app.crud.crud_subject_prompt import subject_prompt as crud_subject_prompt
 from app.schemas.subject_prompt import SubjectPromptOut, SubjectPromptUpdate
@@ -28,12 +29,13 @@ def _to_out(key: str, value: str | None) -> SubjectPromptOut:
 async def list_subject_prompts(
     subject_id: int,
     db: deps.SessionDep,
-    current_user: models.User = Depends(deps.get_current_active_superuser),
+    current_user: models.User = Depends(deps.get_current_active_user),
 ) -> Any:
     """列出某学科的可覆盖提示词：含代码默认值、覆盖原文与是否已定制。"""
     subject = await crud_subject.get(db, id=subject_id)
     if not subject:
         raise HTTPException(status_code=404, detail="Subject not found")
+    deps.require(current_user, Permission.VIEW_QUESTION, subject_id=subject_id)
     out = []
     for key in SUBJECT_PROMPTS:
         override = await crud_subject_prompt.get_value(db, subject_id, key)
@@ -47,7 +49,7 @@ async def update_subject_prompt(
     key: str,
     payload: SubjectPromptUpdate,
     db: deps.SessionDep,
-    current_user: models.User = Depends(deps.get_current_active_superuser),
+    current_user: models.User = Depends(deps.get_current_active_user),
 ) -> Any:
     """保存某学科对某提示词的覆盖。"""
     if key not in SUBJECT_PROMPTS:
@@ -55,6 +57,7 @@ async def update_subject_prompt(
     subject = await crud_subject.get(db, id=subject_id)
     if not subject:
         raise HTTPException(status_code=404, detail="Subject not found")
+    deps.require(current_user, Permission.MANAGE_SUBJECT, subject_id=subject_id)
     await crud_subject_prompt.upsert(db, subject_id, key, payload.value)
     return _to_out(key, payload.value)
 
@@ -64,10 +67,14 @@ async def reset_subject_prompt(
     subject_id: int,
     key: str,
     db: deps.SessionDep,
-    current_user: models.User = Depends(deps.get_current_active_superuser),
+    current_user: models.User = Depends(deps.get_current_active_user),
 ) -> Any:
     """重置为默认：删除该学科的覆盖行。"""
     if key not in SUBJECT_PROMPTS:
         raise HTTPException(status_code=404, detail="Unknown prompt key")
+    subject = await crud_subject.get(db, id=subject_id)
+    if not subject:
+        raise HTTPException(status_code=404, detail="Subject not found")
+    deps.require(current_user, Permission.MANAGE_SUBJECT, subject_id=subject_id)
     await crud_subject_prompt.remove(db, subject_id, key)
     return _to_out(key, None)

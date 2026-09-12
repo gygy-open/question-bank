@@ -7,6 +7,7 @@ from app.schemas.chat import ChatRequest, ChatSession, ChatSessionCreate, ChatSe
 from app.models.chat import ChatMessage as ChatMessageModel
 from app.models.ai_config import AIModel
 from app.crud.crud_chat import chat_session, chat_message
+from app.db.session import SessionLocal
 from app.services.ai_provider import get_ai_provider
 from app.ai.adapters.sse import sse_pack, to_sse
 from app.ai.events import AssistantTurn, RunFinished, ToolCallFinished
@@ -73,7 +74,8 @@ async def get_image_base64(file_path: str) -> str:
         logger.error(f"Error reading image file {file_path}: {e}")
         return None
 
-async def generate_session_title(session_id: str, messages: List[Dict], db: AsyncSession, provider, config):
+async def generate_session_title(session_id: str, messages: List[Dict], provider, config):
+    # 背景任务:请求级 db 在 yield 依赖 teardown 后就关了,这里必须自建会话。
     try:
         # Create a prompt for title generation
         prompt = "Generate a short, concise title (max 5-7 words) for this conversation based on the first user message and assistant response. Do not use quotes. Language: Chinese."
@@ -90,7 +92,9 @@ async def generate_session_title(session_id: str, messages: List[Dict], db: Asyn
                 title += chunk
         
         title = title.strip()
-        if title:
+        if not title:
+            return
+        async with SessionLocal() as db:
             session = await chat_session.get(db, id=session_id)
             if session:
                 await chat_session.update(db, db_obj=session, obj_in={"title": title})
@@ -250,7 +254,7 @@ async def chat_generator(session_id: str, new_user_message: ChatMessageCreate, m
             {"role": "user", "content": user_msg.content},
             {"role": "assistant", "content": final_text},
         ]
-        background_tasks.add_task(generate_session_title, session_id, msgs_for_title, db, service_provider, provider_config)
+        background_tasks.add_task(generate_session_title, session_id, msgs_for_title, service_provider, provider_config)
 
 
 @router.post("/sessions", response_model=ChatSessionSummary)

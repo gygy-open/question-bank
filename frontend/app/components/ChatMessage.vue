@@ -6,13 +6,7 @@ import MarkdownPreview from '@/components/MarkdownPreview.vue'
 import SvgRenderer from '@/components/SvgRenderer.vue'
 import BatchImportCard from '@/components/BatchImportCard.vue'
 import { useClipboard } from '@vueuse/core'
-
-interface Action {
-    tool: string
-    input: any
-    output?: string
-    status: 'running' | 'completed' | 'error'
-}
+import type { ChatAction } from '@/lib/chatStream'
 
 interface Proposal {
     type: 'single' | 'batch'
@@ -25,7 +19,7 @@ interface Props {
     content: string
     images?: string[]
     loading?: boolean
-    actions?: Action[]
+    actions?: ChatAction[]
     proposal?: Proposal
 }
 
@@ -217,6 +211,7 @@ const copyContent = () => {
                 <div class="flex items-center gap-2">
                     <Loader2 v-if="action.status === 'running'" class="w-3 h-3 animate-spin" />
                     <Check v-else-if="action.status === 'completed'" class="w-3 h-3 text-green-500" />
+                    <X v-else class="w-3 h-3 text-destructive" />
                     <span class="font-mono font-bold truncate">{{ action.tool }}</span>
                 </div>
                 <div class="text-muted-foreground mt-1 truncate" :title="JSON.stringify(action.input)">

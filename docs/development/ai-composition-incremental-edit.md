@@ -4,7 +4,7 @@
 > 以及 [上一期交接文档](./ai-composition-handover.md) 第 4.1 节列的「本期明确不做」。
 >
 > 状态：**已实现，自动化测试全绿，未做人工/真实模型验收。**
-> 测试：后端 516 passed / 1 skipped，前端 212 passed（15 个文件）。**无 DB schema 变更，不需要迁移。**
+> 测试：后端 548 passed / 1 skipped，前端 220 passed（17 个文件）。**无 DB schema 变更，不需要迁移。**
 
 ---
 
@@ -153,10 +153,25 @@ client 工具没有 capability，但落盘走的是 `PUT .../nodes` → `composi
 
 ## 二、部署前必读：行为变更
 
-### ✅ 没有破坏性变更
+### ✅ 没有运行时破坏性变更
 
-无 DB schema 变更，无迁移，无既有 API 契约变更。新增的两个工具只在
-`composition_editor` 场景暴露，其余页面的工具集**逐字节未变**。
+无 DB schema 变更，无迁移。新增的两个工具只在 `composition_editor` 场景暴露，
+其余页面的工具集**逐字节未变**。
+
+后续清理从 `ChatRequest` 的 OpenAPI schema 删除了从未生效的 `temperature` 字段。
+Pydantic 仍按默认策略忽略额外字段，所以旧客户端继续发送它不会收到 422，但新生成的客户端不再看到该字段。
+
+### ⚠️ 学科提示词权限已改为学科级
+
+此前学科提示词接口仅超管可用，但没有走统一的 `deps.require`。现在成员凭
+`VIEW_QUESTION` 读取，负责人凭 `MANAGE_SUBJECT` 修改或重置，超管仍有全部权限。
+负责人可从侧栏进入设置页，但只会看到「提示词配置」和自己负责的学科；系统级设置仍只对超管开放。
+
+### ⚠️ SSE 现在区分正常完成与连接中断
+
+`action`、`client_tool`、`action_result` 都携带 `tool_call_id`，前端按调用 id 精确收尾，
+连续调用同名工具不会再匹配错卡片。只有收到 SSE `done` 才算正常完成；连接提前结束时，
+仍在运行的工具卡片会转为错误态并提示重试，不再永久转圈。
 
 ### ⚠️ `useAiScene` 的作用域收紧会影响另外两个页面
 
@@ -195,8 +210,8 @@ scene 仍然停在那里（keepalive 不触发 `onUnmounted`），模型继续�
 ### 3.1 自动化（应当全绿）
 
 ```bash
-cd backend && uv run python -m pytest tests/ -q    # 期望 516 passed, 1 skipped
-cd frontend && pnpm test                            # 期望 212 passed（15 files）
+cd backend && uv run python -m pytest tests/ -q    # 期望 548 passed, 1 skipped
+cd frontend && pnpm test                            # 期望 220 passed（17 files）
 ```
 
 > 注：用 `uv run python -m pytest`，直接 `uv run pytest` 会 `Permission denied`。
@@ -209,10 +224,15 @@ cd backend
 uv run python -m pytest tests/test_composition_ops.py -q       # 原语校验 + 工具契约
 uv run python -m pytest tests/test_agent_runtime.py -q         # 含 prepare 分支
 uv run python -m pytest tests/test_ai_tools.py -q              # 注册表 + 作用域
+uv run python -m pytest tests/test_ai_adapters_sse.py -q       # tool_call_id SSE 契约
+uv run python -m pytest tests/test_chat_session_title.py -q    # 后台标题独立 DB session
+uv run python -m pytest tests/test_api_subject_prompts.py -q   # 学科提示词权限矩阵
 
 cd ../frontend
 pnpm vitest run app/lib/__tests__/compositionPrimitives.test.ts
 pnpm vitest run app/composables/__tests__/useCompositionAiTools.test.ts
+pnpm vitest run app/lib/__tests__/chatStream.test.ts
+pnpm vitest run app/lib/__tests__/subjectPromptAccess.test.ts
 ```
 
 复核工具载荷：
@@ -327,18 +347,18 @@ for s in AgentScene:
 | **AI 不知道用户点了什么** | fire-and-return 的固有代价 | 若模型频繁追问「改好了吗」，可在提示词里明说它不会收到确认结果 |
 | **`option_layout` 没开放给 AI** | 枚举是 `'auto' \| 1 \| 2 \| 4`，混合类型在 JSON Schema 里表达得很丑 | 有人真的要 AI 调选项列数时再说 |
 
-### 4.3 上一期列出、本期仍未动的既有问题
+### 4.3 上一期遗留问题已清理
 
-下面这些是 [上一期文档](./ai-composition-handover.md) 第 4.2 节的原样搬运，本期没有处理：
+下面这些问题来自 [上一期文档](./ai-composition-handover.md) 第 4.2 节，已在后续维护中处理：
 
-| 问题 | 位置 | 严重度 |
+| 问题 | 处理 | 验证 |
 |---|---|---|
-| `enrichment.py` 是死代码 | `backend/app/ai/tools/enrichment.py` | 低，可单独开 PR 删 |
-| 请求级 `db` 被传进 background task | `chat.py` 的 `generate_session_title` | 中，可能静默不生成标题 |
-| `ChatRequest.temperature` 是死字段 | `schemas/chat.py` | 低 |
-| `action_result` 按工具名匹配最后一个 action | `useGlobalChat.ts` | 低 |
-| SSE `done` 事件前端没处理 | | 低 |
-| `subject_prompts.py` 无 `deps.require` | | 中，建议一并补 |
+| `enrichment.py` 是死代码 | 删除未导入、未注册的重复实现 | 工具注册表与全量后端测试通过 |
+| 请求级 `db` 被传进 background task | `generate_session_title` 在任务内创建并关闭 `SessionLocal` | 覆盖成功、空标题和 provider 异常 |
+| `ChatRequest.temperature` 是死字段 | 从请求 schema 删除；旧客户端多传仍按 Pydantic 默认策略忽略 | schema 契约测试 |
+| `action_result` 按工具名匹配最后一个 action | 三类工具事件透传 `tool_call_id`，前端按 id 关联；旧载荷才按同名 running action 回退 | 覆盖同名工具乱序返回 |
+| SSE `done` 事件前端没处理 | 显式记录 `done`；EOF 未见 `done` 时提示中断，并将遗留 action 标为错误 | 覆盖正常完成与提前 EOF |
+| `subject_prompts.py` 无 `deps.require` | `VIEW_QUESTION` 可读，`MANAGE_SUBJECT` 可写；负责人获得裁剪后的前端入口 | viewer/editor/manager/admin/跨学科权限矩阵 |
 
 ---
 

@@ -30,10 +30,11 @@ def to_sse(event: AgentEvent) -> Iterator[str]:
     if isinstance(event, TextDelta):
         yield sse_pack("message", event.text)
     elif isinstance(event, ToolCallStarted):
-        yield sse_pack("action", {"tool": event.name, "input": event.arguments})
+        yield sse_pack("action", {"tool_call_id": event.tool_call_id, "tool": event.name, "input": event.arguments})
     elif isinstance(event, ClientToolRequested):
         yield sse_pack("client_tool", {
             "run_id": event.run_id,
+            "tool_call_id": event.tool_call_id,
             "ticket": event.ticket,
             "tool": event.name,
             "input": event.arguments,
@@ -43,6 +44,6 @@ def to_sse(event: AgentEvent) -> Iterator[str]:
             yield sse_pack(directive.kind, directive.payload)
         content = event.content
         preview = content[:_PREVIEW_LIMIT] + "..." if len(content) > _PREVIEW_LIMIT else content
-        yield sse_pack("action_result", {"tool": event.name, "output": preview})
+        yield sse_pack("action_result", {"tool_call_id": event.tool_call_id, "tool": event.name, "output": preview})
     elif isinstance(event, RunFailed):
         yield sse_pack("message", f"\n[Error: {event.error}]")
