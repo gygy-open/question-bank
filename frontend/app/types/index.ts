@@ -79,6 +79,29 @@ export {
   BODY_SLOT,
 } from './composition'
 
+export type {
+  ExamSessionStatus,
+  ExamAttendanceStatus,
+  ScoreValue,
+  ScoreInput,
+  Student,
+  Classroom,
+  StudentCreateRequest,
+  StudentPage,
+  ClassroomCreateRequest,
+  ClassroomMembersReplaceRequest,
+  ExamQuestion,
+  ExamParticipant,
+  ExamSession,
+  ExamSessionDetail,
+  ExamSessionCreateRequest,
+  GradebookScoreItem,
+  GradebookRow,
+  Gradebook,
+  ScoreItemInput,
+  ScoreSaveRequest,
+  Result,
+} from './assessment'
 import type { RichDoc } from './richContent'
 import type {
   QuestionType,

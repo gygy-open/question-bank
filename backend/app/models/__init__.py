@@ -25,3 +25,16 @@ from .composition import (
     CompositionVersion,
     CompositionEvent,
 )
+from .assessment import (
+    ExamSessionStatus,
+    ExamAttendanceStatus,
+    Student,
+    Classroom,
+    ClassroomStudent,
+    ExamSession,
+    ExamQuestion,
+    ExamParticipant,
+    ExamResult,
+    ExamScoreItem,
+    ExamEvent,
+)

@@ -32,18 +32,31 @@ class Permission(str, enum.Enum):
     MANAGE_SUBJECT = "manage_subject"    # 改学科配置/知识点/标签
     MANAGE_MEMBERS = "manage_members"    # 在本学科内分配成员与角色
     VIEW_PRIVATE_ANY = "view_private_any"  # 查看他人私有题(v1 仅 admin)
+    VIEW_ASSESSMENT = "view_assessment"    # 查看考试/成绩
+    EDIT_SCORE = "edit_score"              # 录入/修改成绩
+    MANAGE_ASSESSMENT = "manage_assessment"  # 创建/管理考试、班级、学生档案
 
 
 # 唯一的角色→权限映射。admin 单独走全量,不在此表内。
 ROLE_PERMISSIONS: dict[SubjectRole, frozenset[Permission]] = {
     SubjectRole.VIEWER: frozenset({Permission.VIEW_QUESTION}),
-    SubjectRole.EDITOR: frozenset({Permission.VIEW_QUESTION, Permission.EDIT_QUESTION}),
+    SubjectRole.EDITOR: frozenset(
+        {
+            Permission.VIEW_QUESTION,
+            Permission.EDIT_QUESTION,
+            Permission.VIEW_ASSESSMENT,
+            Permission.EDIT_SCORE,
+        }
+    ),
     SubjectRole.MANAGER: frozenset(
         {
             Permission.VIEW_QUESTION,
             Permission.EDIT_QUESTION,
             Permission.MANAGE_SUBJECT,
             Permission.MANAGE_MEMBERS,
+            Permission.VIEW_ASSESSMENT,
+            Permission.EDIT_SCORE,
+            Permission.MANAGE_ASSESSMENT,
         }
     ),
 }

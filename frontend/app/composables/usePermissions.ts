@@ -5,6 +5,9 @@ export const Capability = {
   MANAGE_SUBJECT: 'manage_subject',
   MANAGE_MEMBERS: 'manage_members',
   VIEW_PRIVATE_ANY: 'view_private_any',
+  VIEW_ASSESSMENT: 'view_assessment',
+  EDIT_SCORE: 'edit_score',
+  MANAGE_ASSESSMENT: 'manage_assessment',
 } as const
 
 export type CapabilityValue = typeof Capability[keyof typeof Capability]

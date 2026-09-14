@@ -26,7 +26,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import UserProfileDialog from '~/components/UserProfileDialog.vue'
 import ChangePasswordDialog from '~/components/ChangePasswordDialog.vue'
 import { useColorMode } from '@vueuse/core'
-import { BookOpen, ChevronsUpDown, ListTree, LogOut, Settings, Sparkles, User, Users, Tags, Library, HelpCircle, KeyRound, Activity, Layers, Info, Moon, Sun, Bot, Lock } from '@lucide/vue'
+import { BookOpen, ChevronsUpDown, ListTree, LogOut, Settings, Sparkles, User, Users, Tags, Library, HelpCircle, KeyRound, Activity, Layers, Info, Moon, Sun, Bot, Lock, ClipboardCheck } from '@lucide/vue'
 
 const props = withDefaults(defineProps<SidebarProps>(), {
   collapsible: "icon",
@@ -34,7 +34,8 @@ const props = withDefaults(defineProps<SidebarProps>(), {
 
 const route = useRoute()
 const { user, logout } = useAuth()
-const { isAdmin, isManagerSomewhere } = usePermissions()
+const { isAdmin, isManagerSomewhere, permissions, can } = usePermissions()
+const { currentSubjectId } = useSubjectContext()
 const router = useRouter()
 const chat = useGlobalChat()
 const isProfileOpen = ref(false)
@@ -134,6 +135,36 @@ const navActiveClass = 'border-l-2 border-transparent data-[active=true]:border-
                   <NuxtLink to="/compositions/personal">
                     <Lock />
                     <span>个人空间</span>
+                  </NuxtLink>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+            </SidebarMenu>
+          </div>
+
+          <div v-if="permissions && can(Capability.VIEW_ASSESSMENT, currentSubjectId)">
+            <SidebarGroupLabel>考试</SidebarGroupLabel>
+            <SidebarMenu>
+              <SidebarMenuItem>
+                <SidebarMenuButton
+                  as-child
+                  :is-active="route.path === '/exams' || route.path.startsWith('/exams/')"
+                  :class="navActiveClass"
+                >
+                  <NuxtLink to="/exams">
+                    <ClipboardCheck />
+                    <span>考试与成绩</span>
+                  </NuxtLink>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+              <SidebarMenuItem>
+                <SidebarMenuButton
+                  as-child
+                  :is-active="route.path === '/rosters'"
+                  :class="navActiveClass"
+                >
+                  <NuxtLink to="/rosters">
+                    <Users />
+                    <span>学生与班级</span>
                   </NuxtLink>
                 </SidebarMenuButton>
               </SidebarMenuItem>

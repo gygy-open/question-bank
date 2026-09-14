@@ -4,11 +4,12 @@ import { ref, computed, onMounted, watch } from 'vue'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Separator } from '@/components/ui/separator'
-import { ArrowLeft, Download, Loader2, Users, Lock, AlertTriangle } from '@lucide/vue'
+import { ArrowLeft, Download, Loader2, Users, Lock, AlertTriangle, ClipboardCheck } from '@lucide/vue'
 import { toast } from 'vue-sonner'
 import SnapshotRenderer from '~/components/composition/SnapshotRenderer.vue'
 import { useCompositionExport } from '~/composables/useCompositionExport'
 import { useCompositions } from '~/composables/useCompositions'
+import { Capability, usePermissions } from '~/composables/usePermissions'
 import { normalizeScope } from '~/lib/compositions'
 import type { CompositionExportFormat, CompositionScope, CompositionVersionDetail } from '~/types'
 
@@ -17,8 +18,19 @@ const router = useRouter()
 const api = useCompositions()
 const exportApi = useCompositionExport()
 const { currentSubjectId } = useSubjectContext()
+const { can } = usePermissions()
 
 const scope = computed<CompositionScope>(() => normalizeScope(route.params.scope))
+
+// 仅共享空间、版本已加载且对当前学科有成绩管理权限时，允许由此版本创建考试。
+const canCreateExam = computed(
+  () => scope.value === 'shared' && !!version.value && can(Capability.MANAGE_ASSESSMENT, currentSubjectId.value),
+)
+
+function createExamFromVersion() {
+  if (!version.value) return
+  router.push(`/exams?compositionVersionId=${version.value.id}`)
+}
 const compositionId = computed(() => Number(route.params.id))
 const versionNo = computed(() => Number(route.params.versionNo))
 
@@ -90,6 +102,14 @@ function doExport(format: CompositionExportFormat) {
       <component :is="scope === 'shared' ? Users : Lock" class="h-3 w-3" />
       {{ scope === 'shared' ? '共享' : '个人' }}
     </Badge>
+    <Button
+      v-if="canCreateExam"
+      size="sm"
+      @click="createExamFromVersion"
+    >
+      <ClipboardCheck class="mr-2 h-4 w-4" />
+      创建考试
+    </Button>
     <Button
       v-if="version" size="sm" variant="outline"
       :disabled="exportApi.isExporting(compositionId, versionNo, 'docx') || exportApi.isExporting(compositionId, versionNo, 'latex')"
