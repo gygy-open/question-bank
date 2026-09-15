@@ -12,8 +12,6 @@ services:
     command:
       - --character-set-server=utf8mb4
       - --collation-server=utf8mb4_unicode_ci
-    ports:
-      - "3306:3306"
     volumes:
       - mysql_data:/var/lib/mysql
     healthcheck:
@@ -27,8 +25,6 @@ services:
     restart: unless-stopped
     volumes:
       - chromadb_data:/data
-    ports:
-      - "8001:8000"
 
   migrate:
     image: ghcr.io/gygy-open/question-bank-backend:${IMAGE_TAG:-latest}
@@ -60,8 +56,6 @@ services:
       CHROMADB_HOST: ${CHROMADB_HOST:-chromadb}
       CHROMADB_PORT: ${CHROMADB_PORT:-8000}
       LOG_LEVEL: ${LOG_LEVEL:-INFO}
-    ports:
-      - "8000:8000"
     volumes:
       - ${UPLOADS_DIR:-./backend/uploads}:/app/uploads
       - ${STATIC_DIR:-./backend/static}:/app/static
