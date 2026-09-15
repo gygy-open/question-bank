@@ -1,3 +1,5 @@
+name: question-bank
+
 services:
   mysql:
     image: mysql:8.0
@@ -24,7 +26,7 @@ services:
     image: chromadb/chroma:latest
     restart: unless-stopped
     volumes:
-      - ./chromadb_data:/data
+      - chromadb_data:/data
     ports:
       - "8001:8000"
 
@@ -45,8 +47,8 @@ services:
     ports:
       - "8000:8000"
     volumes:
-      - ./backend/uploads:/app/uploads
-      - ./backend/static:/app/static
+      - uploads_data:/app/uploads
+      - static_data:/app/static
     depends_on:
       mysql:
         condition: service_healthy
@@ -69,8 +71,8 @@ services:
       CHROMADB_PORT: ${CHROMADB_PORT:-8000}
       LOG_LEVEL: ${LOG_LEVEL:-INFO}
     volumes:
-      - ./backend/uploads:/app/uploads
-      - ./backend/static:/app/static
+      - uploads_data:/app/uploads
+      - static_data:/app/static
     depends_on:
       - backend
 
@@ -90,3 +92,6 @@ services:
 
 volumes:
   mysql_data:
+  chromadb_data:
+  uploads_data:
+  static_data:
