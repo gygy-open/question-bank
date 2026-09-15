@@ -47,8 +47,8 @@ services:
     ports:
       - "8000:8000"
     volumes:
-      - uploads_data:/app/uploads
-      - static_data:/app/static
+      - ${UPLOADS_DIR:-./backend/uploads}:/app/uploads
+      - ${STATIC_DIR:-./backend/static}:/app/static
     depends_on:
       mysql:
         condition: service_healthy
@@ -71,8 +71,8 @@ services:
       CHROMADB_PORT: ${CHROMADB_PORT:-8000}
       LOG_LEVEL: ${LOG_LEVEL:-INFO}
     volumes:
-      - uploads_data:/app/uploads
-      - static_data:/app/static
+      - ${UPLOADS_DIR:-./backend/uploads}:/app/uploads
+      - ${STATIC_DIR:-./backend/static}:/app/static
     depends_on:
       - backend
 
@@ -93,5 +93,3 @@ services:
 volumes:
   mysql_data:
   chromadb_data:
-  uploads_data:
-  static_data:
