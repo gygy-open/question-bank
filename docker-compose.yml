@@ -33,7 +33,7 @@ services:
       dockerfile: Dockerfile
       target: pro
     user: "${UID:-1000}:${GID:-1000}"
-    restart: "no"
+    restart: "on-failure:5"
     command: ["alembic", "upgrade", "head"]
     environment:
       SECRET_KEY: ${SECRET_KEY:?SECRET_KEY is required}
