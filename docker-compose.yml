@@ -30,6 +30,22 @@ services:
     ports:
       - "8001:8000"
 
+  migrate:
+    image: ghcr.io/gygy-open/question-bank-backend:${IMAGE_TAG:-latest}
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+      target: pro
+    user: "${UID:-1000}:${GID:-1000}"
+    restart: "no"
+    command: ["alembic", "upgrade", "head"]
+    environment:
+      SECRET_KEY: ${SECRET_KEY:?SECRET_KEY is required}
+      DB_URL: ${DB_URL:-mysql+aiomysql://question_bank:${MYSQL_PASSWORD}@mysql:3306/${MYSQL_DATABASE:-question_bank}}
+    depends_on:
+      mysql:
+        condition: service_healthy
+
   backend:
     image: ghcr.io/gygy-open/question-bank-backend:${IMAGE_TAG:-latest}
     build:
@@ -50,8 +66,8 @@ services:
       - ${UPLOADS_DIR:-./backend/uploads}:/app/uploads
       - ${STATIC_DIR:-./backend/static}:/app/static
     depends_on:
-      mysql:
-        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
       chromadb:
         condition: service_started
 
@@ -74,7 +90,10 @@ services:
       - ${UPLOADS_DIR:-./backend/uploads}:/app/uploads
       - ${STATIC_DIR:-./backend/static}:/app/static
     depends_on:
-      - backend
+      migrate:
+        condition: service_completed_successfully
+      backend:
+        condition: service_started
 
   frontend:
     image: ghcr.io/gygy-open/question-bank-frontend:${IMAGE_TAG:-latest}
