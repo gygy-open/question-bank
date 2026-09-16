@@ -32,7 +32,6 @@ services:
       context: ./backend
       dockerfile: Dockerfile
       target: pro
-    user: "${UID:-1000}:${GID:-1000}"
     restart: "on-failure:5"
     command: ["alembic", "upgrade", "head"]
     environment:
@@ -48,7 +47,6 @@ services:
       context: ./backend
       dockerfile: Dockerfile
       target: pro
-    user: "${UID:-1000}:${GID:-1000}"
     restart: unless-stopped
     environment:
       SECRET_KEY: ${SECRET_KEY:?SECRET_KEY is required}
@@ -57,8 +55,8 @@ services:
       CHROMADB_PORT: ${CHROMADB_PORT:-8000}
       LOG_LEVEL: ${LOG_LEVEL:-INFO}
     volumes:
-      - ${UPLOADS_DIR:-./backend/uploads}:/app/uploads
-      - ${STATIC_DIR:-./backend/static}:/app/static
+      - uploads_data:/app/uploads
+      - static_data:/app/static
     depends_on:
       migrate:
         condition: service_completed_successfully
@@ -71,7 +69,6 @@ services:
       context: ./backend
       dockerfile: Dockerfile
       target: pro
-    user: "${UID:-1000}:${GID:-1000}"
     restart: unless-stopped
     command: python -m app.worker
     environment:
@@ -81,8 +78,8 @@ services:
       CHROMADB_PORT: ${CHROMADB_PORT:-8000}
       LOG_LEVEL: ${LOG_LEVEL:-INFO}
     volumes:
-      - ${UPLOADS_DIR:-./backend/uploads}:/app/uploads
-      - ${STATIC_DIR:-./backend/static}:/app/static
+      - uploads_data:/app/uploads
+      - static_data:/app/static
     depends_on:
       migrate:
         condition: service_completed_successfully
@@ -106,3 +103,5 @@ services:
 volumes:
   mysql_data:
   chromadb_data:
+  uploads_data:
+  static_data:

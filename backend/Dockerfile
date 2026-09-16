@@ -39,7 +39,10 @@ COPY --from=builder --chown=nonroot:nonroot /app/.venv /app/.venv
 
 COPY --chown=nonroot:nonroot . /app/
 
-RUN dos2unix /app/entrypoint.sh && chmod +x /app/entrypoint.sh
+RUN mkdir -p /app/static/media /app/uploads \
+ && chown -R nonroot:nonroot /app/static /app/uploads \
+ && dos2unix /app/entrypoint.sh \
+ && chmod +x /app/entrypoint.sh
 
 ENV PATH="/app/.venv/bin:$PATH"
 
