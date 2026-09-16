@@ -1,24 +1,25 @@
-"""成绩录入 (Assessment) 域能力 —— 第二期纵向切片。
+"""通用评测 (Assessment) 域能力 —— 第二期纵向切片的唯一业务入口。
 
-覆盖:学生/班级名册、考试创建与详情、考试状态流转(开始录入 / 锁定)、
-gradebook 读取与逐题录分。
+三段式 `load → authorize → execute`:`load` 做学科存在性前置(不可见/不存在的学科统一
+404),`authorize` 按学科作用域判权(VIEW_ASSESSMENT / MANAGE_ASSESSMENT / EDIT_SCORE),
+`execute` 委托 `services.assessment_service` / `crud_assessment` 完成工作单元并自行 commit。
 
-鉴权显式声明,均为 Scope.SUBJECT:
-- 读取(详情 / 名册 / gradebook):VIEW_ASSESSMENT
-- 创建学生/班级、改名单、状态流转:MANAGE_ASSESSMENT
-- 保存成绩:EDIT_SCORE
-不进入 UNGATED_ALLOWLIST。
+判权语义:
+- 读(名册/评测/投放/gradebook/统计)→ VIEW_ASSESSMENT。
+- 管理(建学生/班级/替换成员/从组稿创建评测)→ MANAGE_ASSESSMENT。
+- 录分(开始/定稿/追加成绩)→ EDIT_SCORE。
+
+跨学科定位失败在 service/crud 的 scoped 查询里回落为 NotFound(404,防枚举)。
 """
 from __future__ import annotations
 
-from typing import Any, List, Optional
+from typing import Any, Dict, List, Optional
 
 from pydantic import BaseModel, Field
 
 from app import crud
 from app.core.permissions import Permission
 from app.crud import crud_assessment
-from app.models.assessment import Classroom, ExamSession, Student
 from app.services import assessment_service
 
 from .base import Authz, Capability, Scope
@@ -27,164 +28,103 @@ from .errors import NotFound
 from .registry import register
 
 
-class ExamSessionCreateInput(BaseModel):
-    subject_id: int
-    composition_version_id: int
-    classroom_id: int
-    name: str
-
-
-class ExamSessionRefInput(BaseModel):
-    subject_id: int
-    exam_session_id: int
-
-
-class ExamSessionListInput(BaseModel):
-    subject_id: int
-    status: Optional[str] = None
-    classroom_id: Optional[int] = None
-
-
-class StudentCreateInput(BaseModel):
-    subject_id: int
-    student_no: str
-    name: str
-    user_id: Optional[int] = None
-
-
-class StudentListInput(BaseModel):
-    subject_id: int
-    keyword: Optional[str] = None
-    page: int = 1
-    page_size: int = 50
-
-
-class ClassroomCreateInput(BaseModel):
-    subject_id: int
-    name: str
-
-
-class ClassroomListInput(BaseModel):
-    subject_id: int
-
-
-class ClassroomStudentsListInput(BaseModel):
-    subject_id: int
-    classroom_id: int
-
-
-class ClassroomMembersReplaceInput(BaseModel):
-    subject_id: int
-    classroom_id: int
-    student_ids: List[int] = Field(default_factory=list)
-
-
-class ScoreItemInput(BaseModel):
-    exam_question_id: int
-    score: Optional[Any] = None
-
-
-class SaveScoresInput(BaseModel):
-    subject_id: int
-    exam_session_id: int
-    result_id: int
-    expected_revision: int
-    batch_id: Optional[str] = None
-    items: List[ScoreItemInput] = Field(default_factory=list)
-
-
-class ScoreImportInput(BaseModel):
-    subject_id: int
-    exam_session_id: int
-    file_bytes: bytes
-
-
-class ScoreImportApplyInput(ScoreImportInput):
-    batch_id: str = Field(min_length=1, max_length=64)
-
-
 async def _ensure_subject(ctx: ExecutionContext, subject_id: int) -> None:
     if not await crud.subject.get(ctx.db, id=subject_id):
         raise NotFound("Subject not found")
 
 
+# --------------------------------------------------------------------------- #
+# 输入模型
+# --------------------------------------------------------------------------- #
+class SubjectScopedInput(BaseModel):
+    subject_id: int
+
+
+class StudentCreateInput(SubjectScopedInput):
+    student_no: str
+    name: str
+    user_id: Optional[int] = None
+
+
+class StudentListInput(SubjectScopedInput):
+    keyword: Optional[str] = None
+    page: int = 1
+    page_size: int = 50
+
+
+class ClassroomCreateInput(SubjectScopedInput):
+    name: str
+
+
+class ClassroomListInput(SubjectScopedInput):
+    pass
+
+
+class ClassroomStudentsListInput(SubjectScopedInput):
+    classroom_id: int
+
+
+class ClassroomMembersReplaceInput(SubjectScopedInput):
+    classroom_id: int
+    student_ids: List[int] = Field(default_factory=list)
+
+
+class AssessmentCreateInput(SubjectScopedInput):
+    title: str
+    composition_version_id: int
+    classroom_id: int
+    session_name: Optional[str] = None
+
+
+class AssessmentListInput(SubjectScopedInput):
+    status: Optional[str] = None
+
+
+class AssessmentRefInput(SubjectScopedInput):
+    assessment_id: int
+
+
+class SessionListInput(SubjectScopedInput):
+    grading_status: Optional[str] = None
+    assessment_id: Optional[int] = None
+
+
+class SessionRefInput(SubjectScopedInput):
+    session_id: int
+
+
+class GradebookInput(SessionRefInput):
+    page: int = 1
+    page_size: int = 50
+
+
+class GradeAppendInput(SubjectScopedInput):
+    attempt_id: int
+    expected_revision: int
+    batch_id: Optional[str] = None
+    items: List[Dict[str, Any]] = Field(default_factory=list)
+
+
+class ExportGradebookInput(SessionRefInput):
+    pass
+
+
+class PreviewGradeImportInput(SessionRefInput):
+    file_bytes: bytes
+
+
+class ApplyGradeImportInput(SessionRefInput):
+    file_bytes: bytes
+    batch_id: Optional[str] = None
+
+
+# --------------------------------------------------------------------------- #
+# 名册
+# --------------------------------------------------------------------------- #
 @register
-class CreateExamSession(Capability[ExamSessionCreateInput, ExamSession]):
-    name = "assessment.create_exam_session"
-    description = "从一个共享组稿定稿版本与班级创建一场 draft 考试并冻结题目/参与者。"
-    input_model = ExamSessionCreateInput
-    authz = Authz.PERMISSION
-    permission = Permission.MANAGE_ASSESSMENT
-    scope = Scope.SUBJECT
-    mutating = True
-
-    async def load(self, ctx: ExecutionContext, inp: ExamSessionCreateInput) -> None:
-        await _ensure_subject(ctx, inp.subject_id)
-
-    async def execute(
-        self, ctx: ExecutionContext, inp: ExamSessionCreateInput, target: Any
-    ) -> ExamSession:
-        return await assessment_service.create_exam_session(
-            ctx.db,
-            subject_id=inp.subject_id,
-            composition_version_id=inp.composition_version_id,
-            classroom_id=inp.classroom_id,
-            name=inp.name,
-            actor=ctx.actor,
-        )
-
-
-@register
-class GetExamSession(Capability[ExamSessionRefInput, ExamSession]):
-    name = "assessment.get_exam_session"
-    description = "按学科强上下文读取考试详情(题目清单与参与者快照)。"
-    input_model = ExamSessionRefInput
-    authz = Authz.PERMISSION
-    permission = Permission.VIEW_ASSESSMENT
-    scope = Scope.SUBJECT
-    mutating = False
-
-    async def load(self, ctx: ExecutionContext, inp: ExamSessionRefInput) -> ExamSession:
-        await _ensure_subject(ctx, inp.subject_id)
-        session = await crud_assessment.assessment.get_session_detail(
-            ctx.db, exam_session_id=inp.exam_session_id, subject_id=inp.subject_id
-        )
-        if session is None:
-            raise NotFound("Exam session not found")
-        return session
-
-    async def execute(
-        self, ctx: ExecutionContext, inp: ExamSessionRefInput, target: ExamSession
-    ) -> ExamSession:
-        return target
-
-
-@register
-class ListExamSessions(Capability[ExamSessionListInput, list]):
-    name = "assessment.list_exam_sessions"
-    description = "按学科列出考试(可选 status / classroom_id 过滤),按创建时间倒序。"
-    input_model = ExamSessionListInput
-    authz = Authz.PERMISSION
-    permission = Permission.VIEW_ASSESSMENT
-    scope = Scope.SUBJECT
-    mutating = False
-
-    async def load(self, ctx: ExecutionContext, inp: ExamSessionListInput) -> None:
-        await _ensure_subject(ctx, inp.subject_id)
-
-    async def execute(
-        self, ctx: ExecutionContext, inp: ExamSessionListInput, target: Any
-    ) -> list:
-        return await crud_assessment.assessment.list_sessions(
-            ctx.db,
-            subject_id=inp.subject_id,
-            status=inp.status,
-            classroom_id=inp.classroom_id,
-        )
-@register
-class CreateStudent(Capability[StudentCreateInput, Student]):
+class CreateStudent(Capability[StudentCreateInput, Any]):
     name = "assessment.create_student"
-    description = "在学科下创建学生档案(学号学科内唯一,可绑定系统用户)。"
+    description = "在学科名册下新建学生档案。"
     input_model = StudentCreateInput
     authz = Authz.PERMISSION
     permission = Permission.MANAGE_ASSESSMENT
@@ -194,9 +134,7 @@ class CreateStudent(Capability[StudentCreateInput, Student]):
     async def load(self, ctx: ExecutionContext, inp: StudentCreateInput) -> None:
         await _ensure_subject(ctx, inp.subject_id)
 
-    async def execute(
-        self, ctx: ExecutionContext, inp: StudentCreateInput, target: Any
-    ) -> Student:
+    async def execute(self, ctx: ExecutionContext, inp: StudentCreateInput, target: Any) -> Any:
         return await assessment_service.create_student(
             ctx.db,
             subject_id=inp.subject_id,
@@ -208,9 +146,9 @@ class CreateStudent(Capability[StudentCreateInput, Student]):
 
 
 @register
-class ListStudents(Capability[StudentListInput, dict]):
+class ListStudents(Capability[StudentListInput, Dict[str, Any]]):
     name = "assessment.list_students"
-    description = "按学科分页/搜索学生名册。"
+    description = "分页查询学科名册中的学生。"
     input_model = StudentListInput
     authz = Authz.PERMISSION
     permission = Permission.VIEW_ASSESSMENT
@@ -222,8 +160,8 @@ class ListStudents(Capability[StudentListInput, dict]):
 
     async def execute(
         self, ctx: ExecutionContext, inp: StudentListInput, target: Any
-    ) -> dict:
-        items, total = await crud_assessment.assessment.list_students(
+    ) -> Dict[str, Any]:
+        students, total = await crud_assessment.assessment.list_students(
             ctx.db,
             subject_id=inp.subject_id,
             keyword=inp.keyword,
@@ -231,7 +169,7 @@ class ListStudents(Capability[StudentListInput, dict]):
             page_size=inp.page_size,
         )
         return {
-            "items": items,
+            "items": students,
             "total": total,
             "page": inp.page,
             "page_size": inp.page_size,
@@ -239,9 +177,9 @@ class ListStudents(Capability[StudentListInput, dict]):
 
 
 @register
-class CreateClassroom(Capability[ClassroomCreateInput, Classroom]):
+class CreateClassroom(Capability[ClassroomCreateInput, Any]):
     name = "assessment.create_classroom"
-    description = "在学科下创建班级/群组。"
+    description = "在学科下新建班级。"
     input_model = ClassroomCreateInput
     authz = Authz.PERMISSION
     permission = Permission.MANAGE_ASSESSMENT
@@ -251,18 +189,16 @@ class CreateClassroom(Capability[ClassroomCreateInput, Classroom]):
     async def load(self, ctx: ExecutionContext, inp: ClassroomCreateInput) -> None:
         await _ensure_subject(ctx, inp.subject_id)
 
-    async def execute(
-        self, ctx: ExecutionContext, inp: ClassroomCreateInput, target: Any
-    ) -> Classroom:
+    async def execute(self, ctx: ExecutionContext, inp: ClassroomCreateInput, target: Any) -> Any:
         return await assessment_service.create_classroom(
             ctx.db, subject_id=inp.subject_id, name=inp.name, actor=ctx.actor
         )
 
 
 @register
-class ListClassrooms(Capability[ClassroomListInput, list]):
+class ListClassrooms(Capability[ClassroomListInput, Any]):
     name = "assessment.list_classrooms"
-    description = "按学科列出班级。"
+    description = "列出学科下的班级。"
     input_model = ClassroomListInput
     authz = Authz.PERMISSION
     permission = Permission.VIEW_ASSESSMENT
@@ -272,27 +208,23 @@ class ListClassrooms(Capability[ClassroomListInput, list]):
     async def load(self, ctx: ExecutionContext, inp: ClassroomListInput) -> None:
         await _ensure_subject(ctx, inp.subject_id)
 
-    async def execute(
-        self, ctx: ExecutionContext, inp: ClassroomListInput, target: Any
-    ) -> list:
+    async def execute(self, ctx: ExecutionContext, inp: ClassroomListInput, target: Any) -> Any:
         return await crud_assessment.assessment.list_classrooms(
             ctx.db, subject_id=inp.subject_id
         )
 
 
 @register
-class ListClassroomStudents(Capability[ClassroomStudentsListInput, list]):
+class ListClassroomStudents(Capability[ClassroomStudentsListInput, Any]):
     name = "assessment.list_classroom_students"
-    description = "读取某班级当前成员的学生名册(跨学科班级 404)。"
+    description = "列出某个班级的学生。"
     input_model = ClassroomStudentsListInput
     authz = Authz.PERMISSION
     permission = Permission.VIEW_ASSESSMENT
     scope = Scope.SUBJECT
     mutating = False
 
-    async def load(
-        self, ctx: ExecutionContext, inp: ClassroomStudentsListInput
-    ) -> Classroom:
+    async def load(self, ctx: ExecutionContext, inp: ClassroomStudentsListInput) -> Any:
         await _ensure_subject(ctx, inp.subject_id)
         classroom = await crud_assessment.assessment.get_classroom(
             ctx.db, classroom_id=inp.classroom_id
@@ -302,17 +234,17 @@ class ListClassroomStudents(Capability[ClassroomStudentsListInput, list]):
         return classroom
 
     async def execute(
-        self, ctx: ExecutionContext, inp: ClassroomStudentsListInput, target: Classroom
-    ) -> list:
+        self, ctx: ExecutionContext, inp: ClassroomStudentsListInput, target: Any
+    ) -> Any:
         return await crud_assessment.assessment.list_classroom_students(
             ctx.db, classroom_id=inp.classroom_id
         )
 
 
 @register
-class ReplaceClassroomMembers(Capability[ClassroomMembersReplaceInput, list]):
+class ReplaceClassroomMembers(Capability[ClassroomMembersReplaceInput, Any]):
     name = "assessment.replace_classroom_members"
-    description = "整体替换班级成员(原子;去重;跨学科学生 422,班级不存在/跨学科 404)。"
+    description = "整体替换班级成员名单。"
     input_model = ClassroomMembersReplaceInput
     authz = Authz.PERMISSION
     permission = Permission.MANAGE_ASSESSMENT
@@ -324,7 +256,7 @@ class ReplaceClassroomMembers(Capability[ClassroomMembersReplaceInput, list]):
 
     async def execute(
         self, ctx: ExecutionContext, inp: ClassroomMembersReplaceInput, target: Any
-    ) -> list:
+    ) -> Any:
         return await assessment_service.replace_classroom_members(
             ctx.db,
             subject_id=inp.subject_id,
@@ -335,175 +267,309 @@ class ReplaceClassroomMembers(Capability[ClassroomMembersReplaceInput, list]):
 
 
 # --------------------------------------------------------------------------- #
-# 考试状态流转
+# 评测身份 / 版本(从组稿定稿创建)
 # --------------------------------------------------------------------------- #
 @register
-class StartRecording(Capability[ExamSessionRefInput, ExamSession]):
-    name = "assessment.start_recording"
-    description = "draft → recording(要求至少一个参与者与一个题目)。"
-    input_model = ExamSessionRefInput
+class CreateAssessment(Capability[AssessmentCreateInput, Dict[str, Any]]):
+    name = "assessment.create_assessment"
+    description = "从一个 shared 组稿定稿版本 + 班级原子创建评测(身份 + v1 + 投放)。"
+    input_model = AssessmentCreateInput
     authz = Authz.PERMISSION
     permission = Permission.MANAGE_ASSESSMENT
     scope = Scope.SUBJECT
     mutating = True
 
-    async def load(self, ctx: ExecutionContext, inp: ExamSessionRefInput) -> None:
+    async def load(self, ctx: ExecutionContext, inp: AssessmentCreateInput) -> None:
         await _ensure_subject(ctx, inp.subject_id)
 
     async def execute(
-        self, ctx: ExecutionContext, inp: ExamSessionRefInput, target: Any
-    ) -> ExamSession:
-        return await assessment_service.start_recording(
+        self, ctx: ExecutionContext, inp: AssessmentCreateInput, target: Any
+    ) -> Dict[str, Any]:
+        return await assessment_service.create_from_composition(
             ctx.db,
             subject_id=inp.subject_id,
-            exam_session_id=inp.exam_session_id,
+            composition_version_id=inp.composition_version_id,
+            classroom_id=inp.classroom_id,
+            title=inp.title,
+            session_name=inp.session_name,
             actor=ctx.actor,
         )
 
 
 @register
-class LockExamSession(Capability[ExamSessionRefInput, ExamSession]):
-    name = "assessment.lock_exam_session"
-    description = "recording → locked(要求所有非缺考参与者每题均已录分)。"
-    input_model = ExamSessionRefInput
+class ListAssessments(Capability[AssessmentListInput, Any]):
+    name = "assessment.list_assessments"
+    description = "列出学科下的评测身份。"
+    input_model = AssessmentListInput
     authz = Authz.PERMISSION
-    permission = Permission.MANAGE_ASSESSMENT
+    permission = Permission.VIEW_ASSESSMENT
+    scope = Scope.SUBJECT
+    mutating = False
+
+    async def load(self, ctx: ExecutionContext, inp: AssessmentListInput) -> None:
+        await _ensure_subject(ctx, inp.subject_id)
+
+    async def execute(self, ctx: ExecutionContext, inp: AssessmentListInput, target: Any) -> Any:
+        return await crud_assessment.assessment.list_assessments(
+            ctx.db, subject_id=inp.subject_id, status=inp.status
+        )
+
+
+@register
+class GetAssessment(Capability[AssessmentRefInput, Dict[str, Any]]):
+    name = "assessment.get_assessment"
+    description = "查看评测身份详情(含版本与当前条目)。"
+    input_model = AssessmentRefInput
+    authz = Authz.PERMISSION
+    permission = Permission.VIEW_ASSESSMENT
+    scope = Scope.SUBJECT
+    mutating = False
+
+    async def load(self, ctx: ExecutionContext, inp: AssessmentRefInput) -> None:
+        await _ensure_subject(ctx, inp.subject_id)
+
+    async def execute(
+        self, ctx: ExecutionContext, inp: AssessmentRefInput, target: Any
+    ) -> Dict[str, Any]:
+        return await assessment_service.get_assessment_detail(
+            ctx.db, subject_id=inp.subject_id, assessment_id=inp.assessment_id
+        )
+
+
+# --------------------------------------------------------------------------- #
+# 投放 session
+# --------------------------------------------------------------------------- #
+@register
+class ListSessions(Capability[SessionListInput, Any]):
+    name = "assessment.list_sessions"
+    description = "列出学科下的评测投放。"
+    input_model = SessionListInput
+    authz = Authz.PERMISSION
+    permission = Permission.VIEW_ASSESSMENT
+    scope = Scope.SUBJECT
+    mutating = False
+
+    async def load(self, ctx: ExecutionContext, inp: SessionListInput) -> None:
+        await _ensure_subject(ctx, inp.subject_id)
+
+    async def execute(self, ctx: ExecutionContext, inp: SessionListInput, target: Any) -> Any:
+        return await assessment_service.list_sessions(
+            ctx.db,
+            subject_id=inp.subject_id,
+            grading_status=inp.grading_status,
+            assessment_id=inp.assessment_id,
+        )
+
+
+@register
+class GetSession(Capability[SessionRefInput, Dict[str, Any]]):
+    name = "assessment.get_session"
+    description = "查看评测投放详情(冻结条目 + 参与者 + attempts)。"
+    input_model = SessionRefInput
+    authz = Authz.PERMISSION
+    permission = Permission.VIEW_ASSESSMENT
+    scope = Scope.SUBJECT
+    mutating = False
+
+    async def load(self, ctx: ExecutionContext, inp: SessionRefInput) -> None:
+        await _ensure_subject(ctx, inp.subject_id)
+
+    async def execute(
+        self, ctx: ExecutionContext, inp: SessionRefInput, target: Any
+    ) -> Dict[str, Any]:
+        return await assessment_service.get_session_detail(
+            ctx.db, subject_id=inp.subject_id, session_id=inp.session_id
+        )
+
+
+@register
+class StartGrading(Capability[SessionRefInput, Dict[str, Any]]):
+    name = "assessment.start_grading"
+    description = "评分状态 not_started → in_progress。"
+    input_model = SessionRefInput
+    authz = Authz.PERMISSION
+    permission = Permission.EDIT_SCORE
     scope = Scope.SUBJECT
     mutating = True
 
-    async def load(self, ctx: ExecutionContext, inp: ExamSessionRefInput) -> None:
+    async def load(self, ctx: ExecutionContext, inp: SessionRefInput) -> None:
         await _ensure_subject(ctx, inp.subject_id)
 
     async def execute(
-        self, ctx: ExecutionContext, inp: ExamSessionRefInput, target: Any
-    ) -> ExamSession:
-        return await assessment_service.lock_exam_session(
-            ctx.db,
-            subject_id=inp.subject_id,
-            exam_session_id=inp.exam_session_id,
-            actor=ctx.actor,
+        self, ctx: ExecutionContext, inp: SessionRefInput, target: Any
+    ) -> Dict[str, Any]:
+        return await assessment_service.start_grading(
+            ctx.db, subject_id=inp.subject_id, session_id=inp.session_id, actor=ctx.actor
         )
 
 
-# --------------------------------------------------------------------------- #
-# gradebook 读取 / 逐题录分
-# --------------------------------------------------------------------------- #
 @register
-class GetGradebook(Capability[ExamSessionRefInput, dict]):
+class FinalizeGrading(Capability[SessionRefInput, Dict[str, Any]]):
+    name = "assessment.finalize_grading"
+    description = "评分状态 in_progress → finalized;要求全部应评参与者已完整评分。"
+    input_model = SessionRefInput
+    authz = Authz.PERMISSION
+    permission = Permission.EDIT_SCORE
+    scope = Scope.SUBJECT
+    mutating = True
+
+    async def load(self, ctx: ExecutionContext, inp: SessionRefInput) -> None:
+        await _ensure_subject(ctx, inp.subject_id)
+
+    async def execute(
+        self, ctx: ExecutionContext, inp: SessionRefInput, target: Any
+    ) -> Dict[str, Any]:
+        return await assessment_service.finalize_grading(
+            ctx.db, subject_id=inp.subject_id, session_id=inp.session_id, actor=ctx.actor
+        )
+
+
+@register
+class GetGradebook(Capability[GradebookInput, Dict[str, Any]]):
     name = "assessment.get_gradebook"
-    description = "读取单场考试的 gradebook 矩阵(题目列 + 每个参与者逐题成绩)。"
-    input_model = ExamSessionRefInput
+    description = "分页读取投放的成绩册矩阵。"
+    input_model = GradebookInput
     authz = Authz.PERMISSION
     permission = Permission.VIEW_ASSESSMENT
     scope = Scope.SUBJECT
     mutating = False
 
-    async def load(self, ctx: ExecutionContext, inp: ExamSessionRefInput) -> None:
+    async def load(self, ctx: ExecutionContext, inp: GradebookInput) -> None:
         await _ensure_subject(ctx, inp.subject_id)
 
     async def execute(
-        self, ctx: ExecutionContext, inp: ExamSessionRefInput, target: Any
-    ) -> dict:
+        self, ctx: ExecutionContext, inp: GradebookInput, target: Any
+    ) -> Dict[str, Any]:
         return await assessment_service.get_gradebook(
-            ctx.db, subject_id=inp.subject_id, exam_session_id=inp.exam_session_id
+            ctx.db,
+            subject_id=inp.subject_id,
+            session_id=inp.session_id,
+            page=inp.page,
+            page_size=inp.page_size,
         )
 
 
 @register
-class ExportGradebook(Capability[ExamSessionRefInput, bytes]):
-    name = "assessment.export_gradebook"
-    description = "导出带考试、题目和成绩 revision 元数据的 Excel 成绩表。"
-    input_model = ExamSessionRefInput
+class ItemStatistics(Capability[SessionRefInput, Dict[str, Any]]):
+    name = "assessment.item_statistics"
+    description = "按条目聚合投放的评分统计(分母只计已评分的应评作答)。"
+    input_model = SessionRefInput
     authz = Authz.PERMISSION
     permission = Permission.VIEW_ASSESSMENT
     scope = Scope.SUBJECT
     mutating = False
 
-    async def load(self, ctx: ExecutionContext, inp: ExamSessionRefInput) -> None:
+    async def load(self, ctx: ExecutionContext, inp: SessionRefInput) -> None:
         await _ensure_subject(ctx, inp.subject_id)
 
     async def execute(
-        self, ctx: ExecutionContext, inp: ExamSessionRefInput, target: Any
-    ) -> bytes:
-        return await assessment_service.export_gradebook(
-            ctx.db, subject_id=inp.subject_id, exam_session_id=inp.exam_session_id
+        self, ctx: ExecutionContext, inp: SessionRefInput, target: Any
+    ) -> Dict[str, Any]:
+        return await assessment_service.get_item_statistics(
+            ctx.db, subject_id=inp.subject_id, session_id=inp.session_id
         )
 
 
+# --------------------------------------------------------------------------- #
+# 追加式评分
+# --------------------------------------------------------------------------- #
 @register
-class PreviewScoreImport(Capability[ScoreImportInput, dict]):
-    name = "assessment.preview_score_import"
-    description = "只读预检 Excel 成绩文件，不修改成绩。"
-    input_model = ScoreImportInput
-    authz = Authz.PERMISSION
-    permission = Permission.EDIT_SCORE
-    scope = Scope.SUBJECT
-    mutating = False
-
-    async def load(self, ctx: ExecutionContext, inp: ScoreImportInput) -> None:
-        await _ensure_subject(ctx, inp.subject_id)
-
-    async def execute(
-        self, ctx: ExecutionContext, inp: ScoreImportInput, target: Any
-    ) -> dict:
-        return await assessment_service.preview_score_import(
-            ctx.db,
-            subject_id=inp.subject_id,
-            exam_session_id=inp.exam_session_id,
-            file_bytes=inp.file_bytes,
-        )
-
-
-@register
-class ApplyScoreImport(Capability[ScoreImportApplyInput, dict]):
-    name = "assessment.apply_score_import"
-    description = "原子应用 Excel 成绩，按文件摘要和 batch_id 保证幂等。"
-    input_model = ScoreImportApplyInput
+class AppendGrades(Capability[GradeAppendInput, Dict[str, Any]]):
+    name = "assessment.append_grades"
+    description = "对某个 attempt 追加式录分(乐观锁 + 幂等 batch)。"
+    input_model = GradeAppendInput
     authz = Authz.PERMISSION
     permission = Permission.EDIT_SCORE
     scope = Scope.SUBJECT
     mutating = True
 
-    async def load(self, ctx: ExecutionContext, inp: ScoreImportApplyInput) -> None:
+    async def load(self, ctx: ExecutionContext, inp: GradeAppendInput) -> None:
         await _ensure_subject(ctx, inp.subject_id)
 
     async def execute(
-        self, ctx: ExecutionContext, inp: ScoreImportApplyInput, target: Any
-    ) -> dict:
-        return await assessment_service.apply_score_import(
+        self, ctx: ExecutionContext, inp: GradeAppendInput, target: Any
+    ) -> Dict[str, Any]:
+        return await assessment_service.append_grades(
             ctx.db,
             subject_id=inp.subject_id,
-            exam_session_id=inp.exam_session_id,
-            file_bytes=inp.file_bytes,
-            batch_id=inp.batch_id,
-            actor=ctx.actor,
-        )
-
-
-@register
-class SaveScores(Capability[SaveScoresInput, dict]):
-    name = "assessment.save_scores"
-    description = "按参与者逐题保存成绩(乐观锁 revision + batch_id 幂等)。"
-    input_model = SaveScoresInput
-    authz = Authz.PERMISSION
-    permission = Permission.EDIT_SCORE
-    scope = Scope.SUBJECT
-    mutating = True
-
-    async def load(self, ctx: ExecutionContext, inp: SaveScoresInput) -> None:
-        await _ensure_subject(ctx, inp.subject_id)
-
-    async def execute(
-        self, ctx: ExecutionContext, inp: SaveScoresInput, target: Any
-    ) -> dict:
-        return await assessment_service.save_scores(
-            ctx.db,
-            subject_id=inp.subject_id,
-            exam_session_id=inp.exam_session_id,
-            result_id=inp.result_id,
+            attempt_id=inp.attempt_id,
             expected_revision=inp.expected_revision,
             batch_id=inp.batch_id,
-            items=[item.model_dump() for item in inp.items],
+            items=inp.items,
+            actor=ctx.actor,
+        )
+
+
+# --------------------------------------------------------------------------- #
+# 成绩册 Excel:导出 / 预览 / 应用
+# --------------------------------------------------------------------------- #
+@register
+class ExportGradebook(Capability[ExportGradebookInput, bytes]):
+    name = "assessment.export_gradebook"
+    description = "导出教师成绩册 Excel(当前最新评分快照)。"
+    input_model = ExportGradebookInput
+    authz = Authz.PERMISSION
+    permission = Permission.VIEW_ASSESSMENT
+    scope = Scope.SUBJECT
+    mutating = False
+
+    async def load(self, ctx: ExecutionContext, inp: ExportGradebookInput) -> None:
+        await _ensure_subject(ctx, inp.subject_id)
+
+    async def execute(
+        self, ctx: ExecutionContext, inp: ExportGradebookInput, target: Any
+    ) -> bytes:
+        return await assessment_service.export_gradebook(
+            ctx.db, subject_id=inp.subject_id, session_id=inp.session_id
+        )
+
+
+@register
+class PreviewGradeImport(Capability[PreviewGradeImportInput, Dict[str, Any]]):
+    name = "assessment.preview_grade_import"
+    description = "预览成绩册导入:验证结构、聚合行错误、计算变更统计,不写库。"
+    input_model = PreviewGradeImportInput
+    authz = Authz.PERMISSION
+    permission = Permission.EDIT_SCORE
+    scope = Scope.SUBJECT
+    mutating = False
+
+    async def load(self, ctx: ExecutionContext, inp: PreviewGradeImportInput) -> None:
+        await _ensure_subject(ctx, inp.subject_id)
+
+    async def execute(
+        self, ctx: ExecutionContext, inp: PreviewGradeImportInput, target: Any
+    ) -> Dict[str, Any]:
+        return await assessment_service.preview_grade_import(
+            ctx.db,
+            subject_id=inp.subject_id,
+            session_id=inp.session_id,
+            file_bytes=inp.file_bytes,
+        )
+
+
+@register
+class ApplyGradeImport(Capability[ApplyGradeImportInput, Dict[str, Any]]):
+    name = "assessment.apply_grade_import"
+    description = "应用成绩册导入:任一错误全拒绝,单事务原子应用,batch+sha256 幂等。"
+    input_model = ApplyGradeImportInput
+    authz = Authz.PERMISSION
+    permission = Permission.EDIT_SCORE
+    scope = Scope.SUBJECT
+    mutating = True
+
+    async def load(self, ctx: ExecutionContext, inp: ApplyGradeImportInput) -> None:
+        await _ensure_subject(ctx, inp.subject_id)
+
+    async def execute(
+        self, ctx: ExecutionContext, inp: ApplyGradeImportInput, target: Any
+    ) -> Dict[str, Any]:
+        return await assessment_service.apply_grade_import(
+            ctx.db,
+            subject_id=inp.subject_id,
+            session_id=inp.session_id,
+            file_bytes=inp.file_bytes,
+            batch_id=inp.batch_id,
             actor=ctx.actor,
         )
 

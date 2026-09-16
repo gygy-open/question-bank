@@ -79,29 +79,8 @@ export {
   BODY_SLOT,
 } from './composition'
 
-export type {
-  ExamSessionStatus,
-  ExamAttendanceStatus,
-  ScoreValue,
-  ScoreInput,
-  Student,
-  Classroom,
-  StudentCreateRequest,
-  StudentPage,
-  ClassroomCreateRequest,
-  ClassroomMembersReplaceRequest,
-  ExamQuestion,
-  ExamParticipant,
-  ExamSession,
-  ExamSessionDetail,
-  ExamSessionCreateRequest,
-  GradebookScoreItem,
-  GradebookRow,
-  Gradebook,
-  ScoreItemInput,
-  ScoreSaveRequest,
-  Result,
-} from './assessment'
+// 通用评测 (Assessment / Gradebook) 域契约,统一从 ./assessment 透出。
+export * from './assessment'
 import type { RichDoc } from './richContent'
 import type {
   QuestionType,

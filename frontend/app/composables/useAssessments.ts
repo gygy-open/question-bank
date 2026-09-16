@@ -1,38 +1,44 @@
 import type {
+  Assessment,
+  AssessmentCreateRequest,
+  AssessmentDetail,
+  AttemptGradeResult,
   Classroom,
   ClassroomCreateRequest,
   ClassroomMembersReplaceRequest,
-  ExamSession,
-  ExamSessionCreateRequest,
-  ExamSessionDetail,
-  ExamSessionStatus,
+  GradeAppendRequest,
   Gradebook,
-  Result,
-  ScoreSaveRequest,
+  GradingStatus,
+  ItemStatistics,
   ScoreImportPreview,
   ScoreImportResult,
+  Session,
+  SessionDetail,
   Student,
   StudentCreateRequest,
   StudentPage,
 } from '@/types/assessment'
 import {
+  assessmentItemPath,
+  assessmentsPath,
+  assessmentSessionItemPath,
+  assessmentSessionsPath,
+  attemptGradesPath,
   classroomStudentsPath,
   classroomsPath,
-  examGradebookPath,
-  examGradebookExcelPath,
-  examLockPath,
-  examResultPath,
-  examSessionItemPath,
-  examSessionsPath,
-  examScoreImportPath,
-  examStartRecordingPath,
+  gradebookExcelPath,
+  gradebookPath,
+  gradeImportPath,
+  gradingFinalizePath,
+  gradingStartPath,
+  itemStatisticsPath,
   studentsPath,
 } from '@/lib/assessments'
 
 /**
  * 409 冲突的可识别错误:
- * - kind='revision':乐观锁失败(成绩/考试被他人改动)。
- * - kind='status':状态前置不满足(如非 recording 不能录分)。
+ * - kind='revision':乐观锁失败(评测状态/成绩被他人改动)。
+ * - kind='status':评分状态前置不满足(如非评分中不能录分 / 已定稿只读)。
  * - kind='batch':batch_id 被其它请求复用。
  * - kind='duplicate':唯一约束冲突(学号 / 班级名 / 用户绑定)。
  * - kind='other':其它 409。
@@ -48,8 +54,8 @@ export class AssessmentConflictError extends Error {
     this.detail = detail
     if (/版本冲突|已变更|revision/i.test(detail)) this.kind = 'revision'
     else if (/batch_id/i.test(detail)) this.kind = 'batch'
-    else if (/只有.*状态|只有.*考试可以|状态/i.test(detail)) this.kind = 'status'
-    else if (/已存在|已.*绑定/i.test(detail)) this.kind = 'duplicate'
+    else if (/只有|已定稿|状态|不能再修改/i.test(detail)) this.kind = 'status'
+    else if (/已存在|绑定/i.test(detail)) this.kind = 'duplicate'
     else this.kind = 'other'
   }
 }
@@ -75,9 +81,10 @@ function mapConflict(err: unknown): never {
 }
 
 /**
- * 成绩录入数据层:封装学生/班级名册、考试创建/列表/详情、状态流转、
- * gradebook 读取与逐题录分。所有资源在学科强上下文下。
- * 409 统一映射为 {@link AssessmentConflictError};其余错误原样抛出。
+ * 通用评测数据层:封装学生/班级名册、评测身份创建/列表/详情、投放 session
+ * 列表/详情、评分状态流转、分页 gradebook、item 统计、追加式录分与成绩册 Excel。
+ * 所有资源在学科强上下文下。409 统一映射为 {@link AssessmentConflictError};
+ * 其余错误原样抛出。
  */
 export function useAssessments() {
   const { $api } = useNuxtApp()
@@ -123,76 +130,97 @@ export function useAssessments() {
       body: payload,
     }).catch(mapConflict)
 
-  // -------------------------------------------------------- Exam sessions //
-  const listExamSessions = (
-    subjectId: number,
-    opts: { status?: ExamSessionStatus; classroomId?: number } = {},
-  ) => {
-    const query: Record<string, string | number> = {}
+  // -------------------------------------------------------- Assessments //
+  const listAssessments = (subjectId: number, opts: { status?: string } = {}) => {
+    const query: Record<string, string> = {}
     if (opts.status) query.status = opts.status
-    if (opts.classroomId != null) query.classroom_id = opts.classroomId
-    return $api<ExamSession[]>(examSessionsPath(subjectId), { query })
+    return $api<Assessment[]>(assessmentsPath(subjectId), { query })
   }
 
-  const createExamSession = (subjectId: number, payload: ExamSessionCreateRequest) =>
-    $api<ExamSessionDetail>(examSessionsPath(subjectId), {
+  const createAssessment = (subjectId: number, payload: AssessmentCreateRequest) =>
+    $api<SessionDetail>(assessmentsPath(subjectId), {
       method: 'POST',
       body: payload,
     }).catch(mapConflict)
 
-  const getExamSession = (subjectId: number, examSessionId: number) =>
-    $api<ExamSessionDetail>(examSessionItemPath(subjectId, examSessionId))
+  const getAssessment = (subjectId: number, assessmentId: number) =>
+    $api<AssessmentDetail>(assessmentItemPath(subjectId, assessmentId))
 
-  const startRecording = (subjectId: number, examSessionId: number) =>
-    $api<ExamSessionDetail>(examStartRecordingPath(subjectId, examSessionId), {
+  // --------------------------------------------------- Assessment sessions //
+  const listSessions = (
+    subjectId: number,
+    opts: { gradingStatus?: GradingStatus; assessmentId?: number } = {},
+  ) => {
+    const query: Record<string, string | number> = {}
+    if (opts.gradingStatus) query.grading_status = opts.gradingStatus
+    if (opts.assessmentId != null) query.assessment_id = opts.assessmentId
+    return $api<Session[]>(assessmentSessionsPath(subjectId), { query })
+  }
+
+  const getSession = (subjectId: number, sessionId: number) =>
+    $api<SessionDetail>(assessmentSessionItemPath(subjectId, sessionId))
+
+  const startGrading = (subjectId: number, sessionId: number) =>
+    $api<SessionDetail>(gradingStartPath(subjectId, sessionId), {
       method: 'POST',
     }).catch(mapConflict)
 
-  const lockExamSession = (subjectId: number, examSessionId: number) =>
-    $api<ExamSessionDetail>(examLockPath(subjectId, examSessionId), {
+  const finalizeGrading = (subjectId: number, sessionId: number) =>
+    $api<SessionDetail>(gradingFinalizePath(subjectId, sessionId), {
       method: 'POST',
     }).catch(mapConflict)
 
   // ------------------------------------------------------------ Gradebook //
-  const getGradebook = (subjectId: number, examSessionId: number) =>
-    $api<Gradebook>(examGradebookPath(subjectId, examSessionId))
+  const getGradebook = (
+    subjectId: number,
+    sessionId: number,
+    opts: { page?: number; pageSize?: number } = {},
+  ) => {
+    const query: Record<string, number> = {}
+    if (opts.page != null) query.page = opts.page
+    if (opts.pageSize != null) query.page_size = opts.pageSize
+    return $api<Gradebook>(gradebookPath(subjectId, sessionId), { query })
+  }
 
-  const exportGradebook = (subjectId: number, examSessionId: number) =>
-    $api<Blob>(examGradebookExcelPath(subjectId, examSessionId), {
+  const getItemStatistics = (subjectId: number, sessionId: number) =>
+    $api<ItemStatistics>(itemStatisticsPath(subjectId, sessionId))
+
+  const exportGradebook = (subjectId: number, sessionId: number) =>
+    $api<Blob>(gradebookExcelPath(subjectId, sessionId), {
       responseType: 'blob',
     })
 
-  const previewScoreImport = (subjectId: number, examSessionId: number, file: File) => {
+  const previewGradeImport = (subjectId: number, sessionId: number, file: File) => {
     const body = new FormData()
     body.append('file', file)
-    return $api<ScoreImportPreview>(examScoreImportPath(subjectId, examSessionId, 'preview'), {
+    return $api<ScoreImportPreview>(gradeImportPath(subjectId, sessionId, 'preview'), {
       method: 'POST',
       body,
     })
   }
 
-  const applyScoreImport = (
+  const applyGradeImport = (
     subjectId: number,
-    examSessionId: number,
+    sessionId: number,
     file: File,
-    batchId: string,
+    batchId?: string,
   ) => {
     const body = new FormData()
     body.append('file', file)
-    body.append('batch_id', batchId)
-    return $api<ScoreImportResult>(examScoreImportPath(subjectId, examSessionId, 'apply'), {
+    if (batchId != null) body.append('batch_id', batchId)
+    return $api<ScoreImportResult>(gradeImportPath(subjectId, sessionId, 'apply'), {
       method: 'POST',
       body,
     }).catch(mapConflict)
   }
 
-  const saveScores = (
+  // ------------------------------------------------------- Attempt grades //
+  const appendGrades = (
     subjectId: number,
-    examSessionId: number,
-    resultId: number,
-    payload: ScoreSaveRequest,
+    attemptId: number,
+    payload: GradeAppendRequest,
   ) =>
-    $api<Result>(examResultPath(subjectId, examSessionId, resultId), {
+    $api<AttemptGradeResult>(attemptGradesPath(subjectId, attemptId), {
       method: 'PATCH',
       body: payload,
     }).catch(mapConflict)
@@ -204,15 +232,18 @@ export function useAssessments() {
     createClassroom,
     listClassroomStudents,
     replaceClassroomMembers,
-    listExamSessions,
-    createExamSession,
-    getExamSession,
-    startRecording,
-    lockExamSession,
+    listAssessments,
+    createAssessment,
+    getAssessment,
+    listSessions,
+    getSession,
+    startGrading,
+    finalizeGrading,
     getGradebook,
+    getItemStatistics,
     exportGradebook,
-    previewScoreImport,
-    applyScoreImport,
-    saveScores,
+    previewGradeImport,
+    applyGradeImport,
+    appendGrades,
   }
 }

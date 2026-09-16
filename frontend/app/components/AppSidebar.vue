@@ -142,17 +142,17 @@ const navActiveClass = 'border-l-2 border-transparent data-[active=true]:border-
           </div>
 
           <div v-if="permissions && can(Capability.VIEW_ASSESSMENT, currentSubjectId)">
-            <SidebarGroupLabel>考试</SidebarGroupLabel>
+            <SidebarGroupLabel>评测</SidebarGroupLabel>
             <SidebarMenu>
               <SidebarMenuItem>
                 <SidebarMenuButton
                   as-child
-                  :is-active="route.path === '/exams' || route.path.startsWith('/exams/')"
+                  :is-active="route.path === '/assessments' || route.path.startsWith('/assessments/')"
                   :class="navActiveClass"
                 >
-                  <NuxtLink to="/exams">
+                  <NuxtLink to="/assessments">
                     <ClipboardCheck />
-                    <span>考试与成绩</span>
+                    <span>评测与成绩</span>
                   </NuxtLink>
                 </SidebarMenuButton>
               </SidebarMenuItem>

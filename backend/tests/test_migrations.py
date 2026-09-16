@@ -57,6 +57,55 @@ def test_no_model_migration_drift(tmp_path):
     command.check(cfg)
 
 
+def test_single_head(tmp_path):
+    async_url, _ = _sqlite_urls(tmp_path)
+    cfg = _alembic_config(async_url)
+    assert len(ScriptDirectory.from_config(cfg).get_heads()) == 1
+
+
+# --------------------------------------------------------------------------- #
+# Assessment domain: upgrade / downgrade / re-upgrade round-trip (SQLite)
+# --------------------------------------------------------------------------- #
+ASSESSMENT_REV = "6f2d70c895a4"
+ASSESSMENT_DOWN_REV = "d4e5f6a7b8c9"
+ASSESSMENT_TABLES = {
+    "assessments",
+    "assessment_versions",
+    "assessment_items",
+    "assessment_sessions",
+    "assessment_participations",
+    "assessment_attempts",
+    "assessment_responses",
+    "response_grades",
+    "assessment_events",
+    "students",
+    "classrooms",
+    "classroom_students",
+}
+
+
+def _table_names(sync_url):
+    engine = create_engine(sync_url)
+    try:
+        return set(sa.inspect(engine).get_table_names())
+    finally:
+        engine.dispose()
+
+
+def test_assessment_migration_round_trip(tmp_path):
+    async_url, sync_url = _sqlite_urls(tmp_path)
+    cfg = _alembic_config(async_url)
+
+    command.upgrade(cfg, ASSESSMENT_REV)
+    assert ASSESSMENT_TABLES <= _table_names(sync_url)
+
+    command.downgrade(cfg, ASSESSMENT_DOWN_REV)
+    assert ASSESSMENT_TABLES.isdisjoint(_table_names(sync_url))
+
+    command.upgrade(cfg, ASSESSMENT_REV)
+    assert ASSESSMENT_TABLES <= _table_names(sync_url)
+
+
 @pytest.mark.skipif(not MYSQL_TEST_URL, reason="MYSQL_TEST_URL not set (needs a real MySQL)")
 def test_upgrade_head_on_mysql():
     # Only a real MySQL exposes dialect-specific failures (types, ALTER, charset)

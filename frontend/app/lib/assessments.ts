@@ -1,4 +1,4 @@
-// 成绩录入 (Assessment) 纯函数:URL 路径构建。不依赖 Nuxt 运行时,便于聚焦单测。
+// 通用评测 (Assessment) 纯函数:URL 路径构建。不依赖 Nuxt 运行时,便于聚焦单测。
 //
 // 所有资源都在学科强上下文下:/subjects/{subjectId}/...
 
@@ -17,50 +17,70 @@ export function classroomStudentsPath(subjectId: number, classroomId: number): s
   return `${classroomsPath(subjectId)}/${classroomId}/students`
 }
 
-/** /subjects/{id}/exam-sessions 集合路径(创建 / 列表)。 */
-export function examSessionsPath(subjectId: number): string {
-  return `/subjects/${subjectId}/exam-sessions`
+// --------------------------------------------------------------------------- //
+// 评测身份
+// --------------------------------------------------------------------------- //
+/** /subjects/{id}/assessments 集合路径(创建 / 列表)。 */
+export function assessmentsPath(subjectId: number): string {
+  return `/subjects/${subjectId}/assessments`
 }
 
-/** 单场考试路径(详情)。 */
-export function examSessionItemPath(subjectId: number, examSessionId: number): string {
-  return `${examSessionsPath(subjectId)}/${examSessionId}`
+/** 单个评测身份路径(详情)。 */
+export function assessmentItemPath(subjectId: number, assessmentId: number): string {
+  return `${assessmentsPath(subjectId)}/${assessmentId}`
 }
 
-/** draft → recording 状态流转路径。 */
-export function examStartRecordingPath(subjectId: number, examSessionId: number): string {
-  return `${examSessionItemPath(subjectId, examSessionId)}/start-recording`
+// --------------------------------------------------------------------------- //
+// 投放 session
+// --------------------------------------------------------------------------- //
+/** /subjects/{id}/assessment-sessions 集合路径(列表)。 */
+export function assessmentSessionsPath(subjectId: number): string {
+  return `/subjects/${subjectId}/assessment-sessions`
 }
 
-/** recording → locked 状态流转路径。 */
-export function examLockPath(subjectId: number, examSessionId: number): string {
-  return `${examSessionItemPath(subjectId, examSessionId)}/lock`
+/** 单场投放路径(详情)。 */
+export function assessmentSessionItemPath(subjectId: number, sessionId: number): string {
+  return `${assessmentSessionsPath(subjectId)}/${sessionId}`
 }
 
-/** gradebook 矩阵读取路径。 */
-export function examGradebookPath(subjectId: number, examSessionId: number): string {
-  return `${examSessionItemPath(subjectId, examSessionId)}/gradebook`
+/** not_started → in_progress 评分流转路径。 */
+export function gradingStartPath(subjectId: number, sessionId: number): string {
+  return `${assessmentSessionItemPath(subjectId, sessionId)}/grading/start`
 }
 
-/** 带隐藏并发元数据的 Excel 成绩表。 */
-export function examGradebookExcelPath(subjectId: number, examSessionId: number): string {
-  return `${examSessionItemPath(subjectId, examSessionId)}/gradebook.xlsx`
+/** in_progress → finalized 评分流转路径。 */
+export function gradingFinalizePath(subjectId: number, sessionId: number): string {
+  return `${assessmentSessionItemPath(subjectId, sessionId)}/grading/finalize`
+}
+
+/** gradebook 矩阵读取路径(分页)。 */
+export function gradebookPath(subjectId: number, sessionId: number): string {
+  return `${assessmentSessionItemPath(subjectId, sessionId)}/gradebook`
+}
+
+/** item 统计读取路径。 */
+export function itemStatisticsPath(subjectId: number, sessionId: number): string {
+  return `${assessmentSessionItemPath(subjectId, sessionId)}/item-statistics`
+}
+
+/** 带隐藏并发元数据的 Excel 成绩表导出。 */
+export function gradebookExcelPath(subjectId: number, sessionId: number): string {
+  return `${assessmentSessionItemPath(subjectId, sessionId)}/gradebook.xlsx`
 }
 
 /** Excel 成绩导入预检或应用路径。 */
-export function examScoreImportPath(
+export function gradeImportPath(
   subjectId: number,
-  examSessionId: number,
+  sessionId: number,
   action: 'preview' | 'apply',
 ): string {
-  return `${examSessionItemPath(subjectId, examSessionId)}/score-imports/${action}`
+  return `${assessmentSessionItemPath(subjectId, sessionId)}/grade-imports/${action}`
 }
 
-/** 单个参与者逐题成绩保存路径。 */
-export function examResultPath(
-  subjectId: number,
-  examSessionId: number,
-  resultId: number,
-): string {
-  return `${examSessionItemPath(subjectId, examSessionId)}/results/${resultId}`
+// --------------------------------------------------------------------------- //
+// attempt 追加式录分
+// --------------------------------------------------------------------------- //
+/** 对某个 attempt 追加式录分路径。 */
+export function attemptGradesPath(subjectId: number, attemptId: number): string {
+  return `/subjects/${subjectId}/assessment-attempts/${attemptId}/grades`
 }

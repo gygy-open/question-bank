@@ -22,14 +22,21 @@ const { can } = usePermissions()
 
 const scope = computed<CompositionScope>(() => normalizeScope(route.params.scope))
 
-// 仅共享空间、版本已加载且对当前学科有成绩管理权限时，允许由此版本创建考试。
+// 仅共享空间、版本已加载且对当前学科有成绩管理权限时，允许由此版本创建评测。
 const canCreateExam = computed(
   () => scope.value === 'shared' && !!version.value && can(Capability.MANAGE_ASSESSMENT, currentSubjectId.value),
 )
 
 function createExamFromVersion() {
   if (!version.value) return
-  router.push(`/exams?compositionVersionId=${version.value.id}`)
+  router.push({
+    path: '/assessments',
+    query: {
+      compositionVersionId: String(version.value.id),
+      title: version.value.title,
+      version: String(version.value.version_no),
+    },
+  })
 }
 const compositionId = computed(() => Number(route.params.id))
 const versionNo = computed(() => Number(route.params.versionNo))
@@ -108,7 +115,7 @@ function doExport(format: CompositionExportFormat) {
       @click="createExamFromVersion"
     >
       <ClipboardCheck class="mr-2 h-4 w-4" />
-      创建考试
+      创建评测
     </Button>
     <Button
       v-if="version" size="sm" variant="outline"
