@@ -46,8 +46,8 @@ docker compose logs -f worker
 ```bash
 git pull
 docker compose up -d --build
-# 如有数据库结构变更
-docker compose exec backend uv run alembic upgrade head
+# 迁移由 migrate 服务自动应用；如需单独重跑
+docker compose run --rm migrate
 ```
 
 升级前建议先 [备份](/server/database#备份与恢复-服务器版-mysql)。

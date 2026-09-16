@@ -26,7 +26,9 @@ RUN --mount=type=cache,target=/root/.cache/uv \
 # Runtime stage
 FROM python:3.13-slim-trixie AS pro
 
-RUN apt-get update && apt-get install -y dos2unix && rm -rf /var/lib/apt/lists/*
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends dos2unix gosu \
+ && rm -rf /var/lib/apt/lists/*
 
 RUN groupadd --system --gid 999 nonroot \
  && useradd --system --gid 999 --uid 999 --create-home nonroot
@@ -34,20 +36,25 @@ RUN groupadd --system --gid 999 nonroot \
 # Fix for aiomysql/getpass issue when running with arbitrary UID
 ENV USER=nonroot
 
+# All runtime-writable state (uploads, static/media, config.json, sqlite, chroma)
+# lives here; /app stays a read-only code directory.
+ENV DATA_DIR=/data
+
 # Copy only the virtual environment from builder
 COPY --from=builder --chown=nonroot:nonroot /app/.venv /app/.venv
 
 COPY --chown=nonroot:nonroot . /app/
 
-RUN mkdir -p /app/static/media /app/uploads \
- && chown -R nonroot:nonroot /app/static /app/uploads \
+RUN mkdir -p "$DATA_DIR" \
+ && chown nonroot:nonroot "$DATA_DIR" \
  && dos2unix /app/entrypoint.sh \
  && chmod +x /app/entrypoint.sh
 
 ENV PATH="/app/.venv/bin:$PATH"
 
-USER nonroot
-
+# Stays root on purpose: the entrypoint fixes ownership of the mounted data
+# volume (Docker does not apply image ownership to pre-existing volumes) and
+# then drops to nonroot via gosu.
 WORKDIR /app
 
 ENTRYPOINT  ["/app/entrypoint.sh"]

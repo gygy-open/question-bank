@@ -84,8 +84,34 @@ docker compose up -d
 
 ## 数据持久化
 
-- **MySQL 数据**：命名卷 `mysql_data`（见 `docker-compose.yml`）。
-- **向量数据**：`./chromadb_data`。
-- **上传文件 / 静态资源**：`./backend/uploads`、`./backend/static`。
+- **MySQL 数据**：命名卷 `mysql_data`。
+- **向量数据**：命名卷 `chromadb_data`。
+- **上传文件 / 静态资源**：命名卷 `app_data`，挂载到后端容器的 `/data`（对应 `DATA_DIR`），内含 `uploads/` 与 `static/media/`。
+
+后端容器以 root 启动 entrypoint，将 `/data` 的属主修正为容器内的 `nonroot`（uid 999）后再降权运行，因此使用命名卷或宿主目录绑定挂载都不会出现权限问题。
 
 备份时需一并覆盖上述数据，详见 [数据库与迁移](/server/database)。
+
+### 从旧版本升级（数据卷合并）
+
+旧版本使用 `uploads_data:/app/uploads` 与 `static_data:/app/static` 两个卷。升级后改为单个 `app_data:/data`，需要搬运一次（`question-bank_` 是 Compose 项目名前缀）：
+
+```bash
+docker compose down
+docker volume create question-bank_app_data
+docker run --rm \
+  -v question-bank_static_data:/old/static \
+  -v question-bank_uploads_data:/old/uploads \
+  -v question-bank_app_data:/data \
+  alpine sh -c 'mkdir -p /data/static /data/uploads \
+    && cp -a /old/static/. /data/static/ \
+    && cp -a /old/uploads/. /data/uploads/'
+docker compose pull
+docker compose up -d
+```
+
+确认图片与上传文件正常后，再删除旧卷：
+
+```bash
+docker volume rm question-bank_static_data question-bank_uploads_data
+```

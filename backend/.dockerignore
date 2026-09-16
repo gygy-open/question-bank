@@ -10,7 +10,11 @@ htmlcov
 
 *.db
 
+# Local runtime config: holds a dev SECRET_KEY / DB_URL, must never reach an image.
+config.json
+
 static/
 uploads/
+data/
 
 .env

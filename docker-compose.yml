@@ -55,8 +55,8 @@ services:
       CHROMADB_PORT: ${CHROMADB_PORT:-8000}
       LOG_LEVEL: ${LOG_LEVEL:-INFO}
     volumes:
-      - uploads_data:/app/uploads
-      - static_data:/app/static
+      # DATA_DIR=/data is baked into the image: uploads/, static/media/, config.json.
+      - app_data:/data
     depends_on:
       migrate:
         condition: service_completed_successfully
@@ -78,8 +78,7 @@ services:
       CHROMADB_PORT: ${CHROMADB_PORT:-8000}
       LOG_LEVEL: ${LOG_LEVEL:-INFO}
     volumes:
-      - uploads_data:/app/uploads
-      - static_data:/app/static
+      - app_data:/data
     depends_on:
       migrate:
         condition: service_completed_successfully
@@ -103,5 +102,4 @@ services:
 volumes:
   mysql_data:
   chromadb_data:
-  uploads_data:
-  static_data:
+  app_data:

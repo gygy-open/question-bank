@@ -9,14 +9,14 @@ Question Bank 支持两种数据库，通过统一的数据模型与 Alembic 迁
 
 数据库结构变更通过 [Alembic](https://alembic.sqlalchemy.org/) 管理。迁移脚本位于 `backend/alembic/versions/`。
 
-服务器版容器启动时通常会自动应用迁移；手动执行：
+服务器版由专门的 `migrate` 服务在每次 `docker compose up` 时自动应用迁移，`backend` / `worker` 会等它成功退出后才启动。手动执行：
 
 ```bash
 # 应用到最新版本
-docker compose exec backend uv run alembic upgrade head
+docker compose run --rm migrate
 
 # 查看当前版本
-docker compose exec backend uv run alembic current
+docker compose run --rm migrate alembic current
 ```
 
 开发环境（非容器）下：
