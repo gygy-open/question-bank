@@ -45,6 +45,30 @@ docker compose exec backend python scripts/create_superuser.py
 克隆完整仓库后，把 `.env` 中的 `IMAGE_TAG` 留空或忽略，改用 `docker compose up -d --build` 即可基于本地源码构建镜像（`docker-compose.yml` 同时声明了 `image` 与 `build`，加 `--build` 会本地构建并覆盖同名 tag）。适合贡献者或需要自定义 Dockerfile 的场景。
 :::
 
+## 中国大陆加速
+
+CI 在发布到 GHCR 的同时会把**同一份镜像**推到阿里云容器镜像服务（ACR，杭州），tag 与国际版完全一致；mysql / chromadb 也已同步一份。仓库均为公开，无需 `docker login`。
+
+在部署步骤基础上只多一条命令 —— 把加速配置下载成 `docker-compose.override.yml`，Compose 会自动加载它：
+
+```bash
+curl -o docker-compose.override.yml \
+  https://raw.githubusercontent.com/gygy-open/question-bank/main/docker-compose.cn.yml
+
+docker compose pull
+docker compose up -d
+```
+
+不需要额外环境变量，也不需要给命令加 `-f`，后续所有 `docker compose ...` 命令与文档完全一致。想恢复成从 GHCR 拉取，删掉 `docker-compose.override.yml` 即可。
+
+::: tip 想保留原文件名？
+下载为 `docker-compose.cn.yml` 也可以，但每条命令都要显式带上两个文件：
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.cn.yml up -d
+```
+:::
+
 ## 访问
 
 - 前端：`http://<服务器IP>`（默认 80 端口）

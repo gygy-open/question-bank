@@ -1,0 +1,28 @@
+# 中国大陆加速：全部镜像改从阿里云容器镜像服务（ACR，杭州）拉取。
+#
+# 这是一个 override 文件，必须与 docker-compose.yml 一起使用。把它下载成
+# docker-compose.override.yml，Compose 会自动加载，之后照常 docker compose up -d：
+#   curl -o docker-compose.override.yml \
+#     https://raw.githubusercontent.com/gygy-open/question-bank/main/docker-compose.cn.yml
+#
+# 想保留原文件名，则每条命令都要显式指定：
+#   docker compose -f docker-compose.yml -f docker-compose.cn.yml up -d
+
+services:
+  mysql:
+    image: crpi-60iblxi36hykzkgd.cn-hangzhou.personal.cr.aliyuncs.com/question-bank/mysql:8.0
+
+  chromadb:
+    image: crpi-60iblxi36hykzkgd.cn-hangzhou.personal.cr.aliyuncs.com/question-bank/chromadb:latest
+
+  migrate:
+    image: crpi-60iblxi36hykzkgd.cn-hangzhou.personal.cr.aliyuncs.com/question-bank/question-bank-backend:${IMAGE_TAG:-latest}
+
+  backend:
+    image: crpi-60iblxi36hykzkgd.cn-hangzhou.personal.cr.aliyuncs.com/question-bank/question-bank-backend:${IMAGE_TAG:-latest}
+
+  worker:
+    image: crpi-60iblxi36hykzkgd.cn-hangzhou.personal.cr.aliyuncs.com/question-bank/question-bank-backend:${IMAGE_TAG:-latest}
+
+  frontend:
+    image: crpi-60iblxi36hykzkgd.cn-hangzhou.personal.cr.aliyuncs.com/question-bank/question-bank-frontend:${IMAGE_TAG:-latest}

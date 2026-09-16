@@ -3,6 +3,10 @@ name: Docker Build & Push
 # Builds the backend and frontend production images and publishes them to
 # GitHub Container Registry (ghcr.io). Pull requests only build (no push) to
 # validate the Dockerfiles; pushes to main and version tags publish images.
+#
+# When the ACR_USERNAME / ACR_PASSWORD secrets are present the same build is
+# additionally pushed to Aliyun ACR (faster pulls from mainland China). One
+# build, two registries -- buildx pushes every tag metadata-action emits.
 on:
   push:
     branches: [main]
@@ -16,6 +20,7 @@ permissions:
 
 env:
   REGISTRY: ghcr.io
+  ACR_IMAGE_PREFIX: crpi-60iblxi36hykzkgd.cn-hangzhou.personal.cr.aliyuncs.com/question-bank
 
 jobs:
   backend:
@@ -45,11 +50,33 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      # Forks and PRs have no ACR credentials; skip that registry instead of failing.
+      - name: Resolve ACR availability
+        id: acr
+        env:
+          ACR_USERNAME: ${{ secrets.ACR_USERNAME }}
+        run: |
+          if [ -n "$ACR_USERNAME" ] && [ "${{ github.event_name }}" != "pull_request" ]; then
+            echo "enabled=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "enabled=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Log in to Aliyun ACR
+        if: steps.acr.outputs.enabled == 'true'
+        uses: docker/login-action@v3
+        with:
+          registry: crpi-60iblxi36hykzkgd.cn-hangzhou.personal.cr.aliyuncs.com
+          username: ${{ secrets.ACR_USERNAME }}
+          password: ${{ secrets.ACR_PASSWORD }}
+
       - name: Extract metadata
         id: meta
         uses: docker/metadata-action@v5
         with:
-          images: ${{ env.REGISTRY }}/${{ github.repository }}-backend
+          images: |
+            ${{ env.REGISTRY }}/${{ github.repository }}-backend
+            name=${{ env.ACR_IMAGE_PREFIX }}/question-bank-backend,enable=${{ steps.acr.outputs.enabled }}
           tags: |
             type=ref,event=branch
             type=semver,pattern={{version}}
@@ -82,11 +109,32 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Resolve ACR availability
+        id: acr
+        env:
+          ACR_USERNAME: ${{ secrets.ACR_USERNAME }}
+        run: |
+          if [ -n "$ACR_USERNAME" ] && [ "${{ github.event_name }}" != "pull_request" ]; then
+            echo "enabled=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "enabled=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Log in to Aliyun ACR
+        if: steps.acr.outputs.enabled == 'true'
+        uses: docker/login-action@v3
+        with:
+          registry: crpi-60iblxi36hykzkgd.cn-hangzhou.personal.cr.aliyuncs.com
+          username: ${{ secrets.ACR_USERNAME }}
+          password: ${{ secrets.ACR_PASSWORD }}
+
       - name: Extract metadata
         id: meta
         uses: docker/metadata-action@v5
         with:
-          images: ${{ env.REGISTRY }}/${{ github.repository }}-frontend
+          images: |
+            ${{ env.REGISTRY }}/${{ github.repository }}-frontend
+            name=${{ env.ACR_IMAGE_PREFIX }}/question-bank-frontend,enable=${{ steps.acr.outputs.enabled }}
           tags: |
             type=ref,event=branch
             type=semver,pattern={{version}}
