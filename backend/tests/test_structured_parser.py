@@ -1,5 +1,6 @@
 import json
 
+from app.services.importing.contracts import OUTLINE_HEADING
 from app.services.question_legacy_adapter import adapt_legacy_question
 from app.services.structured_parser import parse_structured
 
@@ -144,6 +145,93 @@ def test_choice_warns_when_answer_out_of_range():
     q = parse_structured(text).questions[0]
 
     assert any("超出选项范围" in w for w in q["warnings"])
+
+
+def test_trailing_answer_section_backfills_answer_and_analysis_by_number():
+    text = (
+        "1.【题目】1+1=?\n"
+        "【选项】A. 1 B. 2 C. 3 D. 4\n"
+        "2.【题目】3+3=?\n"
+        "【选项】A. 5 B. 6 C. 7 D. 8\n"
+        "【答案区】\n"
+        "| 题号 | 1 | 2 |\n"
+        "|:---:|:---:|:---:|\n"
+        "| 答案 | B | B |\n"
+        "1.因为1+1=2，选B。\n"
+        "2.因为3+3=6，选B。"
+    )
+    result = parse_structured(text)
+
+    q1, q2 = result.questions
+    assert q1["answer"] == "B" and q1["analysis"] == "因为1+1=2，选B。"
+    assert q2["answer"] == "B" and q2["analysis"] == "因为3+3=6，选B。"
+    assert q1["warnings"] == [] and q2["warnings"] == []
+
+
+def test_analysis_paragraph_leading_answer_echo_is_stripped():
+    text = (
+        "1.【题目】哪些是质数（   ）\n"
+        "【选项】A. 1 B. 2 C. 4 D. 5\n"
+        "【答案区】\n"
+        "| 题号 | 1 |\n"
+        "|:---:|:---:|\n"
+        "| 答案 | BD |\n"
+        "1.BD对于A，1不是质数；对于B，2是质数。"
+    )
+    q = parse_structured(text).questions[0]
+
+    assert q["answer"] == "BD"
+    assert q["analysis"] == "对于A，1不是质数；对于B，2是质数。"
+
+
+def test_answer_section_explicit_tags_win_for_fill_in_the_blank():
+    text = (
+        "12.【题目】三角形的面积是\\_\\_\\_\\_\\_。\n"
+        "【答案区】\n"
+        "12.【答案】$x=1$【解析】设边长为...\n"
+    )
+    q = parse_structured(text).questions[0]
+
+    assert json.loads(q["answer"]) == [["$x=1$"]]
+    assert q["analysis"] == "设边长为..."
+    assert q["q_type"] == "fill_in_the_blank"
+    assert q["warnings"] == []
+
+
+def test_explicit_answer_inside_block_wins_over_trailing_answer_section():
+    text = (
+        "1.【题目】1+1=?\n"
+        "【选项】A. 1 B. 2 C. 3 D. 4\n"
+        "【答案】A\n"
+        "【答案区】\n"
+        "| 题号 | 1 |\n"
+        "|:---:|:---:|\n"
+        "| 答案 | B |"
+    )
+    q = parse_structured(text).questions[0]
+
+    assert q["answer"] == "A"
+
+
+def test_answer_section_tag_trailing_other_heading_text_is_recognized():
+    text = (
+        "1.【题目】1+1=?\n"
+        "【选项】A. 1 B. 2 C. 3 D. 4\n"
+        "**《小测》参考答案【答案区】**\n"
+        "| 题号 | 1 |\n"
+        "|:---:|:---:|\n"
+        "| 答案 | B |\n"
+        "1.因为1+1=2，选B。"
+    )
+    result = parse_structured(text)
+
+    q = result.questions[0]
+    assert q["answer"] == "B"
+    assert q["analysis"] == "因为1+1=2，选B。"
+    assert any(
+        item.get("kind") == OUTLINE_HEADING and item.get("text") == "《小测》参考答案"
+        for item in result.paper["outline"]
+    )
 
 
 def test_empty_input_returns_empty_list():

@@ -763,7 +763,7 @@ const reset = () => {
                         <span>批量设置</span>
                         <div class="flex items-center gap-2">
                             <Button variant="outline" @click="reset">取消</Button>
-                            <Button @click="handleImport" :disabled="isImporting">
+                            <Button @click="handleImport()" :disabled="isImporting">
                                 <Loader2 v-if="isImporting" class="mr-2 h-4 w-4 animate-spin" />
                                 <Save v-else class="mr-2 h-4 w-4" />
                                 确认导入 ({{ importList.filter(i => i.selected).length }})

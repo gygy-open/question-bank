@@ -177,6 +177,30 @@ class MarkdownIngestor:
         return CanonicalDoc(task_id=task_id, markdown=content, filename=filename)
 
 
+# pandoc 转换 Word 公式时，把非 ASCII 希腊字母原样塞进 \text{}；KaTeX 的 text 模式
+# 字体没有这些字形的度量信息，需要换成对应的 LaTeX 宏才能正常渲染。
+_GREEK_TO_MACRO = {
+    "α": "alpha", "β": "beta", "γ": "gamma", "δ": "delta", "ε": "epsilon",
+    "ζ": "zeta", "η": "eta", "θ": "theta", "ι": "iota", "κ": "kappa",
+    "λ": "lambda", "μ": "mu", "ν": "nu", "ξ": "xi", "π": "pi", "ρ": "rho",
+    "σ": "sigma", "ς": "sigma", "τ": "tau", "υ": "upsilon", "φ": "phi",
+    "χ": "chi", "ψ": "psi", "ω": "omega",
+    "Γ": "Gamma", "Δ": "Delta", "Θ": "Theta", "Λ": "Lambda", "Ξ": "Xi",
+    "Π": "Pi", "Σ": "Sigma", "Φ": "Phi", "Χ": "Chi", "Ψ": "Psi", "Ω": "Omega",
+}
+_TEXT_WRAPPED_GREEK_RE = re.compile(
+    r'\\text\{([' + ''.join(_GREEK_TO_MACRO) + r']+)\}'
+)
+
+
+def _fix_text_wrapped_greek(content: str) -> str:
+    """把 \\text{π} 这类 pandoc 产物换成 \\pi,避免 KaTeX 报 unknownSymbol/缺字形。"""
+    def repl(match: re.Match) -> str:
+        return ' '.join(f'\\{_GREEK_TO_MACRO[ch]}' for ch in match.group(1))
+
+    return _TEXT_WRAPPED_GREEK_RE.sub(repl, content)
+
+
 class DocxIngestor:
     async def ingest(self, file_path: Path, *, task_id: Optional[str] = None) -> CanonicalDoc:
         task_id = _ensure_task_id(task_id)
@@ -218,7 +242,8 @@ class DocxIngestor:
                 public_media_url = f"/static/media/{task_id}/"
                 content_str = content_str.replace(pandoc_media_prefix, public_media_url)
 
-                output_path.write_text(content_str, encoding="utf-8")
+            content_str = _fix_text_wrapped_greek(content_str)
+            output_path.write_text(content_str, encoding="utf-8")
             return content_str
 
         content = await asyncio.to_thread(handle_media_and_update_content, content)

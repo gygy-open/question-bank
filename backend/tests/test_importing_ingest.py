@@ -11,6 +11,7 @@ from app.services.importing.ingest import (
     ImageIngestor,
     MarkdownArchiveIngestor,
     MarkdownIngestor,
+    _fix_text_wrapped_greek,
     extract_archive_and_rewrite,
 )
 
@@ -60,6 +61,18 @@ async def test_docx_ingestor_rewrites_media_paths(monkeypatch, tmp_path):
     # 媒体已搬到 MEDIA_DIR,临时 media/ 子目录已清理。
     assert (settings.MEDIA_DIR / task_id / "img1.png").exists()
     assert not (task_dir / "media").exists()
+
+
+def test_fix_text_wrapped_greek_converts_unicode_letter_to_macro():
+    text = r"当$x \in \left( 0,\text{π} \right)$时"
+
+    assert _fix_text_wrapped_greek(text) == r"当$x \in \left( 0,\pi \right)$时"
+
+
+def test_fix_text_wrapped_greek_leaves_ascii_text_untouched():
+    text = r"\text{sin}x - x\text{cos}x"
+
+    assert _fix_text_wrapped_greek(text) == text
 
 
 def _make_zip(tmp_path, members: dict[str, bytes]):

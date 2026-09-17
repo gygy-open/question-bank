@@ -47,6 +47,14 @@ TAG_ALIASES = {
     "知识点": "knowledge_point", "knowledge_point": "knowledge_point",
 }
 
+# 文档级分区标签(与上面的逐题字段标签分属不同命名空间,只在题块之外生效):
+# 标记之后的内容是「统一答案区」——答案表(表格)给答案、编号段落给解析,
+# 按题号回填到已解析的题目,而不是当作某一题的字段。
+SECTION_TAG_ALIASES = {
+    "答案区": "answer_section", "答案表": "answer_section",
+    "统一答案": "answer_section", "答案速查": "answer_section",
+}
+
 _Q_TYPE_MAP = {
     "单选": "single_choice", "单选题": "single_choice", "single_choice": "single_choice",
     "多选": "multiple_choice", "多选题": "multiple_choice", "multiple_choice": "multiple_choice",
@@ -73,12 +81,15 @@ _TAG_RE = re.compile(
 )
 
 _OPTION_TAG_RE = re.compile(r'^(?:选项|option)\s*([A-Za-z])$', re.IGNORECASE)
+_BRACKET_TAG_RE = re.compile(r'[【\[]\s*([^\]】]+?)\s*[】\]]')
 _BLOCKQUOTE_PREFIX_RE = re.compile(r'^\s*(?:>\s*)+')
 _BLANK_UNDERSCORE_RE = re.compile(r'(?:\\?_){3,}')
 # 【题目】标签之前的原卷题号(如 "3.【题目】" / "(3)【题目】");_TAG_RE 会吃掉它,故单独捕获。
 _TAG_LEADING_NUMBER_RE = re.compile(r'^\s*(?:\*\*)?\(?(\d+(?:\.\d+)?)\)?[\.、．]?\s*[【\[]')
 # 题干正文开头的题号(如 "【题目】3. 下列...");review 阶段会把它剔掉,故在此先行记录。
 _CONTENT_LEADING_NUMBER_RE = re.compile(r'^\s*\(?(\d+(?:\.\d+)?)\)?[\.、．]\s*')
+# 统一答案区里,编号段落的题号(如 "1．B因为..."),用作该题解析的记录边界。
+_ANALYSIS_ITEM_RE = re.compile(r'^\s*(\d+)[\.、．]\s*')
 _HEADING_MARKUP_RE = re.compile(r'^[\s#*>]+|[\s*]+$')
 _INLINE_ANALYSIS_TAG_RE = re.compile(
     r'(?=[【\[]\s*(?:解析|详解|解答|analysis)\s*[】\]])',
@@ -106,7 +117,26 @@ def _heading_text(line: str) -> str:
 
 def _leading_number_before_tag(line: str) -> Optional[str]:
     m = _TAG_LEADING_NUMBER_RE.match(line)
-    return m.group(1) if m else None
+    return _normalize_number(m.group(1)) if m else None
+
+
+def _normalize_number(raw: Optional[str]) -> Optional[str]:
+    """去掉纯数字题号的前导零,形如 3.1 的子题号原样保留。"""
+    if not raw:
+        return None
+    raw = raw.strip()
+    return str(int(raw)) if raw.isdigit() else raw
+
+
+def _match_section_tag(line: str) -> Optional[Tuple[str, str]]:
+    """识别文档级分区标签(如【答案区】)。标签常跟在"参考答案"等标题文字之后,
+    不要求出现在行首,故用 search 而非 match;返回 (kind, 标签前的标题文字)。"""
+    for m in _BRACKET_TAG_RE.finditer(line):
+        raw_name = m.group(1).strip()
+        kind = SECTION_TAG_ALIASES.get(raw_name) or SECTION_TAG_ALIASES.get(raw_name.lower())
+        if kind:
+            return kind, _heading_text(line[:m.start()])
+    return None
 
 
 def _match_tag(line: str) -> Optional[Tuple[str, str, Optional[str]]]:
@@ -169,6 +199,118 @@ def _infer_q_type(options: List[str], answer: str, content: str) -> str:
     return "free_response"
 
 
+def _is_table_row(line: str) -> bool:
+    stripped = line.strip()
+    return stripped.startswith('|') and stripped.count('|') >= 2
+
+
+def _split_table_row(line: str) -> List[str]:
+    return [cell.strip() for cell in line.strip().strip('|').split('|')]
+
+
+def _is_table_separator_row(cells: List[str]) -> bool:
+    return all(re.fullmatch(r':?-+:?', c) for c in cells if c)
+
+
+def _strip_cell_markup(cell: str) -> str:
+    return cell.strip('* ').strip()
+
+
+def _extract_answer_table(rows: List[List[str]]) -> Dict[str, str]:
+    """从形如 “题号|1|2|3” + “答案|B|B|C” 的两行表格中取 题号->答案。"""
+    header_row: Optional[List[str]] = None
+    for row in rows:
+        if _is_table_separator_row(row):
+            continue
+        if header_row is None:
+            if any("题号" in cell for cell in row):
+                header_row = row
+            continue
+        answers: Dict[str, str] = {}
+        for num_cell, ans_cell in zip(header_row, row):
+            num = _strip_cell_markup(num_cell)
+            ans = _strip_cell_markup(ans_cell)
+            if num.isdigit() and ans:
+                answers[num] = ans
+        return answers
+    return {}
+
+
+def _strip_leading_answer(text: str, answer: str) -> str:
+    """解析段落常在题号后原样抄写答案(如 "10．ACD对于..."),这段与答案表重复,故去掉前缀。"""
+    if not answer:
+        return text
+    stripped = text.lstrip()
+    if stripped[:len(answer)].upper() == answer.upper():
+        return stripped[len(answer):].lstrip()
+    return text
+
+
+def _split_tagged_record(parts: List[str]) -> Tuple[Optional[str], Optional[str], str]:
+    """答案区里某道题若显式写了【答案】/【解析】标签,其可靠性等同逐题解析,应优先采用；
+    返回 (显式答案, 显式解析, 原始拼接文本)，未打标签时前两者为 None。"""
+    raw_text = "\n".join(parts).strip()
+    fields: Dict[str, List[str]] = defaultdict(list)
+    current_field: Optional[str] = None
+    found_tag = False
+
+    for line in parts:
+        t = _match_tag(line)
+        if t and t[0] in ("answer", "analysis"):
+            found_tag = True
+            current_field = t[0]
+            if t[1].strip():
+                fields[current_field].append(t[1])
+        elif t:
+            current_field = None
+        elif current_field is not None and line.strip():
+            fields[current_field].append(line)
+
+    if not found_tag:
+        return None, None, raw_text
+    return (
+        "\n".join(fields.get("answer", [])).strip() or None,
+        "\n".join(fields.get("analysis", [])).strip() or None,
+        raw_text,
+    )
+
+
+def _parse_answer_section(lines: List[str]) -> Tuple[Dict[str, str], Dict[str, str]]:
+    """解析【答案区】之后的内容:每道题若显式写了【答案】/【解析】标签则直接采用;
+    否则退回表格给 answer、编号段落整体作 analysis(并去掉开头重复抄写的答案)。"""
+    table_rows: List[List[str]] = []
+    records: Dict[str, List[str]] = defaultdict(list)
+    current_number: Optional[str] = None
+
+    for line in lines:
+        if _is_table_row(line):
+            table_rows.append(_split_table_row(line))
+            current_number = None
+            continue
+        m = _ANALYSIS_ITEM_RE.match(line)
+        if m:
+            current_number = _normalize_number(m.group(1))
+            rest = line[m.end():]
+            if current_number and rest.strip():
+                records[current_number].append(rest)
+            continue
+        if current_number and line.strip():
+            records[current_number].append(line)
+
+    answers: Dict[str, str] = dict(_extract_answer_table(table_rows))
+    analyses: Dict[str, str] = {}
+    for num, parts in records.items():
+        tagged_answer, tagged_analysis, raw_text = _split_tagged_record(parts)
+        if tagged_answer:
+            answers[num] = tagged_answer
+        analyses[num] = (
+            tagged_analysis if tagged_analysis is not None
+            else _strip_leading_answer(raw_text, answers.get(num, ""))
+        )
+
+    return answers, analyses
+
+
 def _build_question(fields: Dict[str, List[str]],
                     option_items: Dict[str, List[str]]) -> dict:
     def join(field: str) -> str:
@@ -200,12 +342,36 @@ def _build_question(fields: Dict[str, List[str]],
         else:
             difficulty = _CN_DIFFICULTY.get(difficulty_raw.strip(), 1)
 
-    q_type = _map_q_type(q_type_raw) or _infer_q_type(options, answer, content)
-
     source_number: Optional[str] = None
     num_match = _CONTENT_LEADING_NUMBER_RE.match(content)
     if num_match:
-        source_number = num_match.group(1)
+        source_number = _normalize_number(num_match.group(1))
+
+    question = {
+        "content": content,
+        "q_type": None,
+        "options": options,
+        "answer": answer,
+        "thinking": thinking,
+        "analysis": analysis,
+        "summary": summary,
+        "difficulty": difficulty,
+        "warnings": [],
+        "source_number": source_number,
+        # 文末答案区回填 answer 后需要重新推断 q_type，故显式标签的结果先记下，
+        # 不在这里直接 pop——parse_structured 收尾时才统一清理。
+        "_q_type_explicit": _map_q_type(q_type_raw),
+    }
+    _finalize_question(question)
+    return question
+
+
+def _finalize_question(question: dict) -> None:
+    """推导 q_type、规整填空题答案、生成 warnings；答案区回填后会被再次调用。"""
+    content = question["content"]
+    options = question["options"]
+    answer = question["answer"]
+    q_type = question.get("_q_type_explicit") or _infer_q_type(options, answer, content)
 
     if q_type == "fill_in_the_blank" and answer:
         try:
@@ -230,18 +396,9 @@ def _build_question(fields: Dict[str, List[str]],
                     warnings.append(f"答案 {ch.upper()} 超出选项范围")
                     break
 
-    return {
-        "content": content,
-        "q_type": q_type,
-        "options": options,
-        "answer": answer,
-        "thinking": thinking,
-        "analysis": analysis,
-        "summary": summary,
-        "difficulty": difficulty,
-        "warnings": warnings,
-        "source_number": source_number,
-    }
+    question["q_type"] = q_type
+    question["answer"] = answer
+    question["warnings"] = warnings
 
 
 def _parse_block(lines: List[str]) -> dict:
@@ -326,7 +483,9 @@ def parse_structured(text: str) -> ExtractionResult:
         block_temp_id = None
         block_number = None
 
-    for line in lines:
+    answer_section_lines: Optional[List[str]] = None
+
+    for i, line in enumerate(lines):
         tag = _match_tag(line)
         if tag and tag[0] == "content":
             flush_block()
@@ -335,6 +494,18 @@ def parse_structured(text: str) -> ExtractionResult:
             block_temp_id = str(uuid.uuid4())
             block_number = _leading_number_before_tag(line)
             continue
+
+        # 【答案区】标志全卷答案/解析统一收尾：无论当前题块是否还开着都直接结束扫描，
+        # 其后内容整体移交单独解析，不再走逐题字段状态机。
+        section = _match_section_tag(line)
+        if section and section[0] == "answer_section":
+            flush_block()
+            flush_text()
+            prefix_heading = section[1]
+            if prefix_heading:
+                outline.append({"kind": OUTLINE_HEADING, "text": prefix_heading, "level": 2})
+            answer_section_lines = lines[i + 1:]
+            break
 
         # 大题标题是版面结构而非题目字段，遇到即结束当前题块。
         if _is_section_heading(line):
@@ -352,6 +523,24 @@ def parse_structured(text: str) -> ExtractionResult:
 
     flush_block()
     flush_text()
+
+    if answer_section_lines is not None:
+        answers_by_number, analyses_by_number = _parse_answer_section(answer_section_lines)
+        for question in questions:
+            number = question.get("source_number")
+            if not number:
+                continue
+            if not question["answer"] and number in answers_by_number:
+                question["answer"] = answers_by_number[number]
+            if not question["analysis"] and number in analyses_by_number:
+                question["analysis"] = analyses_by_number[number]
+            _finalize_question(question)
+        section_text = "\n".join(answer_section_lines).strip()
+        if section_text:
+            outline.append({"kind": OUTLINE_RICH_TEXT, "markdown": section_text})
+
+    for question in questions:
+        question.pop("_q_type_explicit", None)
 
     suggested_title = _take_suggested_title(outline)
     return ExtractionResult(
