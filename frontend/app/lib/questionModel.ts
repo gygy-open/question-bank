@@ -169,6 +169,10 @@ export interface ImportDraft extends QuestionDraft {
     selected: boolean
     warnings: string[]
     ai_suggested_tags?: Record<string, string[]>
+    // 与整卷 outline 的 question_ref 对齐；母子题关系在入库前也靠它承载。
+    temp_id?: string | null
+    parent_temp_id?: string | null
+    source_number?: string | null
 }
 
 /** /upload/* 返回的单条已转 v2 抽取项（后端已清洗题号/标签并转 RichDoc）。 */
@@ -186,12 +190,22 @@ export interface ExtractedQuestionItem {
     subject_id?: number | null
     ai_suggested_tags?: Record<string, string[]> | null
     warnings?: string[]
+    temp_id?: string | null
+    parent_temp_id?: string | null
+    source_number?: string | null
 }
 
 function generateImportUid(): string {
     const g = globalThis as { crypto?: { randomUUID?: () => string } }
     if (g.crypto?.randomUUID) return `imp_${g.crypto.randomUUID()}`
     return `imp_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 10)}`
+}
+
+/** 生成合法 UUID，用作与后端 outline 对齐的临时题目 id。 */
+export function generateTempId(): string {
+    const g = globalThis as { crypto?: { randomUUID?: () => string } }
+    if (g.crypto?.randomUUID) return g.crypto.randomUUID()
+    return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`
 }
 
 /** 把 /upload/* 的抽取项映射成可编辑的导入评审草稿。 */
@@ -210,6 +224,9 @@ export function extractedItemToDraft(
         selected: true,
         warnings: item.warnings ?? [],
         ai_suggested_tags: item.ai_suggested_tags ?? undefined,
+        temp_id: item.temp_id ?? generateTempId(),
+        parent_temp_id: item.parent_temp_id ?? null,
+        source_number: item.source_number ?? null,
         content: cloneRich(item.content),
         q_type: qType,
         status: (item.status ?? 'draft') as QuestionStatus,
