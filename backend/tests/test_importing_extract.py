@@ -88,7 +88,7 @@ async def test_extract_masks_images_before_ai_and_restores_after(monkeypatch, db
     assert "@@IMG0@@" in stub_provider.received_content
 
     # 还原后的题目 content 里包含完整原始图片 token。
-    assert original_image in result[0]["content"]
+    assert original_image in result.questions[0]["content"]
 
 
 async def test_extract_strips_hallucinated_placeholder_not_in_map(monkeypatch, db_session):
@@ -116,10 +116,10 @@ async def test_extract_strips_hallucinated_placeholder_not_in_map(monkeypatch, d
     result = await extractor.extract(doc_content, db_session, mode="extract", subject_id=None)
 
     # 真实存在的占位符被正确还原。
-    assert result[0]["content"] == f"第一题：见图 {original_image}"
+    assert result.questions[0]["content"] == f"第一题：见图 {original_image}"
     # 幻觉出的占位符不会原样落库,只是被清掉。
-    assert "@@IMG1@@" not in result[0]["options"][1]
-    assert result[0]["options"][1] == "B. 幻觉图 "
+    assert "@@IMG1@@" not in result.questions[0]["options"][1]
+    assert result.questions[0]["options"][1] == "B. 幻觉图 "
 
 
 async def test_extract_recovers_when_ai_writes_wrong_placeholder_number(monkeypatch, db_session):
@@ -146,8 +146,8 @@ async def test_extract_recovers_when_ai_writes_wrong_placeholder_number(monkeypa
     extractor = AIExtractor(prompt_builder=_StubPromptBuilder(), enricher=_StubEnricher())
     result = await extractor.extract(doc_content, db_session, mode="extract", subject_id=None)
 
-    assert result[0]["content"] == f"第一题：见图 {image_a}"
-    assert result[1]["content"] == f"第二题：见图 {image_b}"
+    assert result.questions[0]["content"] == f"第一题：见图 {image_a}"
+    assert result.questions[1]["content"] == f"第二题：见图 {image_b}"
 
 
 async def test_extract_without_images_is_a_no_op_for_masking(monkeypatch, db_session):
@@ -163,4 +163,4 @@ async def test_extract_without_images_is_a_no_op_for_masking(monkeypatch, db_ses
     result = await extractor.extract("没有图片的内容", db_session, mode="extract", subject_id=None)
 
     assert "没有图片的内容" in stub_provider.received_content
-    assert result[0]["content"] == "没有图片的题目"
+    assert result.questions[0]["content"] == "没有图片的题目"

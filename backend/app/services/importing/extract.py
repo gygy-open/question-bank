@@ -15,6 +15,7 @@ from app.services.ai_provider import get_ai_provider
 from app.services.structured_parser import parse_structured
 
 from .enrich import KnowledgePointEnricher
+from .contracts import ExtractionResult
 from .image_mask import mask_images, restore_images
 from .prompt import PromptBuilder
 from .provider_config import resolve_active_provider
@@ -23,7 +24,7 @@ logger = logging.getLogger(__name__)
 
 
 class ExtractionStrategy(Protocol):
-    """把归一化前的"原始内容 → RawQuestion 列表"抽象成可插拔策略。"""
+    """把归一化前的"原始内容 → 题目 + 整卷结构"抽象成可插拔策略。"""
 
     async def extract(
         self,
@@ -34,7 +35,7 @@ class ExtractionStrategy(Protocol):
         filename: str | None = None,
         mode: str = "extract",
         subject_id: Optional[int] = None,
-    ) -> list[dict]: ...
+    ) -> ExtractionResult: ...
 
 
 
@@ -70,11 +71,11 @@ class AIExtractor:
         filename: str | None = None,
         mode: str = "extract",
         subject_id: Optional[int] = None,
-    ) -> list[dict]:
+    ) -> ExtractionResult:
         provider_name, config = await resolve_active_provider(db, is_vision=bool(image_data))
         if provider_name is None:
             logger.warning("No active AI provider configuration found.")
-            return []
+            return ExtractionResult()
 
         config["AI_EXTRACT_PROMPT"] = await self.prompt_builder.build(
             db, mode=mode, subject_id=subject_id
@@ -101,7 +102,7 @@ class AIExtractor:
                 questions, subject_id=subject_id, provider=provider, config=config
             )
             extracted = [q.model_dump() for q in questions]
-            return _assign_temp_ids(extracted)
+            return ExtractionResult(questions=_assign_temp_ids(extracted))
         except Exception as e:
             logger.error(f"AI Provider error: {e}")
             raise
@@ -138,6 +139,6 @@ class TemplateExtractor:
         filename: str | None = None,
         mode: str = "extract",
         subject_id: Optional[int] = None,
-    ) -> list[dict]:
+    ) -> ExtractionResult:
         return parse_structured(content)
 

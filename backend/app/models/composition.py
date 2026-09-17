@@ -162,6 +162,13 @@ class Composition(Base):
     subject_id = Column(Integer, ForeignKey("subjects.id"), nullable=False, index=True)
     folder_id = Column(Integer, ForeignKey("folders.id"), nullable=True, index=True)
 
+    # 整卷导入来源。FK 仅建在稿件侧,导入历史反查走本列索引,避免与 import_tasks 形成循环外键。
+    source_import_task_id = Column(
+        Integer, ForeignKey("import_tasks.id", ondelete="SET NULL"), nullable=True, index=True
+    )
+    # 创建时固化的来源信息(文件名/批次/时间)。源文件被清理后仍可读,不依赖 FK 存活。
+    source_snapshot = Column(JSON, nullable=True)
+
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     created_by = Column(Integer, ForeignKey("user.id"), nullable=True)
@@ -173,6 +180,11 @@ class Composition(Base):
     updater = relationship("User", foreign_keys=[updated_by])
     subject = relationship("Subject")
     folder = relationship("Folder", back_populates="compositions")
+    source_import_task = relationship(
+        "ImportTask",
+        back_populates="compositions",
+        foreign_keys=[source_import_task_id],
+    )
 
     # passive_deletes:节点删除依赖 DB 的 ON DELETE CASCADE(含自引用),ORM 不逐行删,
     # 避免自引用父子删除顺序问题(需 SQLite PRAGMA foreign_keys=ON 生效)。

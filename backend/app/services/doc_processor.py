@@ -36,13 +36,14 @@ class DocProcessor:
             Dict with task_id, content, and extracted questions
         """
         doc = await self._markdown_ingestor.ingest(content, task_id=task_id, filename=filename)
-        extracted_questions = await self._extractor_for(method).extract(
+        extraction = await self._extractor_for(method).extract(
             doc.markdown, db, filename=doc.filename, mode=mode, subject_id=subject_id
         )
         return {
             "task_id": doc.task_id,
             "content": doc.markdown,
-            "questions": extracted_questions,
+            "questions": extraction.questions,
+            "paper": extraction.paper,
         }
 
     async def process_markdown_archive(self, file_path: Path, db: AsyncSession, task_id: str = None, mode: str = "extract", method: str = "ai", subject_id: Optional[int] = None) -> dict:
@@ -52,13 +53,14 @@ class DocProcessor:
         .md files in the archive are concatenated into one document.
         """
         doc = await self._markdown_archive_ingestor.ingest(file_path, task_id=task_id)
-        extracted_questions = await self._extractor_for(method).extract(
+        extraction = await self._extractor_for(method).extract(
             doc.markdown, db, filename=doc.filename, mode=mode, subject_id=subject_id
         )
         return {
             "task_id": doc.task_id,
             "content": doc.markdown,
-            "questions": extracted_questions,
+            "questions": extraction.questions,
+            "paper": extraction.paper,
         }
 
     async def process_image(self, image_file: BinaryIO, db: AsyncSession, task_id: str = None, mode: str = "extract", subject_id: Optional[int] = None) -> dict:
@@ -75,13 +77,14 @@ class DocProcessor:
             Dict with task_id, image_url, and extracted questions
         """
         doc = await self._image_ingestor.ingest(image_file, task_id=task_id)
-        extracted_questions = await self._ai_extractor.extract(
+        extraction = await self._ai_extractor.extract(
             "", db, image_data=doc.image_data, mode=mode, subject_id=subject_id
         )
         return {
             "task_id": doc.task_id,
             "image_url": doc.image_url,
-            "questions": extracted_questions,
+            "questions": extraction.questions,
+            "paper": extraction.paper,
         }
 
     async def process_docx(self, file_path: Path, db: AsyncSession = None, task_id: str = None, mode: str = "extract", method: str = "ai", subject_id: Optional[int] = None) -> dict:
@@ -89,13 +92,14 @@ class DocProcessor:
         Convert docx to markdown, extract media, and parse questions using Gemini.
         """
         doc = await self._docx_ingestor.ingest(file_path, task_id=task_id)
-        extracted_questions = await self._extractor_for(method).extract(
+        extraction = await self._extractor_for(method).extract(
             doc.markdown, db, filename=doc.filename, mode=mode, subject_id=subject_id
         )
         return {
             "task_id": doc.task_id,
             "content": doc.markdown,
-            "questions": extracted_questions,
+            "questions": extraction.questions,
+            "paper": extraction.paper,
         }
 
 doc_processor = DocProcessor()

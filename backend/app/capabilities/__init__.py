@@ -15,7 +15,7 @@ from .errors import (
 from .registry import UNGATED_ALLOWLIST, all_capabilities, get, register, run
 
 # 各域模块必须显式导入以触发注册(见模块 docstring)。放最后是因为它们要 import 上面的符号。
-from . import compositions, questions  # noqa: E402,F401
+from . import compositions, paper_imports, questions  # noqa: E402,F401
 
 __all__ = [
     "Authz",

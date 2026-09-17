@@ -25,6 +25,8 @@ logger = logging.getLogger(__name__)
 
 # 行首题号:如 "1. " / "1、" / "(1) "。抽取产物常带原文序号,编辑前去掉。
 _LEADING_NUMBER_RE = re.compile(r"^(?:\d+[.、\s]\s*|\(\d+\)\s*)")
+# 剔除前先捕获原卷题号,供整卷稿件还原题号使用。
+_CAPTURE_NUMBER_RE = re.compile(r"^\(?(\d+(?:\.\d+)?)\)?[.、\s]")
 
 # AI/结构化解析可能在顶层给出的标签类目,归并到 ai_suggested_tags 供人工确认。
 _AI_TAG_CATEGORIES = ("year", "source", "grade", "semester", "exam_type", "feature")
@@ -34,6 +36,15 @@ def _clean_content(raw: Any) -> str:
     if raw is None:
         return ""
     return _LEADING_NUMBER_RE.sub("", str(raw))
+
+
+def _source_number(raw: Mapping[str, Any]) -> Optional[str]:
+    """优先用解析器已识别的题号;否则从题干行首回捉一次。"""
+    existing = raw.get("source_number")
+    if existing:
+        return str(existing)
+    match = _CAPTURE_NUMBER_RE.match(str(raw.get("content") or ""))
+    return match.group(1) if match else None
 
 
 def _build_ai_tags(raw: Mapping[str, Any]) -> Optional[dict[str, list[str]]]:
@@ -111,6 +122,10 @@ def extracted_to_v2_review(
                 "subject_id": raw.get("subject_id") or subject_id,
                 "ai_suggested_tags": _build_ai_tags(raw),
                 "warnings": warnings,
+                # 与 outline 的 question_ref 对齐;材料题的父子关系也由临时 id 承载。
+                "temp_id": raw.get("id"),
+                "parent_temp_id": raw.get("parent_id"),
+                "source_number": _source_number(raw),
             }
         )
     return out

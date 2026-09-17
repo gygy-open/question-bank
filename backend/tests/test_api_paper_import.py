@@ -1,0 +1,448 @@
+"""整卷导入 API 的聚焦测试。
+
+覆盖产品规格里的关键决策:默认不建稿、空间/目录由用户指定、题号重排可选、
+部分失败由用户决定、私有题不得进共享稿件、幂等重放、权限矩阵,
+以及"正常路径原子"——建稿失败不得留下半份题目。
+"""
+import pytest
+from sqlalchemy import select
+
+from app.core.permissions import SubjectRole
+from app.core.security import create_access_token
+from app.models.composition import Composition
+from app.models.import_task import CompositionImportState, ImportTask
+from app.models.question import Question
+from app.models.subject import Subject
+from app.models.subject_member import SubjectMember
+from app.models.user import User
+
+API = "/api/v1"
+
+
+async def _seed_user(db_session, *, username: str) -> User:
+    user = User(username=username, full_name=username, hashed_password="x", is_active=True)
+    db_session.add(user)
+    await db_session.commit()
+    await db_session.refresh(user)
+    return user
+
+
+async def _seed_subject(db_session, *, name="数学", slug="math") -> Subject:
+    subject = Subject(name=name, slug=slug)
+    db_session.add(subject)
+    await db_session.commit()
+    await db_session.refresh(subject)
+    return subject
+
+
+def _auth(user: User) -> dict:
+    return {"Authorization": f"Bearer {create_access_token(subject=user.id)}"}
+
+
+def _question(temp_id: str, content: str, *, visibility="public", **extra) -> dict:
+    payload = {
+        "temp_id": temp_id,
+        "q_type": "free_response",
+        "content": {
+            "type": "doc",
+            "content": [{"type": "paragraph", "content": [{"type": "text", "text": content}]}],
+        },
+        "answer": {"kind": "free_response", "reference": None},
+        "status": "draft",
+        "difficulty": 3,
+        "visibility": visibility,
+    }
+    payload.update(extra)
+    return payload
+
+
+def _broken_question(temp_id: str) -> dict:
+    """答案引用了不存在的选项 —— 不依赖 status,必定被领域校验拒绝。"""
+    return {
+        "temp_id": temp_id,
+        "q_type": "single_choice",
+        "content": {
+            "type": "doc",
+            "content": [{"type": "paragraph", "content": [{"type": "text", "text": "坏题"}]}],
+        },
+        "options": [
+            {"id": "opt-a", "label": "A", "content": None},
+            {"id": "opt-b", "label": "B", "content": None},
+        ],
+        "answer": {"kind": "single_choice", "correct": "opt-does-not-exist"},
+        "status": "draft",
+        "difficulty": 3,
+        "visibility": "public",
+    }
+
+
+@pytest.fixture
+async def ctx(db_session, grant_role):
+    editor = await _seed_user(db_session, username="editor")
+    viewer = await _seed_user(db_session, username="viewer")
+    outsider = await _seed_user(db_session, username="outsider")
+    subject = await _seed_subject(db_session)
+
+    await grant_role(editor, subject, SubjectRole.EDITOR)
+    db_session.add(
+        SubjectMember(user_id=viewer.id, subject_id=subject.id, role=SubjectRole.VIEWER.value)
+    )
+    await db_session.commit()
+
+    return {"editor": editor, "viewer": viewer, "outsider": outsider, "subject": subject}
+
+
+# --------------------------------------------------------------------------- #
+# 默认行为:仅导入题目
+# --------------------------------------------------------------------------- #
+async def test_import_without_composition_creates_questions_only(client, ctx, db_session):
+    sid = ctx["subject"].id
+
+    response = await client.post(
+        f"{API}/subjects/{sid}/paper-imports",
+        json={
+            "scope": "shared",
+            "questions": [_question("t1", "第一题"), _question("t2", "第二题")],
+            "outline": [
+                {"kind": "question_ref", "temp_id": "t1"},
+                {"kind": "question_ref", "temp_id": "t2"},
+            ],
+            "save_as_composition": False,
+        },
+        headers=_auth(ctx["editor"]),
+    )
+
+    assert response.status_code == 200, response.text
+    body = response.json()
+    assert body["created_count"] == 2
+    assert body["composition_id"] is None
+
+    task = (await db_session.execute(select(ImportTask))).scalars().one()
+    assert task.composition_state is CompositionImportState.NOT_REQUESTED
+
+
+# --------------------------------------------------------------------------- #
+# 同时保存为稿件
+# --------------------------------------------------------------------------- #
+async def test_import_with_composition_builds_full_paper(client, ctx, db_session):
+    sid = ctx["subject"].id
+
+    response = await client.post(
+        f"{API}/subjects/{sid}/paper-imports",
+        json={
+            "scope": "shared",
+            "questions": [_question("t1", "选择题"), _question("t2", "解答题")],
+            "outline": [
+                {"kind": "rich_text", "markdown": "考试时间 120 分钟"},
+                {"kind": "heading", "text": "一、选择题", "level": 2},
+                {"kind": "question_ref", "temp_id": "t1", "number": "1"},
+                {"kind": "heading", "text": "二、解答题", "level": 2},
+                {"kind": "question_ref", "temp_id": "t2", "number": "2"},
+            ],
+            "save_as_composition": True,
+            "title": "高一周测",
+            "filename": "week1.docx",
+        },
+        headers=_auth(ctx["editor"]),
+    )
+
+    assert response.status_code == 200, response.text
+    body = response.json()
+    assert body["composition_id"] is not None
+    assert body["composition_title"] == "高一周测"
+    assert set(body["temp_id_map"]) == {"t1", "t2"}
+
+    detail = await client.get(
+        f"{API}/subjects/{sid}/compositions/{body['composition_id']}?scope=shared",
+        headers=_auth(ctx["editor"]),
+    )
+    assert detail.status_code == 200, detail.text
+    node_types = [n["node_type"] for n in detail.json()["nodes"]]
+    assert node_types == ["rich_text", "heading", "question", "heading", "question"]
+
+    numbers = [
+        n["props"]["number"] for n in detail.json()["nodes"] if n["node_type"] == "question"
+    ]
+    assert numbers == ["1", "2"]
+
+    comp = (await db_session.execute(select(Composition))).scalars().one()
+    assert comp.source_import_task_id is not None
+    # 来源固化为快照:原文件被清理后仍可读。
+    assert comp.source_snapshot["original_filename"] == "week1.docx"
+    assert comp.source_snapshot["question_count"] == 2
+
+
+async def test_renumber_reassigns_sequential_numbers(client, ctx):
+    sid = ctx["subject"].id
+
+    response = await client.post(
+        f"{API}/subjects/{sid}/paper-imports",
+        json={
+            "scope": "shared",
+            "questions": [_question("t1", "题一"), _question("t2", "题二")],
+            # 原卷题号是 3 / 7(中间的题已在审核页删除)。
+            "outline": [
+                {"kind": "question_ref", "temp_id": "t1", "number": "3"},
+                {"kind": "question_ref", "temp_id": "t2", "number": "7"},
+            ],
+            "save_as_composition": True,
+            "title": "重排题号",
+            "renumber": True,
+        },
+        headers=_auth(ctx["editor"]),
+    )
+    assert response.status_code == 200, response.text
+
+    detail = await client.get(
+        f"{API}/subjects/{sid}/compositions/{response.json()['composition_id']}?scope=shared",
+        headers=_auth(ctx["editor"]),
+    )
+    numbers = [
+        n["props"]["number"] for n in detail.json()["nodes"] if n["node_type"] == "question"
+    ]
+    assert numbers == ["1", "2"]
+
+
+async def test_keeping_original_numbers_allows_gaps(client, ctx):
+    sid = ctx["subject"].id
+
+    response = await client.post(
+        f"{API}/subjects/{sid}/paper-imports",
+        json={
+            "scope": "shared",
+            "questions": [_question("t1", "题一"), _question("t2", "题二")],
+            "outline": [
+                {"kind": "question_ref", "temp_id": "t1", "number": "3"},
+                {"kind": "question_ref", "temp_id": "t2", "number": "7"},
+            ],
+            "save_as_composition": True,
+            "title": "保留原题号",
+            "renumber": False,
+        },
+        headers=_auth(ctx["editor"]),
+    )
+    detail = await client.get(
+        f"{API}/subjects/{sid}/compositions/{response.json()['composition_id']}?scope=shared",
+        headers=_auth(ctx["editor"]),
+    )
+    numbers = [
+        n["props"]["number"] for n in detail.json()["nodes"] if n["node_type"] == "question"
+    ]
+    assert numbers == ["3", "7"]
+
+
+async def test_material_question_children_resolve_parent(client, ctx, db_session):
+    sid = ctx["subject"].id
+
+    response = await client.post(
+        f"{API}/subjects/{sid}/paper-imports",
+        json={
+            "scope": "shared",
+            "questions": [
+                _question("parent", "材料题"),
+                _question("child", "子问一", parent_temp_id="parent"),
+            ],
+            "outline": [{"kind": "question_ref", "temp_id": "parent"}],
+            "save_as_composition": True,
+            "title": "材料题试卷",
+        },
+        headers=_auth(ctx["editor"]),
+    )
+    assert response.status_code == 200, response.text
+    mapping = response.json()["temp_id_map"]
+
+    child = (
+        await db_session.execute(select(Question).where(Question.id == mapping["child"]))
+    ).scalars().one()
+    assert child.parent_id == mapping["parent"]
+
+
+# --------------------------------------------------------------------------- #
+# 私有题与共享空间
+# --------------------------------------------------------------------------- #
+async def test_private_question_blocked_from_shared_composition(client, ctx, db_session):
+    sid = ctx["subject"].id
+
+    response = await client.post(
+        f"{API}/subjects/{sid}/paper-imports",
+        json={
+            "scope": "shared",
+            "questions": [_question("t1", "私有题", visibility="private")],
+            "outline": [{"kind": "question_ref", "temp_id": "t1"}],
+            "save_as_composition": True,
+            "title": "共享稿件",
+        },
+        headers=_auth(ctx["editor"]),
+    )
+
+    assert response.status_code == 422
+    assert "私有题" in response.json()["detail"]
+    # 被拒绝时不得留下任何题目。
+    assert (await db_session.execute(select(Question))).scalars().all() == []
+
+
+async def test_private_question_allowed_in_personal_space(client, ctx):
+    sid = ctx["subject"].id
+
+    response = await client.post(
+        f"{API}/subjects/{sid}/paper-imports",
+        json={
+            "scope": "personal",
+            "questions": [_question("t1", "私有题", visibility="private")],
+            "outline": [{"kind": "question_ref", "temp_id": "t1"}],
+            "save_as_composition": True,
+            "title": "我的试卷",
+        },
+        headers=_auth(ctx["editor"]),
+    )
+
+    assert response.status_code == 200, response.text
+    assert response.json()["composition_id"] is not None
+
+
+# --------------------------------------------------------------------------- #
+# 部分失败由用户决定
+# --------------------------------------------------------------------------- #
+async def test_partial_failure_is_rejected_until_user_decides(client, ctx, db_session):
+    sid = ctx["subject"].id
+
+    response = await client.post(
+        f"{API}/subjects/{sid}/paper-imports",
+        json={
+            "scope": "shared",
+            "questions": [_question("t1", "好题"), _broken_question("bad")],
+            "outline": [
+                {"kind": "question_ref", "temp_id": "t1"},
+                {"kind": "question_ref", "temp_id": "bad"},
+            ],
+            "save_as_composition": True,
+            "title": "含坏题",
+            "proceed_with_partial": False,
+        },
+        headers=_auth(ctx["editor"]),
+    )
+
+    assert response.status_code == 422
+    assert "未能入库" in response.json()["detail"]
+    assert (await db_session.execute(select(Question))).scalars().all() == []
+
+
+async def test_partial_failure_proceeds_when_user_confirms(client, ctx):
+    sid = ctx["subject"].id
+
+    response = await client.post(
+        f"{API}/subjects/{sid}/paper-imports",
+        json={
+            "scope": "shared",
+            "questions": [_question("t1", "好题"), _broken_question("bad")],
+            "outline": [
+                {"kind": "question_ref", "temp_id": "t1"},
+                {"kind": "question_ref", "temp_id": "bad"},
+            ],
+            "save_as_composition": True,
+            "title": "含坏题",
+            "proceed_with_partial": True,
+        },
+        headers=_auth(ctx["editor"]),
+    )
+
+    assert response.status_code == 200, response.text
+    body = response.json()
+    assert body["created_count"] == 1
+    assert len(body["skipped"]) == 1
+    assert body["skipped"][0]["temp_id"] == "bad"
+    assert body["composition_id"] is not None
+
+
+# --------------------------------------------------------------------------- #
+# 幂等
+# --------------------------------------------------------------------------- #
+async def test_replay_with_same_idempotency_key_does_not_duplicate(client, ctx, db_session):
+    sid = ctx["subject"].id
+    payload = {
+        "scope": "shared",
+        "questions": [_question("t1", "唯一题")],
+        "outline": [{"kind": "question_ref", "temp_id": "t1"}],
+        "save_as_composition": True,
+        "title": "幂等试卷",
+        "idempotency_key": "fixed-key-001",
+    }
+    headers = _auth(ctx["editor"])
+
+    first = await client.post(f"{API}/subjects/{sid}/paper-imports", json=payload, headers=headers)
+    second = await client.post(f"{API}/subjects/{sid}/paper-imports", json=payload, headers=headers)
+
+    assert first.status_code == 200, first.text
+    assert second.status_code == 200, second.text
+    assert second.json()["reused_existing"] is True
+    assert second.json()["composition_id"] == first.json()["composition_id"]
+
+    assert len((await db_session.execute(select(Question))).scalars().all()) == 1
+    assert len((await db_session.execute(select(Composition))).scalars().all()) == 1
+
+
+# --------------------------------------------------------------------------- #
+# 权限
+# --------------------------------------------------------------------------- #
+async def test_viewer_cannot_import(client, ctx, db_session):
+    sid = ctx["subject"].id
+
+    response = await client.post(
+        f"{API}/subjects/{sid}/paper-imports",
+        json={
+            "scope": "shared",
+            "questions": [_question("t1", "题")],
+            "outline": [{"kind": "question_ref", "temp_id": "t1"}],
+            "save_as_composition": True,
+            "title": "越权",
+        },
+        headers=_auth(ctx["viewer"]),
+    )
+
+    assert response.status_code == 403
+    assert (await db_session.execute(select(Question))).scalars().all() == []
+
+
+async def test_outsider_cannot_import(client, ctx):
+    sid = ctx["subject"].id
+
+    response = await client.post(
+        f"{API}/subjects/{sid}/paper-imports",
+        json={
+            "scope": "shared",
+            "questions": [_question("t1", "题")],
+            "outline": [{"kind": "question_ref", "temp_id": "t1"}],
+            "save_as_composition": False,
+        },
+        headers=_auth(ctx["outsider"]),
+    )
+
+    assert response.status_code == 403
+
+
+# --------------------------------------------------------------------------- #
+# 预检
+# --------------------------------------------------------------------------- #
+async def test_preview_reports_blocking_and_degraded_without_writing(client, ctx, db_session):
+    sid = ctx["subject"].id
+
+    response = await client.post(
+        f"{API}/subjects/{sid}/paper-imports/preview",
+        json={
+            "scope": "shared",
+            "questions": [_question("t1", "私有题", visibility="private")],
+            "outline": [
+                {"kind": "question_ref", "temp_id": "t1"},
+                {"kind": "degraded", "markdown": "复杂表格", "reason": "表格结构无法完整表达"},
+            ],
+        },
+        headers=_auth(ctx["editor"]),
+    )
+
+    assert response.status_code == 200, response.text
+    body = response.json()
+    assert body["importable_count"] == 1
+    assert "私有题" in body["blocking_reason"]
+    assert body["degraded"][0]["reason"] == "表格结构无法完整表达"
+    # 预检不写库。
+    assert (await db_session.execute(select(Question))).scalars().all() == []

@@ -6,11 +6,15 @@ from pathlib import Path
 
 from fastapi import APIRouter, File, HTTPException, UploadFile
 from pydantic import BaseModel
+from sqlalchemy import select
 
 from app.api import deps
 from app.core.config import settings
+from app.models.composition import Composition
+from app.models.import_task import ImportTask
 from app.services.doc_processor import doc_processor
 from app.services.importing.review import extracted_to_v2_review
+from app.services.paper_import_service import file_sha256
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -19,6 +23,36 @@ logger = logging.getLogger(__name__)
 def _as_review(result: dict, subject_id: int | None) -> dict:
     """把抽取产物就地转成可编辑的 v2 草稿（同步复核路径）。"""
     result["questions"] = extracted_to_v2_review(result.get("questions", []), subject_id=subject_id)
+    return result
+
+
+async def _attach_duplicate_hint(result: dict, db, content: bytes) -> dict:
+    """标记“与历史导入文件内容完全一致”。只提示，不阻塞；近似重复不在本期承诺范围。"""
+    digest = file_sha256(content)
+    result["content_sha256"] = digest
+
+    task = (
+        await db.execute(
+            select(ImportTask)
+            .where(ImportTask.content_sha256 == digest)
+            .order_by(ImportTask.created_at.desc())
+        )
+    ).scalars().first()
+    if task is None:
+        result["duplicate_of"] = None
+        return result
+
+    comp = (
+        await db.execute(
+            select(Composition).where(Composition.source_import_task_id == task.id)
+        )
+    ).scalars().first()
+    result["duplicate_of"] = {
+        "import_task_id": task.id,
+        "original_filename": task.original_filename,
+        "imported_at": task.created_at.isoformat() if task.created_at else None,
+        "composition_id": comp.id if comp else None,
+    }
     return result
 
 class MarkdownContentRequest(BaseModel):
@@ -55,6 +89,7 @@ async def upload_docx(
         result = await doc_processor.process_docx(file_path, db=db, mode=mode, method=method, subject_id=subject_id)
         _as_review(result, subject_id)
         result["file_path"] = str(file_path)
+        await _attach_duplicate_hint(result, db, content)
         return result
     except Exception as e:
         logger.exception(
@@ -98,6 +133,7 @@ async def upload_markdown(
         result = await doc_processor.process_markdown(markdown_content, db=db, filename=file.filename, mode=mode, method=method, subject_id=subject_id)
         _as_review(result, subject_id)
         result["file_path"] = str(file_path)
+        await _attach_duplicate_hint(result, db, markdown_content_bytes)
         return result
     except Exception as e:
         logger.exception(

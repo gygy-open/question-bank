@@ -7,11 +7,23 @@ tags (e.g. 【题目】【选项】【答案】【解析】) into structured que
 Design: "【题目】切块 + 字段状态机 + 白名单行首标签 + 尽力解析并收集告警".
 The output shape matches what the AI extraction path returns so it can flow
 through the same frontend review -> import pipeline.
+
+除题目外还产出整卷结构(outline):大题标题与题间说明文字不再丢弃,而是按版面
+顺序记录,供“导入同时保存为稿件”还原原卷。
 """
 import json
 import re
+import uuid
 from collections import defaultdict
 from typing import List, Dict, Optional, Tuple
+
+from app.services.importing.contracts import (
+    OUTLINE_HEADING,
+    OUTLINE_QUESTION_REF,
+    OUTLINE_RICH_TEXT,
+    ExtractionResult,
+    PaperOutlineItem,
+)
 
 # --- Tag whitelist: alias -> canonical field ---
 TAG_ALIASES = {
@@ -63,6 +75,11 @@ _TAG_RE = re.compile(
 _OPTION_TAG_RE = re.compile(r'^(?:选项|option)\s*([A-Za-z])$', re.IGNORECASE)
 _BLOCKQUOTE_PREFIX_RE = re.compile(r'^\s*(?:>\s*)+')
 _BLANK_UNDERSCORE_RE = re.compile(r'(?:\\?_){3,}')
+# 【题目】标签之前的原卷题号(如 "3.【题目】" / "(3)【题目】");_TAG_RE 会吃掉它,故单独捕获。
+_TAG_LEADING_NUMBER_RE = re.compile(r'^\s*(?:\*\*)?\(?(\d+(?:\.\d+)?)\)?[\.、．]?\s*[【\[]')
+# 题干正文开头的题号(如 "【题目】3. 下列...");review 阶段会把它剔掉,故在此先行记录。
+_CONTENT_LEADING_NUMBER_RE = re.compile(r'^\s*\(?(\d+(?:\.\d+)?)\)?[\.、．]\s*')
+_HEADING_MARKUP_RE = re.compile(r'^[\s#*>]+|[\s*]+$')
 _INLINE_ANALYSIS_TAG_RE = re.compile(
     r'(?=[【\[]\s*(?:解析|详解|解答|analysis)\s*[】\]])',
     re.IGNORECASE,
@@ -80,6 +97,16 @@ def _strip_blockquote_prefix(line: str) -> str:
 
 def _is_section_heading(line: str) -> bool:
     return bool(_SECTION_HEADING_RE.match(line))
+
+
+def _heading_text(line: str) -> str:
+    """去掉 Markdown 标题标记与加粗星号,取可读的大题标题文本。"""
+    return _HEADING_MARKUP_RE.sub('', line).strip()
+
+
+def _leading_number_before_tag(line: str) -> Optional[str]:
+    m = _TAG_LEADING_NUMBER_RE.match(line)
+    return m.group(1) if m else None
 
 
 def _match_tag(line: str) -> Optional[Tuple[str, str, Optional[str]]]:
@@ -175,6 +202,11 @@ def _build_question(fields: Dict[str, List[str]],
 
     q_type = _map_q_type(q_type_raw) or _infer_q_type(options, answer, content)
 
+    source_number: Optional[str] = None
+    num_match = _CONTENT_LEADING_NUMBER_RE.match(content)
+    if num_match:
+        source_number = num_match.group(1)
+
     if q_type == "fill_in_the_blank" and answer:
         try:
             parsed_answer = json.loads(answer)
@@ -208,6 +240,7 @@ def _build_question(fields: Dict[str, List[str]],
         "summary": summary,
         "difficulty": difficulty,
         "warnings": warnings,
+        "source_number": source_number,
     }
 
 
@@ -245,13 +278,16 @@ def _parse_block(lines: List[str]) -> dict:
     return _build_question(fields, option_items)
 
 
-def parse_structured(text: str) -> List[dict]:
+def parse_structured(text: str) -> ExtractionResult:
     """
-    Parse tag-annotated text into a list of question dicts.
+    Parse tag-annotated text into questions plus the paper outline.
 
     Uses 【题目】 (content) as the record boundary. Missing tags simply leave
     the corresponding field empty; per-question issues are collected into a
     "warnings" list instead of raising.
+
+    大题标题与题间说明不再被丢弃：它们按版面顺序进入 outline，题目则以
+    question_ref 占位，两者通过 temp_id 关联。
     """
     lines = [
         part
@@ -259,30 +295,83 @@ def parse_structured(text: str) -> List[dict]:
         for part in _INLINE_ANALYSIS_TAG_RE.split(_strip_blockquote_prefix(line))
         if part
     ]
-    blocks: List[List[str]] = []
-    current: Optional[List[str]] = None
-    preamble_count = 0
+
+    questions: List[dict] = []
+    outline: List[PaperOutlineItem] = []
+    block: Optional[List[str]] = None
+    block_temp_id: Optional[str] = None
+    block_number: Optional[str] = None
+    pending_text: List[str] = []
+
+    def flush_text() -> None:
+        markdown = "\n".join(pending_text).strip()
+        pending_text.clear()
+        if markdown:
+            outline.append({"kind": OUTLINE_RICH_TEXT, "markdown": markdown})
+
+    def flush_block() -> None:
+        nonlocal block, block_temp_id, block_number
+        if block is None:
+            return
+        question = _parse_block(block)
+        question["id"] = block_temp_id
+        # 标签前的原卷题号优先于题干正文里的题号。
+        number = block_number or question.get("source_number")
+        question["source_number"] = number
+        questions.append(question)
+        outline.append(
+            {"kind": OUTLINE_QUESTION_REF, "temp_id": block_temp_id, "number": number}
+        )
+        block = None
+        block_temp_id = None
+        block_number = None
 
     for line in lines:
-        t = _match_tag(line)
-        if t and t[0] == "content":
-            if current is not None:
-                blocks.append(current)
-            current = [line]
-        elif current is None:
-            if line.strip():
-                preamble_count += 1
-        else:
-            current.append(line)
+        tag = _match_tag(line)
+        if tag and tag[0] == "content":
+            flush_block()
+            flush_text()
+            block = [line]
+            block_temp_id = str(uuid.uuid4())
+            block_number = _leading_number_before_tag(line)
+            continue
 
-    if current is not None:
-        blocks.append(current)
+        # 大题标题是版面结构而非题目字段，遇到即结束当前题块。
+        if _is_section_heading(line):
+            flush_block()
+            flush_text()
+            heading = _heading_text(line)
+            if heading:
+                outline.append({"kind": OUTLINE_HEADING, "text": heading, "level": 2})
+            continue
 
-    results = [_parse_block(block) for block in blocks]
+        if block is not None:
+            block.append(line)
+        elif line.strip():
+            pending_text.append(line)
 
-    if preamble_count and results:
-        results[0]["warnings"].insert(
-            0, f"已跳过开头 {preamble_count} 行未归属任何题目的内容"
-        )
+    flush_block()
+    flush_text()
 
-    return results
+    suggested_title = _take_suggested_title(outline)
+    return ExtractionResult(
+        questions=questions,
+        paper={"suggested_title": suggested_title, "outline": outline},
+    )
+
+
+def _take_suggested_title(outline: List[PaperOutlineItem]) -> Optional[str]:
+    """把首个结构项之前的第一行文字视为试卷标题，并从 outline 中消费掉它。"""
+    if not outline or outline[0].get("kind") != OUTLINE_RICH_TEXT:
+        return None
+    first = outline[0]
+    parts = (first.get("markdown") or "").split("\n", 1)
+    title = _heading_text(parts[0])
+    if not title:
+        return None
+    rest = parts[1].strip() if len(parts) > 1 else ""
+    if rest:
+        first["markdown"] = rest
+    else:
+        outline.pop(0)
+    return title
