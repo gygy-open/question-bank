@@ -275,6 +275,29 @@ def _split_tagged_record(parts: List[str]) -> Tuple[Optional[str], Optional[str]
     )
 
 
+def _split_answer_section_outline(lines: List[str]) -> List[PaperOutlineItem]:
+    """按表格行/非表格行分组分别出块,而不是拼成一整段 markdown——否则表格解析器会把
+    表格后面紧跟着的解析段落也当成表格的后续行吞进去(行间空行在预处理阶段已被过滤)。"""
+    items: List[PaperOutlineItem] = []
+    current: List[str] = []
+    current_is_table: Optional[bool] = None
+
+    for line in lines:
+        is_table = _is_table_row(line)
+        if current and is_table != current_is_table:
+            markdown = "\n".join(current).strip()
+            if markdown:
+                items.append({"kind": OUTLINE_RICH_TEXT, "markdown": markdown})
+            current = []
+        current.append(line)
+        current_is_table = is_table
+
+    markdown = "\n".join(current).strip()
+    if markdown:
+        items.append({"kind": OUTLINE_RICH_TEXT, "markdown": markdown})
+    return items
+
+
 def _parse_answer_section(lines: List[str]) -> Tuple[Dict[str, str], Dict[str, str]]:
     """解析【答案区】之后的内容:每道题若显式写了【答案】/【解析】标签则直接采用;
     否则退回表格给 answer、编号段落整体作 analysis(并去掉开头重复抄写的答案)。"""
@@ -535,9 +558,7 @@ def parse_structured(text: str) -> ExtractionResult:
             if not question["analysis"] and number in analyses_by_number:
                 question["analysis"] = analyses_by_number[number]
             _finalize_question(question)
-        section_text = "\n".join(answer_section_lines).strip()
-        if section_text:
-            outline.append({"kind": OUTLINE_RICH_TEXT, "markdown": section_text})
+        outline.extend(_split_answer_section_outline(answer_section_lines))
 
     for question in questions:
         question.pop("_q_type_explicit", None)

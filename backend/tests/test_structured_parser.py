@@ -168,6 +168,27 @@ def test_trailing_answer_section_backfills_answer_and_analysis_by_number():
     assert q1["warnings"] == [] and q2["warnings"] == []
 
 
+def test_answer_table_outline_is_isolated_from_following_analysis_text():
+    """表格与解析段落之间的原始空行会在预处理阶段被过滤掉；若把二者拼成一段
+    markdown，下游表格解析器会把解析段落也吞成表格的后续行，故必须分开出块。"""
+    text = (
+        "1.【题目】1+1=?\n"
+        "【选项】A. 1 B. 2 C. 3 D. 4\n"
+        "【答案区】\n"
+        "| 题号 | 1 |\n"
+        "|:---:|:---:|\n"
+        "| 答案 | B |\n"
+        "1.因为1+1=2，选B。"
+    )
+    result = parse_structured(text)
+    rich_text_items = [i for i in result.paper["outline"] if i["kind"] == "rich_text"]
+
+    assert len(rich_text_items) == 2
+    assert rich_text_items[0]["markdown"].startswith("| 题号 | 1 |")
+    assert "因为1+1=2" not in rich_text_items[0]["markdown"]
+    assert rich_text_items[1]["markdown"] == "1.因为1+1=2，选B。"
+
+
 def test_analysis_paragraph_leading_answer_echo_is_stripped():
     text = (
         "1.【题目】哪些是质数（   ）\n"
