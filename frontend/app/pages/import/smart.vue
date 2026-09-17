@@ -4,6 +4,7 @@ import { Upload, Loader2, FileText, CheckCircle2, AlertCircle, Sparkles, Trash2,
 import { Button } from '@/components/ui/button'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Checkbox } from '@/components/ui/checkbox'
 import {
   Dialog,
   DialogContent,
@@ -456,6 +457,7 @@ const removeItem = (index: number) => {
 
 const duplicateItem = (index: number) => {
     const item = importList.value[index]
+    if (!item) return
     const newItem: ImportDraft = JSON.parse(JSON.stringify(item))
     newItem.uid = `imp-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
     newItem.temp_id = generateTempId()
@@ -794,19 +796,20 @@ const reset = () => {
 
                     <!-- 同时保存为稿件：默认关闭，由用户主动勾选 -->
                     <div class="mt-4 rounded-lg border p-4 space-y-4">
-                        <label class="flex items-start gap-3 cursor-pointer">
-                            <input
-                                v-model="saveAsComposition"
-                                type="checkbox"
-                                class="mt-1 h-4 w-4 rounded border-input accent-primary"
+                        <div class="flex items-start gap-3">
+                            <Checkbox
+                                id="save-as-composition"
+                                :model-value="saveAsComposition"
+                                class="mt-1"
+                                @update:model-value="(v) => saveAsComposition = v as boolean"
                             />
-                            <span class="space-y-1">
+                            <Label for="save-as-composition" class="space-y-1 cursor-pointer font-normal">
                                 <span class="text-sm font-medium block">同时保存为试卷稿件</span>
                                 <span class="text-xs text-muted-foreground block">
                                     除了把题目写入题库，再生成一份可继续编辑的整卷稿件，便于下次替换少量题目后复用。
                                 </span>
-                            </span>
-                        </label>
+                            </Label>
+                        </div>
 
                         <div v-if="saveAsComposition" class="grid grid-cols-1 md:grid-cols-2 gap-4 pl-7">
                             <div class="space-y-2">
