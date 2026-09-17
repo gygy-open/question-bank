@@ -1,4 +1,5 @@
 import asyncio
+import hashlib
 import logging
 import shutil
 import uuid
@@ -14,7 +15,6 @@ from app.models.composition import Composition
 from app.models.import_task import ImportTask
 from app.services.doc_processor import doc_processor
 from app.services.importing.review import extracted_to_v2_review
-from app.services.paper_import_service import file_sha256
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -28,7 +28,7 @@ def _as_review(result: dict, subject_id: int | None) -> dict:
 
 async def _attach_duplicate_hint(result: dict, db, content: bytes) -> dict:
     """标记“与历史导入文件内容完全一致”。只提示，不阻塞；近似重复不在本期承诺范围。"""
-    digest = file_sha256(content)
+    digest = hashlib.sha256(content).hexdigest()
     result["content_sha256"] = digest
 
     task = (

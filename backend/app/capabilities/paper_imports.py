@@ -20,8 +20,6 @@ from app.schemas.paper_import import (
     PaperImportCommitResponse,
     PaperImportPreviewResponse,
 )
-from app.services import paper_import_service
-from app.services.paper_import_service import PaperImportError
 
 from .base import Authz, Capability, Scope
 from .context import ExecutionContext
@@ -76,6 +74,9 @@ class PreviewPaperImport(Capability[PaperImportPreviewInput, PaperImportPreviewR
     async def execute(
         self, ctx: ExecutionContext, inp: PaperImportPreviewInput, target: Any
     ) -> PaperImportPreviewResponse:
+        # 延迟导入:服务层依赖 composition_service,后者又依赖本包的 errors,顶层导入会成环。
+        from app.services import paper_import_service
+
         preview = await paper_import_service.preview_paper_import(
             questions=inp.questions,
             outline=inp.outline,
@@ -105,6 +106,9 @@ class CommitPaperImport(Capability[PaperImportCommitInput, PaperImportCommitResp
     async def execute(
         self, ctx: ExecutionContext, inp: PaperImportCommitInput, target: Any
     ) -> PaperImportCommitResponse:
+        from app.services import paper_import_service
+        from app.services.paper_import_service import PaperImportError
+
         try:
             result = await paper_import_service.commit_paper_import(
                 ctx.db,
