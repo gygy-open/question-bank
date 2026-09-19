@@ -98,21 +98,26 @@ DEFAULT_EXTRACT_PROMPT = r"""你是一个专业的{subject_name}题目提取助�
 {tags}
 ```
 
-## 高级功能：嵌套题目结构（可选）
-- **适用场景**：当文档中的题目呈现大小题关系（如大题包含小问）时。
-- **结构要求**：
-    - 在父题目对象中添加 `children` 字段（子题目列表）。
-    - 子题目的结构与普通题目一致。
-    - 独立题目**不要**包含 `children` 字段。
+### 5. 材料、题组与拆题关系
+- 顶层必须返回 `questions`、`stimuli`、`question_groups`。没有对应内容时返回空数组。
+- 阅读材料单独放入 `stimuli`：`temp_id`、`markdown`、`metadata`。
+- 材料下的小题仍放入 `questions`，每题具有唯一 `id`；题组放入 `question_groups`：
+    `temp_id`、`stimulus_temp_id`、按原卷顺序排列的 `question_temp_ids`、`metadata`。
+- 同一材料可被多个题组引用。不得用 `children` 表示材料题。
+- 只有当一道题是由另一道题拆解得到时，才可使用旧 `children`；系统会将其保存为
+    `decomposed_from` 关系，不会把它转换成材料题。
 - **JSON 示例**：
   ```json
   {
-    "content": "大题题干...",
-    "q_type": "composite",
-    "children": [
-      { "content": "小题1...", "q_type": "single_choice", ... },
-      { "content": "小题2...", "q_type": "fill_in_the_blank", ... }
-    ]
+        "questions": [
+            { "id": "q1", "content": "小题1...", "q_type": "single_choice" },
+            { "id": "q2", "content": "小题2...", "q_type": "free_response" }
+        ],
+        "stimuli": [{ "temp_id": "s1", "markdown": "材料正文...", "metadata": {} }],
+        "question_groups": [{
+            "temp_id": "g1", "stimulus_temp_id": "s1",
+            "question_temp_ids": ["q1", "q2"], "metadata": {}
+        }]
   }
   ```
 

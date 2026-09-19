@@ -4,14 +4,22 @@
 部分失败由用户决定、私有题不得进共享稿件、幂等重放、权限矩阵,
 以及"正常路径原子"——建稿失败不得留下半份题目。
 """
+import json
+
 import pytest
 from sqlalchemy import select
 
 from app.core.permissions import SubjectRole
 from app.core.security import create_access_token
-from app.models.composition import Composition
+from app.models.composition import Composition, CompositionNode
 from app.models.import_task import CompositionImportState, ImportTask
 from app.models.question import Question
+from app.models.question_group import (
+    QuestionGroup,
+    QuestionGroupItem,
+    QuestionRelation,
+    Stimulus,
+)
 from app.models.subject import Subject
 from app.models.subject_member import SubjectMember
 from app.models.user import User
@@ -234,7 +242,9 @@ async def test_keeping_original_numbers_allows_gaps(client, ctx):
     assert detail.json()["numbering_enabled"] is True
 
 
-async def test_material_question_children_resolve_parent(client, ctx, db_session):
+async def test_legacy_parent_reference_creates_relation_without_writing_parent_id(
+    client, ctx, db_session
+):
     sid = ctx["subject"].id
 
     response = await client.post(
@@ -245,9 +255,8 @@ async def test_material_question_children_resolve_parent(client, ctx, db_session
                 _question("parent", "材料题"),
                 _question("child", "子问一", parent_temp_id="parent"),
             ],
-            "outline": [{"kind": "question_ref", "temp_id": "parent"}],
-            "save_as_composition": True,
-            "title": "材料题试卷",
+            "outline": [],
+            "save_as_composition": False,
         },
         headers=_auth(ctx["editor"]),
     )
@@ -257,7 +266,342 @@ async def test_material_question_children_resolve_parent(client, ctx, db_session
     child = (
         await db_session.execute(select(Question).where(Question.id == mapping["child"]))
     ).scalars().one()
-    assert child.parent_id == mapping["parent"]
+    assert child.parent_id is None
+    relation = (await db_session.execute(select(QuestionRelation))).scalars().one()
+    assert relation.source_question_id == mapping["parent"]
+    assert relation.target_question_id == mapping["child"]
+    assert relation.relation_type == "decomposed_from"
+
+
+async def test_legacy_nested_children_create_relation_not_material_group(
+    client, ctx, db_session
+):
+    sid = ctx["subject"].id
+    parent = _question("parent", "原题")
+    parent["children"] = [_question("child", "拆解题")]
+    response = await client.post(
+        f"{API}/subjects/{sid}/paper-imports",
+        json={
+            "scope": "shared",
+            "questions": [parent],
+            "save_as_composition": False,
+        },
+        headers=_auth(ctx["editor"]),
+    )
+    assert response.status_code == 200, response.text
+    assert response.json()["created_count"] == 2
+    questions = (await db_session.execute(select(Question))).scalars().all()
+    assert all(question.parent_id is None for question in questions)
+    assert len((await db_session.execute(select(QuestionRelation))).scalars().all()) == 1
+    assert (await db_session.execute(select(Stimulus))).scalars().all() == []
+    assert (await db_session.execute(select(QuestionGroup))).scalars().all() == []
+
+
+async def test_explicit_material_group_persists_and_builds_ordered_composition(
+    client, ctx, db_session
+):
+    sid = ctx["subject"].id
+    response = await client.post(
+        f"{API}/subjects/{sid}/paper-imports",
+        json={
+            "scope": "shared",
+            "questions": [_question("q1", "第一小题"), _question("q2", "第二小题")],
+            "stimuli": [
+                {
+                    "temp_id": "s1",
+                    "markdown": "阅读材料 **甲**",
+                    "metadata": {"source_page": 3},
+                }
+            ],
+            "question_groups": [
+                {
+                    "temp_id": "g1",
+                    "stimulus_temp_id": "s1",
+                    "question_temp_ids": ["q2", "q1"],
+                    "metadata": {"number": "12"},
+                }
+            ],
+            "outline": [{"kind": "question_group_ref", "temp_id": "g1"}],
+            "save_as_composition": True,
+            "title": "材料题试卷",
+            "filename": "material.md",
+        },
+        headers=_auth(ctx["editor"]),
+    )
+    assert response.status_code == 200, response.text
+    body = response.json()
+    assert set(body["stimulus_temp_id_map"]) == {"s1"}
+    assert set(body["question_group_temp_id_map"]) == {"g1"}
+
+    stimulus = (await db_session.execute(select(Stimulus))).scalars().one()
+    assert json.loads(stimulus.content)["type"] == "doc"
+    assert stimulus.source == "material.md"
+    assert json.loads(stimulus.metadata_json) == {"source_page": 3}
+    group = (await db_session.execute(select(QuestionGroup))).scalars().one()
+    items = (
+        await db_session.execute(
+            select(QuestionGroupItem)
+            .where(QuestionGroupItem.group_id == group.id)
+            .order_by(QuestionGroupItem.position)
+        )
+    ).scalars().all()
+    assert [item.question_id for item in items] == [
+        body["temp_id_map"]["q2"],
+        body["temp_id_map"]["q1"],
+    ]
+
+    detail = await client.get(
+        f"{API}/subjects/{sid}/compositions/{body['composition_id']}?scope=shared",
+        headers=_auth(ctx["editor"]),
+    )
+    nodes = detail.json()["nodes"]
+    assert [node["node_type"] for node in nodes] == ["rich_text", "question", "question"]
+    assert [node["question_id"] for node in nodes if node["node_type"] == "question"] == [
+        body["temp_id_map"]["q2"],
+        body["temp_id_map"]["q1"],
+    ]
+
+
+async def test_stimulus_can_be_reused_by_two_imported_groups(client, ctx, db_session):
+    sid = ctx["subject"].id
+    response = await client.post(
+        f"{API}/subjects/{sid}/paper-imports",
+        json={
+            "scope": "shared",
+            "questions": [_question("q1", "题一"), _question("q2", "题二")],
+            "stimuli": [{"temp_id": "s1", "markdown": "共用材料"}],
+            "question_groups": [
+                {"temp_id": "g1", "stimulus_temp_id": "s1", "question_temp_ids": ["q1"]},
+                {"temp_id": "g2", "stimulus_temp_id": "s1", "question_temp_ids": ["q2"]},
+            ],
+            "save_as_composition": False,
+        },
+        headers=_auth(ctx["editor"]),
+    )
+    assert response.status_code == 200, response.text
+    groups = (await db_session.execute(select(QuestionGroup))).scalars().all()
+    assert len(groups) == 2
+    assert len({group.stimulus_id for group in groups}) == 1
+
+
+async def test_shared_stimulus_is_rendered_once_and_outline_order_is_preserved(
+    client, ctx
+):
+    sid = ctx["subject"].id
+    response = await client.post(
+        f"{API}/subjects/{sid}/paper-imports",
+        json={
+            "scope": "shared",
+            "questions": [
+                _question("q0", "独立题一"),
+                _question("q1", "材料题一"),
+                _question("q2", "材料题二"),
+                _question("q3", "独立题二"),
+            ],
+            "stimuli": [{"temp_id": "s1", "markdown": "共用材料"}],
+            "question_groups": [
+                {"temp_id": "g1", "stimulus_temp_id": "s1", "question_temp_ids": ["q1"]},
+                {"temp_id": "g2", "stimulus_temp_id": "s1", "question_temp_ids": ["q2"]},
+            ],
+            "outline": [
+                {"kind": "question_ref", "temp_id": "q0"},
+                {"kind": "question_group_ref", "temp_id": "g1"},
+                {"kind": "question_ref", "temp_id": "q3"},
+                {"kind": "question_group_ref", "temp_id": "g2"},
+            ],
+            "save_as_composition": True,
+            "title": "共用材料试卷",
+        },
+        headers=_auth(ctx["editor"]),
+    )
+    assert response.status_code == 200, response.text
+    body = response.json()
+    detail = await client.get(
+        f"{API}/subjects/{sid}/compositions/{body['composition_id']}?scope=shared",
+        headers=_auth(ctx["editor"]),
+    )
+    nodes = detail.json()["nodes"]
+    assert [node["node_type"] for node in nodes].count("rich_text") == 1
+    assert [node["question_id"] for node in nodes if node["node_type"] == "question"] == [
+        body["temp_id_map"][ref] for ref in ("q0", "q1", "q3", "q2")
+    ]
+
+
+async def test_fallback_outline_follows_extraction_question_order(client, ctx):
+    sid = ctx["subject"].id
+    response = await client.post(
+        f"{API}/subjects/{sid}/paper-imports",
+        json={
+            "scope": "shared",
+            "questions": [
+                _question("q0", "独立题一"),
+                _question("q1", "材料题"),
+                _question("q2", "独立题二"),
+            ],
+            "stimuli": [{"temp_id": "s1", "markdown": "材料"}],
+            "question_groups": [
+                {"temp_id": "g1", "stimulus_temp_id": "s1", "question_temp_ids": ["q1"]}
+            ],
+            "outline": [],
+            "save_as_composition": True,
+            "title": "回退顺序",
+        },
+        headers=_auth(ctx["editor"]),
+    )
+    body = response.json()
+    detail = await client.get(
+        f"{API}/subjects/{sid}/compositions/{body['composition_id']}?scope=shared",
+        headers=_auth(ctx["editor"]),
+    )
+    assert [node["question_id"] for node in detail.json()["nodes"] if node["node_type"] == "question"] == [
+        body["temp_id_map"][ref] for ref in ("q0", "q1", "q2")
+    ]
+
+
+async def test_bad_group_temp_reference_fails_before_any_write(client, ctx, db_session):
+    sid = ctx["subject"].id
+    response = await client.post(
+        f"{API}/subjects/{sid}/paper-imports",
+        json={
+            "scope": "shared",
+            "questions": [_question("q1", "题一")],
+            "stimuli": [{"temp_id": "s1", "markdown": "材料"}],
+            "question_groups": [
+                {
+                    "temp_id": "g1",
+                    "stimulus_temp_id": "s1",
+                    "question_temp_ids": ["missing"],
+                }
+            ],
+            "save_as_composition": False,
+        },
+        headers=_auth(ctx["editor"]),
+    )
+    assert response.status_code == 422, response.text
+    assert "不存在的题目 temp_id" in response.json()["detail"]
+    assert (await db_session.execute(select(Question))).scalars().all() == []
+    assert (await db_session.execute(select(Stimulus))).scalars().all() == []
+    assert (await db_session.execute(select(QuestionGroup))).scalars().all() == []
+    assert (await db_session.execute(select(ImportTask))).scalars().all() == []
+
+
+@pytest.mark.parametrize(
+    ("outline", "message"),
+    [
+        ([{"kind": "question_ref", "temp_id": "missing"}], "不存在的题目 temp_id"),
+        ([{"kind": "question_group_ref", "temp_id": "missing"}], "不存在的题组 temp_id"),
+    ],
+)
+async def test_missing_outline_reference_fails_before_any_write(
+    client, ctx, db_session, outline, message
+):
+    sid = ctx["subject"].id
+    response = await client.post(
+        f"{API}/subjects/{sid}/paper-imports",
+        json={
+            "scope": "shared",
+            "questions": [_question("q1", "题一")],
+            "outline": outline,
+            "save_as_composition": True,
+            "title": "坏引用",
+        },
+        headers=_auth(ctx["editor"]),
+    )
+    assert response.status_code == 422, response.text
+    assert message in response.json()["detail"]
+    assert (await db_session.execute(select(ImportTask))).scalars().all() == []
+    assert (await db_session.execute(select(Question))).scalars().all() == []
+
+
+@pytest.mark.parametrize("save_as_composition", [False, True])
+async def test_question_subject_must_match_url_subject(
+    client, ctx, db_session, save_as_composition
+):
+    other = await _seed_subject(db_session, name="物理", slug="physics")
+    sid = ctx["subject"].id
+    response = await client.post(
+        f"{API}/subjects/{sid}/paper-imports",
+        json={
+            "scope": "shared",
+            "questions": [_question("q1", "跨学科题", subject_id=other.id)],
+            "outline": [{"kind": "question_ref", "temp_id": "q1"}],
+            "save_as_composition": save_as_composition,
+            "title": "跨学科" if save_as_composition else None,
+        },
+        headers=_auth(ctx["editor"]),
+    )
+    assert response.status_code == 422, response.text
+    assert "subject_id" in response.json()["detail"]
+    assert (await db_session.execute(select(ImportTask))).scalars().all() == []
+    assert (await db_session.execute(select(Question))).scalars().all() == []
+
+
+async def test_replace_nodes_failure_rolls_back_all_import_entities(
+    client, ctx, db_session, monkeypatch
+):
+    from app.services import composition_service
+
+    async def fail_replace_nodes(*args, **kwargs):
+        raise RuntimeError("forced node failure")
+
+    monkeypatch.setattr(composition_service, "replace_nodes", fail_replace_nodes)
+    sid = ctx["subject"].id
+    with pytest.raises(RuntimeError, match="forced node failure"):
+        await client.post(
+            f"{API}/subjects/{sid}/paper-imports",
+            json={
+                "scope": "shared",
+                "questions": [
+                    _question("parent", "材料题"),
+                    _question("child", "子题", parent_temp_id="parent"),
+                ],
+                "stimuli": [{"temp_id": "s1", "markdown": "材料"}],
+                "question_groups": [
+                    {
+                        "temp_id": "g1",
+                        "stimulus_temp_id": "s1",
+                        "question_temp_ids": ["child"],
+                    }
+                ],
+                "outline": [{"kind": "question_group_ref", "temp_id": "g1"}],
+                "save_as_composition": True,
+                "title": "应回滚",
+            },
+            headers=_auth(ctx["editor"]),
+        )
+
+    for model in (
+        ImportTask,
+        Question,
+        QuestionRelation,
+        Stimulus,
+        QuestionGroup,
+        Composition,
+        CompositionNode,
+    ):
+        assert (await db_session.execute(select(model))).scalars().all() == []
+
+
+async def test_preview_reports_duplicate_group_question_reference(client, ctx):
+    sid = ctx["subject"].id
+    response = await client.post(
+        f"{API}/subjects/{sid}/paper-imports/preview",
+        json={
+            "scope": "shared",
+            "questions": [_question("q1", "题一")],
+            "stimuli": [{"temp_id": "s1", "markdown": "材料"}],
+            "question_groups": [
+                {
+                    "temp_id": "g1",
+                    "stimulus_temp_id": "s1",
+                    "question_temp_ids": ["q1", "q1"],
+                }
+            ],
+        },
+        headers=_auth(ctx["editor"]),
+    )
+    assert response.status_code == 200, response.text
+    assert "重复的题目引用" in response.json()["blocking_reason"]
 
 
 # --------------------------------------------------------------------------- #
@@ -379,6 +723,18 @@ async def test_replay_with_same_idempotency_key_does_not_duplicate(client, ctx, 
     assert second.status_code == 200, second.text
     assert second.json()["reused_existing"] is True
     assert second.json()["composition_id"] == first.json()["composition_id"]
+    for field in (
+        "created_count",
+        "created_question_ids",
+        "skipped",
+        "degraded",
+        "composition_id",
+        "composition_title",
+        "temp_id_map",
+        "stimulus_temp_id_map",
+        "question_group_temp_id_map",
+    ):
+        assert second.json()[field] == first.json()[field]
 
     assert len((await db_session.execute(select(Question))).scalars().all()) == 1
     assert len((await db_session.execute(select(Composition))).scalars().all()) == 1

@@ -56,7 +56,8 @@ class QuestionService:
         db: AsyncSession,
         question_in: schemas.QuestionCreate,
         user_id: Optional[int],
-        import_task_id: Optional[int] = None
+        import_task_id: Optional[int] = None,
+        commit: bool = True,
     ) -> models.Question:
         """
         Create a question with AI suggested tags processing.
@@ -82,7 +83,8 @@ class QuestionService:
             db=db, 
             obj_in=question_in, 
             user_id=user_id,
-            import_task_id=import_task_id
+            import_task_id=import_task_id,
+            commit=commit,
         )
         
         return question

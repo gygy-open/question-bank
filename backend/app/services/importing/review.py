@@ -18,6 +18,7 @@ from app.services.question_legacy_adapter import (
     LegacyQuestionError,
     adapt_legacy_question,
 )
+from app.services.question_content_converter import markdown_to_rich_doc
 
 from .normalize import coerce_kp_ids, coerce_q_type
 
@@ -73,8 +74,24 @@ def extracted_to_v2_review(
     - 答案无法解析:保留题干/选项,答案降级为 None 并附 warning,交前端结构化补齐。
     - 硬错误(如题干为空):跳过并记日志,不返回不可编辑的空题。
     """
+    flattened: list[Mapping[str, Any]] = []
+
+    def append_with_children(raw: Mapping[str, Any], parent_temp_id: Optional[str] = None) -> None:
+        item = dict(raw)
+        children = item.pop("children", None) or []
+        if parent_temp_id and not item.get("parent_id"):
+            item["parent_id"] = parent_temp_id
+        flattened.append(item)
+        current_temp_id = item.get("id")
+        for child in children:
+            if isinstance(child, Mapping):
+                append_with_children(child, str(current_temp_id) if current_temp_id else None)
+
+    for raw in raws:
+        append_with_children(raw)
+
     out: list[dict[str, Any]] = []
-    for index, raw in enumerate(raws):
+    for index, raw in enumerate(flattened):
         q_type = coerce_q_type(raw.get("q_type", raw.get("type")))
         content = _clean_content(raw.get("content"))
         warnings: list[str] = list(raw.get("warnings") or []) if isinstance(raw.get("warnings"), list) else []
@@ -128,4 +145,19 @@ def extracted_to_v2_review(
                 "source_number": _source_number(raw),
             }
         )
+    return out
+
+
+def extracted_stimuli_to_review(
+    raws: Sequence[Mapping[str, Any]],
+) -> list[dict[str, Any]]:
+    """把材料 Markdown 统一转换为 RichDoc，同时保留显式元数据。"""
+    out: list[dict[str, Any]] = []
+    for raw in raws:
+        item = dict(raw)
+        if item.get("content") is None and item.get("markdown") is not None:
+            item["content"] = markdown_to_rich_doc(str(item["markdown"]))
+        item.pop("markdown", None)
+        item.setdefault("metadata", {})
+        out.append(item)
     return out

@@ -54,3 +54,22 @@ def test_review_degrades_unparseable_answer_and_skips_empty_content():
     assert item["warnings"]
     # 无答案 → 状态从 pending 降级为 draft。
     assert item["status"] == "draft"
+
+
+def test_review_flattens_legacy_children_as_decomposition_references():
+    items = extracted_to_v2_review(
+        [
+            {
+                "id": "parent",
+                "content": "原题",
+                "q_type": "free_response",
+                "children": [
+                    {"id": "child", "content": "拆解题", "q_type": "free_response"}
+                ],
+            }
+        ]
+    )
+
+    assert [item["temp_id"] for item in items] == ["parent", "child"]
+    assert items[0]["parent_temp_id"] is None
+    assert items[1]["parent_temp_id"] == "parent"

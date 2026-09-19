@@ -21,6 +21,7 @@ from app.core.permissions import Permission
 from app.crud.crud_question import is_question_visible
 from app.models.import_task import ImportTask, ImportTaskStatus
 from app.models.question import Question, QuestionStatus
+from app.models.question_group import QuestionRelation, QuestionRelationType
 from app.services.activity_logger import log_activity
 from app.services.question_service import question_service
 
@@ -104,15 +105,14 @@ class BatchCreateQuestions(Capability[schemas.QuestionBatchCreate, List[Question
             status=ImportTaskStatus.COMPLETED,
         )
         ctx.db.add(import_task)
-        await ctx.db.commit()
-        await ctx.db.refresh(import_task)
+        await ctx.db.flush()
 
         async def create_recursive(
             question_in: schemas.QuestionCreate, parent_id: Optional[int] = None
         ) -> Question:
             children_in = question_in.children or []
-            if parent_id is not None:
-                question_in.parent_id = parent_id
+            relation_source_id = parent_id or question_in.parent_id
+            question_in.parent_id = None
             if not question_in.subject_id:
                 question_in.subject_id = ctx.actor.last_active_subject_id
             if not question_in.source and inp.filename:
@@ -123,12 +123,24 @@ class BatchCreateQuestions(Capability[schemas.QuestionBatchCreate, List[Question
                 question_in=question_in,
                 user_id=ctx.actor.id,
                 import_task_id=import_task.id,
+                commit=False,
             )
+            if relation_source_id is not None:
+                ctx.db.add(
+                    QuestionRelation(
+                        source_question_id=relation_source_id,
+                        target_question_id=question.id,
+                        relation_type=QuestionRelationType.DECOMPOSED_FROM.value,
+                        created_by=ctx.actor.id,
+                    )
+                )
             for child_in in children_in:
                 await create_recursive(child_in, parent_id=question.id)
             return question
 
-        return [await create_recursive(question_in) for question_in in inp.questions]
+        created = [await create_recursive(question_in) for question_in in inp.questions]
+        await ctx.db.commit()
+        return created
 
 
 @register
@@ -143,6 +155,21 @@ class UpdateQuestion(Capability[QuestionUpdateInput, Question]):
 
     async def load(self, ctx: ExecutionContext, inp: QuestionUpdateInput) -> Question:
         return await _load_visible_question(ctx, inp.id)
+
+    async def authorize(
+        self, ctx: ExecutionContext, inp: QuestionUpdateInput, target: Question
+    ) -> None:
+        await super().authorize(ctx, inp, target)
+        if (
+            "subject_id" in inp.data.model_fields_set
+            and inp.data.subject_id != target.subject_id
+            and not permissions.can(
+                ctx.actor,
+                Permission.EDIT_QUESTION,
+                subject_id=inp.data.subject_id,
+            )
+        ):
+            raise Forbidden("The user doesn't have enough privileges")
 
     async def execute(self, ctx: ExecutionContext, inp: QuestionUpdateInput, target: Question) -> Question:
         return await crud.question.update_with_tags(

@@ -283,6 +283,7 @@ async def create_composition(
     description: Optional[str],
     folder_id: Optional[int],
     numbering_enabled: bool = False,
+    commit: bool = True,
 ) -> Composition:
     if folder_id is not None:
         await _validate_folder_ref(
@@ -314,7 +315,8 @@ async def create_composition(
         summary=f"Created composition “{title}”",
         actor_id=actor.id,
     )
-    await db.commit()
+    if commit:
+        await db.commit()
     await db.refresh(comp)
     return comp
 
@@ -769,6 +771,7 @@ async def replace_nodes(
     expected_revision: int,
     batch_id: Optional[str],
     items: List[CompositionNodeInput],
+    commit: bool = True,
 ) -> tuple[int, List[CompositionNode]]:
     """一次事务内整体替换 composition 的节点 AST。
 
@@ -950,7 +953,8 @@ async def replace_nodes(
         payload={"root": len(root_nodes), "child": len(child_nodes)},
     )
 
-    await db.commit()
+    if commit:
+        await db.commit()
     refreshed = await crud_composition.composition.list_nodes(db, composition_id=comp.id)
     return new_revision, refreshed
 

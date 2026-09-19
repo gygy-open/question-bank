@@ -44,6 +44,8 @@ class DocProcessor:
             "content": doc.markdown,
             "questions": extraction.questions,
             "paper": extraction.paper,
+            "stimuli": extraction.stimuli,
+            "question_groups": extraction.question_groups,
         }
 
     async def process_markdown_archive(self, file_path: Path, db: AsyncSession, task_id: str = None, mode: str = "extract", method: str = "ai", subject_id: Optional[int] = None) -> dict:
@@ -61,6 +63,8 @@ class DocProcessor:
             "content": doc.markdown,
             "questions": extraction.questions,
             "paper": extraction.paper,
+            "stimuli": extraction.stimuli,
+            "question_groups": extraction.question_groups,
         }
 
     async def process_image(self, image_file: BinaryIO, db: AsyncSession, task_id: str = None, mode: str = "extract", subject_id: Optional[int] = None) -> dict:
@@ -85,6 +89,8 @@ class DocProcessor:
             "image_url": doc.image_url,
             "questions": extraction.questions,
             "paper": extraction.paper,
+            "stimuli": extraction.stimuli,
+            "question_groups": extraction.question_groups,
         }
 
     async def process_docx(self, file_path: Path, db: AsyncSession = None, task_id: str = None, mode: str = "extract", method: str = "ai", subject_id: Optional[int] = None) -> dict:
@@ -100,6 +106,8 @@ class DocProcessor:
             "content": doc.markdown,
             "questions": extraction.questions,
             "paper": extraction.paper,
+            "stimuli": extraction.stimuli,
+            "question_groups": extraction.question_groups,
         }
 
 doc_processor = DocProcessor()

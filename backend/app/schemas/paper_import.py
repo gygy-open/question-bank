@@ -8,7 +8,8 @@ from typing import Any, Dict, List, Optional
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
-from app.models.question import QuestionStatus
+from app.models.question import QuestionStatus, QuestionVisibility
+from app.schemas.question import RichDoc
 from app.services.importing.contracts import OUTLINE_KINDS
 
 
@@ -32,8 +33,8 @@ class PaperOutlineItemInput(BaseModel):
     def _check_kind(self) -> "PaperOutlineItemInput":
         if self.kind not in OUTLINE_KINDS:
             raise ValueError(f"unknown outline kind: {self.kind}")
-        if self.kind == "question_ref" and not self.temp_id:
-            raise ValueError("question_ref requires temp_id")
+        if self.kind in ("question_ref", "question_group_ref") and not self.temp_id:
+            raise ValueError(f"{self.kind} requires temp_id")
         return self
 
 
@@ -51,10 +52,42 @@ class PaperImportQuestion(BaseModel):
     parent_temp_id: Optional[str] = None
 
 
+class PaperImportStimulus(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    temp_id: str = Field(min_length=1)
+    content: RichDoc = None
+    markdown: Optional[str] = None
+    metadata: Dict[str, Any] = Field(default_factory=dict)
+    status: Optional[QuestionStatus] = None
+    visibility: Optional[QuestionVisibility] = None
+    source: Optional[str] = None
+
+    @model_validator(mode="after")
+    def _check_content(self) -> "PaperImportStimulus":
+        if self.content is None and not (self.markdown or "").strip():
+            raise ValueError("stimulus requires content or markdown")
+        return self
+
+
+class PaperImportQuestionGroup(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    temp_id: str = Field(min_length=1)
+    stimulus_temp_id: str = Field(min_length=1)
+    question_temp_ids: List[str] = Field(min_length=1)
+    metadata: Dict[str, Any] = Field(default_factory=dict)
+    status: Optional[QuestionStatus] = None
+    visibility: Optional[QuestionVisibility] = None
+    source: Optional[str] = None
+
+
 class PaperImportPreviewRequest(BaseModel):
     scope: str
     questions: List[PaperImportQuestion] = Field(default_factory=list)
     outline: List[PaperOutlineItemInput] = Field(default_factory=list)
+    stimuli: List[PaperImportStimulus] = Field(default_factory=list)
+    question_groups: List[PaperImportQuestionGroup] = Field(default_factory=list)
 
 
 class SkippedQuestionRead(BaseModel):
@@ -79,6 +112,8 @@ class PaperImportCommitRequest(BaseModel):
     scope: str
     questions: List[PaperImportQuestion] = Field(default_factory=list)
     outline: List[PaperOutlineItemInput] = Field(default_factory=list)
+    stimuli: List[PaperImportStimulus] = Field(default_factory=list)
+    question_groups: List[PaperImportQuestionGroup] = Field(default_factory=list)
     save_as_composition: bool = False
     title: Optional[str] = None
     folder_id: Optional[int] = None
@@ -106,6 +141,8 @@ class PaperImportCommitResponse(BaseModel):
     composition_id: Optional[int] = None
     composition_title: Optional[str] = None
     temp_id_map: Dict[str, int] = Field(default_factory=dict)
+    stimulus_temp_id_map: Dict[str, int] = Field(default_factory=dict)
+    question_group_temp_id_map: Dict[str, int] = Field(default_factory=dict)
     reused_existing: bool = False
 
 

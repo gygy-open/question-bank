@@ -1,6 +1,5 @@
 import asyncio
 import logging
-import json
 import sys
 from pathlib import Path
 from datetime import datetime, timezone
@@ -13,12 +12,10 @@ sys.path.append(str(Path(__file__).parent.parent))
 from app.db.session import SessionLocal
 from app.core.config import get_db_url, is_configured
 from app.models.import_task import ImportTask, ImportTaskStatus
-from app.models.question import QuestionStatus
 from app.models.user import User
 from app.services.doc_processor import doc_processor
 from app.services.embedding import reload_embedding_function
-from app.services.importing.contracts import ImportDefaults
-from app.services.importing.normalize import question_importer
+from app.services.paper_import_service import commit_extracted_paper_import
 
 logging.basicConfig(
     level=logging.INFO,
@@ -45,6 +42,7 @@ async def process_task(db: AsyncSession, task: ImportTask):
 
         # Resolve subject up-front so knowledge-point retrieval can be subject-scoped.
         subject_id = None
+        user = None
         if task.user_id:
             user_stmt = select(User).where(User.id == task.user_id)
             user_result = await db.execute(user_stmt)
@@ -63,50 +61,35 @@ async def process_task(db: AsyncSession, task: ImportTask):
             proc_task_id = str(uuid.uuid4())
             result = await doc_processor.process_markdown(content, db=db, filename=task.original_filename, task_id=proc_task_id, mode=task.mode or "extract", subject_id=subject_id)
             
-        if result:
-            # Save questions via the shared importer (same path as /questions/batch-legacy).
-            questions_data = result.get("questions", [])
-            defaults = ImportDefaults(
-                subject_id=subject_id,
-                status=QuestionStatus.PENDING,
-                source=task.original_filename,
-            )
-            report = await question_importer.import_batch(
+        if result and user and subject_id:
+            report = await commit_extracted_paper_import(
                 db,
-                questions_data,
-                user_id=task.user_id,
-                import_task_id=task.id,
-                defaults=defaults,
+                actor=user,
+                subject_id=subject_id,
+                extraction=result,
+                import_task=task,
             )
-
-            task.result_summary = json.dumps(
-                {
-                    "count": report.saved_count,
-                    "failed": report.failed_count,
-                    "proc_task_id": result.get("task_id"),
-                }
-            )
-            task.status = ImportTaskStatus.COMPLETED
             logger.info(
-                f"Task {task.id} completed. Saved {report.saved_count} questions, "
-                f"{report.failed_count} skipped (un-adaptable)."
+                f"Task {task.id} completed. Saved {len(report.created_questions)} questions, "
+                f"{len(report.skipped)} skipped."
             )
         else:
-            task.status = ImportTaskStatus.FAILED
-            task.error_message = "No result from processor"
-            logger.error(f"Task {task.id} failed: No result")
+            raise ValueError("Import task requires an extraction result, user, and subject")
+
+        task.updated_at = datetime.now(timezone.utc)
+        await db.commit()
             
     except Exception as e:
         logger.error(f"Error processing task {task.id}: {e}", exc_info=True)
+        await db.rollback()
         task.status = ImportTaskStatus.FAILED
         task.error_message = str(e)
+        task.updated_at = datetime.now(timezone.utc)
+        await db.commit()
 
         if "429" in str(e) or "RESOURCE_EXHAUSTED" in str(e):
             logger.critical("Quota exceeded (429), stopping worker...")
             raise SystemExit(1)
-    finally:
-        task.updated_at = datetime.now(timezone.utc)
-        await db.commit()
 
 async def wait_for_schema() -> None:
     """Block until the database schema has been migrated.

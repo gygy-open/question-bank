@@ -40,7 +40,7 @@ class AIProvider(ABC):
         pass
 
     @abstractmethod
-    async def extract_questions(self, content: str, image_data: bytes = None, config: Dict[str, str] = None) -> List[AIQuestion]:
+    async def extract_questions(self, content: str, image_data: bytes = None, config: Dict[str, str] = None) -> Union[QuestionList, List[AIQuestion]]:
         """
         Extract questions from text content or image.
         
@@ -301,7 +301,7 @@ class GeminiProvider(AIProvider):
             logger.error(f"Gemini chat error: {e}")
             yield f"Error: {str(e)}"
 
-    async def extract_questions(self, content: str, image_data: bytes = None, config: Dict[str, str] = None) -> List[AIQuestion]:
+    async def extract_questions(self, content: str, image_data: bytes = None, config: Dict[str, str] = None) -> Union[QuestionList, List[AIQuestion]]:
         try:
             from google import genai
             from google.genai import types
@@ -355,7 +355,7 @@ class GeminiProvider(AIProvider):
                     contents=contents,
                     config=types.GenerateContentConfig(
                         response_mime_type="application/json",
-                        response_schema=list[AIQuestion]
+                        response_schema=QuestionList
                     )
                 )
 
@@ -365,11 +365,13 @@ class GeminiProvider(AIProvider):
                 logger.debug(f"Gemini response: {response.text}")
                 cleaned_text = self._clean_json_response(response.text)
                 try:
-                    return [AIQuestion(**q) for q in json.loads(cleaned_text)]
-                except json.JSONDecodeError as e:
-                    logger.error(f"JSON Decode Error: {e}. Text: {cleaned_text}")
-                    # Try to repair common JSON errors if needed, or just fail gracefully
-                    raise e
+                    data = json.loads(cleaned_text)
+                    if isinstance(data, list):
+                        return QuestionList(questions=[AIQuestion(**q) for q in data])
+                    return QuestionList.model_validate(data)
+                except (json.JSONDecodeError, ValueError) as e:
+                    logger.error(f"JSON parse error: {e}. Text: {cleaned_text}")
+                    raise
         except Exception as e:
             logger.error(f"Gemini API error: {e}")
             raise e
@@ -652,7 +654,7 @@ class OpenAIProvider(AIProvider):
             logger.error(f"OpenAI chat error: {e}")
             yield f"Error: {str(e)}"
 
-    async def extract_questions(self, content: str, image_data: bytes = None, config: Dict[str, str] = None) -> List[AIQuestion]:
+    async def extract_questions(self, content: str, image_data: bytes = None, config: Dict[str, str] = None) -> Union[QuestionList, List[AIQuestion]]:
         try:
             from openai import AsyncOpenAI
         except ImportError:
@@ -744,7 +746,7 @@ class OpenAIProvider(AIProvider):
                 return []
             
             try:
-                return QuestionList.model_validate_json(content).questions
+                return QuestionList.model_validate_json(content)
             except Exception as e:
                 logger.warning(f"Failed to parse as QuestionList, trying raw list: {e}")
                 # Fallback: some providers ignore the wrapper schema and return either a bare list
@@ -752,9 +754,11 @@ class OpenAIProvider(AIProvider):
                 data = json.loads(content)
                 if isinstance(data, dict):
                     questions = data.get("questions")
-                    data = questions if isinstance(questions, list) else [data]
+                    if isinstance(questions, list):
+                        return QuestionList(questions=[AIQuestion(**q) for q in questions])
+                    data = [data]
                 if isinstance(data, list):
-                    return [AIQuestion(**q) for q in data]
+                    return QuestionList(questions=[AIQuestion(**q) for q in data])
                 raise e
             
         except Exception as e:

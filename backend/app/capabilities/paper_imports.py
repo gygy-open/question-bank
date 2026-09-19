@@ -11,6 +11,7 @@ from __future__ import annotations
 from typing import Any, Dict, List, Optional
 
 from pydantic import BaseModel, Field
+from sqlalchemy.exc import IntegrityError
 
 from app import crud
 from app.core.permissions import Permission
@@ -36,11 +37,15 @@ class PaperImportScopeInput(BaseModel):
 class PaperImportPreviewInput(PaperImportScopeInput):
     questions: List[Dict[str, Any]] = Field(default_factory=list)
     outline: List[Dict[str, Any]] = Field(default_factory=list)
+    stimuli: List[Dict[str, Any]] = Field(default_factory=list)
+    question_groups: List[Dict[str, Any]] = Field(default_factory=list)
 
 
 class PaperImportCommitInput(PaperImportScopeInput):
     questions: List[Dict[str, Any]] = Field(default_factory=list)
     outline: List[Dict[str, Any]] = Field(default_factory=list)
+    stimuli: List[Dict[str, Any]] = Field(default_factory=list)
+    question_groups: List[Dict[str, Any]] = Field(default_factory=list)
     save_as_composition: bool = False
     title: Optional[str] = None
     folder_id: Optional[int] = None
@@ -78,8 +83,11 @@ class PreviewPaperImport(Capability[PaperImportPreviewInput, PaperImportPreviewR
         from app.services import paper_import_service
 
         preview = await paper_import_service.preview_paper_import(
+            subject_id=inp.subject_id,
             questions=inp.questions,
             outline=inp.outline,
+            stimuli=inp.stimuli,
+            question_groups=inp.question_groups,
             scope_type=inp.scope_type,
         )
         return PaperImportPreviewResponse(
@@ -118,6 +126,8 @@ class CommitPaperImport(Capability[PaperImportCommitInput, PaperImportCommitResp
                 owner_id=inp.owner_id,
                 questions=inp.questions,
                 outline=inp.outline,
+                stimuli=inp.stimuli,
+                question_groups=inp.question_groups,
                 save_as_composition=inp.save_as_composition,
                 title=inp.title,
                 folder_id=inp.folder_id,
@@ -132,8 +142,25 @@ class CommitPaperImport(Capability[PaperImportCommitInput, PaperImportCommitResp
         except PaperImportError as exc:
             await ctx.db.rollback()
             raise Unprocessable(str(exc)) from exc
+        except Exception:
+            await ctx.db.rollback()
+            raise
 
-        await ctx.db.commit()
+        try:
+            await ctx.db.commit()
+        except IntegrityError:
+            await ctx.db.rollback()
+            if not inp.idempotency_key:
+                raise
+            replayed = await paper_import_service.replay_paper_import(
+                ctx.db, inp.idempotency_key
+            )
+            if replayed is None:
+                raise
+            result = replayed
+        except Exception:
+            await ctx.db.rollback()
+            raise
         return PaperImportCommitResponse(
             import_task_id=result.import_task_id,
             created_count=len(result.created_questions),
@@ -143,5 +170,7 @@ class CommitPaperImport(Capability[PaperImportCommitInput, PaperImportCommitResp
             composition_id=result.composition_id,
             composition_title=result.composition_title,
             temp_id_map=result.temp_id_map,
+            stimulus_temp_id_map=result.stimulus_temp_id_map,
+            question_group_temp_id_map=result.question_group_temp_id_map,
             reused_existing=result.reused_existing,
         )

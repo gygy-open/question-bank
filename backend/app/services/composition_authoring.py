@@ -137,6 +137,24 @@ def _rich_text_nodes(markdown: str) -> List[CompositionNodeInput]:
     ]
 
 
+def _rich_doc_nodes(content: Any) -> List[CompositionNodeInput]:
+    if not isinstance(content, dict) or content.get("type") != "doc":
+        raise AuthoringError("rich_text.content must be a RichDoc")
+    blocks = content.get("content")
+    if not isinstance(blocks, list) or not blocks:
+        raise AuthoringError("rich_text.content requires at least one block")
+    return [
+        CompositionNodeInput(
+            id=_new_id(),
+            node_kind=CompositionNodeKind.BLOCK,
+            node_type=NODE_TYPE_RICH_TEXT,
+            content={"type": "doc", "content": [block]},
+            schema_version=_RICH_TEXT_SCHEMA_VERSION,
+        )
+        for block in blocks
+    ]
+
+
 def build_nodes(specs: List[Dict[str, Any]]) -> List[CompositionNodeInput]:
     """把 AI 给的扁平节点列表翻译成 AST。顺序即版面顺序。"""
     if not isinstance(specs, list):
@@ -153,7 +171,11 @@ def build_nodes(specs: List[Dict[str, Any]]) -> List[CompositionNodeInput]:
             )
 
         if node_type == NODE_TYPE_RICH_TEXT:
-            produced = _rich_text_nodes(spec.get("markdown") or "")
+            produced = (
+                _rich_doc_nodes(spec["content"])
+                if spec.get("content") is not None
+                else _rich_text_nodes(spec.get("markdown") or "")
+            )
             if not produced:
                 raise AuthoringError(f"nodes[{idx}] rich_text requires non-empty markdown")
             nodes.extend(produced)

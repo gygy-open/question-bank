@@ -10,6 +10,11 @@ from .knowledge_point import (
 from .tag import Tag, TagCreate, TagUpdate, TagPage, TagImportRowError, TagImportResult
 from .tag_category import TagCategory, TagCategoryCreate, TagCategoryUpdate
 from .question import Question, QuestionCreate, QuestionUpdate, QuestionPage, QuestionBatchCreate, QuestionReview, QuestionBatchConfirm, QuestionBatchDelete, QuestionBatchUpdate, LegacyQuestionCreate, LegacyQuestionBatchCreate, LegacyBatchError, LegacyBatchResult
+from .question_group import (
+    QuestionGroupCreate, QuestionGroupRead, QuestionGroupUpdate,
+    QuestionRelationCreate,
+    StimulusCreate, StimulusRead, StimulusUpdate,
+)
 from .system_setting import SystemSetting, SystemSettingCreate, SystemSettingUpdate
 from .subject_prompt import SubjectPromptOut, SubjectPromptUpdate
 from .activity_log import ActivityLog, ActivityLogCreate, ActivityLogPage

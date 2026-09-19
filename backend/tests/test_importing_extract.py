@@ -4,9 +4,30 @@ import app.services.importing.extract as extract_module
 from app.models.subject import Subject
 from app.models.tag import Tag
 from app.models.tag_category import TagCategory
-from app.schemas.ai import AIQuestion
+from app.schemas.ai import AIQuestion, AIQuestionGroup, AIStimulus, QuestionList
+from app.services.importing.contracts import ExtractionResult
 from app.services.importing.extract import AIExtractor, _assign_temp_ids
 from app.services.importing.prompt import PromptBuilder
+
+
+def test_extraction_result_supports_explicit_material_groups_without_breaking_defaults():
+    plain = ExtractionResult(questions=[{"id": "q1"}])
+    assert plain.stimuli == []
+    assert plain.question_groups == []
+
+    grouped = ExtractionResult(
+        questions=[{"id": "q1"}, {"id": "q2"}],
+        stimuli=[{"temp_id": "s1", "markdown": "阅读材料", "metadata": {}}],
+        question_groups=[
+            {
+                "temp_id": "g1",
+                "stimulus_temp_id": "s1",
+                "question_temp_ids": ["q1", "q2"],
+                "metadata": {},
+            }
+        ],
+    )
+    assert grouped.question_groups[0]["question_temp_ids"] == ["q1", "q2"]
 
 
 def test_assign_temp_ids_fills_and_links_children():
@@ -64,6 +85,35 @@ class _StubProvider:
     async def extract_questions(self, content, image_data=None, config=None):
         self.received_content = content
         return self._questions
+
+
+async def test_ai_extractor_preserves_explicit_stimuli_and_groups(monkeypatch, db_session):
+    payload = QuestionList(
+        questions=[AIQuestion(id="q1", q_type="free_response", content="小题")],
+        stimuli=[AIStimulus(temp_id="s1", markdown="材料")],
+        question_groups=[
+            AIQuestionGroup(
+                temp_id="g1",
+                stimulus_temp_id="s1",
+                question_temp_ids=["q1"],
+            )
+        ],
+    )
+    stub_provider = _StubProvider(payload)
+
+    async def _stub_resolve_active_provider(db, *, is_vision=False):
+        return "gemini", {}
+
+    monkeypatch.setattr(extract_module, "resolve_active_provider", _stub_resolve_active_provider)
+    monkeypatch.setattr(extract_module, "get_ai_provider", lambda name: stub_provider)
+
+    result = await AIExtractor(
+        prompt_builder=_StubPromptBuilder(), enricher=_StubEnricher()
+    ).extract("原文", db_session)
+
+    assert result.questions[0]["id"] == "q1"
+    assert result.stimuli[0]["temp_id"] == "s1"
+    assert result.question_groups[0]["question_temp_ids"] == ["q1"]
 
 
 async def test_extract_masks_images_before_ai_and_restores_after(monkeypatch, db_session):

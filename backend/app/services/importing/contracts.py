@@ -52,6 +52,7 @@ class ImportDefaults:
 OUTLINE_HEADING = "heading"
 OUTLINE_RICH_TEXT = "rich_text"
 OUTLINE_QUESTION_REF = "question_ref"
+OUTLINE_QUESTION_GROUP_REF = "question_group_ref"
 OUTLINE_PAGE_BREAK = "page_break"
 OUTLINE_ANSWER_SPACE = "answer_space"
 OUTLINE_DETAILS_MODULE = "details_module"
@@ -63,6 +64,7 @@ OUTLINE_KINDS = frozenset(
         OUTLINE_HEADING,
         OUTLINE_RICH_TEXT,
         OUTLINE_QUESTION_REF,
+        OUTLINE_QUESTION_GROUP_REF,
         OUTLINE_PAGE_BREAK,
         OUTLINE_ANSWER_SPACE,
         OUTLINE_DETAILS_MODULE,
@@ -81,7 +83,7 @@ class PaperOutlineItem(TypedDict, total=False):
     # rich_text / degraded
     markdown: str
     reason: str
-    # question_ref
+    # question_ref / question_group_ref
     temp_id: str
     number: Optional[str]
     score: Optional[float]
@@ -100,12 +102,32 @@ class PaperExtraction(TypedDict, total=False):
     outline: List[PaperOutlineItem]
 
 
+class ExtractedStimulus(TypedDict, total=False):
+    """抽取出的可复用材料；content 为 RichDoc，markdown 供抽取端简写。"""
+
+    temp_id: str
+    content: dict
+    markdown: str
+    metadata: dict
+
+
+class ExtractedQuestionGroup(TypedDict, total=False):
+    """题组引用同批次材料与题目，question_temp_ids 的顺序即成员顺序。"""
+
+    temp_id: str
+    stimulus_temp_id: str
+    question_temp_ids: List[str]
+    metadata: dict
+
+
 @dataclass
 class ExtractionResult:
     """抽取阶段的完整产物。paper 为 None 表示该路径未识别整卷结构。"""
 
     questions: List[dict] = field(default_factory=list)
     paper: Optional[PaperExtraction] = None
+    stimuli: List[ExtractedStimulus] = field(default_factory=list)
+    question_groups: List[ExtractedQuestionGroup] = field(default_factory=list)
 
 
 @dataclass

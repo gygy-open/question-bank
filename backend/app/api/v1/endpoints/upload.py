@@ -14,7 +14,7 @@ from app.core.config import settings
 from app.models.composition import Composition
 from app.models.import_task import ImportTask
 from app.services.doc_processor import doc_processor
-from app.services.importing.review import extracted_to_v2_review
+from app.services.importing.review import extracted_stimuli_to_review, extracted_to_v2_review
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -23,6 +23,7 @@ logger = logging.getLogger(__name__)
 def _as_review(result: dict, subject_id: int | None) -> dict:
     """把抽取产物就地转成可编辑的 v2 草稿（同步复核路径）。"""
     result["questions"] = extracted_to_v2_review(result.get("questions", []), subject_id=subject_id)
+    result["stimuli"] = extracted_stimuli_to_review(result.get("stimuli", []))
     return result
 
 

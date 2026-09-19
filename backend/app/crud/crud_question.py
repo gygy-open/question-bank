@@ -330,7 +330,7 @@ class CRUDQuestion(CRUDBase[Question, QuestionCreate, QuestionUpdate]):
         result = await db.execute(count_query)
         return result.scalar_one()
 
-    async def create_with_tags(self, db: AsyncSession, *, obj_in: QuestionCreate, user_id: Optional[int] = None, import_task_id: Optional[int] = None) -> Question:
+    async def create_with_tags(self, db: AsyncSession, *, obj_in: QuestionCreate, user_id: Optional[int] = None, import_task_id: Optional[int] = None, commit: bool = True) -> Question:
         obj_in_data = obj_in.model_dump()
         tag_ids = obj_in_data.pop("tag_ids", [])
         knowledge_point_ids = obj_in_data.pop("knowledge_point_ids", [])
@@ -368,7 +368,10 @@ class CRUDQuestion(CRUDBase[Question, QuestionCreate, QuestionUpdate]):
             db_obj.knowledge_points = list(kps)
             
         db.add(db_obj)
-        await db.commit()
+        if commit:
+            await db.commit()
+        else:
+            await db.flush()
         await db.refresh(db_obj)
         
         # Re-fetch with relationships loaded to avoid MissingGreenlet error
@@ -408,6 +411,12 @@ class CRUDQuestion(CRUDBase[Question, QuestionCreate, QuestionUpdate]):
             
         tag_ids = update_data.pop("tag_ids", None)
         knowledge_point_ids = update_data.pop("knowledge_point_ids", None)
+
+        new_subject_id = update_data.get("subject_id", db_obj.subject_id)
+        if new_subject_id != db_obj.subject_id:
+            await self._validate_subject_change(
+                db, question=db_obj, new_subject_id=new_subject_id
+            )
 
         # Merge v2 content state (current DB row + overlay), then run full domain validation
         # before persisting. This is the authoritative net for partial updates.
@@ -518,6 +527,69 @@ class CRUDQuestion(CRUDBase[Question, QuestionCreate, QuestionUpdate]):
             
         return db_obj
 
+    async def _validate_subject_change(
+        self,
+        db: AsyncSession,
+        *,
+        question: Question,
+        new_subject_id: Optional[int],
+    ) -> None:
+        from app.capabilities.errors import Unprocessable
+        from app.models.question_group import (
+            QuestionGroup,
+            QuestionGroupItem,
+            QuestionRelation,
+        )
+
+        subject_ids = [subject_id for subject_id in (question.subject_id, new_subject_id) if subject_id is not None]
+        if subject_ids:
+            await db.execute(
+                select(Question.id)
+                .where(
+                    Question.subject_id.in_(subject_ids),
+                    Question.deleted_at.is_(None),
+                )
+                .order_by(Question.id)
+                .with_for_update()
+            )
+
+        group_subjects = await db.scalars(
+            select(QuestionGroup.subject_id)
+            .join(QuestionGroupItem, QuestionGroupItem.group_id == QuestionGroup.id)
+            .where(
+                QuestionGroupItem.question_id == question.id,
+                QuestionGroup.deleted_at.is_(None),
+            )
+            .with_for_update()
+        )
+        if any(subject_id != new_subject_id for subject_id in group_subjects):
+            raise Unprocessable("Question subject must match its question group")
+
+        relations = await db.execute(
+            select(
+                QuestionRelation.source_question_id,
+                QuestionRelation.target_question_id,
+            ).where(
+                or_(
+                    QuestionRelation.source_question_id == question.id,
+                    QuestionRelation.target_question_id == question.id,
+                )
+            )
+            .with_for_update()
+        )
+        peer_ids = {
+            target_id if source_id == question.id else source_id
+            for source_id, target_id in relations.all()
+        }
+        if peer_ids:
+            peer_subjects = await db.scalars(
+                select(Question.subject_id)
+                .where(Question.id.in_(peer_ids))
+                .with_for_update()
+            )
+            if any(subject_id != new_subject_id for subject_id in peer_subjects):
+                raise Unprocessable("Question relation endpoints must share a subject")
+
     async def remove(self, db: AsyncSession, *, id: int, user_id: Optional[int] = None) -> Optional[Question]:
         obj = await self.get(db, id=id)
         if obj:
@@ -525,16 +597,6 @@ class CRUDQuestion(CRUDBase[Question, QuestionCreate, QuestionUpdate]):
             obj.deleted_at = now
             if user_id:
                 obj.updated_by = user_id
-            
-            # Soft delete children recursively
-            def soft_delete_children(q: Question):
-                for child in q.children:
-                    child.deleted_at = now
-                    if user_id:
-                        child.updated_by = user_id
-                    soft_delete_children(child)
-            
-            soft_delete_children(obj)
 
             db.add(obj)
             await db.commit()

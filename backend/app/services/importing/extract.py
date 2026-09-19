@@ -10,7 +10,7 @@ from typing import Optional, Protocol
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.schemas.ai import AIQuestion
+from app.schemas.ai import AIQuestion, QuestionList
 from app.services.ai_provider import get_ai_provider
 from app.services.structured_parser import parse_structured
 
@@ -94,7 +94,17 @@ class AIExtractor:
             final_content = f"文件名: {filename}\n\n{masked_content}"
 
         try:
-            questions = await provider.extract_questions(final_content, image_data, config)
+            extracted_payload = await provider.extract_questions(final_content, image_data, config)
+            if isinstance(extracted_payload, QuestionList):
+                questions = extracted_payload.questions
+                stimuli = [item.model_dump() for item in extracted_payload.stimuli]
+                question_groups = [item.model_dump() for item in extracted_payload.question_groups]
+                paper = extracted_payload.paper
+            else:
+                questions = extracted_payload
+                stimuli = []
+                question_groups = []
+                paper = None
             # 文本路径无论是否遮罩到图片都跑还原,以清掉 AI 凭空写出的裸露占位符;视觉路径不涉及。
             if not image_data:
                 questions = self._restore_images(questions, image_map)
@@ -102,7 +112,12 @@ class AIExtractor:
                 questions, subject_id=subject_id, provider=provider, config=config
             )
             extracted = [q.model_dump() for q in questions]
-            return ExtractionResult(questions=_assign_temp_ids(extracted))
+            return ExtractionResult(
+                questions=_assign_temp_ids(extracted),
+                stimuli=stimuli,
+                question_groups=question_groups,
+                paper=paper,
+            )
         except Exception as e:
             logger.error(f"AI Provider error: {e}")
             raise

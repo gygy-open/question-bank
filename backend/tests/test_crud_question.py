@@ -187,7 +187,7 @@ async def test_get_excludes_soft_deleted(db_session):
     assert await crud_question.get(db_session, created.id) is None
 
 
-async def test_soft_delete_cascades_to_children(db_session):
+async def test_soft_delete_does_not_cascade_to_decomposed_questions(db_session):
     subject, _, _ = await _seed_taxonomy(db_session)
     parent = await crud_question.create_with_tags(
         db_session,
@@ -202,7 +202,7 @@ async def test_soft_delete_cascades_to_children(db_session):
     db_session.expunge_all()
     await crud_question.remove(db_session, id=parent.id)
 
-    assert await crud_question.get(db_session, child.id) is None
+    assert await crud_question.get(db_session, child.id) is not None
 
 
 async def test_restore_makes_question_visible_again(db_session):

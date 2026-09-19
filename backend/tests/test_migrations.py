@@ -57,6 +57,114 @@ def test_no_model_migration_drift(tmp_path):
     command.check(cfg)
 
 
+def test_parent_id_backfill_skips_cross_subject_edges_and_preserves_parent_id(tmp_path):
+    async_url, sync_url = _sqlite_urls(tmp_path)
+    cfg = _alembic_config(async_url)
+    command.upgrade(cfg, "b7c1e94d2a35")
+    engine = create_engine(sync_url)
+    try:
+        metadata = sa.MetaData()
+        metadata.reflect(engine, only=["user", "subjects", "questions"])
+        with engine.begin() as conn:
+            conn.execute(
+                metadata.tables["user"].insert(),
+                {"id": 1, "username": "migration-user", "hashed_password": "x"},
+            )
+            conn.execute(
+                metadata.tables["subjects"].insert(),
+                [
+                    {
+                        "id": 1,
+                        "name": "迁移学科",
+                        "slug": "migration-subject",
+                        "required_review_count": 1,
+                    },
+                    {
+                        "id": 2,
+                        "name": "另一学科",
+                        "slug": "migration-subject-2",
+                        "required_review_count": 1,
+                    },
+                ],
+            )
+            conn.execute(
+                metadata.tables["questions"].insert(),
+                [
+                    {
+                        "id": 10,
+                        "content": json.dumps({"type": "doc", "content": []}),
+                        "q_type": "free_response",
+                        "status": "draft",
+                        "subject_id": 1,
+                            "parent_id": None,
+                    },
+                    {
+                        "id": 11,
+                        "content": json.dumps({"type": "doc", "content": []}),
+                        "q_type": "free_response",
+                        "status": "draft",
+                        "subject_id": 1,
+                        "parent_id": 10,
+                    },
+                    {
+                        "id": 20,
+                        "content": json.dumps({"type": "doc", "content": []}),
+                        "q_type": "free_response",
+                        "status": "draft",
+                        "subject_id": 1,
+                        "parent_id": None,
+                    },
+                    {
+                        "id": 21,
+                        "content": json.dumps({"type": "doc", "content": []}),
+                        "q_type": "free_response",
+                        "status": "draft",
+                        "subject_id": 2,
+                        "parent_id": 20,
+                    },
+                    {
+                        "id": 30,
+                        "content": json.dumps({"type": "doc", "content": []}),
+                        "q_type": "free_response",
+                        "status": "draft",
+                        "subject_id": None,
+                        "parent_id": None,
+                    },
+                    {
+                        "id": 31,
+                        "content": json.dumps({"type": "doc", "content": []}),
+                        "q_type": "free_response",
+                        "status": "draft",
+                        "subject_id": None,
+                        "parent_id": 30,
+                    },
+                ],
+            )
+    finally:
+        engine.dispose()
+
+    command.upgrade(cfg, "head")
+    engine = create_engine(sync_url)
+    try:
+        with engine.connect() as conn:
+            relations = conn.execute(
+                sa.text(
+                    "SELECT source_question_id, target_question_id, relation_type "
+                    "FROM question_relations ORDER BY source_question_id"
+                )
+            ).all()
+            assert [tuple(relation) for relation in relations] == [
+                (10, 11, "decomposed_from"),
+                (30, 31, "decomposed_from"),
+            ]
+            assert conn.scalar(
+                sa.text("SELECT parent_id FROM questions WHERE id = 21")
+            ) == 20
+            assert conn.scalar(sa.text("SELECT COUNT(*) FROM question_groups")) == 0
+    finally:
+        engine.dispose()
+
+
 @pytest.mark.skipif(not MYSQL_TEST_URL, reason="MYSQL_TEST_URL not set (needs a real MySQL)")
 def test_upgrade_head_on_mysql():
     # Only a real MySQL exposes dialect-specific failures (types, ALTER, charset)

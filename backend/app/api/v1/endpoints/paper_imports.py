@@ -49,6 +49,8 @@ async def preview_paper_import(
             owner_id=owner_id,
             questions=[q.model_dump() for q in payload.questions],
             outline=[o.model_dump() for o in payload.outline],
+            stimuli=[s.model_dump() for s in payload.stimuli],
+            question_groups=[g.model_dump() for g in payload.question_groups],
         ),
     )
 
@@ -70,6 +72,8 @@ async def commit_paper_import(
             owner_id=owner_id,
             questions=[q.model_dump() for q in payload.questions],
             outline=[o.model_dump() for o in payload.outline],
+            stimuli=[s.model_dump() for s in payload.stimuli],
+            question_groups=[g.model_dump() for g in payload.question_groups],
             save_as_composition=payload.save_as_composition,
             title=payload.title,
             folder_id=payload.folder_id,
