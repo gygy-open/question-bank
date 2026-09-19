@@ -1,6 +1,6 @@
 import tailwindcss from '@tailwindcss/vite'
 
-const appName = 'Question Bank'
+const appName = 'QuestionBank'
 const appSlogan = 'AI原生的题库系统'
 
 // https://nuxt.com/docs/api/configuration/nuxt-config

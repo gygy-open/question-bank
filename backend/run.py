@@ -43,7 +43,7 @@ def _open_browser(url: str) -> None:
     try:
         import webview  # type: ignore
 
-        webview.create_window("Question Bank", url, width=1280, height=800)
+        webview.create_window("QuestionBank", url, width=1280, height=800)
         webview.start()
     except Exception:
         import webbrowser

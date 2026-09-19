@@ -132,7 +132,7 @@ jobs:
       - name: Publish Release
         uses: softprops/action-gh-release@v2
         with:
-          name: Question Bank ${{ github.ref_name }}
+          name: QuestionBank ${{ github.ref_name }}
           tag_name: ${{ github.ref_name }}
           files: artifacts/**/*
           generate_release_notes: true

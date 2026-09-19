@@ -30,7 +30,7 @@ async def lifespan(app: FastAPI):
     yield
     # Shutdown
 
-app = FastAPI(title="Question Bank API", version=__version__, lifespan=lifespan)
+app = FastAPI(title="QuestionBank API", version=__version__, lifespan=lifespan)
 
 
 @app.exception_handler(DomainError)
@@ -107,4 +107,4 @@ if FRONTEND_DIR is not None:
 else:
     @app.get("/")
     def read_root():
-        return {"message": "Welcome to Question Bank API"}
+        return {"message": "Welcome to QuestionBank API"}

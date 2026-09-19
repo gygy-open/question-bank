@@ -2,12 +2,12 @@
 layout: home
 
 hero:
-  name: Question Bank
+  name: QuestionBank
   text: AI 原生的题库系统
   tagline: 智能导入、多题型、多供应商 AI、知识点 RAG 与审核工作流
   image:
     src: /examples/questions.png
-    alt: Question Bank
+    alt: QuestionBank
   actions:
     - theme: brand
       text: 快速开始

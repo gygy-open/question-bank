@@ -1,4 +1,4 @@
-# Question Bank Project Instructions
+# QuestionBank Project Instructions
 
 ## Project Context
 - **Backend**: Python 3.13+, FastAPI, SQLAlchemy (Async), Alembic, Pydantic.

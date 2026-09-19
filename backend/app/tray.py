@@ -23,7 +23,7 @@ import webbrowser
 
 PORT = int(os.getenv("PORT", "8000"))
 URL_LOCAL = f"http://127.0.0.1:{PORT}/"
-_FIREWALL_RULE = f"Question Bank ({PORT})"
+_FIREWALL_RULE = f"QuestionBank ({PORT})"
 _MUTEX_HANDLE = None
 
 
@@ -218,11 +218,11 @@ def run_tray() -> None:
     # Auto-open the UI once on launch.
     threading.Thread(target=_open_when_ready, args=(URL_LOCAL,), daemon=True).start()
 
-    icon = pystray.Icon("question-bank", _make_image(), "Question Bank")
+    icon = pystray.Icon("question-bank", _make_image(), "QuestionBank")
 
     def _notify(message: str) -> None:
         try:
-            icon.notify(message, "Question Bank")
+            icon.notify(message, "QuestionBank")
         except Exception:  # noqa: BLE001 - notifications are best-effort
             pass
 

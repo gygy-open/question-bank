@@ -4,7 +4,7 @@
   "type": "module",
   "private": true,
   "license": "AGPL-3.0-or-later",
-  "description": "Question Bank frontend — Nuxt 4 SPA with Tiptap/KaTeX/MathLive editor.",
+  "description": "QuestionBank frontend — Nuxt 4 SPA with Tiptap/KaTeX/MathLive editor.",
   "scripts": {
     "build": "nuxt build",
     "dev": "nuxt dev",

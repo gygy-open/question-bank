@@ -3,7 +3,7 @@ import { defineConfig } from 'vitepress'
 // https://vitepress.dev/reference/site-config
 export default defineConfig({
   lang: 'zh-CN',
-  title: 'Question Bank',
+  title: 'QuestionBank',
   description: 'AI 原生的题库系统 · 使用文档',
 
   // Project Pages: https://gygy-open.github.io/question-bank/
@@ -176,7 +176,7 @@ export default defineConfig({
 
     footer: {
       message: '基于 AGPL-3.0 许可发布',
-      copyright: 'Copyright © 2025-present Question Bank'
+      copyright: 'Copyright © 2025-present QuestionBank'
     }
   }
 })

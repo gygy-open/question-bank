@@ -84,7 +84,7 @@ onMounted(async () => {
       </div>
       <div class="space-y-2 mt-2">
         <h1 class="text-3xl font-extrabold tracking-tight bg-gradient-to-br from-foreground to-foreground/60 bg-clip-text text-transparent">
-            Question Bank 题库系统
+            QuestionBank 题库系统
         </h1>
         <p class="text-muted-foreground/80 max-w-md text-base leading-relaxed mx-auto">
           AI 原生的题库系统

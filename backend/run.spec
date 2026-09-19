@@ -1,4 +1,4 @@
-# PyInstaller spec for the Question Bank desktop build.
+# PyInstaller spec for the QuestionBank desktop build.
 #
 # Build with:  uv run pyinstaller run.spec --clean
 #

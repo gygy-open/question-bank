@@ -1,4 +1,4 @@
-; Inno Setup script for Question Bank (Windows desktop / tray app).
+; Inno Setup script for QuestionBank (Windows desktop / tray app).
 ;
 ; Produces a friendly GUI installer: double-click -> UAC -> Next/Install/Finish.
 ; It installs the app to Program Files, adds a login autostart entry so the
@@ -21,10 +21,10 @@
   #define PayloadDir "."
 #endif
 
-#define MyAppName "Question Bank"
+#define MyAppName "QuestionBank"
 #define MyAppExe "question-bank.exe"
 #define MyPort "8000"
-#define MyFwRule "Question Bank (" + MyPort + ")"
+#define MyFwRule "QuestionBank (" + MyPort + ")"
 
 [Setup]
 AppId={{8F3A2B14-9C7E-4D6A-B1F2-3E5C7A9D0B11}

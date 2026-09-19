@@ -1,7 +1,7 @@
 [project]
 name = "question-bank-backend"
 version = "0.1.0"
-description = "Question Bank — AI-assisted question extraction, review and knowledge-point management backend (FastAPI + SQLAlchemy async + ChromaDB)."
+description = "QuestionBank — AI-assisted question extraction, review and knowledge-point management backend (FastAPI + SQLAlchemy async + ChromaDB)."
 readme = "README.md"
 requires-python = ">=3.13"
 license = { text = "AGPL-3.0-or-later" }
