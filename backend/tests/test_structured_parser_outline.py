@@ -34,16 +34,41 @@ def test_section_headings_and_notes_enter_outline():
 
     assert result.paper["suggested_title"] == "高一年级第一次周测"
     assert _kinds(outline) == [
-        OUTLINE_RICH_TEXT,      # 考试说明
+        OUTLINE_RICH_TEXT,      # 卷名与考试说明
         OUTLINE_HEADING,        # 一、单选题
         OUTLINE_QUESTION_REF,
         OUTLINE_HEADING,        # 二、填空题
         OUTLINE_RICH_TEXT,      # 大题说明
         OUTLINE_QUESTION_REF,
     ]
-    assert outline[0]["markdown"] == "考试时间 120 分钟，满分 150 分。"
+    assert outline[0]["markdown"] == (
+        "高一年级第一次周测\n考试时间 120 分钟，满分 150 分。"
+    )
     assert outline[1]["text"] == "一、单选题"
     assert outline[4]["markdown"] == "本大题共 1 小题。"
+
+
+def test_suggested_title_keeps_original_markdown_in_outline():
+    text = (
+        "**高二数学小测（7）**\n\n"
+        "**一、单选题（本题共1小题）**\n\n"
+        "1．【题目】1 + 1 = ?\n"
+        "【答案】2"
+    )
+
+    result = parse_structured(text)
+    outline = result.paper["outline"]
+
+    assert result.paper["suggested_title"] == "高二数学小测（7）"
+    assert outline[0] == {
+        "kind": OUTLINE_RICH_TEXT,
+        "markdown": "**高二数学小测（7）**",
+    }
+    assert outline[1] == {
+        "kind": OUTLINE_HEADING,
+        "text": "一、单选题（本题共1小题）",
+        "level": 2,
+    }
 
 
 def test_question_refs_point_at_question_temp_ids_in_order():

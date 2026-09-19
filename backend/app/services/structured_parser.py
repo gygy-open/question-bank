@@ -571,17 +571,8 @@ def parse_structured(text: str) -> ExtractionResult:
 
 
 def _take_suggested_title(outline: List[PaperOutlineItem]) -> Optional[str]:
-    """把首个结构项之前的第一行文字视为试卷标题，并从 outline 中消费掉它。"""
+    """把首个结构项之前的第一行文字作为标题建议，并原样保留在 outline 中。"""
     if not outline or outline[0].get("kind") != OUTLINE_RICH_TEXT:
         return None
-    first = outline[0]
-    parts = (first.get("markdown") or "").split("\n", 1)
-    title = _heading_text(parts[0])
-    if not title:
-        return None
-    rest = parts[1].strip() if len(parts) > 1 else ""
-    if rest:
-        first["markdown"] = rest
-    else:
-        outline.pop(0)
-    return title
+    first_line = (outline[0].get("markdown") or "").split("\n", 1)[0]
+    return _heading_text(first_line) or None
