@@ -282,6 +282,7 @@ async def create_composition(
     title: str,
     description: Optional[str],
     folder_id: Optional[int],
+    numbering_enabled: bool = False,
 ) -> Composition:
     if folder_id is not None:
         await _validate_folder_ref(
@@ -298,6 +299,7 @@ async def create_composition(
         owner_id=owner_id,
         subject_id=subject_id,
         folder_id=folder_id,
+        numbering_enabled=numbering_enabled,
         revision=1,
         created_by=actor.id,
         updated_by=actor.id,

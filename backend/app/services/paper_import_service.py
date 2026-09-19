@@ -388,6 +388,7 @@ async def commit_paper_import(
         title=(title or "").strip() or (filename or "未命名试卷"),
         description=None,
         folder_id=folder_id,
+        numbering_enabled=True,
     )
     comp.source_import_task_id = import_task.id
     # 来源信息在创建时固化:源文件后续被清理也不影响稿件可读性。

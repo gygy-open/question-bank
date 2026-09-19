@@ -164,6 +164,7 @@ async def test_import_with_composition_builds_full_paper(client, ctx, db_session
         n["props"]["number"] for n in detail.json()["nodes"] if n["node_type"] == "question"
     ]
     assert numbers == ["1", "2"]
+    assert detail.json()["numbering_enabled"] is True
 
     comp = (await db_session.execute(select(Composition))).scalars().one()
     assert comp.source_import_task_id is not None
@@ -201,6 +202,7 @@ async def test_renumber_reassigns_sequential_numbers(client, ctx):
         n["props"]["number"] for n in detail.json()["nodes"] if n["node_type"] == "question"
     ]
     assert numbers == ["1", "2"]
+    assert detail.json()["numbering_enabled"] is True
 
 
 async def test_keeping_original_numbers_allows_gaps(client, ctx):
@@ -229,6 +231,7 @@ async def test_keeping_original_numbers_allows_gaps(client, ctx):
         n["props"]["number"] for n in detail.json()["nodes"] if n["node_type"] == "question"
     ]
     assert numbers == ["3", "7"]
+    assert detail.json()["numbering_enabled"] is True
 
 
 async def test_material_question_children_resolve_parent(client, ctx, db_session):
