@@ -18,7 +18,9 @@ from collections import defaultdict
 from typing import List, Dict, Optional, Tuple
 
 from app.services.importing.contracts import (
+    OUTLINE_DEGRADED,
     OUTLINE_HEADING,
+    OUTLINE_QUESTION_GROUP_REF,
     OUTLINE_QUESTION_REF,
     OUTLINE_RICH_TEXT,
     ExtractionResult,
@@ -55,6 +57,20 @@ SECTION_TAG_ALIASES = {
     "统一答案": "answer_section", "答案速查": "answer_section",
 }
 
+# 题目材料与题组是文档结构，不是逐题字段。结构标签必须独占一行，并在题块
+# 字段状态机之前处理，避免被追加到上一题的答案或解析中。
+STRUCTURE_TAG_ALIASES = {
+    "题目材料": "stimulus",
+    "材料": "stimulus",
+    "stimulus": "stimulus",
+    "题组": "question_group",
+    "question_group": "question_group",
+    "group": "question_group",
+    "题组结束": "question_group_end",
+    "/题组": "question_group_end",
+    "end_group": "question_group_end",
+}
+
 _Q_TYPE_MAP = {
     "单选": "single_choice", "单选题": "single_choice", "single_choice": "single_choice",
     "多选": "multiple_choice", "多选题": "multiple_choice", "multiple_choice": "multiple_choice",
@@ -76,16 +92,22 @@ _TRUE_FALSE_ANSWERS = {
 # Optional leading numbering like "1." "1、" "(1)" before a tag, then a bracketed
 # tag using full-width 【】 or half-width [], then optional colon, then inline text.
 _TAG_RE = re.compile(
-    r'^\s*(?:\*\*)?(?:\(?\d+\)?[\.、\．]?\s*)?[【\[]\s*([^\]】]+?)\s*[】\]]'
+    r'^\s*(?:\*\*)?(?:\(?\d+\)?(?:\\?[\.、．])?\s*)?[【\[]\s*([^\]】]+?)\s*[】\]]'
     r'(?:\*\*)?\s*[:：]?\s*(.*?)\s*(?:\*\*)?\s*$'
 )
 
 _OPTION_TAG_RE = re.compile(r'^(?:选项|option)\s*([A-Za-z])$', re.IGNORECASE)
 _BRACKET_TAG_RE = re.compile(r'[【\[]\s*([^\]】]+?)\s*[】\]]')
+_STRUCTURE_TAG_RE = re.compile(
+    r'^\s*(?:\*\*)?[【\[]\s*([^\]】]+?)\s*[】\]](?:\*\*)?'
+    r'\s*(?:[:：]\s*)?(.*?)\s*(?:\*\*)?\s*$'
+)
 _BLOCKQUOTE_PREFIX_RE = re.compile(r'^\s*(?:>\s*)+')
 _BLANK_UNDERSCORE_RE = re.compile(r'(?:\\?_){3,}')
 # 【题目】标签之前的原卷题号(如 "3.【题目】" / "(3)【题目】");_TAG_RE 会吃掉它,故单独捕获。
-_TAG_LEADING_NUMBER_RE = re.compile(r'^\s*(?:\*\*)?\(?(\d+(?:\.\d+)?)\)?[\.、．]?\s*[【\[]')
+_TAG_LEADING_NUMBER_RE = re.compile(
+    r'^\s*(?:\*\*)?\(?(\d+(?:\.\d+)?)\)?(?:\\?[\.、．])?\s*[【\[]'
+)
 # 题干正文开头的题号(如 "【题目】3. 下列...");review 阶段会把它剔掉,故在此先行记录。
 _CONTENT_LEADING_NUMBER_RE = re.compile(r'^\s*\(?(\d+(?:\.\d+)?)\)?[\.、．]\s*')
 # 统一答案区里,编号段落的题号(如 "1．B因为..."),用作该题解析的记录边界。
@@ -137,6 +159,20 @@ def _match_section_tag(line: str) -> Optional[Tuple[str, str]]:
         if kind:
             return kind, _heading_text(line[:m.start()])
     return None
+
+
+def _match_structure_tag(line: str) -> Optional[Tuple[str, str]]:
+    """识别独占一行的题目材料/题组结构标签，返回 (kind, 可选名称)。"""
+    match = _STRUCTURE_TAG_RE.match(line)
+    if not match:
+        return None
+    raw_name = match.group(1).strip()
+    kind = STRUCTURE_TAG_ALIASES.get(raw_name) or STRUCTURE_TAG_ALIASES.get(
+        raw_name.lower()
+    )
+    if kind is None:
+        return None
+    return kind, match.group(2).strip()
 
 
 def _match_tag(line: str) -> Optional[Tuple[str, str, Optional[str]]]:
@@ -469,19 +505,23 @@ def parse_structured(text: str) -> ExtractionResult:
     大题标题与题间说明不再被丢弃：它们按版面顺序进入 outline，题目则以
     question_ref 占位，两者通过 temp_id 关联。
     """
-    lines = [
-        part
-        for line in (text or "").splitlines()
-        for part in _INLINE_ANALYSIS_TAG_RE.split(_strip_blockquote_prefix(line))
-        if part
-    ]
+    source_lines = (text or "").splitlines()
 
     questions: List[dict] = []
     outline: List[PaperOutlineItem] = []
+    stimuli: List[dict] = []
+    question_groups: List[dict] = []
     block: Optional[List[str]] = None
     block_temp_id: Optional[str] = None
     block_number: Optional[str] = None
     pending_text: List[str] = []
+    material_lines: Optional[List[str]] = None
+    material_temp_id: Optional[str] = None
+    material_label: Optional[str] = None
+    latest_material_temp_id: Optional[str] = None
+    material_ids_by_label: Dict[str, str] = {}
+    current_group: Optional[dict] = None
+    material_marker_kind = "_stimulus_declaration"
 
     def flush_text() -> None:
         markdown = "\n".join(pending_text).strip()
@@ -499,53 +539,196 @@ def parse_structured(text: str) -> ExtractionResult:
         number = block_number or question.get("source_number")
         question["source_number"] = number
         questions.append(question)
-        outline.append(
-            {"kind": OUTLINE_QUESTION_REF, "temp_id": block_temp_id, "number": number}
-        )
+        if current_group is not None:
+            current_group["question_temp_ids"].append(block_temp_id)
+        else:
+            outline.append(
+                {"kind": OUTLINE_QUESTION_REF, "temp_id": block_temp_id, "number": number}
+            )
         block = None
         block_temp_id = None
         block_number = None
 
+    def finish_material() -> None:
+        nonlocal material_lines, material_temp_id, material_label
+        nonlocal latest_material_temp_id
+        if material_lines is None or material_temp_id is None:
+            return
+        markdown = "\n".join(material_lines).strip()
+        if markdown:
+            stimuli.append(
+                {
+                    "temp_id": material_temp_id,
+                    "markdown": markdown,
+                    "metadata": {"label": material_label} if material_label else {},
+                }
+            )
+        latest_material_temp_id = material_temp_id
+        if material_label:
+            material_ids_by_label[material_label] = material_temp_id
+        material_lines = None
+        material_temp_id = None
+        material_label = None
+
+    def finish_group(*, warn_unclosed: bool = False) -> None:
+        nonlocal current_group
+        if current_group is None:
+            return
+        if warn_unclosed and current_group["question_temp_ids"]:
+            member_ids = set(current_group["question_temp_ids"])
+            for question in questions:
+                if question.get("id") in member_ids:
+                    question.setdefault("warnings", []).append(
+                        "题组未显式结束，已在文件末尾自动结束"
+                    )
+        current_group = None
+
     answer_section_lines: Optional[List[str]] = None
 
-    for i, line in enumerate(lines):
-        tag = _match_tag(line)
-        if tag and tag[0] == "content":
-            flush_block()
-            flush_text()
-            block = [line]
-            block_temp_id = str(uuid.uuid4())
-            block_number = _leading_number_before_tag(line)
-            continue
+    for source_index, raw_line in enumerate(source_lines):
+        stripped_line = _strip_blockquote_prefix(raw_line)
+        parts = (
+            [stripped_line]
+            if material_lines is not None
+            else [part for part in _INLINE_ANALYSIS_TAG_RE.split(stripped_line) if part]
+        )
+        for line in parts:
+            structure = _match_structure_tag(line)
+            if structure:
+                kind, label = structure
+                flush_block()
+                if (
+                    kind == "question_group"
+                    and not label
+                    and material_lines is not None
+                    and material_label
+                ):
+                    material_lines.insert(0, material_label)
+                    material_label = None
+                finish_material()
+                if kind == "stimulus":
+                    finish_group()
+                    flush_text()
+                    material_label = label or None
+                    existing_id = material_ids_by_label.get(label) if label else None
+                    material_temp_id = existing_id or str(uuid.uuid4())
+                    material_lines = []
+                    outline.append(
+                        {"kind": material_marker_kind, "temp_id": material_temp_id}
+                    )
+                elif kind == "question_group":
+                    finish_group()
+                    flush_text()
+                    stimulus_ref = (
+                        material_ids_by_label.get(label)
+                        if label
+                        else latest_material_temp_id
+                    )
+                    group_temp_id = str(uuid.uuid4())
+                    current_group = {
+                        "temp_id": group_temp_id,
+                        "stimulus_temp_id": stimulus_ref
+                        or f"missing-stimulus:{label or '最近材料'}",
+                        "question_temp_ids": [],
+                        "metadata": {},
+                    }
+                    question_groups.append(current_group)
+                    outline.append(
+                        {
+                            "kind": OUTLINE_QUESTION_GROUP_REF,
+                            "temp_id": group_temp_id,
+                        }
+                    )
+                else:
+                    finish_group()
+                continue
 
-        # 【答案区】标志全卷答案/解析统一收尾：无论当前题块是否还开着都直接结束扫描，
-        # 其后内容整体移交单独解析，不再走逐题字段状态机。
-        section = _match_section_tag(line)
-        if section and section[0] == "answer_section":
-            flush_block()
-            flush_text()
-            prefix_heading = section[1]
-            if prefix_heading:
-                outline.append({"kind": OUTLINE_HEADING, "text": prefix_heading, "level": 2})
-            answer_section_lines = lines[i + 1:]
+            tag = _match_tag(line)
+            if material_lines is not None:
+                section = _match_section_tag(line)
+                if not (tag and tag[0] == "content") and not (
+                    section and section[0] == "answer_section"
+                ):
+                    material_lines.append(line)
+                    continue
+                finish_material()
+
+            if tag and tag[0] == "content":
+                flush_block()
+                flush_text()
+                block = [line]
+                block_temp_id = str(uuid.uuid4())
+                block_number = _leading_number_before_tag(line)
+                continue
+
+            # 【答案区】标志全卷答案/解析统一收尾：无论当前题块是否还开着都直接结束扫描，
+            # 其后内容整体移交单独解析，不再走逐题字段状态机。
+            section = _match_section_tag(line)
+            if section and section[0] == "answer_section":
+                flush_block()
+                finish_group()
+                flush_text()
+                prefix_heading = section[1]
+                if prefix_heading:
+                    outline.append({"kind": OUTLINE_HEADING, "text": prefix_heading, "level": 2})
+                answer_section_lines = [
+                    part
+                    for rest in source_lines[source_index + 1:]
+                    for part in _INLINE_ANALYSIS_TAG_RE.split(
+                        _strip_blockquote_prefix(rest)
+                    )
+                    if part
+                ]
+                break
+
+            # 大题标题是版面结构而非题目字段，遇到即结束当前题块。
+            if _is_section_heading(line):
+                flush_block()
+                finish_group()
+                flush_text()
+                heading = _heading_text(line)
+                if heading:
+                    outline.append({"kind": OUTLINE_HEADING, "text": heading, "level": 2})
+                continue
+
+            if block is not None:
+                block.append(line)
+            elif line.strip():
+                pending_text.append(line)
+        if answer_section_lines is not None:
             break
 
-        # 大题标题是版面结构而非题目字段，遇到即结束当前题块。
-        if _is_section_heading(line):
-            flush_block()
-            flush_text()
-            heading = _heading_text(line)
-            if heading:
-                outline.append({"kind": OUTLINE_HEADING, "text": heading, "level": 2})
-            continue
-
-        if block is not None:
-            block.append(line)
-        elif line.strip():
-            pending_text.append(line)
-
     flush_block()
+    finish_material()
+    finish_group(warn_unclosed=True)
     flush_text()
+
+    referenced_stimuli = {
+        str(group["stimulus_temp_id"]) for group in question_groups
+    }
+    stimulus_by_id = {str(item["temp_id"]): item for item in stimuli}
+    resolved_outline: List[PaperOutlineItem] = []
+    for item in outline:
+        if item.get("kind") != material_marker_kind:
+            resolved_outline.append(item)
+            continue
+        stimulus_ref = str(item.get("temp_id") or "")
+        if stimulus_ref in referenced_stimuli:
+            continue
+        stimulus = stimulus_by_id.get(stimulus_ref)
+        if stimulus is not None:
+            resolved_outline.append(
+                {"kind": OUTLINE_RICH_TEXT, "markdown": stimulus["markdown"]}
+            )
+        else:
+            resolved_outline.append(
+                {
+                    "kind": OUTLINE_DEGRADED,
+                    "reason": "题目材料内容为空",
+                    "markdown": "",
+                }
+            )
+    outline = resolved_outline
 
     if answer_section_lines is not None:
         answers_by_number, analyses_by_number = _parse_answer_section(answer_section_lines)
@@ -567,6 +750,8 @@ def parse_structured(text: str) -> ExtractionResult:
     return ExtractionResult(
         questions=questions,
         paper={"suggested_title": suggested_title, "outline": outline},
+        stimuli=stimuli,
+        question_groups=question_groups,
     )
 
 

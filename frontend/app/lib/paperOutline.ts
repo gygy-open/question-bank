@@ -10,6 +10,7 @@ export type PaperOutlineKind =
   | 'heading'
   | 'rich_text'
   | 'question_ref'
+  | 'question_group_ref'
   | 'page_break'
   | 'answer_space'
   | 'details_module'
@@ -111,5 +112,10 @@ export function buildSubmitOutline(
   const tempIds = selected.map((d) => d.temp_id).filter((id): id is string => !!id)
   if (!hasPaperStructure(paper)) return outlineFromDrafts(selected)
   const pruned = pruneOutline(paper?.outline ?? [], tempIds)
-  return reorderQuestionRefs(pruned, tempIds)
+  const independentTempIds = new Set(
+    pruned
+      .filter((item) => item.kind === 'question_ref' && item.temp_id)
+      .map((item) => item.temp_id as string),
+  )
+  return reorderQuestionRefs(pruned, tempIds.filter((id) => independentTempIds.has(id)))
 }

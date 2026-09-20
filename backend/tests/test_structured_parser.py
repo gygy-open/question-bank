@@ -40,6 +40,21 @@ def test_pandoc_blockquote_options_are_not_appended_to_content():
     assert q["options"] == ["A. 12", "B. 11", "C. 8", "D. 6"]
 
 
+def test_pandoc_escaped_question_number_before_tag_is_recognized():
+    result = parse_structured(
+        "1\\. 【题目】第一道题\n"
+        "【答案】甲\n"
+        "2\\. 【题目】第二道题\n"
+        "【答案】乙"
+    )
+
+    assert [question["content"] for question in result.questions] == [
+        "第一道题",
+        "第二道题",
+    ]
+    assert [question["source_number"] for question in result.questions] == ["1", "2"]
+
+
 def test_explicit_multiple_choice_survives_following_section_heading():
     text = (
         "11．【题目】已知函数 f(x)，则（ ）\n"

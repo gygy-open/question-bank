@@ -29,6 +29,7 @@ interface Props {
   selected?: boolean
   selectable?: boolean
   hideDelete?: boolean
+  hideDuplicate?: boolean
   hideDecompose?: boolean
   defaultExpanded?: boolean
 }
@@ -40,6 +41,7 @@ const props = withDefaults(defineProps<Props>(), {
   selected: false,
   selectable: false,
   hideDelete: false,
+  hideDuplicate: false,
   hideDecompose: false,
   defaultExpanded: false
 })
@@ -363,7 +365,7 @@ const sourceFileUrl = computed(() => {
             </DropdownMenu>
 
             <Button
-              v-if="mode === 'import'"
+              v-if="mode === 'import' && !hideDuplicate"
               variant="ghost"
               size="icon"
               class="h-8 w-8"

@@ -25,6 +25,9 @@ const emit = defineEmits<{ (e: 'update:open', value: boolean): void }>()
 
 const tagRows = [
     { tag: '【题目】', required: '必填', note: '每道题的开头，同时作为题目之间的分隔符' },
+    { tag: '【题目材料】', required: '题组必填', note: '声明多行题目材料；名称可选，复用时填写名称' },
+    { tag: '【题组】', required: '题组必填', note: '开始题组；名称省略时引用最近声明的题目材料' },
+    { tag: '【题组结束】', required: '可选', note: '结束题组，后续题目恢复为独立题；新题组、题目材料或大题标题也会自动结束当前题组' },
     { tag: '【题型】', required: '可选', note: '单选/多选/判断/填空/解答；省略时自动推断' },
     { tag: '【选项】', required: '可选', note: '块写法 A. … B. … 或逐项 【选项A】【选项B】' },
     { tag: '【答案】', required: '可选', note: '选择题写字母（多选如 AB），判断题写 对/错' },
@@ -57,6 +60,31 @@ const examples = [
 【答案】2`,
     },
     {
+        key: 'question-group',
+        label: '材料题组',
+        text: `【题目】卷首独立题
+【答案】略
+
+【题目材料】材料一
+阅读下面的文字，完成后续题目。
+
+这里可以包含多段 Markdown 内容。
+
+【题组】材料一
+1.【题目】请概括题目材料的主要内容
+【题型】解答
+【答案】略
+
+2.【题目】下列理解正确的是
+【题型】单选
+【选项】A. 选项一  B. 选项二
+【答案】A
+【题组结束】
+
+【题目】题组后的独立题
+【答案】略`,
+    },
+    {
         key: 'answer-section',
         label: '统一答案区',
         text: `【题目】1+1=?
@@ -84,8 +112,9 @@ const copyExample = async (text: string) => {
             <DialogHeader>
                 <DialogTitle>标签精准解析：格式说明</DialogTitle>
                 <DialogDescription>
-                    用 <Badge variant="outline">【题目】</Badge> 分隔每一道题，其余标签均可省略。全角
-                    【】与半角 [] 均可识别。
+                    独立题用 <Badge variant="outline">【题目】</Badge> 分隔；材料题组使用
+                    <Badge variant="outline">【题目材料】</Badge> 和 <Badge variant="outline">【题组】</Badge>。
+                    全角【】与半角 [] 均可识别。
                 </DialogDescription>
             </DialogHeader>
 
@@ -109,7 +138,7 @@ const copyExample = async (text: string) => {
             </Table>
 
             <Tabs default-value="single" class="mt-2">
-                <TabsList class="grid w-full grid-cols-4">
+                <TabsList class="grid h-auto w-full grid-cols-2 gap-1 sm:grid-cols-5">
                     <TabsTrigger v-for="ex in examples" :key="ex.key" :value="ex.key">{{ ex.label }}</TabsTrigger>
                 </TabsList>
                 <TabsContent v-for="ex in examples" :key="ex.key" :value="ex.key" class="mt-3">

@@ -27,6 +27,7 @@ import { Badge } from '@/components/ui/badge'
 import { Separator } from '@/components/ui/separator'
 import { Stepper, StepperItem, StepperIndicator, StepperTitle, StepperSeparator } from '@/components/ui/stepper'
 import QuestionListItem from '@/components/QuestionListItem.vue'
+import QuestionGroupReview from '@/components/import/QuestionGroupReview.vue'
 import QuestionEditDialog from '@/components/QuestionEditDialog.vue'
 import StructuredTemplateGuideDialog from '@/components/StructuredTemplateGuideDialog.vue'
 import PageHeader from '@/components/PageHeader.vue'
@@ -35,11 +36,17 @@ import { zipFolder } from '@/lib/zipFolder'
 import type { CompositionFolder, CompositionScope, KnowledgePoint, Subject } from '@/types'
 import { buildFolderTree } from '@/lib/compositions'
 import {
-    buildSubmitOutline,
     hasPaperStructure,
     insertQuestionRefAfter,
     type PaperExtraction,
 } from '@/lib/paperOutline'
+import {
+    buildImportReviewEntries,
+    buildImportStructurePayload,
+    validateImportStructure,
+    type ImportQuestionGroup,
+    type ImportStimulus,
+} from '@/lib/importReview'
 import {
     type ImportDraft,
     type ExtractedQuestionItem,
@@ -71,6 +78,8 @@ const isUploading = ref(false)
 const isImporting = ref(false)
 const error = ref<string | null>(null)
 const importList = ref<ImportDraft[]>([])
+const stimuli = ref<ImportStimulus[]>([])
+const questionGroups = ref<ImportQuestionGroup[]>([])
 const editingItemId = ref<string | null>(null)
 const importedTaskId = ref<number | null>(null)
 const uploadedFilePath = ref<string | null>(null)
@@ -112,11 +121,23 @@ const hasStructure = computed(() => hasPaperStructure(paper.value))
 const warningCount = computed(() => importList.value.filter((i) => i.warnings?.length).length)
 const selectedCount = computed(() => importList.value.filter((item) => item.selected).length)
 const onlyWarnings = ref(false)
-const visibleImportList = computed(() => {
-    if (!onlyWarnings.value) return importList.value.map((item, index) => ({ item, index }))
-    return importList.value
-        .map((item, index) => ({ item, index }))
-        .filter(({ item }) => item.warnings?.length)
+const structureErrors = computed(() => validateImportStructure(
+    importList.value,
+    stimuli.value,
+    questionGroups.value,
+    paper.value,
+))
+const reviewEntries = computed(() => buildImportReviewEntries(
+    importList.value,
+    stimuli.value,
+    questionGroups.value,
+    paper.value,
+))
+const visibleReviewEntries = computed(() => {
+    if (!onlyWarnings.value) return reviewEntries.value
+    return reviewEntries.value.filter((entry) => entry.kind === 'question'
+        ? entry.question.warnings?.length
+        : entry.members.some(({ question }) => question.warnings?.length))
 })
 
 // Global Settings
@@ -276,6 +297,12 @@ const acceptExtraction = (data: any) => {
         return
     }
     importList.value = drafts
+    stimuli.value = data.stimuli ?? []
+    questionGroups.value = data.question_groups ?? []
+    const groupedQuestionIds = new Set(questionGroups.value.flatMap((group) => group.question_temp_ids))
+    for (const draft of importList.value) {
+        if (draft.temp_id && groupedQuestionIds.has(draft.temp_id)) draft.selected = true
+    }
     paper.value = data.paper ?? null
     contentSha256.value = data.content_sha256 ?? null
     duplicateOf.value = data.duplicate_of ?? null
@@ -415,6 +442,11 @@ const handleImport = async (proceedWithPartial = false) => {
         return
     }
 
+    if (structureErrors.value.length > 0) {
+        toast.error('题组结构无效，请重新解析文件')
+        return
+    }
+
     const selectedItems = importList.value.filter(item => item.selected)
     if (selectedItems.length === 0) {
         toast.error('请至少选择一道题目')
@@ -444,10 +476,33 @@ const handleImport = async (proceedWithPartial = false) => {
         // 幂等键绑定本次提交：网络重试不会重复建题建稿。
         idempotencyKey.value ||= generateTempId()
 
+        const structurePayload = buildImportStructurePayload(
+            payloadQuestions,
+            selectedItems,
+            stimuli.value,
+            questionGroups.value,
+            paper.value,
+        )
+        const preview = await $api<{
+            importable_count: number
+            skipped: { temp_id: string | null; message: string }[]
+            blocking_reason: string | null
+        }>(`/subjects/${globalSettings.value.subject_id}/paper-imports/preview`, {
+            method: 'POST',
+            body: { scope: compositionScope.value, ...structurePayload },
+        })
+        if (preview.blocking_reason) {
+            toast.error('导入预检未通过', { description: preview.blocking_reason })
+            return
+        }
+        if (preview.skipped.length > 0 && !proceedWithPartial) {
+            partialFailureDetail.value = `${preview.skipped.length} 道题目未能入库：${preview.skipped.map((item) => item.message).join('；')}`
+            return
+        }
+
         const body = {
             scope: compositionScope.value,
-            questions: payloadQuestions,
-            outline: buildSubmitOutline(paper.value, selectedItems),
+            ...structurePayload,
             save_as_composition: saveAsComposition.value,
             title: compositionTitle.value.trim() || null,
             folder_id: compositionFolderId.value,
@@ -497,6 +552,15 @@ const confirmPartialImport = async () => {
 }
 
 const removeItem = (index: number) => {
+    const item = importList.value[index]
+    if (paper.value?.outline && item?.temp_id) {
+        paper.value = {
+            ...paper.value,
+            outline: paper.value.outline.filter(
+                (outlineItem) => outlineItem.kind !== 'question_ref' || outlineItem.temp_id !== item.temp_id,
+            ),
+        }
+    }
     importList.value.splice(index, 1)
 }
 
@@ -541,6 +605,8 @@ const reset = () => {
     fileTextPreview.value = null
     uploadedFilePath.value = null
     importList.value = []
+    stimuli.value = []
+    questionGroups.value = []
     step.value = 'upload'
     error.value = null
     paper.value = null
@@ -860,20 +926,39 @@ const reset = () => {
 
             <!-- Question List -->
             <div class="space-y-4 pb-4">
+                <Alert v-if="structureErrors.length" variant="destructive">
+                    <AlertCircle class="h-4 w-4" />
+                    <AlertDescription>
+                        <p class="font-medium">题组结构无效，无法导入，请重新解析文件。</p>
+                        <ul class="mt-2 list-disc space-y-1 pl-5">
+                            <li v-for="message in structureErrors" :key="message">{{ message }}</li>
+                        </ul>
+                    </AlertDescription>
+                </Alert>
                 <div v-if="importList.length === 0" class="text-center py-8 text-muted-foreground">
                     无导入的题目，请先上传文档或粘贴内容
                 </div>
 
-                <QuestionListItem 
-                    v-for="{ item, index } in visibleImportList"
-                    :key="item.uid"
-                    :item="item"
-                    :index="index"
-                    :all-knowledge-points="knowledgePoints"
-                    @edit="editItem(item.uid)"
-                    @delete="removeItem(index)"
-                    @duplicate="duplicateItem(index)"
-                />
+                <template v-for="entry in visibleReviewEntries" :key="entry.kind === 'question' ? entry.question.uid : entry.group.temp_id">
+                    <QuestionListItem
+                        v-if="entry.kind === 'question'"
+                        :item="entry.question"
+                        :index="entry.index"
+                        :all-knowledge-points="knowledgePoints"
+                        :selected="entry.question.selected"
+                        selectable
+                        @select="entry.question.selected = $event"
+                        @edit="editItem(entry.question.uid)"
+                        @delete="removeItem(entry.index)"
+                        @duplicate="duplicateItem(entry.index)"
+                    />
+                    <QuestionGroupReview
+                        v-else
+                        :entry="entry"
+                        :all-knowledge-points="knowledgePoints"
+                        @edit="editItem"
+                    />
+                </template>
 
                 <QuestionEditDialog
                     :open="!!editingItemId"
@@ -984,7 +1069,7 @@ const reset = () => {
                         </div>
                         <div class="flex items-center gap-2">
                             <Button variant="ghost" :disabled="isImporting" @click="reset">取消</Button>
-                            <Button class="min-w-[148px]" @click="handleImport()" :disabled="isImporting || selectedCount === 0">
+                            <Button class="min-w-[148px]" @click="handleImport()" :disabled="isImporting || selectedCount === 0 || structureErrors.length > 0">
                                 <Loader2 v-if="isImporting" class="mr-2 h-4 w-4 animate-spin" />
                                 <Save v-else class="mr-2 h-4 w-4" />
                                 确认导入 ({{ selectedCount }})

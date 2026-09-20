@@ -6,7 +6,7 @@ from app.models.tag import Tag
 from app.models.tag_category import TagCategory
 from app.schemas.ai import AIQuestion, AIQuestionGroup, AIStimulus, QuestionList
 from app.services.importing.contracts import ExtractionResult
-from app.services.importing.extract import AIExtractor, _assign_temp_ids
+from app.services.importing.extract import AIExtractor, TemplateExtractor, _assign_temp_ids
 from app.services.importing.prompt import PromptBuilder
 
 
@@ -45,6 +45,26 @@ def test_assign_temp_ids_fills_and_links_children():
     # 已有 id 的题保持不变。
     assert out[1]["id"] == "keep-me"
     assert "parent_id" not in out[1]
+
+
+async def test_template_extractor_emits_material_group_and_mixed_outline(db_session):
+    result = await TemplateExtractor().extract(
+        "【题目材料】材料一\n"
+        "共同材料\n"
+        "【题组】材料一\n"
+        "【题目】组内题\n"
+        "【题组结束】\n"
+        "【题目】独立题",
+        db_session,
+    )
+
+    assert len(result.stimuli) == 1
+    assert len(result.question_groups) == 1
+    assert result.question_groups[0]["question_temp_ids"] == [result.questions[0]["id"]]
+    assert [item["kind"] for item in result.paper["outline"]] == [
+        "question_group_ref",
+        "question_ref",
+    ]
 
 
 async def test_prompt_builder_injects_tag_context(db_session):

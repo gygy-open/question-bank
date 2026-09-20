@@ -5,6 +5,7 @@
 """
 from app.services.importing.contracts import (
     OUTLINE_HEADING,
+    OUTLINE_QUESTION_GROUP_REF,
     OUTLINE_QUESTION_REF,
     OUTLINE_RICH_TEXT,
 )
@@ -123,3 +124,117 @@ def test_empty_input_has_no_questions_and_empty_outline():
     assert result.questions == []
     assert result.paper["outline"] == []
     assert result.paper["suggested_title"] is None
+
+
+def test_question_group_and_independent_questions_can_be_interleaved():
+    text = (
+        "1.【题目】卷首独立题\n"
+        "【答案】甲\n"
+        "【题目材料】材料一\n"
+        "材料第一段。\n\n"
+        "材料第二段。\n"
+        "【题组】材料一\n"
+        "2.【题目】材料小题一\n"
+        "【答案】乙\n"
+        "3.【题目】材料小题二\n"
+        "【答案】丙\n"
+        "【题组结束】\n"
+        "4.【题目】题组后的独立题\n"
+        "【答案】丁"
+    )
+
+    result = parse_structured(text)
+    outline = result.paper["outline"]
+
+    assert [question["content"] for question in result.questions] == [
+        "卷首独立题",
+        "材料小题一",
+        "材料小题二",
+        "题组后的独立题",
+    ]
+    assert len(result.stimuli) == 1
+    assert result.stimuli[0]["markdown"] == "材料第一段。\n\n材料第二段。"
+    assert result.stimuli[0]["metadata"] == {"label": "材料一"}
+    assert len(result.question_groups) == 1
+    assert result.question_groups[0]["stimulus_temp_id"] == result.stimuli[0]["temp_id"]
+    assert result.question_groups[0]["question_temp_ids"] == [
+        result.questions[1]["id"],
+        result.questions[2]["id"],
+    ]
+    assert _kinds(outline) == [
+        OUTLINE_QUESTION_REF,
+        OUTLINE_QUESTION_GROUP_REF,
+        OUTLINE_QUESTION_REF,
+    ]
+    assert outline[1]["temp_id"] == result.question_groups[0]["temp_id"]
+
+
+def test_unnamed_group_uses_latest_material_and_heading_ends_group():
+    result = parse_structured(
+        "【题目材料】\n"
+        "共同材料\n"
+        "【题组】\n"
+        "1.【题目】组内题\n"
+        "二、解答题\n"
+        "2.【题目】组外题"
+    )
+
+    group = result.question_groups[0]
+    assert group["stimulus_temp_id"] == result.stimuli[0]["temp_id"]
+    assert group["question_temp_ids"] == [result.questions[0]["id"]]
+    assert _kinds(result.paper["outline"]) == [
+        OUTLINE_QUESTION_GROUP_REF,
+        OUTLINE_HEADING,
+        OUTLINE_QUESTION_REF,
+    ]
+
+
+def test_unnamed_group_treats_stimulus_tag_suffix_as_material_content():
+    result = parse_structured(
+        "【题目材料】材料正文第一段。\n\n"
+        "材料正文第二段。\n"
+        "【题组】\n"
+        "1\\. 【题目】材料小题\n"
+        "【题组结束】"
+    )
+
+    assert result.stimuli[0]["markdown"] == "材料正文第一段。\n\n材料正文第二段。"
+    assert result.stimuli[0]["metadata"] == {}
+    assert result.question_groups[0]["stimulus_temp_id"] == result.stimuli[0]["temp_id"]
+
+
+def test_named_material_can_be_reused_by_multiple_groups():
+    result = parse_structured(
+        "【题目材料】材料一\n"
+        "共同材料\n"
+        "【题组】材料一\n"
+        "【题目】第一组小题\n"
+        "【题组结束】\n"
+        "【题目】中间独立题\n"
+        "【题组】材料一\n"
+        "【题目】第二组小题\n"
+        "【题组结束】"
+    )
+
+    assert len(result.stimuli) == 1
+    assert len(result.question_groups) == 2
+    assert {
+        group["stimulus_temp_id"] for group in result.question_groups
+    } == {result.stimuli[0]["temp_id"]}
+    assert _kinds(result.paper["outline"]) == [
+        OUTLINE_QUESTION_GROUP_REF,
+        OUTLINE_QUESTION_REF,
+        OUTLINE_QUESTION_GROUP_REF,
+    ]
+
+
+def test_unknown_material_reference_is_preserved_for_preview_validation():
+    result = parse_structured(
+        "【题组】不存在的材料\n"
+        "【题目】不会被静默降级的小题\n"
+        "【题组结束】"
+    )
+
+    assert result.stimuli == []
+    assert result.question_groups[0]["stimulus_temp_id"].startswith("missing-stimulus:")
+    assert _kinds(result.paper["outline"]) == [OUTLINE_QUESTION_GROUP_REF]

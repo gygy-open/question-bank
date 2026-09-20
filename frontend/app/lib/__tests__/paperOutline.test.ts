@@ -156,4 +156,18 @@ describe('buildSubmitOutline', () => {
 
     expect(result.map((i) => i.temp_id)).toEqual(['a', 'b'])
   })
+
+  it('题组成员不会替换独立题引用', () => {
+    const result = buildSubmitOutline({
+      outline: [
+        { kind: 'question_group_ref', temp_id: 'group' },
+        { kind: 'question_ref', temp_id: 'solo', number: '3' },
+      ],
+    }, [draft('member'), draft('solo')])
+
+    expect(result).toEqual([
+      { kind: 'question_group_ref', temp_id: 'group' },
+      { kind: 'question_ref', temp_id: 'solo', number: '3' },
+    ])
+  })
 })
