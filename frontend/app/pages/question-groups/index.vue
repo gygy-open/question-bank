@@ -43,15 +43,17 @@ const total = computed(() => data.value?.total ?? 0)
 const pages = computed(() => data.value?.pages ?? 0)
 const load = () => currentSubjectId.value ? refresh() : Promise.resolve()
 
+let hasActivated = false
 onActivated(() => {
   questionId.value = typeof route.query.question_id === 'string' ? route.query.question_id : ''
-  load()
+  if (hasActivated) load()
+  hasActivated = true
 })
 watch(() => route.query.question_id, value => {
   questionId.value = typeof value === 'string' ? value : ''
   page.value = 1
 })
-watch(currentSubjectId, () => { page.value = 1; load() })
+watch(currentSubjectId, () => { page.value = 1; load() }, { immediate: true })
 watch([page, size, keyword, statusFilter, visibility, stimulusId, questionId], load)
 watch([size, keyword, statusFilter, visibility, stimulusId, questionId], () => {
   if (page.value !== 1) page.value = 1
