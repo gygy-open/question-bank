@@ -43,6 +43,7 @@ import type { DocumentChange } from '~/lib/compositionDiff'
 import type {
   AnswerFieldKey, CompositionDetail, CompositionExportFormat, CompositionFolder, CompositionScope,
   CompositionVersionSummary, QuestionPage, QuestionRevisionStatus,
+  QuestionGroupRevisionStatus,
 } from '~/types'
 
 const route = useRoute()
@@ -115,7 +116,9 @@ useCompositionAiTools({
 
 // 题目版本状态（question_id → 实时 revision/可用性），只用于 stale/deleted 标记，不渲染内容。
 const questionStatus = ref<Map<number, QuestionRevisionStatus>>(new Map())
+const questionGroupStatus = ref<QuestionGroupRevisionStatus[]>([])
 const syncingNodes = ref(false)
+const syncingQuestionGroups = ref(false)
 
 // 面包屑：仅用于头部路径展示与导航，加载失败静默降级为空路径。
 const folders = ref<CompositionFolder[]>([])
@@ -145,6 +148,23 @@ const dirty = computed(() => metaDirty.value || nodesDirty.value)
 const hasStaleQuestions = computed(
   () => collectStaleQuestionNodeIds(document.value, questionStatus.value).length > 0,
 )
+const staleQuestionGroups = computed(() => questionGroupStatus.value.filter((status) => status.stale))
+const hasStaleSources = computed(() => hasStaleQuestions.value || staleQuestionGroups.value.length > 0)
+const questionGroupUpdateSummary = computed(() => {
+  const statuses = staleQuestionGroups.value
+  const material = statuses.filter((status) =>
+    !status.stimulus_available || status.stimulus_current_revision !== status.stimulus_pinned_revision)
+  const structure = statuses.filter((status) => status.structure_changed)
+  const questions = statuses.filter((status) => status.members.some((member) =>
+    !member.available || member.current_revision !== member.pinned_revision))
+  const categorized = new Set([...material, ...structure, ...questions].map((status) => status.node_id))
+  return {
+    material: material.length,
+    structure: structure.length,
+    questions: questions.length,
+    group: statuses.filter((status) => !categorized.has(status.node_id)).length,
+  }
+})
 const numberingEnabled = computed(() => composition.value?.numbering_enabled ?? false)
 const scoringEnabled = computed(() => composition.value?.scoring_enabled ?? false)
 const questionDisplay = computed<Record<AnswerFieldKey, boolean>>(
@@ -194,7 +214,7 @@ async function load() {
     document.value = documentFromNodes(data.nodes ?? [])
     savedSnapshot.value = snapshotDocument(document.value)
     editConflict.value = false
-    await loadQuestionStatus()
+    await loadSourceStatus()
   } catch {
     toast.error('加载组稿失败')
     router.push(`/compositions/${scope.value}`)
@@ -216,6 +236,23 @@ async function loadQuestionStatus() {
   } catch {
     // 状态获取失败时保持空 Map（不显示过期/删除标记，不影响冻结快照渲染）。
   }
+}
+
+async function loadQuestionGroupStatus() {
+  if (!currentSubjectId.value || !composition.value) return
+  try {
+    questionGroupStatus.value = await api.getQuestionGroupRevisions(
+      currentSubjectId.value,
+      scope.value,
+      composition.value.id,
+    )
+  } catch {
+    questionGroupStatus.value = []
+  }
+}
+
+async function loadSourceStatus() {
+  await Promise.all([loadQuestionStatus(), loadQuestionGroupStatus()])
 }
 
 // keepalive 缓存下 onMounted 只会触发一次；用 onActivated 覆盖“离开又切回同一稿件”的重新加载。
@@ -292,7 +329,7 @@ async function saveNodes(opts?: { silent?: boolean }) {
     composition.value = { ...composition.value, revision: resp.revision }
     editConflict.value = false
     if (!opts?.silent) toast.success('已保存内容')
-    await loadQuestionStatus()
+    await loadSourceStatus()
   } catch (err) {
     if (err instanceof CompositionConflictError && err.kind === 'revision') {
       // 不静默覆盖本地改动：显示冲突条，由用户决定是否放弃本地重新加载。
@@ -322,7 +359,7 @@ async function syncNodes(nodeIds: string[]) {
     composition.value = { ...composition.value, revision: resp.revision }
     savedSnapshot.value = snapshotDocument(document.value)
     toast.success(`已同步 ${nodeIds.length} 道题目`)
-    await loadQuestionStatus()
+    await loadSourceStatus()
   } catch (err) {
     if (err instanceof CompositionConflictError && err.kind === 'revision') {
       editConflict.value = true
@@ -332,6 +369,36 @@ async function syncNodes(nodeIds: string[]) {
     }
   } finally {
     syncingNodes.value = false
+  }
+}
+
+async function syncQuestionGroups() {
+  if (!currentSubjectId.value || !composition.value || syncingQuestionGroups.value) return
+  const nodeIds = staleQuestionGroups.value.map((status) => status.node_id)
+  if (dirty.value || !nodeIds.length) return
+  if (!window.confirm('同步会整组替换冻结的材料、成员结构和小题内容，并保留稿件内可兼容的题号、分值与作答区。确定继续？')) return
+  syncingQuestionGroups.value = true
+  try {
+    const response = await api.syncQuestionGroupNodes(
+      currentSubjectId.value,
+      scope.value,
+      composition.value.id,
+      { expected_revision: composition.value.revision, node_ids: nodeIds },
+    )
+    document.value = documentFromNodes(response.nodes)
+    composition.value = { ...composition.value, revision: response.revision }
+    savedSnapshot.value = snapshotDocument(document.value)
+    toast.success(`已同步 ${nodeIds.length} 个题组`)
+    await loadSourceStatus()
+  } catch (error) {
+    if (error instanceof CompositionConflictError && error.kind === 'revision') {
+      editConflict.value = true
+      toast.error('组稿已被他人更新，同步失败；本地内容仍保留')
+    } else {
+      toast.error('同步题组失败')
+    }
+  } finally {
+    syncingQuestionGroups.value = false
   }
 }
 
@@ -727,6 +794,25 @@ onBeforeRouteLeave(() => {
         </Button>
       </div>
 
+      <div
+        v-if="staleQuestionGroups.length"
+        class="flex flex-wrap items-center gap-3 rounded-md border border-amber-400 bg-amber-50 px-4 py-3 text-sm dark:border-amber-700 dark:bg-amber-900/20"
+      >
+        <AlertTriangle class="h-4 w-4 shrink-0 text-amber-600 dark:text-amber-400" />
+        <span class="min-w-0 flex-1">
+          {{ staleQuestionGroups.length }} 个题组有来源更新：
+          <template v-if="questionGroupUpdateSummary.material">材料 {{ questionGroupUpdateSummary.material }} 个</template>
+          <template v-if="questionGroupUpdateSummary.structure">{{ questionGroupUpdateSummary.material ? '，' : '' }}结构 {{ questionGroupUpdateSummary.structure }} 个</template>
+          <template v-if="questionGroupUpdateSummary.questions">{{ questionGroupUpdateSummary.material || questionGroupUpdateSummary.structure ? '，' : '' }}小题 {{ questionGroupUpdateSummary.questions }} 个</template>
+          <template v-if="questionGroupUpdateSummary.group">{{ questionGroupUpdateSummary.material || questionGroupUpdateSummary.structure || questionGroupUpdateSummary.questions ? '，' : '' }}题组版本 {{ questionGroupUpdateSummary.group }} 个</template>。
+          当前仍显示冻结版本，不会自动刷新。
+        </span>
+        <Button size="sm" variant="outline" :disabled="dirty || syncingQuestionGroups" @click="syncQuestionGroups">
+          <Loader2 v-if="syncingQuestionGroups" class="mr-2 h-4 w-4 animate-spin" />
+          <RefreshCw v-else class="mr-2 h-4 w-4" />同步整组
+        </Button>
+      </div>
+
       <!-- 画布 + 题号面板 -->
       <div class="flex flex-col gap-6 lg:flex-row lg:items-start">
         <div class="flex min-w-0 flex-1 flex-col gap-6">
@@ -803,11 +889,11 @@ onBeforeRouteLeave(() => {
         <Input v-model="finalizeLabel" placeholder="例如：期中卷终稿" maxlength="200" />
       </div>
       <div
-        v-if="hasStaleQuestions"
+        v-if="hasStaleSources"
         class="flex items-start gap-2 rounded-md border border-amber-400 bg-amber-50 px-3 py-2 text-xs dark:border-amber-700 dark:bg-amber-900/20"
       >
         <AlertTriangle class="mt-0.5 h-3.5 w-3.5 shrink-0 text-amber-600 dark:text-amber-400" />
-        <span>部分题目在题库中已更新，本次将冻结当前显示的旧版本内容。如需最新内容，请先取消并“同步全部”。</span>
+        <span>部分题目或题组来源已更新，本次将冻结当前显示的旧版本内容。如需最新内容，请先取消并手动同步。</span>
       </div>
       <DialogFooter>
         <Button variant="outline" :disabled="finalizing" @click="finalizeOpen = false">取消</Button>

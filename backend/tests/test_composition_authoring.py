@@ -46,6 +46,13 @@ def test_question_content_is_left_to_the_server():
     assert node.question_id == 7
 
 
+def test_question_group_children_are_left_to_the_server():
+    (node,) = build_nodes([{"type": "question_group", "question_group_id": 9}])
+    assert node.node_kind.value == "module"
+    assert node.question_group_id == 9
+    assert node.content is None
+
+
 # --------------------------------------------------------------------------- #
 # Markdown 正文
 # --------------------------------------------------------------------------- #

@@ -104,7 +104,7 @@ async def test_list_folders_permission_matrix(client, ctx, actor, expected):
 
 @pytest.mark.parametrize(
     "path_suffix",
-    ["", "/question-revisions", "/versions", "/events"],
+    ["", "/question-revisions", "/question-group-revisions", "/versions", "/events"],
 )
 async def test_composition_reads_reject_non_member(client, ctx, path_suffix):
     """稿件维度的读路径全部要成员身份,不能靠任一入口绕过。"""

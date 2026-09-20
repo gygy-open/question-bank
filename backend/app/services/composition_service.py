@@ -23,6 +23,7 @@ from pydantic import ValidationError
 from sqlalchemy import delete, select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
 from app.capabilities.errors import Conflict, Invalid, NotFound, Unprocessable
 from app.crud import crud_composition
@@ -35,13 +36,16 @@ from app.models.composition import (
     CompositionVersion,
     Folder,
     NODE_TYPE_ANSWER_ITEM,
+    NODE_TYPE_ANSWER_SPACE,
     NODE_TYPE_HEADING,
     NODE_TYPE_QUESTION,
     NODE_TYPE_QUESTION_DETAILS,
+    NODE_TYPE_QUESTION_GROUP,
     NODE_TYPE_RICH_TEXT,
     ScopeType,
 )
 from app.models.question import Question, QuestionType, QuestionVisibility
+from app.models.question_group import QuestionGroup, QuestionGroupItem, Stimulus
 from app.models.user import User
 from app.schemas.composition import (
     ANSWER_FIELD_KEYS,
@@ -51,7 +55,7 @@ from app.schemas.composition import (
 )
 from app.services.question_content import parse_json_field
 
-SNAPSHOT_SCHEMA_VERSION = 2
+SNAPSHOT_SCHEMA_VERSION = 3
 
 
 # --------------------------------------------------------------------------- #
@@ -372,6 +376,10 @@ async def duplicate_composition(
                 schema_version=n.schema_version,
                 question_id=n.question_id,
                 question_revision=n.question_revision,
+                question_group_id=n.question_group_id,
+                question_group_revision=n.question_group_revision,
+                stimulus_id=n.stimulus_id,
+                stimulus_revision=n.stimulus_revision,
                 source_question_node_id=id_map.get(n.source_question_node_id),
                 anchor_before_node_id=id_map.get(n.anchor_before_node_id),
                 created_by=actor.id,
@@ -632,6 +640,51 @@ async def _load_scoped_question(
     return question
 
 
+async def _load_scoped_question_group(
+    db: AsyncSession,
+    *,
+    question_group_id: int,
+    subject_id: int,
+    scope_type: ScopeType,
+    actor: User,
+) -> QuestionGroup:
+    result = await db.execute(
+        select(QuestionGroup)
+        .options(
+            selectinload(QuestionGroup.stimulus),
+            selectinload(QuestionGroup.items).selectinload(QuestionGroupItem.question),
+        )
+        .where(
+            QuestionGroup.id == question_group_id,
+            QuestionGroup.deleted_at.is_(None),
+        )
+    )
+    group = result.scalar_one_or_none()
+    if group is None or group.subject_id != subject_id:
+        raise _unprocessable(f"question group {question_group_id} not found or belongs to a different subject")
+    if (
+        group.visibility == QuestionVisibility.PRIVATE.value
+        and not actor.is_superuser
+        and group.created_by != actor.id
+    ):
+        raise _unprocessable(f"question group {question_group_id} is not accessible")
+    stimulus = group.stimulus
+    if stimulus is None or stimulus.deleted_at is not None:
+        raise _unprocessable(f"question group {question_group_id} stimulus is unavailable")
+    questions = [item.question for item in group.items]
+    if any(question is None or question.deleted_at is not None for question in questions):
+        raise _unprocessable(f"question group {question_group_id} contains unavailable questions")
+    if scope_type == ScopeType.SHARED and (
+        group.visibility == QuestionVisibility.PRIVATE.value
+        or stimulus.visibility == QuestionVisibility.PRIVATE.value
+        or any(q.visibility == QuestionVisibility.PRIVATE.value for q in questions)
+    ):
+        raise _unprocessable(
+            f"private question group {question_group_id} cannot be added to a shared composition"
+        )
+    return group
+
+
 # --------------------------------------------------------------------------- #
 # CompositionNode 整体替换(AST 契约)
 # --------------------------------------------------------------------------- #
@@ -647,20 +700,39 @@ def _validate_ast(items: List[CompositionNodeInput]) -> None:
     自定义节点 anchor 指向同 module 内 answer_item。
     """
     by_id = {it.id: it for it in items}
+    children_by_parent: Dict[str, List[CompositionNodeInput]] = defaultdict(list)
+    for it in items:
+        if it.parent_id is not None:
+            children_by_parent[it.parent_id].append(it)
+
     for it in items:
         if it.parent_id is not None:
             parent = by_id.get(it.parent_id)
             if parent is None:
                 raise _bad_request(f"node {it.id} references a missing parent")
-            if parent.node_type != NODE_TYPE_QUESTION_DETAILS:
+            if parent.node_type not in (NODE_TYPE_QUESTION_DETAILS, NODE_TYPE_QUESTION_GROUP):
                 raise _bad_request(
-                    f"node {it.id} parent must be a question_details module"
+                    f"node {it.id} parent must be a supported module"
                 )
+            allowed = (
+                {NODE_TYPE_ANSWER_ITEM, NODE_TYPE_HEADING, NODE_TYPE_RICH_TEXT}
+                if parent.node_type == NODE_TYPE_QUESTION_DETAILS
+                else {NODE_TYPE_QUESTION, NODE_TYPE_ANSWER_SPACE}
+            )
+            if it.node_type not in allowed:
+                raise _bad_request(f"node {it.id} is not valid inside {parent.node_type}")
         if it.node_type == NODE_TYPE_ANSWER_ITEM:
             src = by_id.get(it.source_question_node_id)
-            if src is None or src.node_type != NODE_TYPE_QUESTION or src.parent_id is not None:
+            parent = by_id.get(src.parent_id) if src is not None and src.parent_id else None
+            if (
+                src is None
+                or src.node_type != NODE_TYPE_QUESTION
+                or (src.parent_id is not None and (
+                    parent is None or parent.node_type != NODE_TYPE_QUESTION_GROUP
+                ))
+            ):
                 raise _bad_request(
-                    f"answer_item {it.id} source must point to a root-level question node"
+                    f"answer_item {it.id} source must point to an answerable question node"
                 )
         if it.anchor_before_node_id is not None:
             target = by_id.get(it.anchor_before_node_id)
@@ -673,18 +745,33 @@ def _validate_ast(items: List[CompositionNodeInput]) -> None:
                     f"node {it.id} anchor must point to an answer_item in the same module"
                 )
 
+    for parent_id, children in children_by_parent.items():
+        parent = by_id[parent_id]
+        if parent.node_type != NODE_TYPE_QUESTION_GROUP:
+            continue
+        previous_question_id: Optional[str] = None
+        for child in children:
+            if child.node_type == NODE_TYPE_QUESTION:
+                previous_question_id = child.id
+            elif child.source_question_node_id != previous_question_id:
+                raise _bad_request(
+                    f"answer_space {child.id} must immediately follow and reference its question"
+                )
+            else:
+                previous_question_id = None
+
 
 def _normalize_module_children(
     module: CompositionNodeInput,
     *,
-    root_question_items: List[CompositionNodeInput],
+    answerable_questions: List[tuple[Any, int]],
     module_root_index: int,
-    root_index_by_id: Dict[str, int],
     children: List[CompositionNodeInput],
 ) -> List[Dict[str, Any]]:
     """按 module scope 规范化 question_details 的子节点顺序与 answer_item 集合。
 
-    - scope=all → 整稿全部 root 层 question 节点;scope=before → module 之前的。
+        - scope=all → 整稿全部可作答 question(root + question_group child);
+            scope=before → 所在 root module 位于当前 module 之前的。
     - 每个范围内 question 节点产出一条 answer_item(重复 question_id 因节点不同而各自保留)。
     - answer_item 相对顺序跟随正文(题序)。
     - 尽量复用客户端传入的 answer_item(按 source_question_node_id 顺序消费)以保留
@@ -696,11 +783,11 @@ def _normalize_module_children(
     """
     scope = (module.props or {}).get("scope")
     if scope == "all":
-        scoped_questions = list(root_question_items)
+        scoped_questions = [question for question, _ in answerable_questions]
     else:  # before
         scoped_questions = [
-            q for q in root_question_items
-            if root_index_by_id[q.id] < module_root_index
+            question for question, root_index in answerable_questions
+            if root_index < module_root_index
         ]
 
     # 客户端 answer_item 按 source 分组,保留请求顺序以支持重复消费。
@@ -785,10 +872,58 @@ async def replace_nodes(
     existing = await crud_composition.composition.list_nodes(db, composition_id=comp.id)
     existing_by_id = {n.id: n for n in existing}
 
+    children_by_parent: Dict[str, List[CompositionNodeInput]] = defaultdict(list)
+    for it in items:
+        if it.parent_id is not None:
+            children_by_parent[it.parent_id].append(it)
+
+    group_plan: Dict[str, Dict[str, Any]] = {}
+    for it in items:
+        if it.node_type != NODE_TYPE_QUESTION_GROUP:
+            continue
+        assert it.question_group_id is not None
+        previous = existing_by_id.get(it.id)
+        requested_children = children_by_parent.get(it.id, [])
+        if previous is not None and previous.node_type == NODE_TYPE_QUESTION_GROUP:
+            if previous.question_group_id != it.question_group_id:
+                raise _bad_request("an existing question_group node cannot change its source")
+            previous_children = sorted(
+                (node for node in existing if node.parent_id == it.id),
+                key=lambda node: node.position,
+            )
+            previous_questions = [
+                node for node in previous_children if node.node_type == NODE_TYPE_QUESTION
+            ]
+            requested_questions = [
+                node for node in requested_children if node.node_type == NODE_TYPE_QUESTION
+            ]
+            if [node.question_id for node in requested_questions] != [
+                node.question_id for node in previous_questions
+            ]:
+                raise _bad_request(
+                    "an existing question_group node cannot change member question order"
+                )
+            group_plan[it.id] = {
+                "previous": previous,
+                "questions": previous_questions,
+                "children": requested_children,
+            }
+        else:
+            if requested_children:
+                raise _bad_request("a new question_group node must not provide children")
+            group = await _load_scoped_question_group(
+                db,
+                question_group_id=it.question_group_id,
+                subject_id=comp.subject_id,
+                scope_type=comp.scope_type,
+                actor=actor,
+            )
+            group_plan[it.id] = {"group": group}
+
     # 2) 冻结 question 快照计划:新建 / question_id 变化 → 读实时题目;否则保留 DB 快照。
     question_plan: Dict[str, Optional[tuple[int, Dict[str, Any]]]] = {}
     for it in items:
-        if it.node_type != NODE_TYPE_QUESTION:
+        if it.node_type != NODE_TYPE_QUESTION or it.parent_id is not None:
             continue
         assert it.question_id is not None  # schema 已保证
         prev = existing_by_id.get(it.id)
@@ -821,12 +956,6 @@ async def replace_nodes(
     # 4) 计算新 AST 布局。
     root_items = [it for it in items if it.parent_id is None]
     root_index_by_id = {it.id: idx for idx, it in enumerate(root_items)}
-    root_question_items = [it for it in root_items if it.node_type == NODE_TYPE_QUESTION]
-    children_by_parent: Dict[str, List[CompositionNodeInput]] = defaultdict(list)
-    for it in items:
-        if it.parent_id is not None:
-            children_by_parent[it.parent_id].append(it)
-
     def _new_node(**kwargs: Any) -> CompositionNode:
         return CompositionNode(
             composition_id=comp.id,
@@ -862,6 +991,39 @@ async def replace_nodes(
                     question_revision=revision,
                 )
             )
+        elif it.node_type == NODE_TYPE_QUESTION_GROUP:
+            plan = group_plan[it.id]
+            previous = plan.get("previous")
+            group = plan.get("group")
+            root_nodes.append(
+                _new_node(
+                    id=it.id,
+                    parent_id=None,
+                    slot=None,
+                    position=root_idx,
+                    node_kind=CompositionNodeKind.MODULE,
+                    node_type=NODE_TYPE_QUESTION_GROUP,
+                    content=(
+                        previous.content
+                        if previous is not None
+                        else parse_json_field(group.stimulus.content)
+                    ),
+                    props=None,
+                    schema_version=it.schema_version,
+                    question_group_id=it.question_group_id,
+                    question_group_revision=(
+                        previous.question_group_revision
+                        if previous is not None
+                        else int(group.revision or 1)
+                    ),
+                    stimulus_id=(previous.stimulus_id if previous is not None else group.stimulus_id),
+                    stimulus_revision=(
+                        previous.stimulus_revision
+                        if previous is not None
+                        else int(group.stimulus.revision or 1)
+                    ),
+                )
+            )
         else:
             root_nodes.append(
                 _new_node(
@@ -878,13 +1040,84 @@ async def replace_nodes(
             )
 
     for it in root_items:
+        if it.node_type != NODE_TYPE_QUESTION_GROUP:
+            continue
+        plan = group_plan[it.id]
+        previous_questions = plan.get("questions")
+        if previous_questions is None:
+            group = plan["group"]
+            for pos, group_item in enumerate(group.items):
+                question = group_item.question
+                child_nodes.append(
+                    _new_node(
+                        id=str(uuid.uuid4()),
+                        parent_id=it.id,
+                        slot=BODY_SLOT,
+                        position=pos,
+                        node_kind=CompositionNodeKind.BLOCK,
+                        node_type=NODE_TYPE_QUESTION,
+                        content=_build_question_content_snapshot(question),
+                        props=None,
+                        schema_version=1,
+                        question_id=question.id,
+                        question_revision=int(question.content_revision or 1),
+                    )
+                )
+        else:
+            question_index = 0
+            for pos, child in enumerate(plan["children"]):
+                if child.node_type == NODE_TYPE_QUESTION:
+                    previous_question = previous_questions[question_index]
+                    question_index += 1
+                    child_nodes.append(
+                        _new_node(
+                            id=child.id,
+                            parent_id=it.id,
+                            slot=BODY_SLOT,
+                            position=pos,
+                            node_kind=CompositionNodeKind.BLOCK,
+                            node_type=NODE_TYPE_QUESTION,
+                            content=previous_question.content,
+                            props=child.props,
+                            schema_version=child.schema_version,
+                            question_id=previous_question.question_id,
+                            question_revision=previous_question.question_revision,
+                        )
+                    )
+                else:
+                    child_nodes.append(
+                        _new_node(
+                            id=child.id,
+                            parent_id=it.id,
+                            slot=BODY_SLOT,
+                            position=pos,
+                            node_kind=CompositionNodeKind.BLOCK,
+                            node_type=NODE_TYPE_ANSWER_SPACE,
+                            content=None,
+                            props=child.props,
+                            schema_version=child.schema_version,
+                            source_question_node_id=child.source_question_node_id,
+                        )
+                    )
+
+    answerable_questions: List[tuple[Any, int]] = []
+    for root in root_nodes:
+        if root.node_type == NODE_TYPE_QUESTION:
+            answerable_questions.append((root, root.position))
+        elif root.node_type == NODE_TYPE_QUESTION_GROUP:
+            answerable_questions.extend(
+                (child, root.position)
+                for child in child_nodes
+                if child.parent_id == root.id and child.node_type == NODE_TYPE_QUESTION
+            )
+
+    for it in root_items:
         if it.node_type != NODE_TYPE_QUESTION_DETAILS:
             continue
         ordered = _normalize_module_children(
             it,
-            root_question_items=root_question_items,
+            answerable_questions=answerable_questions,
             module_root_index=root_index_by_id[it.id],
-            root_index_by_id=root_index_by_id,
             children=children_by_parent.get(it.id, []),
         )
         for pos, entry in enumerate(ordered):
@@ -983,21 +1216,178 @@ async def question_revision_status(
         return []
 
     result = await db.execute(
-        select(Question.id, Question.content_revision, Question.deleted_at).where(
-            Question.id.in_(unique_ids)
-        )
+        select(
+            Question.id,
+            Question.content_revision,
+            Question.deleted_at,
+            Question.subject_id,
+            Question.visibility,
+        ).where(Question.id.in_(unique_ids))
     )
     rows = {row[0]: row for row in result.all()}
 
     statuses: List[Dict[str, Any]] = []
     for qid in unique_ids:
         row = rows.get(qid)
-        if row is None or row[2] is not None:
+        unavailable = (
+            row is None
+            or row[2] is not None
+            or row[3] != comp.subject_id
+            or (
+                comp.scope_type == ScopeType.SHARED
+                and row[4] == QuestionVisibility.PRIVATE.value
+            )
+        )
+        if unavailable:
             statuses.append({"question_id": qid, "current_revision": None, "available": False})
         else:
             statuses.append(
                 {"question_id": qid, "current_revision": int(row[1] or 1), "available": True}
             )
+    return statuses
+
+
+async def question_group_revision_status(
+    db: AsyncSession,
+    *,
+    comp: Composition,
+    actor: User,
+) -> List[Dict[str, Any]]:
+    """返回题组节点的实时来源状态；不可见来源统一收敛为 unavailable。"""
+    nodes = await crud_composition.composition.list_nodes(db, composition_id=comp.id)
+    group_nodes = [node for node in nodes if node.node_type == NODE_TYPE_QUESTION_GROUP]
+    if not group_nodes:
+        return []
+
+    result = await db.execute(
+        select(QuestionGroup)
+        .options(
+            selectinload(QuestionGroup.stimulus),
+            selectinload(QuestionGroup.items).selectinload(QuestionGroupItem.question),
+        )
+        .where(
+            QuestionGroup.id.in_(
+                {node.question_group_id for node in group_nodes}
+            )
+        )
+    )
+    groups_by_id = {group.id: group for group in result.scalars().unique().all()}
+    children_by_parent: Dict[str, List[CompositionNode]] = defaultdict(list)
+    for child in nodes:
+        if child.parent_id is not None:
+            children_by_parent[child.parent_id].append(child)
+    pinned_question_ids = {
+        child.question_id
+        for node in group_nodes
+        for child in children_by_parent[node.id]
+        if child.node_type == NODE_TYPE_QUESTION
+    }
+    question_result = await db.execute(
+        select(Question).where(Question.id.in_(pinned_question_ids))
+    )
+    questions_by_id = {
+        question.id: question for question in question_result.scalars().all()
+    }
+
+    statuses: List[Dict[str, Any]] = []
+    for node in group_nodes:
+        pinned_members = [
+            child
+            for child in sorted(children_by_parent[node.id], key=lambda item: item.position)
+            if child.node_type == NODE_TYPE_QUESTION
+        ]
+        group = groups_by_id.get(node.question_group_id)
+        group_available = bool(
+            group is not None
+            and group.deleted_at is None
+            and group.subject_id == comp.subject_id
+            and (
+                group.visibility != QuestionVisibility.PRIVATE.value
+                or (
+                    comp.scope_type == ScopeType.PERSONAL
+                    and (actor.is_superuser or group.created_by == actor.id)
+                )
+            )
+        )
+        if not group_available:
+            statuses.append({
+                "node_id": node.id,
+                "question_group_id": node.question_group_id,
+                "pinned_revision": node.question_group_revision,
+                "current_revision": None,
+                "stimulus_pinned_revision": node.stimulus_revision,
+                "stimulus_current_revision": None,
+                "members": [{
+                    "node_id": child.id,
+                    "question_id": child.question_id,
+                    "pinned_revision": child.question_revision,
+                    "current_revision": None,
+                    "available": False,
+                } for child in pinned_members],
+                "group_available": False,
+                "stimulus_available": False,
+                "structure_changed": False,
+                "stale": True,
+            })
+            continue
+
+        stimulus = group.stimulus
+        stimulus_available = bool(
+            stimulus is not None
+            and stimulus.deleted_at is None
+            and stimulus.subject_id == comp.subject_id
+            and not (
+                comp.scope_type == ScopeType.SHARED
+                and stimulus.visibility == QuestionVisibility.PRIVATE.value
+            )
+        )
+        current_items = sorted(group.items, key=lambda item: item.position)
+        member_statuses: List[Dict[str, Any]] = []
+        for child in pinned_members:
+            question = questions_by_id.get(child.question_id)
+            available = bool(
+                question is not None
+                and question.deleted_at is None
+                and question.subject_id == comp.subject_id
+                and not (
+                    comp.scope_type == ScopeType.SHARED
+                    and question.visibility == QuestionVisibility.PRIVATE.value
+                )
+            )
+            member_statuses.append({
+                "node_id": child.id,
+                "question_id": child.question_id,
+                "pinned_revision": child.question_revision,
+                "current_revision": int(question.content_revision or 1) if available else None,
+                "available": available,
+            })
+        current_member_ids = [item.question_id for item in current_items]
+        pinned_member_ids = [child.question_id for child in pinned_members]
+        structure_changed = current_member_ids != pinned_member_ids
+        stale = (
+            node.question_group_revision != int(group.revision or 1)
+            or not stimulus_available
+            or node.stimulus_revision != int(stimulus.revision or 1)
+            or structure_changed
+            or any(
+                not member["available"]
+                or member["pinned_revision"] != member["current_revision"]
+                for member in member_statuses
+            )
+        )
+        statuses.append({
+            "node_id": node.id,
+            "question_group_id": node.question_group_id,
+            "pinned_revision": node.question_group_revision,
+            "current_revision": int(group.revision or 1),
+            "stimulus_pinned_revision": node.stimulus_revision,
+            "stimulus_current_revision": int(stimulus.revision or 1) if stimulus_available else None,
+            "members": member_statuses,
+            "group_available": True,
+            "stimulus_available": stimulus_available,
+            "structure_changed": structure_changed,
+            "stale": stale,
+        })
     return statuses
 
 
@@ -1025,6 +1415,10 @@ async def sync_question_nodes(
             raise _not_found("Node")
         if node.node_type != NODE_TYPE_QUESTION:
             raise _unprocessable(f"node {nid} is not a question node")
+        if node.parent_id is not None:
+            raise _unprocessable(
+                f"question node {nid} belongs to a question group and must be synced with its group"
+            )
         targets.append(node)
 
     question_ids = {n.question_id for n in targets if n.question_id is not None}
@@ -1074,8 +1468,178 @@ async def sync_question_nodes(
     return new_revision, refreshed
 
 
+async def sync_question_group_nodes(
+    db: AsyncSession,
+    *,
+    comp: Composition,
+    actor: User,
+    expected_revision: int,
+    node_ids: List[str],
+) -> tuple[int, List[CompositionNode]]:
+    """原子刷新指定题组节点的来源快照、成员顺序及成员题目快照。"""
+    existing = await crud_composition.composition.list_nodes(db, composition_id=comp.id)
+    existing_by_id = {node.id: node for node in existing}
+    children_by_parent: Dict[str, List[CompositionNode]] = defaultdict(list)
+    for child in existing:
+        if child.parent_id is not None:
+            children_by_parent[child.parent_id].append(child)
+
+    plans: List[Dict[str, Any]] = []
+    for node_id in node_ids:
+        node = existing_by_id.get(node_id)
+        if node is None:
+            raise _not_found("Node")
+        if node.node_type != NODE_TYPE_QUESTION_GROUP:
+            raise _unprocessable(f"node {node_id} is not a question_group node")
+        group = await _load_scoped_question_group(
+            db,
+            question_group_id=node.question_group_id,
+            subject_id=comp.subject_id,
+            scope_type=comp.scope_type,
+            actor=actor,
+        )
+        old_children = sorted(children_by_parent[node.id], key=lambda child: child.position)
+        old_questions = [
+            child for child in old_children if child.node_type == NODE_TYPE_QUESTION
+        ]
+        old_questions_by_id = {child.question_id: child for child in old_questions}
+        answer_spaces_by_source = {
+            child.source_question_node_id: child
+            for child in old_children
+            if child.node_type == NODE_TYPE_ANSWER_SPACE
+        }
+        old_question_ids = [child.question_id for child in old_questions]
+        new_question_ids = [item.question_id for item in group.items]
+        old_set = set(old_question_ids)
+        new_set = set(new_question_ids)
+        common = old_set & new_set
+        plans.append({
+            "node": node,
+            "group": group,
+            "old_children": old_children,
+            "old_questions_by_id": old_questions_by_id,
+            "answer_spaces_by_source": answer_spaces_by_source,
+            "added": [question_id for question_id in new_question_ids if question_id not in old_set],
+            "removed": [question_id for question_id in old_question_ids if question_id not in new_set],
+            "reordered": (
+                [question_id for question_id in old_question_ids if question_id in common]
+                != [question_id for question_id in new_question_ids if question_id in common]
+            ),
+            "old_group_revision": node.question_group_revision,
+        })
+
+    new_revision = await _guarded_write(
+        db,
+        composition_id=comp.id,
+        expected_revision=expected_revision,
+        values={"updated_by": actor.id, "updated_at": datetime.utcnow()},
+        require_deleted=False,
+    )
+
+    target_ids = [plan["node"].id for plan in plans]
+    for plan in plans:
+        for child in plan["old_children"]:
+            db.expunge(child)
+    await db.execute(
+        delete(CompositionNode).where(
+            CompositionNode.composition_id == comp.id,
+            CompositionNode.parent_id.in_(target_ids),
+        )
+    )
+
+    new_children: List[CompositionNode] = []
+    event_groups: List[Dict[str, Any]] = []
+    for plan in plans:
+        node = plan["node"]
+        group = plan["group"]
+        node.content = parse_json_field(group.stimulus.content)
+        node.question_group_revision = int(group.revision or 1)
+        node.stimulus_id = group.stimulus_id
+        node.stimulus_revision = int(group.stimulus.revision or 1)
+        node.updated_by = actor.id
+        db.add(node)
+
+        position = 0
+        for group_item in sorted(group.items, key=lambda item: item.position):
+            question = group_item.question
+            previous = plan["old_questions_by_id"].get(question.id)
+            question_node_id = previous.id if previous is not None else str(uuid.uuid4())
+            new_children.append(
+                CompositionNode(
+                    id=question_node_id,
+                    composition_id=comp.id,
+                    parent_id=node.id,
+                    slot=BODY_SLOT,
+                    position=position,
+                    node_kind=CompositionNodeKind.BLOCK,
+                    node_type=NODE_TYPE_QUESTION,
+                    content=_build_question_content_snapshot(question),
+                    props=previous.props if previous is not None else None,
+                    schema_version=previous.schema_version if previous is not None else 1,
+                    question_id=question.id,
+                    question_revision=int(question.content_revision or 1),
+                    created_by=actor.id,
+                    updated_by=actor.id,
+                )
+            )
+            position += 1
+            answer_space = (
+                plan["answer_spaces_by_source"].get(previous.id)
+                if previous is not None
+                else None
+            )
+            if answer_space is not None:
+                new_children.append(
+                    CompositionNode(
+                        id=answer_space.id,
+                        composition_id=comp.id,
+                        parent_id=node.id,
+                        slot=BODY_SLOT,
+                        position=position,
+                        node_kind=CompositionNodeKind.BLOCK,
+                        node_type=NODE_TYPE_ANSWER_SPACE,
+                        content=None,
+                        props=answer_space.props,
+                        schema_version=answer_space.schema_version,
+                        source_question_node_id=question_node_id,
+                        created_by=actor.id,
+                        updated_by=actor.id,
+                    )
+                )
+                position += 1
+
+        event_groups.append({
+            "node_id": node.id,
+            "question_group_id": node.question_group_id,
+            "old_revision": plan["old_group_revision"],
+            "new_revision": node.question_group_revision,
+            "added_question_ids": plan["added"],
+            "removed_question_ids": plan["removed"],
+            "reordered": plan["reordered"],
+        })
+
+    db.add_all(new_children)
+    await db.flush()
+    await _add_event(
+        db,
+        composition_id=comp.id,
+        composition_revision=new_revision,
+        event_type="question_group_nodes_synced",
+        summary=f"Synced {len(plans)} question group node(s)",
+        actor_id=actor.id,
+        payload={
+            "old_revision": expected_revision,
+            "new_revision": new_revision,
+            "groups": event_groups,
+        },
+    )
+    await db.commit()
+    refreshed = await crud_composition.composition.list_nodes(db, composition_id=comp.id)
+    return new_revision, refreshed
+
+
 # --------------------------------------------------------------------------- #
-# 定稿 (Composition Version) —— 不可变 snapshot v2
+# 定稿 (Composition Version) —— 不可变 snapshot v3
 # --------------------------------------------------------------------------- #
 def _build_question_snapshot_from_node(node: CompositionNode) -> Dict[str, Any]:
     """从 question 节点冻结内容合成定稿题目投影;损坏/缺失快照 422(带 node id)。
@@ -1121,11 +1685,21 @@ def _node_snapshot(node: CompositionNode) -> Dict[str, Any]:
         snap["question"] = _build_question_snapshot_from_node(node)
         if node.props:
             snap["props"] = node.props
+    elif nt == NODE_TYPE_QUESTION_GROUP:
+        snap["question_group_id"] = node.question_group_id
+        snap["question_group_revision"] = node.question_group_revision
+        snap["stimulus_id"] = node.stimulus_id
+        snap["stimulus_revision"] = node.stimulus_revision
+        snap["content"] = node.content
     elif nt == NODE_TYPE_QUESTION_DETAILS:
         snap["props"] = node.props
     elif nt == NODE_TYPE_ANSWER_ITEM:
         snap["source_question_node_id"] = node.source_question_node_id
         snap["props"] = node.props
+    elif nt == NODE_TYPE_ANSWER_SPACE:
+        snap["props"] = node.props
+        if node.source_question_node_id is not None:
+            snap["source_question_node_id"] = node.source_question_node_id
     if node.anchor_before_node_id is not None:
         snap["anchor_before_node_id"] = node.anchor_before_node_id
     return snap
@@ -1153,7 +1727,7 @@ def _build_snapshot(
     nodes: List[CompositionNode],
     finalized_at: datetime,
 ) -> Dict[str, Any]:
-    """组装 snapshot v2:顶层元数据 + 前序展平的规范化节点。
+    """组装 snapshot v3:顶层元数据 + 前序展平的规范化节点。
 
     question 节点携带冻结题目投影;answer_item 保留配置(included/overrides + source),
     可由同 snapshot 内 source question 节点解析出答案,定稿完全不查询实时题库。

@@ -1,4 +1,4 @@
-"""Composition 定稿 (Version) 契约的聚焦测试(snapshot v2)。
+"""Composition 定稿 (Version) 契约的聚焦测试(snapshot v3，兼容读取 v2)。
 
 覆盖:完整冻结题目、题目后续修改旧版本不变、expected_revision 冲突 409、
 同一 revision 连续两次定稿 version_no 1/2 且 revision 不变、question_details module +
@@ -179,7 +179,7 @@ async def test_finalize_freezes_full_question(client, ctx, db_session):
     assert version["label"] == "终稿"
 
     snap = version["snapshot"]
-    assert snap["schema_version"] == 2
+    assert snap["schema_version"] == 3
     assert snap["composition_id"] == comp["id"]
     assert snap["source_revision"] == 2
     assert snap["subject_id"] == sid
@@ -456,6 +456,34 @@ async def test_export_version_docx_and_latex_succeed(client, ctx, db_session):
     assert r.status_code == 200, r.text
     assert len(r.content) > 0
     assert f'{comp["title"]}-v1-latex.zip' in unquote(r.headers["content-disposition"])
+
+
+async def test_legacy_v2_snapshot_can_still_be_read_and_exported(client, ctx, db_session):
+    sid = ctx["subject"].id
+    h = _auth(ctx["user"])
+    q = await _seed_full_question(db_session, subject_id=sid)
+    comp = await _create_composition(client, sid, h)
+    await _put_nodes(
+        client, sid, comp["id"], h, expected_revision=1,
+        nodes=[_question(q.id)],
+    )
+    finalized = await _finalize(client, sid, comp["id"], h, expected_revision=2)
+    assert finalized.status_code == 201, finalized.text
+    version = await db_session.scalar(
+        select(CompositionVersion).where(CompositionVersion.composition_id == comp["id"])
+    )
+    version.snapshot = {**version.snapshot, "schema_version": 2}
+    await db_session.commit()
+
+    detail = await client.get(
+        f"{API}/subjects/{sid}/compositions/{comp['id']}/versions/1?scope=shared",
+        headers=h,
+    )
+    assert detail.status_code == 200, detail.text
+    assert detail.json()["snapshot"]["schema_version"] == 2
+    exported = await _export(client, sid, comp["id"], h, version_no=1, fmt="docx")
+    assert exported.status_code == 200, exported.text
+    assert exported.content
 
 
 async def test_export_uses_title_override(client, ctx):

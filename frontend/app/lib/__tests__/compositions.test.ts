@@ -10,6 +10,8 @@ import {
   compositionVersionsPath,
   compositionVersionItemPath,
   compositionEventsPath,
+  compositionQuestionGroupNodesSyncPath,
+  compositionQuestionGroupRevisionsPath,
   compositionListQuery,
   buildFolderTree,
   folderBreadcrumb,
@@ -63,6 +65,11 @@ describe('URL 构建', () => {
 
   it('时间线路径', () => {
     expect(compositionEventsPath(7, 9)).toBe('/subjects/7/compositions/9/events')
+  })
+
+  it('题组状态与同步路径', () => {
+    expect(compositionQuestionGroupRevisionsPath(7, 9)).toBe('/subjects/7/compositions/9/question-group-revisions')
+    expect(compositionQuestionGroupNodesSyncPath(7, 9)).toBe('/subjects/7/compositions/9/question-group-nodes/sync')
   })
 })
 

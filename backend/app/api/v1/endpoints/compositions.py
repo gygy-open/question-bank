@@ -26,6 +26,8 @@ from app.schemas.composition import (
     CompositionMetaUpdateRequest,
     CompositionNodesReplaceRequest,
     CompositionNodesReplaceResponse,
+    CompositionQuestionGroupNodesSyncRequest,
+    CompositionQuestionGroupNodesSyncResponse,
     CompositionQuestionNodesSyncRequest,
     CompositionQuestionNodesSyncResponse,
     CompositionRead,
@@ -35,6 +37,7 @@ from app.schemas.composition import (
     FolderCreateRequest,
     FolderRead,
     FolderUpdateRequest,
+    QuestionGroupRevisionStatus,
     QuestionRevisionStatus,
 )
 from app.schemas.export import OutputFormat
@@ -315,6 +318,33 @@ async def get_question_revisions(
     return await composition_service.question_revision_status(db, comp=comp)
 
 
+@router.get(
+    "/{subject_id}/compositions/{composition_id}/question-group-revisions",
+    response_model=List[QuestionGroupRevisionStatus],
+)
+async def get_question_group_revisions(
+    subject_id: int,
+    composition_id: int,
+    db: deps.SessionDep,
+    scope: ScopeType = Query(...),
+    current_user: models.User = Depends(deps.get_current_active_user),
+) -> Any:
+    await _require_subject_access(db, subject_id, current_user)
+    scope_type, owner_id = _resolve_scope(scope, current_user)
+    comp = await crud_composition.composition.get_scoped(
+        db,
+        composition_id=composition_id,
+        subject_id=subject_id,
+        scope_type=scope_type,
+        owner_id=owner_id,
+    )
+    if comp is None:
+        raise HTTPException(status_code=404, detail="Composition not found")
+    return await composition_service.question_group_revision_status(
+        db, comp=comp, actor=current_user
+    )
+
+
 @router.post(
     "/{subject_id}/compositions/{composition_id}/question-nodes/sync",
     response_model=CompositionQuestionNodesSyncResponse,
@@ -332,6 +362,33 @@ async def sync_question_nodes(
         "composition.sync_question_nodes",
         deps.api_context(db, current_user, subject_id=subject_id),
         composition_caps.CompositionSyncNodesInput(
+            subject_id=subject_id,
+            scope_type=scope_type,
+            owner_id=owner_id,
+            composition_id=composition_id,
+            expected_revision=payload.expected_revision,
+            node_ids=payload.node_ids,
+        ),
+    )
+
+
+@router.post(
+    "/{subject_id}/compositions/{composition_id}/question-group-nodes/sync",
+    response_model=CompositionQuestionGroupNodesSyncResponse,
+)
+async def sync_question_group_nodes(
+    subject_id: int,
+    composition_id: int,
+    payload: CompositionQuestionGroupNodesSyncRequest,
+    db: deps.SessionDep,
+    scope: ScopeType = Query(...),
+    current_user: models.User = Depends(deps.get_current_active_user),
+) -> Any:
+    scope_type, owner_id = _resolve_scope(scope, current_user)
+    return await capabilities.run(
+        "composition.sync_question_group_nodes",
+        deps.api_context(db, current_user, subject_id=subject_id),
+        composition_caps.CompositionSyncQuestionGroupNodesInput(
             subject_id=subject_id,
             scope_type=scope_type,
             owner_id=owner_id,

@@ -82,6 +82,21 @@ function questionRowToPm(node: EditorNode): RichNode {
   }
 }
 
+function questionGroupRowToPm(node: EditorNode): RichNode {
+  return {
+    type: 'questionGroup',
+    attrs: {
+      [UID_ATTR]: node.id,
+      questionGroupId: node.questionGroupId,
+      questionGroupRevision: node.questionGroupRevision,
+      stimulusId: node.stimulusId,
+      stimulusRevision: node.stimulusRevision,
+      stimulus: node.content,
+      children: node.children,
+    },
+  }
+}
+
 /** 把编辑态文档序列化为单一 PM doc（供 tiptap setContent）。 */
 export function editorDocumentToPmDoc(doc: EditorDocument): RichDocNode {
   const content: RichNode[] = []
@@ -92,6 +107,9 @@ export function editorDocumentToPmDoc(doc: EditorDocument): RichDocNode {
         break
       case 'question':
         content.push(questionRowToPm(node))
+        break
+      case 'question_group':
+        content.push(questionGroupRowToPm(node))
         break
       case 'page_break':
         content.push({ type: 'pageBreak', attrs: { [UID_ATTR]: node.id } })
@@ -195,6 +213,18 @@ export function pmDocToEditorDocument(pmDoc: RichDocNode): EditorDocument {
       case 'question':
         nodes.push(pmQuestionToRow(block))
         break
+      case 'questionGroup': {
+        const node = makeNode('question_group')
+        if (typeof uid === 'string') node.id = uid
+        node.questionGroupId = (block.attrs?.questionGroupId as number | null) ?? null
+        node.questionGroupRevision = (block.attrs?.questionGroupRevision as number | null) ?? null
+        node.stimulusId = (block.attrs?.stimulusId as number | null) ?? null
+        node.stimulusRevision = (block.attrs?.stimulusRevision as number | null) ?? null
+        node.content = (block.attrs?.stimulus as RichDocNode | null) ?? null
+        node.children = (block.attrs?.children as EditorNode[] | null) ?? []
+        nodes.push(node)
+        break
+      }
       case 'pageBreak': {
         const node = makeNode('page_break')
         if (typeof uid === 'string') node.id = uid

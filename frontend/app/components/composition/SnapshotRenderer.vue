@@ -6,7 +6,7 @@ import { computed } from 'vue'
 import RichContent from '@/components/rich-editor/RichContent.vue'
 import AnswerDisplay from '@/components/AnswerDisplay.vue'
 import { Badge } from '@/components/ui/badge'
-import { FileQuestion, ListChecks, AlertTriangle } from '@lucide/vue'
+import { FileQuestion, Files, ListChecks, AlertTriangle } from '@lucide/vue'
 import { questionTypeLabel } from '@/lib/answerFormat'
 import {
   buildSnapshotTree, effectiveAnswerFields, effectiveQuestionDisplay,
@@ -16,12 +16,12 @@ import { headingClassFor, questionOptionLayoutOf, resolveOptionColumns } from '@
 import type { SnapshotTreeNode } from '@/lib/compositionSnapshot'
 import { ANSWER_FIELD_KEYS } from '@/types/composition'
 import type {
-  AnswerFieldKey, CompositionSnapshotV2, SnapshotAnswerItemNode, SnapshotQuestionDetailsNode,
+  AnswerFieldKey, CompositionSnapshot, SnapshotAnswerItemNode, SnapshotQuestionDetailsNode,
   SnapshotQuestionNode,
 } from '@/types/composition'
 
 const props = defineProps<{
-  snapshot: CompositionSnapshotV2
+  snapshot: CompositionSnapshot
 }>()
 
 const tree = computed(() => buildSnapshotTree(props.snapshot))
@@ -69,6 +69,13 @@ function sourceQuestion(child: SnapshotAnswerItemNode) {
 function anyVisible(moduleNode: SnapshotTreeNode, child: SnapshotAnswerItemNode): boolean {
   const fields = moduleFieldsVisible(moduleNode, child)
   return ANSWER_FIELD_KEYS.some((k) => fields[k])
+}
+
+function groupChildSnapshot(node: SnapshotTreeNode): CompositionSnapshot {
+  return {
+    ...props.snapshot,
+    nodes: node.children.map((child, position) => ({ ...child, parent_id: null, slot: null, position })),
+  } as CompositionSnapshot
 }
 </script>
 
@@ -126,6 +133,19 @@ function anyVisible(moduleNode: SnapshotTreeNode, child: SnapshotAnswerItemNode)
         <span class="text-xs font-medium text-muted-foreground">分页</span>
         <div class="h-px flex-1 border-t-2 border-dashed border-muted-foreground/40" />
       </div>
+
+      <!-- 题组：保持边界，材料冻结显示；成员复用本组件的题目/作答区只读路径。 -->
+      <section v-else-if="node.node_type === 'question_group'" class="border-y bg-muted/20 px-4 py-4">
+        <div class="mb-3 flex items-center gap-2">
+          <Files class="h-4 w-4 text-muted-foreground" />
+          <span class="text-sm font-medium">题组 #{{ node.question_group_id }}</span>
+          <Badge variant="secondary" class="text-[11px]">r{{ node.question_group_revision }}</Badge>
+        </div>
+        <div class="mb-5 border-l-2 border-primary/30 pl-4">
+          <RichContent :content="node.content" empty-text="（无材料）" />
+        </div>
+        <SnapshotRenderer :snapshot="groupChildSnapshot(node)" />
+      </section>
 
       <!-- 作答空间：按行数预留留白 / 答题横线 -->
       <div v-else-if="node.node_type === 'answer_space'" class="my-1">

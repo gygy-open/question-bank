@@ -63,6 +63,22 @@ export function compositionQuestionNodesSyncPath(
   return `${compositionItemPath(subjectId, compositionId)}/question-nodes/sync`
 }
 
+/** question_group 节点来源状态路径。 */
+export function compositionQuestionGroupRevisionsPath(
+  subjectId: number,
+  compositionId: number,
+): string {
+  return `${compositionItemPath(subjectId, compositionId)}/question-group-revisions`
+}
+
+/** question_group 整组同步路径。 */
+export function compositionQuestionGroupNodesSyncPath(
+  subjectId: number,
+  compositionId: number,
+): string {
+  return `${compositionItemPath(subjectId, compositionId)}/question-group-nodes/sync`
+}
+
 /** /subjects/{id}/compositions/{cid}/versions 版本集合路径（定稿/列表）。 */
 export function compositionVersionsPath(subjectId: number, compositionId: number): string {
   return `${compositionItemPath(subjectId, compositionId)}/versions`

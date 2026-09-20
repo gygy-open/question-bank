@@ -13,7 +13,7 @@ from __future__ import annotations
 
 from typing import Any, Dict, List, Optional
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field, model_validator
 
 from app import crud
 from app.core.permissions import Permission
@@ -22,6 +22,7 @@ from app.models.composition import Composition, Folder, ScopeType
 from app.schemas.composition import (
     CompositionNodeInput,
     CompositionNodesReplaceResponse,
+    CompositionQuestionGroupNodesSyncResponse,
     CompositionQuestionNodesSyncResponse,
 )
 from app.services import composition_service
@@ -200,6 +201,18 @@ class CompositionSyncNodesInput(CompositionRevisionInput):
     node_ids: Optional[List[str]] = None
 
 
+class CompositionSyncQuestionGroupNodesInput(CompositionRevisionInput):
+    node_ids: List[str] = Field(default_factory=list)
+
+    @model_validator(mode="after")
+    def _check_node_ids(self) -> "CompositionSyncQuestionGroupNodesInput":
+        if not self.node_ids:
+            raise ValueError("node_ids must not be empty")
+        if len(self.node_ids) != len(set(self.node_ids)):
+            raise ValueError("node_ids must be unique")
+        return self
+
+
 class CompositionFinalizeInput(CompositionRevisionInput):
     label: Optional[str] = None
 
@@ -317,6 +330,42 @@ class SyncCompositionQuestionNodes(
             node_ids=inp.node_ids,
         )
         return CompositionQuestionNodesSyncResponse(revision=revision, nodes=nodes)
+
+
+@register
+class SyncCompositionQuestionGroupNodes(
+    Capability[
+        CompositionSyncQuestionGroupNodesInput,
+        CompositionQuestionGroupNodesSyncResponse,
+    ]
+):
+    name = "composition.sync_question_group_nodes"
+    description = "原子刷新稿件中题组、材料和全部成员题目的冻结快照及顺序。"
+    input_model = CompositionSyncQuestionGroupNodesInput
+    authz = Authz.PERMISSION
+    permission = Permission.EDIT_QUESTION
+    scope = Scope.SUBJECT
+    mutating = True
+
+    async def load(
+        self, ctx: ExecutionContext, inp: CompositionSyncQuestionGroupNodesInput
+    ) -> Composition:
+        return await _load_scoped_composition(ctx, inp)
+
+    async def execute(
+        self,
+        ctx: ExecutionContext,
+        inp: CompositionSyncQuestionGroupNodesInput,
+        target: Composition,
+    ) -> CompositionQuestionGroupNodesSyncResponse:
+        revision, nodes = await composition_service.sync_question_group_nodes(
+            ctx.db,
+            comp=target,
+            actor=ctx.actor,
+            expected_revision=inp.expected_revision,
+            node_ids=inp.node_ids,
+        )
+        return CompositionQuestionGroupNodesSyncResponse(revision=revision, nodes=nodes)
 
 
 @register

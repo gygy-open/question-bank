@@ -355,8 +355,13 @@ async def test_explicit_material_group_persists_and_builds_ordered_composition(
         headers=_auth(ctx["editor"]),
     )
     nodes = detail.json()["nodes"]
-    assert [node["node_type"] for node in nodes] == ["rich_text", "question", "question"]
-    assert [node["question_id"] for node in nodes if node["node_type"] == "question"] == [
+    module = next(node for node in nodes if node["node_type"] == "question_group")
+    assert module["question_group_id"] == body["question_group_temp_id_map"]["g1"]
+    children = sorted(
+        [node for node in nodes if node["parent_id"] == module["id"]],
+        key=lambda node: node["position"],
+    )
+    assert [node["question_id"] for node in children] == [
         body["temp_id_map"]["q2"],
         body["temp_id_map"]["q1"],
     ]
@@ -384,7 +389,7 @@ async def test_stimulus_can_be_reused_by_two_imported_groups(client, ctx, db_ses
     assert len({group.stimulus_id for group in groups}) == 1
 
 
-async def test_shared_stimulus_is_rendered_once_and_outline_order_is_preserved(
+async def test_shared_stimulus_is_self_contained_per_group_and_outline_order_is_preserved(
     client, ctx
 ):
     sid = ctx["subject"].id
@@ -421,10 +426,23 @@ async def test_shared_stimulus_is_rendered_once_and_outline_order_is_preserved(
         headers=_auth(ctx["editor"]),
     )
     nodes = detail.json()["nodes"]
-    assert [node["node_type"] for node in nodes].count("rich_text") == 1
-    assert [node["question_id"] for node in nodes if node["node_type"] == "question"] == [
-        body["temp_id_map"][ref] for ref in ("q0", "q1", "q3", "q2")
+    roots = sorted(
+        [node for node in nodes if node["parent_id"] is None],
+        key=lambda node: node["position"],
+    )
+    assert [node["node_type"] for node in roots] == [
+        "question", "question_group", "question", "question_group"
     ]
+    groups = [node for node in roots if node["node_type"] == "question_group"]
+    assert groups[0]["content"] == groups[1]["content"]
+    assert groups[0]["content"]["content"][0]["content"][0]["text"] == "共用材料"
+    assert [
+        next(
+            node["question_id"] for node in nodes
+            if node["parent_id"] == group["id"] and node["node_type"] == "question"
+        )
+        for group in groups
+    ] == [body["temp_id_map"]["q1"], body["temp_id_map"]["q2"]]
 
 
 async def test_fallback_outline_follows_extraction_question_order(client, ctx):
@@ -453,9 +471,18 @@ async def test_fallback_outline_follows_extraction_question_order(client, ctx):
         f"{API}/subjects/{sid}/compositions/{body['composition_id']}?scope=shared",
         headers=_auth(ctx["editor"]),
     )
-    assert [node["question_id"] for node in detail.json()["nodes"] if node["node_type"] == "question"] == [
-        body["temp_id_map"][ref] for ref in ("q0", "q1", "q2")
+    nodes = detail.json()["nodes"]
+    roots = sorted(
+        [node for node in nodes if node["parent_id"] is None],
+        key=lambda node: node["position"],
+    )
+    assert [node["node_type"] for node in roots] == [
+        "question", "question_group", "question"
     ]
+    assert roots[0]["question_id"] == body["temp_id_map"]["q0"]
+    assert roots[2]["question_id"] == body["temp_id_map"]["q2"]
+    group_child = next(node for node in nodes if node["parent_id"] == roots[1]["id"])
+    assert group_child["question_id"] == body["temp_id_map"]["q1"]
 
 
 async def test_bad_group_temp_reference_fails_before_any_write(client, ctx, db_session):

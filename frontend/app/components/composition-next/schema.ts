@@ -13,6 +13,7 @@ import { UniqueId } from './uniqueId'
 import { PageBreak } from './nodes/PageBreak'
 import { AnswerSpace } from './nodes/AnswerSpace'
 import { QuestionBlock } from './nodes/QuestionBlock'
+import { QuestionGroupBlock } from './nodes/QuestionGroupBlock'
 import { QuestionDetailsBlock } from './nodes/QuestionDetailsBlock'
 import { OpaqueBlock } from './nodes/OpaqueBlock'
 
@@ -31,6 +32,7 @@ export const TOP_LEVEL_TYPES = [
   'pageBreak',
   'answerSpace',
   'question',
+  'questionGroup',
   'questionDetails',
   'opaqueBlock',
 ] as const
@@ -87,6 +89,7 @@ export function getCompositionExtensions(options: CompositionExtensionOptions = 
     PageBreak,
     AnswerSpace,
     QuestionBlock,
+    QuestionGroupBlock,
     QuestionDetailsBlock,
     OpaqueBlock,
     UniqueId.configure({ types: [...TOP_LEVEL_TYPES], attrName: 'uid' }),

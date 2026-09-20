@@ -105,6 +105,20 @@ describe('useCompositions 请求构建', () => {
     expect(calls[0]!.opts.query).toEqual({ scope: 'personal' })
     expect(calls[0]!.opts.body).toBe(payload)
   })
+
+  it('题组 status GET 与整组 sync POST 使用独立路径', async () => {
+    const api = useCompositions()
+    await api.getQuestionGroupRevisions(3, 'shared', 9)
+    const payload = { expected_revision: 4, node_ids: ['group-node'] }
+    await api.syncQuestionGroupNodes(3, 'shared', 9, payload)
+    expect(calls[0]).toMatchObject({
+      url: '/subjects/3/compositions/9/question-group-revisions', opts: { query: { scope: 'shared' } },
+    })
+    expect(calls[1]).toMatchObject({
+      url: '/subjects/3/compositions/9/question-group-nodes/sync',
+      opts: { method: 'POST', query: { scope: 'shared' }, body: payload },
+    })
+  })
 })
 
 describe('409 冲突映射', () => {

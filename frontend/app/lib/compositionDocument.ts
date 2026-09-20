@@ -22,6 +22,7 @@ import type {
   QuestionContentSnapshot,
   QuestionDetailsProps,
   QuestionProps,
+  QuestionGroupRevisionStatus,
   QuestionRevisionStatus,
 } from '@/types/composition'
 import { ANSWER_FIELD_KEYS, BODY_SLOT } from '@/types/composition'
@@ -38,6 +39,11 @@ export interface EditorNode {
   questionId: number | null
   questionRevision: number | null
   questionContent: QuestionContentSnapshot | null
+  // question_group root 的冻结来源；content 为材料快照，children 为成员 question/answer_space。
+  questionGroupId?: number | null
+  questionGroupRevision?: number | null
+  stimulusId?: number | null
+  stimulusRevision?: number | null
   // module 子节点专用软指针。
   sourceQuestionNodeId: string | null
   anchorBeforeNodeId: string | null
@@ -85,6 +91,10 @@ function baseNode(nodeType: CompositionNodeType): EditorNode {
     questionId: null,
     questionRevision: null,
     questionContent: null,
+    questionGroupId: null,
+    questionGroupRevision: null,
+    stimulusId: null,
+    stimulusRevision: null,
     sourceQuestionNodeId: null,
     anchorBeforeNodeId: null,
     children: [],
@@ -139,6 +149,13 @@ export function createQuestionNode(question: Question): EditorNode {
   node.questionId = question.id
   node.questionRevision = question.content_revision
   node.questionContent = questionContentSnapshotFromQuestion(question)
+  return node
+}
+
+/** 首次 replace 只创建题组 root；服务端负责冻结材料并生成成员 children。 */
+export function createQuestionGroupNode(groupId: number): EditorNode {
+  const node = baseNode('question_group')
+  node.questionGroupId = groupId
   return node
 }
 
@@ -350,8 +367,15 @@ export function documentFromNodes(nodes: CompositionNode[]): EditorDocument {
       node.questionId = n.question_id
       node.questionRevision = n.question_revision
       node.questionContent = (n.content as QuestionContentSnapshot | null) ?? null
-    } else if (n.node_type === 'answer_item') {
+    } else if (n.node_type === 'question_group') {
+      node.content = n.content
+      node.questionGroupId = n.question_group_id
+      node.questionGroupRevision = n.question_group_revision
+      node.stimulusId = n.stimulus_id
+      node.stimulusRevision = n.stimulus_revision
+    } else if (n.node_type === 'answer_item' || n.node_type === 'answer_space') {
       node.sourceQuestionNodeId = n.source_question_node_id
+      if (n.node_type === 'answer_space') node.content = null
     } else {
       node.content = (n.content as RichDocNode | null) ?? null
       node.anchorBeforeNodeId = n.anchor_before_node_id ?? null
@@ -363,13 +387,12 @@ export function documentFromNodes(nodes: CompositionNode[]): EditorDocument {
   const orderByPosition = (list: CompositionNode[]) =>
     [...list].sort((a, b) => a.position - b.position || a.id.localeCompare(b.id))
 
-  const rootNodes = orderByPosition(roots).map((n) => {
+  const buildTree = (n: CompositionNode): EditorNode => {
     const editor = toEditor(n)
-    if (n.node_type === 'question_details') {
-      editor.children = orderByPosition(childrenByParent.get(n.id) ?? []).map(toEditor)
-    }
+    editor.children = orderByPosition(childrenByParent.get(n.id) ?? []).map(buildTree)
     return editor
-  })
+  }
+  const rootNodes = orderByPosition(roots).map(buildTree)
 
   return { nodes: rootNodes }
 }
@@ -378,8 +401,15 @@ export function documentFromNodes(nodes: CompositionNode[]): EditorDocument {
 // 规范化：镜像服务端 _normalize_module_children
 // --------------------------------------------------------------------------- //
 
-function rootQuestionNodes(doc: EditorDocument): EditorNode[] {
-  return doc.nodes.filter((n) => n.nodeType === 'question')
+/** 文档前序中的所有可计分题：root question + question_group 成员 question。 */
+export function documentQuestionNodes(doc: EditorDocument): EditorNode[] {
+  const result: EditorNode[] = []
+  const visit = (node: EditorNode): void => {
+    if (node.nodeType === 'question') result.push(node)
+    for (const child of node.children) visit(child)
+  }
+  for (const node of doc.nodes) visit(node)
+  return result
 }
 
 /**
@@ -455,18 +485,15 @@ function normalizeSingleModule(
 
 /** 规范化整篇文档的所有 module 子节点，返回新文档（不改入参）。 */
 export function normalizeDocument(doc: EditorDocument): EditorDocument {
-  const questions = rootQuestionNodes(doc)
-  const questionIndex = new Map<string, number>()
-  doc.nodes.forEach((n, i) => questionIndex.set(n.id, i))
+  const questions = documentQuestionNodes(doc)
 
-  const nodes = doc.nodes.map((node) => {
+  const nodes = doc.nodes.map((node, rootIndex) => {
     if (node.nodeType !== 'question_details') return node
     const props = detailPropsOf(node)
-    const moduleIdx = questionIndex.get(node.id) ?? doc.nodes.length
     const scoped =
       props.scope === 'all'
         ? questions
-        : questions.filter((q) => (questionIndex.get(q.id) ?? 0) < moduleIdx)
+        : documentQuestionNodes({ nodes: doc.nodes.slice(0, rootIndex) })
     return { ...node, children: normalizeSingleModule(node, scoped) }
   })
 
@@ -481,7 +508,7 @@ export type NumberingMode = 'global' | 'heading'
 
 /** 是否已有任意 root question 节点带题号。 */
 export function hasAnyQuestionNumber(doc: EditorDocument): boolean {
-  return doc.nodes.some((n) => n.nodeType === 'question' && questionNumberOf(n) !== '')
+  return documentQuestionNodes(doc).some((n) => questionNumberOf(n) !== '')
 }
 
 /**
@@ -494,12 +521,12 @@ export function applyQuestionNumbers(doc: EditorDocument, mode: NumberingMode): 
   let group = 0
   let inGroup = 0
   let pendingNewGroup = false
-  const nodes = doc.nodes.map((node) => {
+  const numberNode = (node: EditorNode): EditorNode => {
     if (node.nodeType === 'heading' && headingLevelOf(node) === 2) {
       if (group > 0) pendingNewGroup = true
-      return node
+      return { ...node, children: node.children.map(numberNode) }
     }
-    if (node.nodeType !== 'question') return node
+    if (node.nodeType !== 'question') return { ...node, children: node.children.map(numberNode) }
     let number: string
     if (mode === 'global') {
       global += 1
@@ -517,7 +544,8 @@ export function applyQuestionNumbers(doc: EditorDocument, mode: NumberingMode): 
       number = `${group}.${inGroup}`
     }
     return { ...node, props: questionPropsWithNumber(node, number) }
-  })
+  }
+  const nodes = doc.nodes.map(numberNode)
   return { nodes }
 }
 
@@ -525,15 +553,13 @@ export function applyQuestionNumbers(doc: EditorDocument, mode: NumberingMode): 
 export function orderedScorableQuestions(
   doc: EditorDocument,
 ): { nodeId: string; number: string; score: number | null }[] {
-  return doc.nodes
-    .filter((n) => n.nodeType === 'question')
+  return documentQuestionNodes(doc)
     .map((n) => ({ nodeId: n.id, number: questionNumberOf(n), score: questionScoreOf(n) }))
 }
 
 /** 已填分值之和（未填不计入）。 */
 export function totalScore(doc: EditorDocument): number {
-  return doc.nodes.reduce((sum, n) => {
-    if (n.nodeType !== 'question') return sum
+  return documentQuestionNodes(doc).reduce((sum, n) => {
     const s = questionScoreOf(n)
     return s == null ? sum : sum + s
   }, 0)
@@ -574,16 +600,32 @@ function nodeToInput(node: EditorNode, parentId: string | null): CompositionNode
     case 'question':
       return {
         id: node.id,
+        ...(parentId ? { parent_id: parentId, slot } : {}),
         node_kind: 'block',
         node_type: 'question',
         question_id: node.questionId,
         ...(questionInputProps(node) ? { props: questionInputProps(node) } : {}),
       }
+    case 'question_group':
+      return {
+        id: node.id,
+        node_kind: 'module',
+        node_type: 'question_group',
+        question_group_id: node.questionGroupId,
+      }
     case 'page_break':
       return { id: node.id, node_kind: 'block', node_type: 'page_break' }
     case 'answer_space': {
       const props = answerSpacePropsOf(node)
-      return { id: node.id, node_kind: 'block', node_type: 'answer_space', props: { lines: props.lines, style: props.style } }
+      return {
+        id: node.id,
+        parent_id: parentId,
+        slot,
+        node_kind: 'block',
+        node_type: 'answer_space',
+        props: { lines: props.lines, style: props.style },
+        ...(parentId ? { source_question_node_id: node.sourceQuestionNodeId } : {}),
+      }
     }
     case 'question_details': {
       const props = detailPropsOf(node)
@@ -606,7 +648,7 @@ export function documentToReplaceRequest(
   const nodes: CompositionNodeInput[] = []
   for (const root of normalized.nodes) {
     nodes.push(nodeToInput(root, null))
-    if (root.nodeType === 'question_details') {
+    if (root.nodeType === 'question_details' || root.nodeType === 'question_group') {
       for (const child of root.children) nodes.push(nodeToInput(child, root.id))
     }
   }
@@ -678,13 +720,11 @@ export function patchNode(
       ...('props' in patch ? { props: patch.props ?? null } : {}),
     }
   }
-  const nodes = doc.nodes.map((root) => {
-    const updated = apply(root)
-    if (root.nodeType === 'question_details') {
-      return { ...updated, children: root.children.map(apply) }
-    }
-    return updated
-  })
+  const visit = (node: EditorNode): EditorNode => {
+    const updated = apply(node)
+    return { ...updated, children: updated.children.map(visit) }
+  }
+  const nodes = doc.nodes.map(visit)
   return { nodes }
 }
 
@@ -706,6 +746,10 @@ function snapNode(node: EditorNode): Record<string, unknown> {
       // 忽略 questionRevision / questionContent（服务端钉住，同步时才变）；props 参与脏检测。
       base.q = node.questionId
       base.p = questionInputProps(node) ?? null
+      break
+    case 'question_group':
+      base.qg = node.questionGroupId
+      base.children = node.children.map(snapNode)
       break
     case 'question_details': {
       const props = detailPropsOf(node)
@@ -784,11 +828,18 @@ export function collectStaleQuestionNodeIds(
   statusMap: Map<number, QuestionRevisionStatus>,
 ): string[] {
   const ids: string[] = []
-  for (const node of doc.nodes) {
+  for (const node of documentQuestionNodes(doc)) {
     if (node.nodeType !== 'question' || node.questionId == null) continue
     if (questionNodeStatus(node, statusMap.get(node.questionId)).stale) ids.push(node.id)
   }
   return ids
+}
+
+/** 收集后端已判定 stale 的题组 root UUID；材料、结构、成员题更新均由状态契约区分。 */
+export function collectStaleQuestionGroupNodeIds(
+  statuses: ReadonlyArray<QuestionGroupRevisionStatus>,
+): string[] {
+  return statuses.filter((status) => status.stale).map((status) => status.node_id)
 }
 
 // --------------------------------------------------------------------------- //

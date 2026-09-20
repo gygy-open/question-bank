@@ -12,6 +12,7 @@ from app.services.exporting.composition_contracts import (
     ExportHeadingNode,
     ExportPageBreakNode,
     ExportQuestionDetailsNode,
+    ExportQuestionGroupNode,
     ExportQuestionNode,
     ExportRichTextNode,
 )
@@ -47,9 +48,13 @@ def _qsnap(qid: int, **overrides) -> dict:
     return base
 
 
-def _question_node(nid: str, position: int, qid: int, props: dict | None = None, **qsnap_overrides) -> dict:
+def _question_node(
+    nid: str, position: int, qid: int, props: dict | None = None,
+    parent_id: str | None = None, **qsnap_overrides,
+) -> dict:
     return {
-        "id": nid, "parent_id": None, "slot": None, "position": position,
+        "id": nid, "parent_id": parent_id, "slot": "body" if parent_id else None,
+        "position": position,
         "node_kind": "block", "node_type": "question", "schema_version": 1,
         "question_id": qid, "question_revision": 1,
         "question": _qsnap(qid, **qsnap_overrides),
@@ -94,6 +99,15 @@ def _module_node(nid: str, position: int, scope: str = "all", fields: dict | Non
         "id": nid, "parent_id": None, "slot": None, "position": position,
         "node_kind": "module", "node_type": "question_details", "schema_version": 1,
         "props": {"scope": scope, "fields": complete_fields},
+    }
+
+
+def _group_node(nid: str, position: int) -> dict:
+    return {
+        "id": nid, "parent_id": None, "slot": None, "position": position,
+        "node_kind": "module", "node_type": "question_group", "schema_version": 1,
+        "question_group_id": 7, "question_group_revision": 2,
+        "stimulus_id": 8, "stimulus_revision": 3, "content": _rich_doc("材料"),
     }
 
 
@@ -164,6 +178,53 @@ def test_unsupported_node_type_raises_with_node_id():
 def test_unsupported_schema_version_rejected():
     snap = _snapshot([], schema_version=1)
     with pytest.raises(CompositionExportError):
+        CompositionAssembler().assemble(snap)
+
+
+def test_v3_question_group_preserves_children_and_details_can_reference_member():
+    snap = _snapshot([
+        _group_node("g1", 0),
+        _question_node("gq1", 0, qid=1, props={"number": "1", "score": 5}, parent_id="g1"),
+        {
+            **_answer_space_node("space", 1, lines=2, style="lined"),
+            "parent_id": "g1", "slot": "body", "source_question_node_id": "gq1",
+        },
+        _module_node("m1", 1),
+        _answer_item_node("ai1", "m1", 0, source_id="gq1"),
+    ], schema_version=3, numbering_enabled=True, scoring_enabled=True)
+    doc = CompositionAssembler().assemble(snap)
+    group = doc.nodes[0]
+    assert isinstance(group, ExportQuestionGroupNode)
+    assert group.stimulus == _rich_doc("材料")
+    assert [type(child) for child in group.children] == [
+        ExportQuestionNode, ExportAnswerSpaceNode
+    ]
+    assert group.children[0].number == "1"
+    assert group.children[0].score == 5
+    details = doc.nodes[1]
+    assert isinstance(details, ExportQuestionDetailsNode)
+    assert isinstance(details.children[0], ExportAnswerEntry)
+    assert details.children[0].question_id == 1
+
+
+def test_v3_question_group_rejects_answer_space_with_wrong_source():
+    snap = _snapshot([
+        _group_node("g1", 0),
+        _question_node("gq1", 0, qid=1, parent_id="g1"),
+        {
+            **_answer_space_node("space", 1),
+            "parent_id": "g1", "slot": "body", "source_question_node_id": "other",
+        },
+    ], schema_version=3)
+    with pytest.raises(CompositionExportError, match="preceding question"):
+        CompositionAssembler().assemble(snap)
+
+
+def test_v3_question_group_rejects_question_without_frozen_source():
+    child = _question_node("gq1", 0, qid=1, parent_id="g1")
+    child.pop("question")
+    snap = _snapshot([_group_node("g1", 0), child], schema_version=3)
+    with pytest.raises(CompositionExportError, match="no frozen source"):
         CompositionAssembler().assemble(snap)
 
 

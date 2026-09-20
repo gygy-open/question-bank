@@ -7,7 +7,7 @@
 - 校验严格按 node_kind / node_type 分派 payload。
 """
 from datetime import datetime
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Literal, Optional, Union
 import uuid
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
@@ -24,6 +24,7 @@ from app.models.composition import (
     NODE_TYPE_PAGE_BREAK,
     NODE_TYPE_QUESTION,
     NODE_TYPE_QUESTION_DETAILS,
+    NODE_TYPE_QUESTION_GROUP,
     NODE_TYPE_RICH_TEXT,
     REFERENCE_NODE_TYPES,
     ScopeType,
@@ -259,6 +260,7 @@ class CompositionNodeInput(BaseModel):
     props: Optional[Dict[str, Any]] = None
     schema_version: int = 1
     question_id: Optional[int] = None
+    question_group_id: Optional[int] = None
     source_question_node_id: Optional[str] = None
     anchor_before_node_id: Optional[str] = None
 
@@ -290,20 +292,19 @@ class CompositionNodeInput(BaseModel):
         # question_id / source / anchor 只允许挂在对应节点类型上。
         if nt != NODE_TYPE_QUESTION and self.question_id is not None:
             raise ValueError("question_id is only valid on question nodes")
-        if nt != NODE_TYPE_ANSWER_ITEM and self.source_question_node_id is not None:
-            raise ValueError("source_question_node_id is only valid on answer_item nodes")
+        if nt != NODE_TYPE_QUESTION_GROUP and self.question_group_id is not None:
+            raise ValueError("question_group_id is only valid on question_group nodes")
+        if nt not in (NODE_TYPE_ANSWER_ITEM, NODE_TYPE_ANSWER_SPACE) and self.source_question_node_id is not None:
+            raise ValueError(
+                "source_question_node_id is only valid on answer_item and answer_space nodes"
+            )
         if nt == NODE_TYPE_ANSWER_ITEM and self.anchor_before_node_id is not None:
             raise ValueError("answer_item nodes must not carry anchor_before_node_id")
         if self.anchor_before_node_id is not None and not _is_valid_uuid(self.anchor_before_node_id):
             raise ValueError("anchor_before_node_id must be a valid UUID string")
 
         # 层级归属约束(跨节点的“父必须是同稿 module”留给服务层):
-        if nt in (
-            NODE_TYPE_QUESTION,
-            NODE_TYPE_PAGE_BREAK,
-            NODE_TYPE_ANSWER_SPACE,
-            NODE_TYPE_QUESTION_DETAILS,
-        ):
+        if nt in (NODE_TYPE_PAGE_BREAK, NODE_TYPE_QUESTION_DETAILS, NODE_TYPE_QUESTION_GROUP):
             if self.parent_id is not None:
                 raise ValueError(f"{nt} must be a root-level node")
         if nt == NODE_TYPE_ANSWER_ITEM and self.parent_id is None:
@@ -325,12 +326,23 @@ class CompositionNodeInput(BaseModel):
             _validate_question_props(self.props)
             if self.question_id is None:
                 raise ValueError("question node requires question_id")
+        elif nt == NODE_TYPE_QUESTION_GROUP:
+            if self.content is not None:
+                raise ValueError("question_group content must be null (frozen by server)")
+            if self.props:
+                raise ValueError("question_group nodes must not carry props")
+            if self.question_group_id is None:
+                raise ValueError("question_group node requires question_group_id")
         elif nt == NODE_TYPE_PAGE_BREAK:
             if self.content is not None or self.props is not None:
                 raise ValueError("page_break node must not carry content or props")
         elif nt == NODE_TYPE_ANSWER_SPACE:
             if self.content is not None:
                 raise ValueError("answer_space node content must be null")
+            if self.parent_id is None and self.source_question_node_id is not None:
+                raise ValueError("root answer_space must not carry source_question_node_id")
+            if self.parent_id is not None and self.source_question_node_id is None:
+                raise ValueError("child answer_space requires source_question_node_id")
             _validate_answer_space_props(self.props)
         elif nt == NODE_TYPE_QUESTION_DETAILS:
             if self.content is not None:
@@ -373,6 +385,10 @@ class CompositionNodeRead(BaseModel):
     schema_version: int
     question_id: Optional[int] = None
     question_revision: Optional[int] = None
+    question_group_id: Optional[int] = None
+    question_group_revision: Optional[int] = None
+    stimulus_id: Optional[int] = None
+    stimulus_revision: Optional[int] = None
     source_question_node_id: Optional[str] = None
     anchor_before_node_id: Optional[str] = None
 
@@ -395,6 +411,29 @@ class QuestionRevisionStatus(BaseModel):
     available: bool
 
 
+class QuestionGroupMemberRevisionStatus(BaseModel):
+    node_id: str
+    question_id: int
+    pinned_revision: int
+    current_revision: Optional[int] = None
+    available: bool
+
+
+class QuestionGroupRevisionStatus(BaseModel):
+    """稿件内一个 question_group 节点的来源状态，不携带实时内容。"""
+    node_id: str
+    question_group_id: int
+    pinned_revision: int
+    current_revision: Optional[int] = None
+    stimulus_pinned_revision: int
+    stimulus_current_revision: Optional[int] = None
+    members: List[QuestionGroupMemberRevisionStatus] = Field(default_factory=list)
+    group_available: bool
+    stimulus_available: bool
+    structure_changed: bool
+    stale: bool
+
+
 class CompositionQuestionNodesSyncRequest(BaseModel):
     """同步请求:expected_revision 乐观校验,node_ids 为要刷新的 question 节点(唯一非空)。
 
@@ -414,6 +453,24 @@ class CompositionQuestionNodesSyncRequest(BaseModel):
 
 class CompositionQuestionNodesSyncResponse(BaseModel):
     """同步响应:自增后的 revision + 刷新后的完整 node 序列(供前端 reconcile)。"""
+    revision: int
+    nodes: List[CompositionNodeRead] = Field(default_factory=list)
+
+
+class CompositionQuestionGroupNodesSyncRequest(BaseModel):
+    expected_revision: int
+    node_ids: List[str] = Field(default_factory=list)
+
+    @model_validator(mode="after")
+    def _check_node_ids(self) -> "CompositionQuestionGroupNodesSyncRequest":
+        if not self.node_ids:
+            raise ValueError("node_ids must not be empty")
+        if len(self.node_ids) != len(set(self.node_ids)):
+            raise ValueError("node_ids must be unique")
+        return self
+
+
+class CompositionQuestionGroupNodesSyncResponse(BaseModel):
     revision: int
     nodes: List[CompositionNodeRead] = Field(default_factory=list)
 
@@ -562,6 +619,31 @@ class CompositionVersionSummary(BaseModel):
     finalized_by: int
 
 
+class _CompositionSnapshotBase(BaseModel):
+    model_config = ConfigDict(extra="allow")
+
+    composition_id: int
+    source_revision: int
+    title: str
+    subject_id: int
+    finalized_at: str
+    numbering_enabled: bool
+    scoring_enabled: bool
+    question_display: Dict[str, bool]
+    nodes: List[Dict[str, Any]]
+
+
+class CompositionSnapshotV2(_CompositionSnapshotBase):
+    schema_version: Literal[2]
+
+
+class CompositionSnapshotV3(_CompositionSnapshotBase):
+    schema_version: Literal[3]
+
+
+CompositionSnapshot = Union[CompositionSnapshotV2, CompositionSnapshotV3]
+
+
 class CompositionVersionRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
@@ -571,7 +653,7 @@ class CompositionVersionRead(BaseModel):
     source_revision: int
     title: str
     subject_id: int
-    snapshot: Dict[str, Any]
+    snapshot: CompositionSnapshot = Field(discriminator="schema_version")
     label: Optional[str] = None
     finalized_at: datetime
     finalized_by: int

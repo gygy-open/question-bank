@@ -16,6 +16,7 @@ from app.services.exporting.composition_contracts import (
     ExportOption,
     ExportPageBreakNode,
     ExportQuestionDetailsNode,
+    ExportQuestionGroupNode,
     ExportQuestionNode,
     ExportRichTextNode,
 )
@@ -174,6 +175,35 @@ def test_composition_latex_renderer_answer_space_blank_and_lined():
     finally:
         os.remove(blank)
         os.remove(lined)
+
+
+def test_question_group_renders_stimulus_question_and_answer_space_in_both_formats():
+    question = ExportQuestionNode(
+        number="12.1", score=6, q_type="free_response", stem=_rich_doc("组内小题"),
+        options=[], option_columns=1, answer=None, thinking=None, analysis=None, summary=None,
+    )
+    doc = CompositionExportDoc(
+        title="题组",
+        nodes=[ExportQuestionGroupNode(
+            stimulus=_rich_doc("阅读材料"),
+            children=[question, ExportAnswerSpaceNode(lines=2, style="lined")],
+        )],
+    )
+    docx_path = CompositionDocxRenderer().render(doc)
+    latex_path = CompositionLatexRenderer().render(doc)
+    try:
+        document = Document(docx_path)
+        text = "\n".join(paragraph.text for paragraph in document.paragraphs)
+        assert "阅读材料" in text
+        assert "12.1. （6 分）组内小题" in text
+        with zipfile.ZipFile(latex_path) as zf:
+            tex = zf.read([name for name in zf.namelist() if name.endswith(".tex")][0]).decode("utf-8")
+        assert "阅读材料" in tex
+        assert "12.1" in tex and "6 分" in tex and "组内小题" in tex
+        assert tex.count("\\rule{\\linewidth}") == 2
+    finally:
+        os.remove(docx_path)
+        os.remove(latex_path)
 
 
 

@@ -21,6 +21,7 @@ from app.models.composition import (
     NODE_TYPE_PAGE_BREAK,
     NODE_TYPE_QUESTION,
     NODE_TYPE_QUESTION_DETAILS,
+    NODE_TYPE_QUESTION_GROUP,
     NODE_TYPE_RICH_TEXT,
     REFERENCE_NODE_TYPES,
     CompositionNodeKind,
@@ -34,6 +35,7 @@ AUTHORABLE_NODE_TYPES = (
     NODE_TYPE_RICH_TEXT,
     NODE_TYPE_QUESTION,
     NODE_TYPE_QUESTION_DETAILS,
+    NODE_TYPE_QUESTION_GROUP,
     NODE_TYPE_PAGE_BREAK,
     NODE_TYPE_ANSWER_SPACE,
 )
@@ -217,6 +219,23 @@ def build_nodes(specs: List[Dict[str, Any]]) -> List[CompositionNodeInput]:
                 node_kind=CompositionNodeKind.MODULE,
                 node_type=NODE_TYPE_QUESTION_DETAILS,
                 props=_details_props(spec),
+            ))
+            continue
+
+        if node_type == NODE_TYPE_QUESTION_GROUP:
+            question_group_id = _int_or_none(
+                spec.get("question_group_id"),
+                field=f"nodes[{idx}].question_group_id",
+            )
+            if question_group_id is None:
+                raise AuthoringError(
+                    f"nodes[{idx}] question_group requires question_group_id"
+                )
+            nodes.append(CompositionNodeInput(
+                id=_new_id(),
+                node_kind=CompositionNodeKind.MODULE,
+                node_type=NODE_TYPE_QUESTION_GROUP,
+                question_group_id=question_group_id,
             ))
             continue
 

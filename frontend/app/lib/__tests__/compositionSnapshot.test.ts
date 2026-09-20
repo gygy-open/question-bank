@@ -10,6 +10,7 @@ import {
 } from '@/lib/compositionSnapshot'
 import type {
   CompositionSnapshotV2,
+  CompositionSnapshotV3,
   QuestionProps,
   QuestionSnapshot,
   SnapshotAnswerItemNode,
@@ -117,6 +118,26 @@ describe('buildSnapshotTree', () => {
     expect(tree.every((n) => n.parent_id == null)).toBe(true)
     const mod = tree.find((n) => n.id === 'm1')!
     expect(mod.children.map((c) => c.id)).toEqual(['ai1'])
+  })
+
+  it('snapshot v3 把题组 question/answer_space 挂到 module，v2 仍兼容', () => {
+    const groupId = 'group-1'
+    const group = {
+      id: groupId, parent_id: null, slot: null, position: 0, schema_version: 1,
+      node_kind: 'module', node_type: 'question_group', question_group_id: 4,
+      question_group_revision: 2, stimulus_id: 6, stimulus_revision: 3, content: richDoc('材料'),
+    } as SnapshotNode
+    const child = { ...questionNode('child-q', 0, qsnap(2)), parent_id: groupId, slot: 'body' } as SnapshotNode
+    const answerSpace = {
+      id: 'space', parent_id: groupId, slot: 'body', position: 1, schema_version: 1,
+      node_kind: 'block', node_type: 'answer_space', source_question_node_id: 'child-q',
+      props: { lines: 4, style: 'lined' },
+    } as SnapshotNode
+    const v3 = { ...snapshot([]), schema_version: 3, nodes: [answerSpace, child, group] } as CompositionSnapshotV3
+    const tree = buildSnapshotTree(v3)
+    expect(tree[0]!.node_type).toBe('question_group')
+    expect(tree[0]!.children.map((node) => node.id)).toEqual(['child-q', 'space'])
+    expect(buildSnapshotTree(snapshot([questionNode('q1', 0, qsnap(1))]))).toHaveLength(1)
   })
 })
 

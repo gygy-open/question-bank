@@ -10,6 +10,8 @@ import type {
   CompositionMetaUpdatePayload,
   CompositionQuestionNodesSyncRequest,
   CompositionQuestionNodesSyncResponse,
+  CompositionQuestionGroupNodesSyncRequest,
+  CompositionQuestionGroupNodesSyncResponse,
   CompositionScope,
   CompositionVersionCreatePayload,
   CompositionVersionDetail,
@@ -17,6 +19,7 @@ import type {
   FolderCreatePayload,
   FolderUpdatePayload,
   QuestionRevisionStatus,
+  QuestionGroupRevisionStatus,
 } from '@/types/composition'
 import {
   compositionDuplicatePath,
@@ -25,6 +28,8 @@ import {
   compositionItemPath,
   compositionListQuery,
   compositionQuestionNodesSyncPath,
+  compositionQuestionGroupNodesSyncPath,
+  compositionQuestionGroupRevisionsPath,
   compositionQuestionRevisionsPath,
   compositionRestorePath,
   compositionVersionExportPath,
@@ -247,6 +252,27 @@ export function useCompositions() {
       },
     ).catch(mapConflict)
 
+  const getQuestionGroupRevisions = (
+    subjectId: number,
+    scope: CompositionScope,
+    compositionId: number,
+  ) =>
+    $api<QuestionGroupRevisionStatus[]>(
+      compositionQuestionGroupRevisionsPath(subjectId, compositionId),
+      { query: { scope } },
+    )
+
+  const syncQuestionGroupNodes = (
+    subjectId: number,
+    scope: CompositionScope,
+    compositionId: number,
+    payload: CompositionQuestionGroupNodesSyncRequest,
+  ) =>
+    $api<CompositionQuestionGroupNodesSyncResponse>(
+      compositionQuestionGroupNodesSyncPath(subjectId, compositionId),
+      { method: 'POST', query: { scope }, body: payload },
+    ).catch(mapConflict)
+
   // ------------------------------------------------------------- Versions //
   // 定稿：冻结当前 revision 为不可变版本。不修改 composition.revision；409 复用冲突映射。
   const finalizeVersion = (
@@ -334,6 +360,8 @@ export function useCompositions() {
     replaceNodes,
     getQuestionRevisions,
     syncQuestionNodes,
+    getQuestionGroupRevisions,
+    syncQuestionGroupNodes,
     finalizeVersion,
     listVersions,
     getVersion,

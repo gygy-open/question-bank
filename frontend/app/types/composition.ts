@@ -81,6 +81,7 @@ export type CompositionNodeType =
   | 'rich_text'
   | 'heading'
   | 'question'
+  | 'question_group'
   | 'page_break'
   | 'answer_space'
   | 'question_details'
@@ -168,6 +169,10 @@ interface CompositionNodeCommon {
   slot: string | null
   position: number
   schema_version: number
+  question_group_id: number | null
+  question_group_revision: number | null
+  stimulus_id: number | null
+  stimulus_revision: number | null
 }
 
 export interface RichTextNode extends CompositionNodeCommon {
@@ -196,9 +201,25 @@ export interface QuestionNode extends CompositionNodeCommon {
   node_kind: 'block'
   node_type: 'question'
   content: QuestionContentSnapshot | null
-  props: null
+  props: QuestionProps | null
   question_id: number
   question_revision: number
+  source_question_node_id: null
+  anchor_before_node_id: null
+}
+
+export interface QuestionGroupNode extends CompositionNodeCommon {
+  node_kind: 'module'
+  node_type: 'question_group'
+  /** 服务端冻结的材料内容。 */
+  content: RichDocNode | null
+  props: null
+  question_id: null
+  question_revision: null
+  question_group_id: number
+  question_group_revision: number
+  stimulus_id: number
+  stimulus_revision: number
   source_question_node_id: null
   anchor_before_node_id: null
 }
@@ -252,6 +273,7 @@ export type CompositionNode =
   | RichTextNode
   | HeadingNode
   | QuestionNode
+  | QuestionGroupNode
   | PageBreakNode
   | AnswerSpaceNode
   | QuestionDetailsNode
@@ -276,6 +298,7 @@ export interface CompositionNodeInput {
   props?: Record<string, unknown> | null
   schema_version?: number
   question_id?: number | null
+  question_group_id?: number | null
   source_question_node_id?: string | null
   anchor_before_node_id?: string | null
 }
@@ -312,6 +335,35 @@ export interface CompositionQuestionNodesSyncResponse {
   revision: number
   nodes: CompositionNode[]
 }
+
+export interface QuestionGroupMemberRevisionStatus {
+  node_id: string
+  question_id: number
+  pinned_revision: number
+  current_revision: number | null
+  available: boolean
+}
+
+export interface QuestionGroupRevisionStatus {
+  node_id: string
+  question_group_id: number
+  pinned_revision: number
+  current_revision: number | null
+  stimulus_pinned_revision: number
+  stimulus_current_revision: number | null
+  members: QuestionGroupMemberRevisionStatus[]
+  group_available: boolean
+  stimulus_available: boolean
+  structure_changed: boolean
+  stale: boolean
+}
+
+export interface CompositionQuestionGroupNodesSyncRequest {
+  expected_revision: number
+  node_ids: string[]
+}
+
+export type CompositionQuestionGroupNodesSyncResponse = CompositionQuestionNodesSyncResponse
 
 // --- 定稿 (Version) 契约 --- //
 
@@ -437,6 +489,16 @@ export interface SnapshotQuestionNode extends SnapshotNodeCommon {
   props?: QuestionProps | null
 }
 
+export interface SnapshotQuestionGroupNode extends SnapshotNodeCommon {
+  node_kind: 'module'
+  node_type: 'question_group'
+  question_group_id: number
+  question_group_revision: number
+  stimulus_id: number
+  stimulus_revision: number
+  content: RichDocNode | null
+}
+
 export interface SnapshotPageBreakNode extends SnapshotNodeCommon {
   node_kind: 'block'
   node_type: 'page_break'
@@ -446,6 +508,7 @@ export interface SnapshotAnswerSpaceNode extends SnapshotNodeCommon {
   node_kind: 'block'
   node_type: 'answer_space'
   props: AnswerSpaceProps
+  source_question_node_id?: string
 }
 
 export interface SnapshotQuestionDetailsNode extends SnapshotNodeCommon {
@@ -465,6 +528,7 @@ export type SnapshotNode =
   | SnapshotRichTextNode
   | SnapshotHeadingNode
   | SnapshotQuestionNode
+  | SnapshotQuestionGroupNode
   | SnapshotPageBreakNode
   | SnapshotAnswerSpaceNode
   | SnapshotQuestionDetailsNode
@@ -485,6 +549,13 @@ export interface CompositionSnapshotV2 {
   nodes: SnapshotNode[]
 }
 
+/** snapshot v3 在 v2 基础上增加 question_group module 及其 question/answer_space children。 */
+export interface CompositionSnapshotV3 extends Omit<CompositionSnapshotV2, 'schema_version'> {
+  schema_version: 3
+}
+
+export type CompositionSnapshot = CompositionSnapshotV2 | CompositionSnapshotV3
+
 /** GET version detail：版本元数据 + 不可变 snapshot。 */
 export interface CompositionVersionDetail {
   id: number
@@ -493,7 +564,7 @@ export interface CompositionVersionDetail {
   source_revision: number
   title: string
   subject_id: number
-  snapshot: CompositionSnapshotV2
+  snapshot: CompositionSnapshot
   label: string | null
   finalized_at: string
   finalized_by: number

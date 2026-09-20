@@ -20,6 +20,7 @@ from app.services.exporting.composition_contracts import (
     ExportOption,
     ExportPageBreakNode,
     ExportQuestionDetailsNode,
+    ExportQuestionGroupNode,
     ExportQuestionNode,
     ExportRichTextNode,
     RichDoc,
@@ -108,6 +109,8 @@ class CompositionLatexRenderer:
             return self._render_answer_space(node)
         if isinstance(node, ExportQuestionDetailsNode):
             return self._render_question_details(node, image_path)
+        if isinstance(node, ExportQuestionGroupNode):
+            return self._render_question_group(node, image_path)
         raise ValueError(f"Unsupported composition export node: {type(node)!r}")
 
     def _render_heading(self, node: ExportHeadingNode, image_path: ImagePathFn) -> str:
@@ -124,6 +127,12 @@ class CompositionLatexRenderer:
             row = "\\noindent\\rule{\\linewidth}{0.4pt}\\par\\vspace{%s}\n" % _ANSWER_SPACE_LINE_HEIGHT
             return "\\par\\vspace{0.3\\baselineskip}\n" + row * lines
         return "\\par\\vspace{%d\\baselineskip}\n" % lines
+
+    def _render_question_group(self, node: ExportQuestionGroupNode, image_path: ImagePathFn) -> str:
+        parts = ["\\par\\smallskip\n", rich_doc_to_latex(node.stimulus, image_path) + "\n"]
+        parts.extend(self._render_node(child, image_path) for child in node.children)
+        parts.append("\\par\\smallskip\n")
+        return "\n".join(parts)
 
     def _render_question(self, q: ExportQuestionNode, image_path: ImagePathFn) -> str:
         # 题号(粗体)+ 分值(斜体)同挤在题干首段前,而非各占一行,与编辑器内联展示口径一致。

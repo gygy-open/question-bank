@@ -76,6 +76,15 @@ class ExportQuestionDetailsNode:
     children: list[QuestionDetailsChild] = field(default_factory=list)
 
 
+QuestionGroupChild = Union[ExportQuestionNode, ExportAnswerSpaceNode]
+
+
+@dataclass
+class ExportQuestionGroupNode:
+    stimulus: RichDoc
+    children: list[QuestionGroupChild] = field(default_factory=list)
+
+
 CompositionExportNode = Union[
     ExportRichTextNode,
     ExportHeadingNode,
@@ -83,6 +92,7 @@ CompositionExportNode = Union[
     ExportPageBreakNode,
     ExportAnswerSpaceNode,
     ExportQuestionDetailsNode,
+    ExportQuestionGroupNode,
 ]
 
 

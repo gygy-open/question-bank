@@ -75,6 +75,7 @@ NODE_TYPE_QUESTION = "question"
 NODE_TYPE_PAGE_BREAK = "page_break"
 NODE_TYPE_ANSWER_SPACE = "answer_space"
 NODE_TYPE_QUESTION_DETAILS = "question_details"
+NODE_TYPE_QUESTION_GROUP = "question_group"
 NODE_TYPE_ANSWER_ITEM = "answer_item"
 
 # 各 kind 允许的 node_type 集合(服务层/契约共享)。
@@ -87,7 +88,7 @@ BLOCK_NODE_TYPES = frozenset(
         NODE_TYPE_ANSWER_SPACE,
     }
 )
-MODULE_NODE_TYPES = frozenset({NODE_TYPE_QUESTION_DETAILS})
+MODULE_NODE_TYPES = frozenset({NODE_TYPE_QUESTION_DETAILS, NODE_TYPE_QUESTION_GROUP})
 REFERENCE_NODE_TYPES = frozenset({NODE_TYPE_ANSWER_ITEM})
 
 
@@ -249,8 +250,16 @@ class CompositionNode(Base):
     question_id = Column(Integer, ForeignKey("questions.id"), nullable=True, index=True)
     question_revision = Column(Integer, nullable=True)
 
+    # 仅 question_group module 使用：题组、材料及其冻结修订来源。
+    question_group_id = Column(
+        Integer, ForeignKey("question_groups.id"), nullable=True, index=True
+    )
+    question_group_revision = Column(Integer, nullable=True)
+    stimulus_id = Column(Integer, ForeignKey("stimuli.id"), nullable=True, index=True)
+    stimulus_revision = Column(Integer, nullable=True)
+
     # 软指针(无 DB FK,服务层保证同稿):
-    # - reference.answer_item.source_question_node_id → 同稿 root 层 question 节点。
+    # - answer_item / 题组内 answer_space.source_question_node_id → 同稿 question 节点。
     # - 自定义 module 子节点.anchor_before_node_id → 同 module 内 answer_item 节点。
     source_question_node_id = Column(String(NODE_ID_LEN), nullable=True)
     anchor_before_node_id = Column(String(NODE_ID_LEN), nullable=True)
@@ -275,7 +284,7 @@ class CompositionNode(Base):
         CheckConstraint(
             "(node_kind = 'block' AND node_type IN "
             "('rich_text', 'heading', 'question', 'page_break', 'answer_space')) OR "
-            "(node_kind = 'module' AND node_type = 'question_details') OR "
+            "(node_kind = 'module' AND node_type IN ('question_details', 'question_group')) OR "
             "(node_kind = 'reference' AND node_type = 'answer_item')",
             name="kind_matches_type",
         ),
@@ -288,9 +297,22 @@ class CompositionNode(Base):
             name="question_ref_matches_type",
         ),
         CheckConstraint(
+            "(node_type = 'question_group' AND question_group_id IS NOT NULL AND "
+            "question_group_revision IS NOT NULL AND stimulus_id IS NOT NULL AND "
+            "stimulus_revision IS NOT NULL AND content IS NOT NULL) OR "
+            "(node_type <> 'question_group' AND question_group_id IS NULL AND "
+            "question_group_revision IS NULL AND stimulus_id IS NULL AND "
+            "stimulus_revision IS NULL)",
+            name="question_group_ref_matches_type",
+        ),
+        CheckConstraint(
             "(node_type = 'answer_item' AND source_question_node_id IS NOT NULL "
             "AND parent_id IS NOT NULL) OR "
-            "(node_type <> 'answer_item' AND source_question_node_id IS NULL)",
+            "(node_type = 'answer_space' AND ((parent_id IS NULL AND "
+            "source_question_node_id IS NULL) OR (parent_id IS NOT NULL AND "
+            "source_question_node_id IS NOT NULL))) OR "
+            "(node_type NOT IN ('answer_item', 'answer_space') AND "
+            "source_question_node_id IS NULL)",
             name="source_ref_matches_type",
         ),
         CheckConstraint(

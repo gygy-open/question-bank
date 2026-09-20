@@ -105,6 +105,20 @@ function moduleRow(id: string): EditorNode {
 }
 
 describe('composition-next convert round-trip', () => {
+  it('question_group atom preserves frozen source and complete children', () => {
+    const question = questionRow('child-q', 42)
+    const space = answerSpaceRow('child-a', 4, 'lined')
+    space.sourceQuestionNodeId = question.id
+    const group: EditorNode = {
+      id: 'group-1', nodeType: 'question_group', content: richTextRow('x', '材料').content,
+      props: null, questionId: null, questionRevision: null, questionContent: null,
+      questionGroupId: 9, questionGroupRevision: 3, stimulusId: 8, stimulusRevision: 2,
+      sourceQuestionNodeId: null, anchorBeforeNodeId: null, children: [question, space],
+    }
+    const back = pmDocToEditorDocument(editorDocumentToPmDoc({ nodes: [group] })).nodes[0]!
+    expect(back).toEqual(group)
+  })
+
   it('rich_text single block preserves row id and content', () => {
     const doc: EditorDocument = { nodes: [richTextRow('r1', 'hello')] }
     const back = pmDocToEditorDocument(editorDocumentToPmDoc(doc))

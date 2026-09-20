@@ -34,6 +34,8 @@ const props = defineProps<{
   updateAttributes: (attrs: Record<string, unknown>) => void
   deleteNode: () => void
   selected?: boolean
+  deletable?: boolean
+  syncable?: boolean
 }>()
 
 const numberingEnabled = inject(NUMBERING_ENABLED_KEY, FALLBACK_NUMBERING)
@@ -213,11 +215,11 @@ const scoreDisplay = computed(() => `（${questionScore.value != null ? `${quest
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" class="w-40">
-          <DropdownMenuItem v-if="isStale" :disabled="syncDisabled" @click="syncThis">
+          <DropdownMenuItem v-if="isStale && deletable !== false && syncable !== false" :disabled="syncDisabled" @click="syncThis">
             <RefreshCw class="mr-2 h-4 w-4" /> 同步此题
           </DropdownMenuItem>
-          <DropdownMenuSeparator v-if="isStale" />
-          <DropdownMenuItem class="text-destructive focus:text-destructive" @click="deleteNode()">
+          <DropdownMenuSeparator v-if="isStale && deletable !== false && syncable !== false" />
+          <DropdownMenuItem v-if="deletable !== false" class="text-destructive focus:text-destructive" @click="deleteNode()">
             <Trash2 class="mr-2 h-4 w-4" /> 删除
           </DropdownMenuItem>
         </DropdownMenuContent>

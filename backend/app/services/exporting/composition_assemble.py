@@ -1,4 +1,4 @@
-"""Snapshot v2 → CompositionExportDoc 装配器(导出格式无关)。
+"""Snapshot v2/v3 → CompositionExportDoc 装配器(导出格式无关)。
 
 树重建与 answer_item 有效字段解析,与前端 `compositionSnapshot.ts` 的
 `buildSnapshotTree` / `effectiveAnswerFields` 语义严格对齐,保证导出与只读预览
@@ -21,6 +21,7 @@ from app.services.exporting.composition_contracts import (
     ExportOption,
     ExportPageBreakNode,
     ExportQuestionDetailsNode,
+    ExportQuestionGroupNode,
     ExportQuestionNode,
     ExportRichTextNode,
     QuestionDetailsChild,
@@ -28,7 +29,7 @@ from app.services.exporting.composition_contracts import (
 from app.services.question_content_converter import rich_doc_to_plain_text
 
 ANSWER_FIELD_KEYS = ("answer", "thinking", "analysis", "summary")
-SUPPORTED_SCHEMA_VERSION = 2
+SUPPORTED_SCHEMA_VERSIONS = frozenset({2, 3})
 
 
 class CompositionExportError(Exception):
@@ -91,7 +92,8 @@ def _resolve_option_columns(options: list[ExportOption], layout: Any) -> int:
 
 class CompositionAssembler:
     def assemble(self, snapshot: dict[str, Any]) -> CompositionExportDoc:
-        if snapshot.get("schema_version") != SUPPORTED_SCHEMA_VERSION:
+        schema_version = snapshot.get("schema_version")
+        if schema_version not in SUPPORTED_SCHEMA_VERSIONS:
             raise CompositionExportError(
                 f"Unsupported snapshot schema_version: {snapshot.get('schema_version')!r}"
             )
@@ -123,6 +125,7 @@ class CompositionAssembler:
                 numbering_enabled=numbering_enabled,
                 scoring_enabled=scoring_enabled,
                 question_display=question_display,
+                snapshot_schema_version=schema_version,
             )
             for n in roots
         ]
@@ -137,6 +140,7 @@ class CompositionAssembler:
         numbering_enabled: bool,
         scoring_enabled: bool,
         question_display: dict[str, bool],
+        snapshot_schema_version: int,
     ) -> CompositionExportNode:
         node_type = n.get("node_type")
         if node_type == "rich_text":
@@ -163,9 +167,72 @@ class CompositionAssembler:
             return self._assemble_question_details(
                 n, children_by_parent, question_nodes_by_id, numbering_enabled=numbering_enabled,
             )
+        if node_type == "question_group" and snapshot_schema_version >= 3:
+            return self._assemble_question_group(
+                n,
+                children_by_parent,
+                numbering_enabled=numbering_enabled,
+                scoring_enabled=scoring_enabled,
+                question_display=question_display,
+            )
         raise CompositionExportError(
             f"Unsupported snapshot node type: {node_type!r}", node_id=n.get("id"), node_type=node_type,
         )
+
+    def _assemble_question_group(
+        self,
+        n: dict[str, Any],
+        children_by_parent: dict[str, list[dict[str, Any]]],
+        *,
+        numbering_enabled: bool,
+        scoring_enabled: bool,
+        question_display: dict[str, bool],
+    ) -> ExportQuestionGroupNode:
+        raw_children = sorted(
+            children_by_parent.get(n["id"], []), key=lambda child: (child["position"], child["id"])
+        )
+        children: list[ExportQuestionNode | ExportAnswerSpaceNode] = []
+        previous_question_id: Optional[str] = None
+        for child in raw_children:
+            child_type = child.get("node_type")
+            if child_type == "question":
+                if child.get("question_id") is None or not isinstance(child.get("question"), dict):
+                    raise CompositionExportError(
+                        "question_group question child has no frozen source",
+                        node_id=child.get("id"),
+                        node_type=child_type,
+                    )
+                children.append(
+                    self._assemble_question(
+                        child,
+                        numbering_enabled=numbering_enabled,
+                        scoring_enabled=scoring_enabled,
+                        question_display=question_display,
+                    )
+                )
+                previous_question_id = child.get("id")
+            elif child_type == "answer_space":
+                if child.get("source_question_node_id") != previous_question_id:
+                    raise CompositionExportError(
+                        "question_group answer_space source must reference the preceding question",
+                        node_id=child.get("id"),
+                        node_type=child_type,
+                    )
+                props = child.get("props") or {}
+                children.append(
+                    ExportAnswerSpaceNode(
+                        lines=int(props.get("lines", 3)),
+                        style=str(props.get("style", "blank")),
+                    )
+                )
+                previous_question_id = None
+            else:
+                raise CompositionExportError(
+                    f"Unsupported question_group child node type: {child_type!r}",
+                    node_id=child.get("id"),
+                    node_type=child_type,
+                )
+        return ExportQuestionGroupNode(stimulus=n.get("content"), children=children)
 
     def _assemble_question(
         self,

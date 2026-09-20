@@ -97,9 +97,9 @@ const addToBasket = (group: QuestionGroup) => {
 }
 
 const pickerOpen = ref(false)
-const pickerQuestionIds = ref<number[]>([])
+const pickerQuestionGroupId = ref<number>()
 const addToComposition = (group: QuestionGroup) => {
-  pickerQuestionIds.value = [...group.items].sort((a, b) => a.position - b.position).map(item => item.question_id)
+  pickerQuestionGroupId.value = group.id
   pickerOpen.value = true
 }
 
@@ -149,5 +149,5 @@ const clearQuestionFilter = () => {
     </div>
   </main>
 
-  <CompositionTargetPicker v-model:open="pickerOpen" :subject-id="currentSubjectId" :question-ids="pickerQuestionIds" />
+  <CompositionTargetPicker v-model:open="pickerOpen" :subject-id="currentSubjectId" :question-group-id="pickerQuestionGroupId" />
 </template>

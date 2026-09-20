@@ -375,7 +375,6 @@ def _resolve_outline_nodes(
     """outline → build_nodes 可消费的意图节点。跳过引用不存在题目的占位。"""
     specs: List[Dict[str, Any]] = []
     sequence = 0
-    rendered_stimuli: set[str] = set()
 
     for item in outline:
         kind = item.get("kind")
@@ -396,16 +395,10 @@ def _resolve_outline_nodes(
             group = group_specs.get(str(item.get("temp_id")))
             if group is None:
                 continue
-            stimulus_ref = group["stimulus_ref"]
-            if stimulus_ref not in rendered_stimuli:
-                specs.append({"type": "rich_text", "content": group["content"]})
-                rendered_stimuli.add(stimulus_ref)
-            for question_id in group["question_ids"]:
-                sequence += 1
-                spec = {"type": "question", "question_id": question_id}
-                if renumber:
-                    spec["number"] = str(sequence)
-                specs.append(spec)
+            specs.append(
+                {"type": "question_group", "question_group_id": group["group_id"]}
+            )
+            sequence += len(group["question_ids"])
         elif kind == OUTLINE_HEADING:
             specs.append(
                 {"type": "heading", "text": item.get("text") or "", "level": item.get("level") or 2}
@@ -675,7 +668,6 @@ async def commit_paper_import(
     await db.flush()
 
     stimulus_temp_id_map: Dict[str, int] = {}
-    stimulus_content_map: Dict[str, dict] = {}
     for raw, stimulus_in in stimulus_plans:
         stimulus = Stimulus(
             subject_id=subject_id,
@@ -691,7 +683,6 @@ async def commit_paper_import(
         await db.flush()
         stimulus_ref = str(raw["temp_id"])
         stimulus_temp_id_map[stimulus_ref] = stimulus.id
-        stimulus_content_map[stimulus_ref] = stimulus_in.content
 
     question_group_temp_id_map: Dict[str, int] = {}
     group_specs: Dict[str, Dict[str, Any]] = {}
@@ -718,9 +709,8 @@ async def commit_paper_import(
         )
         question_group_temp_id_map[group_ref] = group.id
         group_specs[group_ref] = {
-            "content": stimulus_content_map[stimulus_ref],
+            "group_id": group.id,
             "question_ids": question_ids,
-            "stimulus_ref": stimulus_ref,
         }
     await db.flush()
 

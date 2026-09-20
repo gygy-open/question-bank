@@ -9,6 +9,7 @@ import {
   createPageBreakNode,
   createQuestionDetailsModule,
   createQuestionNode,
+  createQuestionGroupNode,
   createRichTextNode,
   DETAIL_PRESETS,
   detailPropsOf,
@@ -34,6 +35,7 @@ import {
   snapshotDocument,
   orderedScorableQuestions,
   totalScore,
+  collectStaleQuestionGroupNodeIds,
 } from '@/lib/compositionDocument'
 import type { EditorDocument, EditorNode } from '@/lib/compositionDocument'
 import type { CompositionNode, QuestionRevisionStatus } from '@/types/composition'
@@ -374,6 +376,85 @@ describe('documentFromNodes 重建（含 module 子树）', () => {
     expect(d.nodes.map((n) => n.id)).toEqual(['q1', 'm1'])
     expect(d.nodes[0]!.questionContent?.q_type).toBe('single_choice')
     expect(d.nodes[1]!.children.map((c) => c.id)).toEqual(['ai1'])
+  })
+
+  it('题组材料与 question/answer_space children 无损往返', () => {
+    const group = createQuestionGroupNode(8)
+    group.questionGroupRevision = 3
+    group.stimulusId = 12
+    group.stimulusRevision = 4
+    group.content = richDoc('材料')
+    const question = createQuestionNode(fakeQuestion(7, 2))
+    question.props = { number: '2', score: 6, optionLayout: 2 }
+    const space = createAnswerSpaceNode(5, 'lined')
+    space.sourceQuestionNodeId = question.id
+    group.children = [question, space]
+
+    const request = documentToReplaceRequest({ nodes: [group] }, 9)
+    expect(request.nodes[0]).toMatchObject({ node_type: 'question_group', question_group_id: 8 })
+    expect(request.nodes[1]).toMatchObject({ node_type: 'question', parent_id: group.id, slot: 'body', question_id: 7 })
+    expect(request.nodes[2]).toMatchObject({
+      node_type: 'answer_space', parent_id: group.id, slot: 'body', source_question_node_id: question.id,
+      props: { lines: 5, style: 'lined' },
+    })
+  })
+
+  it('新题组首次 replace 只发送 root module', () => {
+    const group = createQuestionGroupNode(23)
+    expect(documentToReplaceRequest({ nodes: [group] }, 1).nodes).toEqual([
+      { id: group.id, node_kind: 'module', node_type: 'question_group', question_group_id: 23 },
+    ])
+  })
+
+  it('从服务端读回题组 answer_space source 后再次保存不丢失', () => {
+    const server = [
+      {
+        id: 'group', composition_id: 1, parent_id: null, slot: null, position: 0,
+        node_kind: 'module', node_type: 'question_group', content: richDoc('材料'), props: null,
+        schema_version: 1, question_id: null, question_revision: null, question_group_id: 8,
+        question_group_revision: 2, stimulus_id: 3, stimulus_revision: 4,
+        source_question_node_id: null, anchor_before_node_id: null,
+      },
+      {
+        id: 'space', composition_id: 1, parent_id: 'group', slot: 'body', position: 0,
+        node_kind: 'block', node_type: 'answer_space', content: null, props: { lines: 4, style: 'lined' },
+        schema_version: 1, question_id: null, question_revision: null, question_group_id: null,
+        question_group_revision: null, stimulus_id: null, stimulus_revision: null,
+        source_question_node_id: 'child-q', anchor_before_node_id: null,
+      },
+    ] as CompositionNode[]
+    const request = documentToReplaceRequest(documentFromNodes(server), 2)
+    expect(request.nodes[1]).toMatchObject({ source_question_node_id: 'child-q' })
+  })
+})
+
+describe('题组递归题目行为', () => {
+  it('统一参与编号、赋分、题目 stale 与题组 stale 收集', () => {
+    const root = createQuestionNode(fakeQuestion(1, 1))
+    const group = createQuestionGroupNode(5)
+    const child = createQuestionNode(fakeQuestion(2, 1))
+    child.props = { score: 2.5 }
+    group.children = [child]
+    const numbered = applyQuestionNumbers({ nodes: [root, group] }, 'global')
+    expect(orderedScorableQuestions(numbered).map((item) => item.number)).toEqual(['1', '2'])
+    expect(totalScore(numbered)).toBe(2.5)
+    expect(collectStaleQuestionNodeIds(numbered, new Map([
+      [2, { question_id: 2, current_revision: 2, available: true }],
+    ]))).toEqual([child.id])
+    expect(collectStaleQuestionGroupNodeIds([{
+      node_id: group.id, question_group_id: 5, pinned_revision: 1, current_revision: 2,
+      stimulus_pinned_revision: 1, stimulus_current_revision: 1, members: [],
+      group_available: true, stimulus_available: true, structure_changed: true, stale: true,
+    }])).toEqual([group.id])
+  })
+
+  it('question_details scope=all 为题组成员生成 answer_item', () => {
+    const group = createQuestionGroupNode(5)
+    const child = createQuestionNode(fakeQuestion(2))
+    group.children = [child]
+    const details = createQuestionDetailsModule('all')
+    const normalized = normalizeDocument({ nodes: [group, details] })
+    expect(normalized.nodes[1]!.children.map((node) => node.sourceQuestionNodeId)).toEqual([child.id])
   })
 })
 
