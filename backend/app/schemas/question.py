@@ -241,8 +241,12 @@ class Question(QuestionBase):
         from_attributes = True
 
 
+class QuestionListItem(Question):
+    question_group_count: int = 0
+
+
 class QuestionPage(BaseModel):
-    items: List[Question]
+    items: List[QuestionListItem]
     total: int
     page: int
     size: int

@@ -256,12 +256,10 @@ const sourceFileUrl = computed(() => {
                 <Lock class="w-3 h-3" /> 私有
               </Badge>
 
-              <!-- Structure Badges -->
-              <Badge v-if="(item as DbQuestion).parent_id" variant="secondary" class="flex items-center gap-1 px-1.5 bg-indigo-50 text-indigo-700 hover:bg-indigo-100 dark:bg-indigo-500/10 dark:text-indigo-400">
-                 子题
-              </Badge>
-              <Badge v-if="(item as DbQuestion).children?.length" variant="secondary" class="flex items-center gap-1 px-1.5 bg-blue-50 text-blue-700 hover:bg-blue-100 dark:bg-blue-500/10 dark:text-blue-400">
-                 母题
+              <Badge v-if="((item as DbQuestion).question_group_count ?? 0) > 0" as-child variant="secondary">
+                <NuxtLink :to="{ path: '/question-groups', query: { question_id: item.id } }">
+                  属于 {{ (item as DbQuestion).question_group_count }} 个题组
+                </NuxtLink>
               </Badge>
 
               <!-- Fixed 5-star scale so difficulty is comparable at a glance across items -->
@@ -344,14 +342,14 @@ const sourceFileUrl = computed(() => {
                   @click="emit('decompose', item as DbQuestion)"
                 >
                   <GitFork class="h-4 w-4" />
-                  添加子题
+                  创建派生题
                 </DropdownMenuItem>
                 <DropdownMenuItem
                   v-if="(item as DbQuestion).children?.length || (item as DbQuestion).parent_id"
                   @click="emit('view-structure', item as DbQuestion)"
                 >
                   <Workflow class="h-4 w-4" />
-                  查看结构图谱
+                  查看派生关系
                 </DropdownMenuItem>
                 <DropdownMenuItem
                   v-if="!hideDelete"

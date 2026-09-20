@@ -51,9 +51,23 @@ async def group_ctx(db_session):
         is_active=True,
         is_superuser=False,
     )
+    admin = User(
+        username="group_admin",
+        full_name="Group Admin",
+        hashed_password="x",
+        is_active=True,
+        is_superuser=True,
+    )
+    stranger = User(
+        username="group_stranger",
+        full_name="Group Stranger",
+        hashed_password="x",
+        is_active=True,
+        is_superuser=False,
+    )
     humanities = Subject(name="历史", slug="history")
     science = Subject(name="物理", slug="physics-groups")
-    db_session.add_all([owner, other, humanities, science])
+    db_session.add_all([owner, other, admin, stranger, humanities, science])
     await db_session.flush()
     db_session.add_all(
         [
@@ -94,6 +108,8 @@ async def group_ctx(db_session):
     return {
         "owner": owner,
         "other": other,
+        "admin": admin,
+        "stranger": stranger,
         "subject": humanities,
         "other_subject": science,
         "questions": questions,
@@ -308,6 +324,272 @@ async def test_subject_permissions_and_private_stimulus_access(client, group_ctx
         headers=_auth(group_ctx["other"]),
     )
     assert hidden.status_code == 404
+
+
+async def test_subject_resource_lists_filter_paginate_and_count_active_groups(
+    client, db_session, group_ctx
+):
+    owner = group_ctx["owner"]
+    other = group_ctx["other"]
+    subject = group_ctx["subject"]
+    foreign_subject = group_ctx["other_subject"]
+    first, second = group_ctx["questions"][:2]
+    older = datetime(2025, 1, 1)
+    newer = datetime(2025, 1, 2)
+    stimuli = [
+        Stimulus(
+            subject_id=subject.id,
+            content=json.dumps(doc("older searchable passage")),
+            source="archive",
+            status="published",
+            created_by=owner.id,
+            updated_at=older,
+        ),
+        Stimulus(
+            subject_id=subject.id,
+            content=json.dumps(doc("newer passage")),
+            source="searchable source",
+            visibility=QuestionVisibility.PRIVATE.value,
+            created_by=owner.id,
+            updated_at=newer,
+        ),
+        Stimulus(
+            subject_id=subject.id,
+            content=json.dumps(doc("hidden passage")),
+            visibility=QuestionVisibility.PRIVATE.value,
+            created_by=group_ctx["stranger"].id,
+        ),
+        Stimulus(
+            subject_id=subject.id,
+            content=json.dumps(doc("deleted passage")),
+            created_by=owner.id,
+            deleted_at=datetime.utcnow(),
+        ),
+        Stimulus(
+            subject_id=foreign_subject.id,
+            content=json.dumps(doc("foreign passage")),
+            created_by=owner.id,
+        ),
+    ]
+    db_session.add_all(stimuli)
+    await db_session.flush()
+    groups = [
+        QuestionGroup(
+            subject_id=subject.id,
+            stimulus_id=stimuli[0].id,
+            source="older group",
+            status="published",
+            created_by=owner.id,
+            updated_at=older,
+        ),
+        QuestionGroup(
+            subject_id=subject.id,
+            stimulus_id=stimuli[1].id,
+            source="newer group",
+            visibility=QuestionVisibility.PRIVATE.value,
+            created_by=owner.id,
+            updated_at=newer,
+        ),
+        QuestionGroup(
+            subject_id=subject.id,
+            stimulus_id=stimuli[0].id,
+            source="deleted group",
+            created_by=owner.id,
+            deleted_at=datetime.utcnow(),
+        ),
+        QuestionGroup(
+            subject_id=foreign_subject.id,
+            stimulus_id=stimuli[4].id,
+            source="foreign group",
+            created_by=owner.id,
+        ),
+        QuestionGroup(
+            subject_id=subject.id,
+            stimulus_id=stimuli[2].id,
+            source="hidden private group",
+            visibility=QuestionVisibility.PRIVATE.value,
+            created_by=group_ctx["stranger"].id,
+        ),
+    ]
+    db_session.add_all(groups)
+    await db_session.flush()
+    db_session.add_all(
+        [
+            QuestionGroupItem(group_id=groups[0].id, question_id=first.id, position=9),
+            QuestionGroupItem(group_id=groups[0].id, question_id=second.id, position=2),
+            QuestionGroupItem(group_id=groups[1].id, question_id=first.id, position=0),
+            QuestionGroupItem(group_id=groups[2].id, question_id=second.id, position=0),
+            QuestionGroupItem(group_id=groups[4].id, question_id=first.id, position=0),
+        ]
+    )
+    await db_session.commit()
+
+    stimulus_page = await client.get(
+        f"{API}/subjects/{subject.id}/stimuli",
+        params={"page": 1, "size": 1},
+        headers=_auth(owner),
+    )
+    assert stimulus_page.status_code == 200, stimulus_page.text
+    assert stimulus_page.json()["total"] == 2
+    assert stimulus_page.json()["pages"] == 2
+    assert stimulus_page.json()["items"][0]["id"] == stimuli[1].id
+    assert stimulus_page.json()["items"][0]["question_group_count"] == 1
+
+    keyword = await client.get(
+        f"{API}/subjects/{subject.id}/stimuli",
+        params={"keyword": "searchable", "size": 10},
+        headers=_auth(owner),
+    )
+    assert {item["id"] for item in keyword.json()["items"]} == {
+        stimuli[0].id,
+        stimuli[1].id,
+    }
+
+    public_only = await client.get(
+        f"{API}/subjects/{subject.id}/stimuli",
+        params={"status": "published", "visibility": "public", "size": 10},
+        headers=_auth(owner),
+    )
+    assert [item["id"] for item in public_only.json()["items"]] == [stimuli[0].id]
+
+    viewer_page = await client.get(
+        f"{API}/subjects/{subject.id}/stimuli",
+        params={"size": 10},
+        headers=_auth(other),
+    )
+    assert [item["id"] for item in viewer_page.json()["items"]] == [stimuli[0].id]
+
+    admin_page = await client.get(
+        f"{API}/subjects/{subject.id}/stimuli",
+        params={"size": 10},
+        headers=_auth(group_ctx["admin"]),
+    )
+    assert admin_page.json()["total"] == 3
+
+    denied = await client.get(
+        f"{API}/subjects/{subject.id}/stimuli",
+        headers=_auth(group_ctx["stranger"]),
+    )
+    assert denied.status_code == 403
+    missing = await client.get(
+        f"{API}/subjects/999999/stimuli",
+        headers=_auth(group_ctx["admin"]),
+    )
+    assert missing.status_code == 404
+
+    group_page = await client.get(
+        f"{API}/subjects/{subject.id}/question-groups",
+        params={"question_id": first.id, "size": 10},
+        headers=_auth(owner),
+    )
+    assert group_page.status_code == 200, group_page.text
+    assert [item["id"] for item in group_page.json()["items"]] == [
+        groups[1].id,
+        groups[0].id,
+    ]
+    older_group = group_page.json()["items"][1]
+    assert [item["question_id"] for item in older_group["items"]] == [second.id, first.id]
+
+    viewer_groups = await client.get(
+        f"{API}/subjects/{subject.id}/question-groups",
+        params={"size": 10},
+        headers=_auth(other),
+    )
+    assert [item["id"] for item in viewer_groups.json()["items"]] == [groups[0].id]
+    admin_groups = await client.get(
+        f"{API}/subjects/{subject.id}/question-groups",
+        params={"size": 10},
+        headers=_auth(group_ctx["admin"]),
+    )
+    assert admin_groups.json()["total"] == 3
+
+    filtered_group = await client.get(
+        f"{API}/subjects/{subject.id}/question-groups",
+        params={
+            "status": "published",
+            "visibility": "public",
+            "stimulus_id": stimuli[0].id,
+            "size": 10,
+        },
+        headers=_auth(owner),
+    )
+    assert [item["id"] for item in filtered_group.json()["items"]] == [groups[0].id]
+
+    stimulus_keyword = await client.get(
+        f"{API}/subjects/{subject.id}/question-groups",
+        params={"keyword": "older searchable", "size": 10},
+        headers=_auth(owner),
+    )
+    assert [item["id"] for item in stimulus_keyword.json()["items"]] == [groups[0].id]
+
+
+async def test_question_list_filters_membership_and_returns_active_group_counts(
+    client, db_session, group_ctx
+):
+    owner = group_ctx["owner"]
+    subject = group_ctx["subject"]
+    first, second, standalone = group_ctx["questions"][:3]
+    stimulus = Stimulus(
+        subject_id=subject.id,
+        content=json.dumps(doc("membership material")),
+        created_by=owner.id,
+    )
+    db_session.add(stimulus)
+    await db_session.flush()
+    groups = [
+        QuestionGroup(subject_id=subject.id, stimulus_id=stimulus.id, created_by=owner.id),
+        QuestionGroup(subject_id=subject.id, stimulus_id=stimulus.id, created_by=owner.id),
+        QuestionGroup(
+            subject_id=subject.id,
+            stimulus_id=stimulus.id,
+            created_by=owner.id,
+            deleted_at=datetime.utcnow(),
+        ),
+    ]
+    db_session.add_all(groups)
+    await db_session.flush()
+    db_session.add_all(
+        [
+            QuestionGroupItem(group_id=groups[0].id, question_id=first.id, position=0),
+            QuestionGroupItem(group_id=groups[0].id, question_id=second.id, position=1),
+            QuestionGroupItem(group_id=groups[1].id, question_id=first.id, position=0),
+            QuestionGroupItem(group_id=groups[2].id, question_id=standalone.id, position=0),
+        ]
+    )
+    await db_session.commit()
+
+    grouped = await client.get(
+        f"{API}/questions",
+        params={
+            "subject_id": subject.id,
+            "in_question_group": "true",
+            "size": 10,
+        },
+        headers=_auth(owner),
+    )
+    assert grouped.status_code == 200, grouped.text
+    assert grouped.json()["total"] == 2
+    assert {
+        item["id"]: item["question_group_count"] for item in grouped.json()["items"]
+    } == {first.id: 2, second.id: 1}
+
+    ungrouped = await client.get(
+        f"{API}/questions",
+        params={
+            "subject_id": subject.id,
+            "in_question_group": "false",
+            "size": 10,
+        },
+        headers=_auth(owner),
+    )
+    assert ungrouped.status_code == 200, ungrouped.text
+    assert ungrouped.json()["total"] == 1
+    assert ungrouped.json()["items"][0]["id"] == standalone.id
+    assert ungrouped.json()["items"][0]["question_group_count"] == 0
+
+    detail = await client.get(f"{API}/questions/{first.id}", headers=_auth(owner))
+    assert detail.status_code == 200, detail.text
+    assert "question_group_count" not in detail.json()
 
 
 async def test_relation_rejects_self_duplicate_and_directed_cycle(db_session, group_ctx):

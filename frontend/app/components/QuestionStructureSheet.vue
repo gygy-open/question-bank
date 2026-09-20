@@ -59,9 +59,9 @@ const isOpen = computed({
   <Sheet v-model:open="isOpen">
     <SheetContent class="w-[600px] sm:w-[800px] overflow-y-auto">
       <SheetHeader>
-        <SheetTitle>题目结构图谱</SheetTitle>
+        <SheetTitle>题目派生关系</SheetTitle>
         <SheetDescription>
-          查看题目拆解关系及涉及的知识点
+          查看来源题、派生题及涉及的知识点
         </SheetDescription>
       </SheetHeader>
       
@@ -77,7 +77,7 @@ const isOpen = computed({
           
           <div class="border rounded-lg p-4 bg-muted/40 border-dashed relative z-10">
             <div class="flex items-center gap-2 mb-2">
-              <Badge variant="outline" class="bg-background">母题</Badge>
+              <Badge variant="outline" class="bg-background">来源题</Badge>
               <span class="text-sm text-muted-foreground">ID: {{ question.parent.id }}</span>
               <Button variant="link" size="sm" class="h-auto p-0 ml-auto text-xs" @click="fetchQuestion(question.parent!.id)">
                 查看此题
@@ -112,13 +112,14 @@ const isOpen = computed({
 
           <!-- Children -->
           <div v-if="question.children?.length" class="mt-6 space-y-6 pl-8">
-            <div v-for="(child, index) in question.children" :key="child.id" class="relative">
+            <div v-for="child in question.children" :key="child.id" class="relative">
               <!-- Connector -->
               <div class="absolute -left-8 top-6 w-8 h-px bg-border"></div>
               <div class="absolute -left-8 top-6 w-2 h-2 rounded-full bg-border -translate-x-1/2"></div>
               
               <div class="border rounded-lg p-4 bg-muted/30">
                 <div class="flex items-center gap-2 mb-2">
+                  <Badge variant="outline">派生题</Badge>
                   <span class="text-sm text-muted-foreground">ID: {{ child.id }}</span>
                 </div>
                 <RichContent :content="child.content" class="text-sm" />
@@ -135,7 +136,7 @@ const isOpen = computed({
           </div>
           
           <div v-else class="mt-4 text-sm text-muted-foreground italic pl-4">
-            暂无拆解步骤
+            暂无派生题
           </div>
         </div>
       </div>

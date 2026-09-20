@@ -1,16 +1,22 @@
-from typing import Any
+import math
+from typing import Any, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 
 from app import models
 from app.api import deps
 from app.core.permissions import Permission
+from app.crud.crud_question_group import question_group as crud_question_group
+from app.crud.crud_question_group import stimulus as crud_stimulus
 from app.crud.crud_subject import subject as crud_subject
 from app.schemas.question_group import (
     QuestionGroupCreate,
+    QuestionGroupPage,
     QuestionGroupRead,
     QuestionGroupUpdate,
     StimulusCreate,
+    StimulusListItem,
+    StimulusPage,
     StimulusRead,
     StimulusUpdate,
 )
@@ -48,6 +54,45 @@ async def create_stimulus(
         source=payload.source,
         metadata=payload.metadata,
     )
+
+
+@router.get("/{subject_id}/stimuli", response_model=StimulusPage)
+async def read_stimuli(
+    subject_id: int,
+    db: deps.SessionDep,
+    page: int = Query(1, ge=1),
+    size: int = Query(10, ge=1, le=100),
+    keyword: Optional[str] = None,
+    status_value: Optional[str] = Query(None, alias="status"),
+    visibility: Optional[str] = None,
+    current_user: models.User = Depends(deps.get_current_active_user),
+) -> Any:
+    await _require_subject(db, subject_id)
+    deps.require(current_user, Permission.VIEW_QUESTION, subject_id=subject_id)
+    rows, total = await crud_stimulus.get_page(
+        db,
+        subject_id=subject_id,
+        viewer_id=current_user.id,
+        is_superuser=current_user.is_superuser,
+        skip=(page - 1) * size,
+        limit=size,
+        keyword=keyword,
+        status=status_value,
+        visibility=visibility,
+    )
+    items = [
+        StimulusListItem.model_validate(stimulus).model_copy(
+            update={"question_group_count": group_count}
+        )
+        for stimulus, group_count in rows
+    ]
+    return {
+        "items": items,
+        "total": total,
+        "page": page,
+        "size": size,
+        "pages": math.ceil(total / size),
+    }
 
 
 @router.get("/{subject_id}/stimuli/{stimulus_id}", response_model=StimulusRead)
@@ -115,6 +160,43 @@ async def create_question_group(
         source=payload.source,
         metadata=payload.metadata,
     )
+
+
+@router.get("/{subject_id}/question-groups", response_model=QuestionGroupPage)
+async def read_question_groups(
+    subject_id: int,
+    db: deps.SessionDep,
+    page: int = Query(1, ge=1),
+    size: int = Query(10, ge=1, le=100),
+    keyword: Optional[str] = None,
+    status_value: Optional[str] = Query(None, alias="status"),
+    visibility: Optional[str] = None,
+    stimulus_id: Optional[int] = None,
+    question_id: Optional[int] = None,
+    current_user: models.User = Depends(deps.get_current_active_user),
+) -> Any:
+    await _require_subject(db, subject_id)
+    deps.require(current_user, Permission.VIEW_QUESTION, subject_id=subject_id)
+    items, total = await crud_question_group.get_page(
+        db,
+        subject_id=subject_id,
+        viewer_id=current_user.id,
+        is_superuser=current_user.is_superuser,
+        skip=(page - 1) * size,
+        limit=size,
+        keyword=keyword,
+        status=status_value,
+        visibility=visibility,
+        stimulus_id=stimulus_id,
+        question_id=question_id,
+    )
+    return {
+        "items": items,
+        "total": total,
+        "page": page,
+        "size": size,
+        "pages": math.ceil(total / size),
+    }
 
 
 @router.get(

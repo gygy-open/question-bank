@@ -1,7 +1,7 @@
 from typing import List, Optional, Union, Dict, Any
 from datetime import datetime
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func, or_, and_, true, false
+from sqlalchemy import select, func, or_, and_, true, false, exists
 from sqlalchemy.orm import selectinload
 from app.crud.base import CRUDBase
 from app.models.question import Question, QuestionStatus, QuestionType, QuestionVisibility
@@ -20,6 +20,7 @@ from app.services.question_content import (
 from app.models.knowledge_point import KnowledgePoint
 from app.models.import_task import ImportTask
 from app.models.activity_log import ActivityLog
+from app.models.question_group import QuestionGroup, QuestionGroupItem
 
 
 def visible_questions_filter(viewer):
@@ -121,6 +122,7 @@ class CRUDQuestion(CRUDBase[Question, QuestionCreate, QuestionUpdate]):
         ids: Optional[List[int]] = None,
         source: Optional[str] = None,
         root_only: bool = False,
+        in_question_group: Optional[bool] = None,
         viewer=None,
     ):
         # Define recursive loading paths
@@ -205,6 +207,17 @@ class CRUDQuestion(CRUDBase[Question, QuestionCreate, QuestionUpdate]):
         if root_only:
             query = query.filter(self.model.parent_id.is_(None))
 
+        if in_question_group is not None:
+            active_membership = exists(
+                select(QuestionGroupItem.id)
+                .join(QuestionGroup, QuestionGroup.id == QuestionGroupItem.group_id)
+                .where(
+                    QuestionGroupItem.question_id == self.model.id,
+                    QuestionGroup.deleted_at.is_(None),
+                )
+            )
+            query = query.filter(active_membership if in_question_group else ~active_membership)
+
         if review_count is not None:
             query = query.filter(self.model.review_count == review_count)
             
@@ -248,6 +261,7 @@ class CRUDQuestion(CRUDBase[Question, QuestionCreate, QuestionUpdate]):
         ids: Optional[List[int]] = None,
         source: Optional[str] = None,
         root_only: bool = False,
+        in_question_group: Optional[bool] = None,
         viewer=None
     ) -> List[Question]:
         query = await self._get_filter_query(
@@ -268,11 +282,28 @@ class CRUDQuestion(CRUDBase[Question, QuestionCreate, QuestionUpdate]):
             ids=ids,
             source=source,
             root_only=root_only,
+            in_question_group=in_question_group,
             viewer=viewer
         )
         query = query.offset(skip).limit(limit).order_by(self.model.created_at.desc())
         result = await db.execute(query)
         return result.scalars().all()
+
+    async def get_question_group_counts(
+        self, db: AsyncSession, *, question_ids: List[int]
+    ) -> Dict[int, int]:
+        if not question_ids:
+            return {}
+        result = await db.execute(
+            select(QuestionGroupItem.question_id, func.count(QuestionGroupItem.group_id))
+            .join(QuestionGroup, QuestionGroup.id == QuestionGroupItem.group_id)
+            .where(
+                QuestionGroupItem.question_id.in_(question_ids),
+                QuestionGroup.deleted_at.is_(None),
+            )
+            .group_by(QuestionGroupItem.question_id)
+        )
+        return {question_id: count for question_id, count in result.all()}
 
     async def get_multi_by_ids(self, db: AsyncSession, *, ids: List[int]) -> List[Question]:
         """
@@ -302,6 +333,7 @@ class CRUDQuestion(CRUDBase[Question, QuestionCreate, QuestionUpdate]):
         ids: Optional[List[int]] = None,
         source: Optional[str] = None,
         root_only: bool = False,
+        in_question_group: Optional[bool] = None,
         viewer=None
     ) -> int:
         query = await self._get_filter_query(
@@ -322,6 +354,7 @@ class CRUDQuestion(CRUDBase[Question, QuestionCreate, QuestionUpdate]):
             ids=ids,
             source=source,
             root_only=root_only,
+            in_question_group=in_question_group,
             viewer=viewer
         )
         # Use subquery for count to handle joins correctly

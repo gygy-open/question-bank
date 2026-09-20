@@ -254,14 +254,117 @@ export interface Question {
   parent_id?: number
   parent?: Question
   children?: Question[]
+  question_group_count?: number
+}
+
+export interface QuestionListItem extends Question {
+  question_group_count: number
 }
 
 export interface QuestionPage {
-  items: Question[]
+  items: QuestionListItem[]
   total: number
   page: number
   size: number
   pages: number
+}
+
+export interface StimulusListItem {
+  id: number
+  subject_id: number
+  content: RichDoc
+  status: QuestionStatus
+  visibility: 'public' | 'private'
+  source?: string | null
+  metadata: Record<string, unknown>
+  revision: number
+  created_by?: number | null
+  updated_by?: number | null
+  created_at: string
+  updated_at: string
+  question_group_count: number
+}
+
+export interface StimulusPage {
+  items: StimulusListItem[]
+  total: number
+  page: number
+  size: number
+  pages: number
+}
+
+export type Stimulus = Omit<StimulusListItem, 'question_group_count'>
+
+export interface StimulusCreateRequest {
+  content: RichDoc
+  status: QuestionStatus
+  visibility: 'public' | 'private'
+  source?: string | null
+}
+
+export interface StimulusUpdateRequest extends StimulusCreateRequest {
+  expected_revision: number
+}
+
+export interface QuestionSummary {
+  id: number
+  content: RichDoc
+  options?: OptionSpec[] | null
+  answer?: AnswerSpec | null
+  thinking?: RichDoc
+  analysis?: RichDoc
+  summary?: RichDoc
+  q_type: QuestionType
+  status: QuestionStatus
+  difficulty: number
+  visibility: 'public' | 'private'
+  source?: string | null
+  parent_id?: number | null
+  created_at: string
+  updated_at: string
+}
+
+export interface QuestionGroupItem {
+  question_id: number
+  position: number
+  question: QuestionSummary
+}
+
+export interface QuestionGroup {
+  id: number
+  subject_id: number
+  stimulus_id: number
+  status: QuestionStatus
+  visibility: 'public' | 'private'
+  source?: string | null
+  metadata: Record<string, unknown>
+  revision: number
+  created_by?: number | null
+  updated_by?: number | null
+  created_at: string
+  updated_at: string
+  stimulus: Omit<StimulusListItem, 'question_group_count'>
+  items: QuestionGroupItem[]
+}
+
+export interface QuestionGroupPage {
+  items: QuestionGroup[]
+  total: number
+  page: number
+  size: number
+  pages: number
+}
+
+export interface QuestionGroupWriteRequest {
+  stimulus_id: number
+  status: QuestionStatus
+  visibility: 'public' | 'private'
+  source?: string | null
+  items: Array<{ question_id: number, position: number }>
+}
+
+export interface QuestionGroupUpdateRequest extends QuestionGroupWriteRequest {
+  expected_revision: number
 }
 
 

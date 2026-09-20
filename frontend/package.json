@@ -16,7 +16,7 @@
   },
   "dependencies": {
     "@floating-ui/dom": "^1.8.0",
-    "@lucide/vue": "^1.28.0",
+    "@lucide/vue": "^1.47.0",
     "@radix-icons/vue": "^1.0.0",
     "@tanstack/vue-table": "^8.21.3",
     "@tiptap/core": "^3.30.2",

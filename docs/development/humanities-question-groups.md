@@ -1,8 +1,8 @@
 # 文科材料题与题目派生关系设计
 
-> 状态：后端第一阶段已实现，前端与题组原生组稿仍待完成  
+> 状态：阶段四题库前端已完成，智能导入审核与题组原生组稿仍待完成
 > 实施分支：`feature/humanities-question-groups`  
-> 更新日期：2026-09-19
+> 更新日期：2026-09-20
 
 ## 背景
 
@@ -21,6 +21,10 @@
 2. `QuestionRelation` 表达 AI 拆题产生的题目派生谱系。
 
 ## 设计原则
+
+### 术语与领域边界
+
+中文用户界面统一使用“题目材料”，避免简称为“材料”；后端模型、API 契约和代码标识继续使用 `Stimulus`。`Question` 是可作答、可评分的题目；`Stimulus` 是不可作答、可复用的上下文；`QuestionGroup` 由一份 `Stimulus` 和若干有序 `Question` 组成，不承担题号、分值或版面；`Composition` 负责具体稿件中的题号、分值和版面。
 
 ### 材料与可作答题目分离
 
@@ -131,9 +135,11 @@ parent_id 指向的原题 -> 当前题，relation_type = decomposed_from
 | 方法 | 路径 | 用途 |
 | --- | --- | --- |
 | `POST` | `/subjects/{subject_id}/stimuli` | 创建材料 |
+| `GET` | `/subjects/{subject_id}/stimuli` | 分页查询材料，支持关键词、状态和可见性筛选 |
 | `GET` | `/subjects/{subject_id}/stimuli/{stimulus_id}` | 获取材料 |
 | `PUT` | `/subjects/{subject_id}/stimuli/{stimulus_id}` | 更新材料 |
 | `POST` | `/subjects/{subject_id}/question-groups` | 创建题组 |
+| `GET` | `/subjects/{subject_id}/question-groups` | 分页查询题组，支持关键词、状态、可见性、材料 ID 和题目 ID 筛选 |
 | `GET` | `/subjects/{subject_id}/question-groups/{group_id}` | 获取材料及有序小题 |
 | `PUT` | `/subjects/{subject_id}/question-groups/{group_id}` | 更新材料引用、成员或顺序 |
 | `DELETE` | `/subjects/{subject_id}/question-groups/{group_id}` | 软删除题组 |
@@ -187,6 +193,19 @@ parent_id 指向的原题 -> 当前题，relation_type = decomposed_from
 
 这保证了现有稿件和导出链路可继续工作，但稿件中只保留展开后的内容快照，没有 `question_group_id`、`group_revision` 或 `stimulus_revision`。
 
+### 题库前端
+
+阶段四已提供以下 SPA 路由：
+
+- `/materials`、`/materials/new`、`/materials/{id}/edit`：材料分页列表、筛选、创建和编辑。
+- `/question-groups`、`/question-groups/new`、`/question-groups/{id}/edit`：题组分页列表、筛选、创建和编辑。
+
+题组编辑器支持选择或新建材料、选择或新建题目、拖拽及按钮排序、移除成员、状态/可见性/来源编辑和 revision 冲突处理。公开题组会在前端标记并禁止选择私有材料或私有题目；历史遗留的不兼容组合会保留展示，但必须解决后才能保存，后端仍是最终校验边界。
+
+材料和题组编辑器会保护未保存草稿：路由离开和关闭页面前提示确认；全局学科切换后保留原学科草稿、不重新加载覆盖，并提示用户切回原学科或返回列表。KeepAlive 再激活不会覆盖 dirty 草稿。
+
+材料选择器避免重复选择当前材料，题目选择器避免重复添加已有成员。题组列表删除遇到 revision `409` 时会刷新列表并提示用户重新确认。题库题目项提供“创建派生题”和“查看派生关系”，关系面板使用“来源题/派生题”术语。
+
 ## 如何验收
 
 ### 自动化测试
@@ -204,7 +223,17 @@ uv run pytest \
   tests/test_migrations.py -q
 ```
 
-当前分支于 2026-09-19 执行结果为：`54 passed, 1 skipped`。跳过项是未设置 `MYSQL_TEST_URL` 时的真实 MySQL 迁移测试；SQLite 测试、模型迁移漂移检查及其余聚焦测试均通过。测试过程中存在一个既有 SQLAlchemy 警告：`subjects` 与 `user` 的相互外键使表排序无法完全解析，本次改动未新增该警告。
+当前分支于 2026-09-20 执行结果为：`56 passed, 1 skipped`。跳过项是未设置 `MYSQL_TEST_URL` 时的真实 MySQL 迁移测试；SQLite 测试、模型迁移漂移检查及其余聚焦测试均通过。测试过程中存在一个既有 SQLAlchemy 警告：`subjects` 与 `user` 的相互外键使表排序无法完全解析，本次改动未新增该警告。
+
+前端于 2026-09-20 执行：
+
+```bash
+cd frontend
+pnpm test
+pnpm generate
+```
+
+结果为：Vitest `21 passed` 个测试文件、`248 passed` 个测试；Nuxt 静态生成成功并预渲染 24 个路由。生成过程仅有 KaTeX quirks mode、较大 chunk 和 SPA 无 SSR 的既有提示。本次未执行手工浏览器验收，因此不声明视觉或交互手工验收已通过。
 
 重点验收场景：
 
@@ -240,13 +269,9 @@ TEST_MYSQL_URL='mysql+aiomysql://...' uv run pytest tests/test_migrations.py -q
 
 ## 待完成
 
-### 前端创编与审核
+### 智能导入审核
 
-- 增加材料创建、编辑和复用界面。
-- 增加题组编辑器，支持从题库选择或新建小题、拖拽排序和移除成员。
-- 题库列表区分独立题、题组和题组成员。
 - 智能导入审核页显示“材料 -> 小题”结构，允许拆组、合组、换序和修正引用。
-- 将现有“母子题”界面改为语义明确的“题目派生关系”视图。
 
 ### 题组原生组稿
 

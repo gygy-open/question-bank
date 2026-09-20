@@ -34,6 +34,7 @@ async def read_questions(
     ids: List[int] = Query(None),
     source: Optional[str] = None,
     root_only: bool = False,
+    in_question_group: Optional[bool] = None,
     current_user: models.User = Depends(deps.get_current_active_user),
 ) -> Any:
     skip = (page - 1) * size
@@ -57,6 +58,7 @@ async def read_questions(
         ids=ids,
         source=source,
         root_only=root_only,
+        in_question_group=in_question_group,
         viewer=current_user
     )
     total = await crud.question.count_with_filters(
@@ -77,12 +79,22 @@ async def read_questions(
         ids=ids,
         source=source,
         root_only=root_only,
+        in_question_group=in_question_group,
         viewer=current_user
     )
+    group_counts = await crud.question.get_question_group_counts(
+        db, question_ids=[question.id for question in questions]
+    )
+    items = [
+        schemas.QuestionListItem.model_validate(question).model_copy(
+            update={"question_group_count": group_counts.get(question.id, 0)}
+        )
+        for question in questions
+    ]
     
     import math
     return {
-        "items": questions,
+        "items": items,
         "total": total,
         "page": page,
         "size": size,

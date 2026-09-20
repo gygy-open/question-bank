@@ -47,6 +47,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
+import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
 import ClearableInput from '@/components/ClearableInput.vue'
 import ClearableSelect from '@/components/ClearableSelect.vue'
 import { toast } from 'vue-sonner'
@@ -92,6 +93,7 @@ const filters = reactive({
   id: undefined as string | undefined,
   source: undefined as string | undefined,
   root_only: false,
+  membership: 'all' as 'all' | 'independent' | 'grouped',
 })
 
 // Initialize filters from route query
@@ -159,8 +161,13 @@ const queryParams = computed(() => {
   if (filters.keyword) params.keyword = filters.keyword
   if (filters.source) params.source = filters.source
   if (filters.root_only) params.root_only = true
+  if (filters.membership !== 'all') params.in_question_group = filters.membership === 'grouped'
   
   return params
+})
+
+watch(() => filters.membership, () => {
+  page.value = 1
 })
 
 // Count of active filters tucked away in the "more filters" popover, so it can carry a badge.
@@ -476,6 +483,7 @@ const resetFilters = () => {
   filters.keyword = undefined
   filters.source = undefined
   filters.root_only = false
+  filters.membership = 'all'
   page.value = 1
   
   // Remove query param
@@ -528,7 +536,7 @@ const viewStructure = (question: Question) => {
 
 <template>
   <!-- Header -->
-  <PageHeader title="题目管理">
+  <PageHeader title="题目">
     <template #actions>
       <Button v-if="canEditCurrentSubject" size="sm" @click="createQuestion">
         <Plus class="mr-2 h-4 w-4" />
@@ -538,6 +546,7 @@ const viewStructure = (question: Question) => {
   </PageHeader>
   <div class="flex flex-1 flex-col">
     <div class="@container/main flex flex-1 flex-col px-4 space-y-6 py-6">
+      <p class="text-sm text-muted-foreground">可独立作答和评分的基本单元；加入题组只建立引用，不改变题目本身。</p>
       
       <div v-if="filters.import_task_id" class="bg-primary/10 text-primary px-4 py-3 rounded-md flex items-center justify-between">
           <span class="text-sm font-medium">正在查看最新导入的题目任务</span>
@@ -631,6 +640,21 @@ const viewStructure = (question: Question) => {
                       :categories="tagCategories || []" 
                     />
                   </div>
+                  </div>
+
+                  <div class="space-y-2">
+                    <Label class="text-xs font-medium">归属</Label>
+                    <ToggleGroup
+                      :model-value="filters.membership"
+                      type="single"
+                      variant="outline"
+                      size="sm"
+                      @update:model-value="filters.membership = ($event || 'all') as typeof filters.membership"
+                    >
+                      <ToggleGroupItem value="all">全部</ToggleGroupItem>
+                      <ToggleGroupItem value="independent">独立题</ToggleGroupItem>
+                      <ToggleGroupItem value="grouped">题组成员</ToggleGroupItem>
+                    </ToggleGroup>
                   </div>
 
                   <!-- Actions group: pinned to the row's trailing edge, visually separate from the filter fields -->

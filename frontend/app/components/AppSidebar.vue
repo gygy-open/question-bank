@@ -26,7 +26,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import UserProfileDialog from '~/components/UserProfileDialog.vue'
 import ChangePasswordDialog from '~/components/ChangePasswordDialog.vue'
 import { useColorMode } from '@vueuse/core'
-import { BookOpen, ChevronsUpDown, ListTree, LogOut, Settings, Sparkles, User, Users, Tags, Library, HelpCircle, KeyRound, Activity, Layers, Info, Moon, Sun, Bot, Lock } from '@lucide/vue'
+import { BookOpen, ChevronsUpDown, ListTree, ListOrdered, LogOut, Settings, Sparkles, User, Users, Tags, Library, KeyRound, Activity, Layers, Info, Moon, Sun, Bot, Lock, SquareText } from '@lucide/vue'
 
 const props = withDefaults(defineProps<SidebarProps>(), {
   collapsible: "icon",
@@ -97,13 +97,29 @@ const navActiveClass = 'border-l-2 border-transparent data-[active=true]:border-
       <SidebarGroup>
         <SidebarGroupContent class="flex flex-col gap-3">
           <div>
-            <SidebarGroupLabel>素材</SidebarGroupLabel>
+            <SidebarGroupLabel>题库</SidebarGroupLabel>
             <SidebarMenu>
               <SidebarMenuItem>
-                <SidebarMenuButton as-child :is-active="route.path === '/questions'" :class="navActiveClass">
+                <SidebarMenuButton as-child :is-active="route.path === '/questions' || route.path.startsWith('/questions/')" :class="navActiveClass">
                   <NuxtLink to="/questions">
                     <BookOpen />
-                    <span>题目管理</span>
+                    <span>题目</span>
+                  </NuxtLink>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+              <SidebarMenuItem>
+                <SidebarMenuButton as-child :is-active="route.path === '/question-groups' || route.path.startsWith('/question-groups/')" :class="navActiveClass">
+                  <NuxtLink to="/question-groups">
+                    <ListOrdered />
+                    <span>题组</span>
+                  </NuxtLink>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+              <SidebarMenuItem>
+                <SidebarMenuButton as-child :is-active="route.path === '/materials' || route.path.startsWith('/materials/')" :class="navActiveClass">
+                  <NuxtLink to="/materials">
+                    <SquareText />
+                    <span>题目材料</span>
                   </NuxtLink>
                 </SidebarMenuButton>
               </SidebarMenuItem>

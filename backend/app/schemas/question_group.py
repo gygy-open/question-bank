@@ -50,6 +50,18 @@ class StimulusRead(BaseModel):
         from_attributes = True
 
 
+class StimulusListItem(StimulusRead):
+    question_group_count: int = 0
+
+
+class StimulusPage(BaseModel):
+    items: List[StimulusListItem]
+    total: int
+    page: int
+    size: int
+    pages: int
+
+
 class QuestionGroupItemInput(BaseModel):
     question_id: int
     position: int = Field(ge=0)
@@ -130,6 +142,14 @@ class QuestionGroupRead(BaseModel):
 
     class Config:
         from_attributes = True
+
+
+class QuestionGroupPage(BaseModel):
+    items: List[QuestionGroupRead]
+    total: int
+    page: int
+    size: int
+    pages: int
 
 
 class QuestionRelationCreate(BaseModel):
