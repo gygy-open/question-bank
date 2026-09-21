@@ -70,13 +70,14 @@ const visibilityOptions = [
 </script>
 
 <template>
-  <PageHeader title="题目材料">
+  <PageHeader title="题库">
     <template #actions>
       <Button v-if="canEdit" as-child size="sm">
         <NuxtLink to="/materials/new"><Plus class="mr-2 size-4" />创建题目材料</NuxtLink>
       </Button>
     </template>
   </PageHeader>
+  <QuestionBankNav />
 
   <main class="flex flex-1 flex-col gap-5 px-4 py-6">
     <p class="text-sm text-muted-foreground">供一道或多道题共同引用的文章、图表或背景内容；本身不可作答，也不包含答案和题型。</p>

@@ -110,11 +110,12 @@ const clearQuestionFilter = () => {
 </script>
 
 <template>
-  <PageHeader title="题组">
+  <PageHeader title="题库">
     <template #actions>
       <Button v-if="canEdit" as-child size="sm"><NuxtLink to="/question-groups/new"><Plus class="mr-2 size-4" />创建题组</NuxtLink></Button>
     </template>
   </PageHeader>
+  <QuestionBankNav />
 
   <main class="flex flex-1 flex-col gap-5 px-4 py-6">
     <p class="text-sm text-muted-foreground">由一份题目材料和若干有序题目组成；题号、分值和试卷版面由具体稿件管理。</p>

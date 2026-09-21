@@ -536,7 +536,7 @@ const viewStructure = (question: Question) => {
 
 <template>
   <!-- Header -->
-  <PageHeader title="题目">
+  <PageHeader title="题库">
     <template #actions>
       <Button v-if="canEditCurrentSubject" size="sm" @click="createQuestion">
         <Plus class="mr-2 h-4 w-4" />
@@ -544,6 +544,7 @@ const viewStructure = (question: Question) => {
       </Button>
     </template>
   </PageHeader>
+  <QuestionBankNav />
   <div class="flex flex-1 flex-col">
     <div class="@container/main flex flex-1 flex-col px-4 space-y-6 py-6">
       <p class="text-sm text-muted-foreground">可独立作答和评分的基本单元；加入题组只建立引用，不改变题目本身。</p>
