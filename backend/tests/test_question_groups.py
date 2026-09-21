@@ -679,6 +679,149 @@ async def test_relation_requires_edit_permission_and_private_visibility(db_sessi
         )
 
 
+async def test_relation_read_returns_visible_one_hop_sources_and_targets(
+    client, db_session, group_ctx
+):
+    source, target, private, _ = group_ctx["questions"]
+    actor = await _load_actor(db_session, group_ctx["owner"].id)
+    await create_question_relation(
+        db_session,
+        source_question_id=source.id,
+        target_question_id=target.id,
+        actor=actor,
+    )
+    await create_question_relation(
+        db_session,
+        source_question_id=private.id,
+        target_question_id=target.id,
+        actor=actor,
+    )
+
+    owner_response = await client.get(
+        f"{API}/questions/{target.id}/relations",
+        headers=_auth(group_ctx["owner"]),
+    )
+    assert owner_response.status_code == 200, owner_response.text
+    owner_body = owner_response.json()
+    assert owner_body["question_id"] == target.id
+    assert {item["question"]["id"] for item in owner_body["sources"]} == {
+        source.id,
+        private.id,
+    }
+    assert owner_body["targets"] == []
+
+    viewer_response = await client.get(
+        f"{API}/questions/{target.id}/relations",
+        headers=_auth(group_ctx["other"]),
+    )
+    assert viewer_response.status_code == 200, viewer_response.text
+    viewer_body = viewer_response.json()
+    assert [item["question"]["id"] for item in viewer_body["sources"]] == [source.id]
+
+    source_response = await client.get(
+        f"{API}/questions/{source.id}/relations",
+        headers=_auth(group_ctx["other"]),
+    )
+    assert source_response.status_code == 200, source_response.text
+    assert [item["question"]["id"] for item in source_response.json()["targets"]] == [
+        target.id
+    ]
+
+    question_page = await client.get(
+        f"{API}/questions",
+        params={"subject_id": group_ctx["subject"].id, "size": 10},
+        headers=_auth(group_ctx["other"]),
+    )
+    assert question_page.status_code == 200, question_page.text
+    counts = {
+        item["id"]: (item["incoming_relation_count"], item["outgoing_relation_count"])
+        for item in question_page.json()["items"]
+    }
+    assert counts[target.id] == (1, 0)
+    assert counts[source.id] == (0, 1)
+
+
+async def test_relation_api_links_and_unlinks_without_deleting_questions(
+    client, db_session, group_ctx
+):
+    source, target = group_ctx["questions"][:2]
+    created = await client.post(
+        f"{API}/questions/{source.id}/relations",
+        json={"target_question_id": target.id},
+        headers=_auth(group_ctx["owner"]),
+    )
+    assert created.status_code == 201, created.text
+    assert created.json()["source_question_id"] == source.id
+    assert created.json()["target_question_id"] == target.id
+
+    removed = await client.delete(
+        f"{API}/questions/{source.id}/relations/{target.id}",
+        headers=_auth(group_ctx["owner"]),
+    )
+    assert removed.status_code == 204, removed.text
+    assert await db_session.get(Question, source.id) is not None
+    assert await db_session.get(Question, target.id) is not None
+    relation_count = await db_session.scalar(select(func.count(QuestionRelation.id)))
+    assert relation_count == 0
+
+
+async def test_derived_question_api_creates_question_and_relation_atomically(
+    client, db_session, group_ctx
+):
+    source = group_ctx["questions"][0]
+    response = await client.post(
+        f"{API}/questions/{source.id}/derived-questions",
+        json={
+            "content": doc("新派生题"),
+            "q_type": QuestionType.FREE_RESPONSE.value,
+            "subject_id": group_ctx["other_subject"].id,
+        },
+        headers=_auth(group_ctx["owner"]),
+    )
+    assert response.status_code == 201, response.text
+    derived = response.json()
+    assert derived["subject_id"] == source.subject_id
+    assert "parent_id" not in derived
+
+    relation = await db_session.scalar(
+        select(QuestionRelation).where(
+            QuestionRelation.source_question_id == source.id,
+            QuestionRelation.target_question_id == derived["id"],
+        )
+    )
+    assert relation is not None
+
+
+async def test_ordinary_question_writes_reject_legacy_relation_fields(
+    client, group_ctx
+):
+    payload = {
+        "content": doc("普通题"),
+        "q_type": QuestionType.FREE_RESPONSE.value,
+        "subject_id": group_ctx["subject"].id,
+    }
+    create_with_parent = await client.post(
+        f"{API}/questions",
+        json={**payload, "parent_id": group_ctx["questions"][0].id},
+        headers=_auth(group_ctx["owner"]),
+    )
+    assert create_with_parent.status_code == 422
+
+    create_with_children = await client.post(
+        f"{API}/questions",
+        json={**payload, "children": [payload]},
+        headers=_auth(group_ctx["owner"]),
+    )
+    assert create_with_children.status_code == 422
+
+    update_with_parent = await client.put(
+        f"{API}/questions/{group_ctx['questions'][0].id}",
+        json={"parent_id": None},
+        headers=_auth(group_ctx["owner"]),
+    )
+    assert update_with_parent.status_code == 422
+
+
 async def test_question_subject_change_checks_target_permission_and_existing_links(
     client, db_session, group_ctx
 ):

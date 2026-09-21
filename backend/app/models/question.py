@@ -3,7 +3,7 @@ from sqlalchemy import (
     DateTime, JSON, String, text,
 )
 from sqlalchemy.dialects.mysql import LONGTEXT
-from sqlalchemy.orm import relationship, backref
+from sqlalchemy.orm import relationship
 from datetime import datetime
 import enum
 from .base import Base
@@ -86,7 +86,6 @@ class Question(Base):
 
     subject_id = Column(Integer, ForeignKey('subjects.id'), nullable=True)
     import_task_id = Column(Integer, ForeignKey('import_tasks.id'), nullable=True)
-    parent_id = Column(Integer, ForeignKey('questions.id'), nullable=True, index=True)
     source = Column(String(255), nullable=True) # 来源 (例如导入的文件名)
     
     created_at = Column(DateTime, default=datetime.utcnow)
@@ -111,9 +110,5 @@ class Question(Base):
         order_by="desc(ActivityLog.created_at)"
     )
 
-    # 关系
-    children = relationship("Question",
-                backref=backref('parent', remote_side=[id]),
-                cascade="all, delete-orphan")
     knowledge_points = relationship("KnowledgePoint", secondary=question_knowledge_points, back_populates="questions")
     tags = relationship("Tag", secondary=question_tags, back_populates="questions")

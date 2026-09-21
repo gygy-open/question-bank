@@ -1,4 +1,4 @@
-from pydantic import BaseModel, BeforeValidator, Field, field_validator, model_validator
+from pydantic import BaseModel, BeforeValidator, ConfigDict, Field, field_validator, model_validator
 from typing import Optional, List, Any, Dict, Literal, Annotated, Union
 from datetime import datetime
 from app.models.question import QuestionType, QuestionStatus, QuestionVisibility
@@ -126,7 +126,6 @@ class QuestionBase(BaseModel):
     difficulty: int = 1
     visibility: QuestionVisibility = QuestionVisibility.PUBLIC
     source: Optional[str] = None
-    parent_id: Optional[int] = None
 
     @field_validator("answer", mode="before")
     @classmethod
@@ -140,16 +139,14 @@ def _reject_legacy(answer: Any) -> None:
 
 
 class QuestionCreate(QuestionBase):
+    model_config = ConfigDict(extra="forbid")
+
     knowledge_point_ids: List[int] = []
     tag_ids: Optional[List[int]] = []
     import_task_id: Optional[int] = None
     subject_id: Optional[int] = None
     ai_suggested_tags: Optional[Dict[str, List[str]]] = None
-    children: Optional[List['QuestionCreate']] = None
     temp_id: Optional[str] = None
-
-    # parent_id 允许创建/导入期传入字符串 UUID(占位),CRUD 再落地为真实 id。
-    parent_id: Optional[Any] = None
 
     @model_validator(mode='after')
     def _validate_domain(self) -> 'QuestionCreate':
@@ -166,13 +163,20 @@ class QuestionCreate(QuestionBase):
         return self
 
 
+class QuestionBatchItemCreate(QuestionCreate):
+    children: Optional[List['QuestionBatchItemCreate']] = None
+    parent_id: Optional[Any] = None
+
+
 class QuestionBatchCreate(BaseModel):
     filename: Optional[str] = None
     file_path: Optional[str] = None
-    questions: List[QuestionCreate]
+    questions: List[QuestionBatchItemCreate]
 
 
 class QuestionUpdate(QuestionBase):
+    model_config = ConfigDict(extra="forbid")
+
     content: RichDoc = None
     q_type: Optional[QuestionType] = None
     status: Optional[QuestionStatus] = None
@@ -229,9 +233,6 @@ class Question(QuestionBase):
     review_logs: List[ActivityLog] = []
     subject: Optional[Subject] = None
     import_task: Optional[ImportTask] = None
-    children: Optional[List['Question']] = []
-    parent: Optional['QuestionSummary'] = None
-
     @field_validator('review_count', mode='before')
     @classmethod
     def set_review_count_default(cls, v):
@@ -243,6 +244,8 @@ class Question(QuestionBase):
 
 class QuestionListItem(Question):
     question_group_count: int = 0
+    incoming_relation_count: int = 0
+    outgoing_relation_count: int = 0
 
 
 class QuestionPage(BaseModel):
@@ -268,6 +271,7 @@ class QuestionBatchUpdate(BaseModel):
 
 
 Question.model_rebuild()
+QuestionBatchItemCreate.model_rebuild()
 
 
 # --------------------------------------------------------------------------- #

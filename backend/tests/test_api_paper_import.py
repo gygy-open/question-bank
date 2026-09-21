@@ -266,7 +266,7 @@ async def test_legacy_parent_reference_creates_relation_without_writing_parent_i
     child = (
         await db_session.execute(select(Question).where(Question.id == mapping["child"]))
     ).scalars().one()
-    assert child.parent_id is None
+    assert not hasattr(child, "parent_id")
     relation = (await db_session.execute(select(QuestionRelation))).scalars().one()
     assert relation.source_question_id == mapping["parent"]
     assert relation.target_question_id == mapping["child"]
@@ -291,7 +291,7 @@ async def test_legacy_nested_children_create_relation_not_material_group(
     assert response.status_code == 200, response.text
     assert response.json()["created_count"] == 2
     questions = (await db_session.execute(select(Question))).scalars().all()
-    assert all(question.parent_id is None for question in questions)
+    assert all(not hasattr(question, "parent_id") for question in questions)
     assert len((await db_session.execute(select(QuestionRelation))).scalars().all()) == 1
     assert (await db_session.execute(select(Stimulus))).scalars().all() == []
     assert (await db_session.execute(select(QuestionGroup))).scalars().all() == []

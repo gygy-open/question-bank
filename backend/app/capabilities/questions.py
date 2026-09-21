@@ -23,6 +23,10 @@ from app.models.import_task import ImportTask, ImportTaskStatus
 from app.models.question import Question, QuestionStatus
 from app.models.question_group import QuestionRelation, QuestionRelationType
 from app.services.activity_logger import log_activity
+from app.services.question_group_service import (
+    create_question_relation,
+    delete_question_relation,
+)
 from app.services.question_service import question_service
 
 from .base import Authz, Capability, Scope
@@ -61,6 +65,16 @@ class QuestionReviewInput(BaseModel):
     data: schemas.QuestionReview
 
 
+class QuestionRelationInput(BaseModel):
+    source_question_id: int
+    target_question_id: int
+
+
+class DerivedQuestionCreateInput(BaseModel):
+    source_question_id: int
+    data: schemas.QuestionCreate
+
+
 @register
 class CreateQuestion(Capability[schemas.QuestionCreate, Question]):
     name = "question.create"
@@ -77,6 +91,97 @@ class CreateQuestion(Capability[schemas.QuestionCreate, Question]):
     async def execute(self, ctx: ExecutionContext, inp: schemas.QuestionCreate, target: Any) -> Question:
         inp.subject_id = self.subject_for(ctx, inp, target)
         return await crud.question.create_with_tags(db=ctx.db, obj_in=inp, user_id=ctx.actor.id)
+
+
+@register
+class CreateQuestionRelation(Capability[QuestionRelationInput, QuestionRelation]):
+    name = "question.relation.create"
+    description = "关联来源题与派生题。"
+    input_model = QuestionRelationInput
+    authz = Authz.PERMISSION
+    permission = Permission.EDIT_QUESTION
+    scope = Scope.SUBJECT
+    mutating = True
+
+    async def load(self, ctx: ExecutionContext, inp: QuestionRelationInput) -> Question:
+        return await _load_visible_question(ctx, inp.source_question_id)
+
+    async def execute(
+        self, ctx: ExecutionContext, inp: QuestionRelationInput, target: Question
+    ) -> QuestionRelation:
+        return await create_question_relation(
+            ctx.db,
+            source_question_id=target.id,
+            target_question_id=inp.target_question_id,
+            actor=ctx.actor,
+        )
+
+
+@register
+class DeleteQuestionRelation(Capability[QuestionRelationInput, None]):
+    name = "question.relation.delete"
+    description = "解除来源题与派生题的关系，不删除题目。"
+    input_model = QuestionRelationInput
+    authz = Authz.PERMISSION
+    permission = Permission.EDIT_QUESTION
+    scope = Scope.SUBJECT
+    mutating = True
+
+    async def load(self, ctx: ExecutionContext, inp: QuestionRelationInput) -> Question:
+        return await _load_visible_question(ctx, inp.source_question_id)
+
+    async def execute(
+        self, ctx: ExecutionContext, inp: QuestionRelationInput, target: Question
+    ) -> None:
+        await delete_question_relation(
+            ctx.db,
+            source_question_id=target.id,
+            target_question_id=inp.target_question_id,
+            actor=ctx.actor,
+        )
+
+
+@register
+class CreateDerivedQuestion(Capability[DerivedQuestionCreateInput, Question]):
+    name = "question.derived.create"
+    description = "原子创建一道派生题及其来源关系。"
+    input_model = DerivedQuestionCreateInput
+    authz = Authz.PERMISSION
+    permission = Permission.EDIT_QUESTION
+    scope = Scope.SUBJECT
+    mutating = True
+
+    async def load(self, ctx: ExecutionContext, inp: DerivedQuestionCreateInput) -> Question:
+        return await _load_visible_question(ctx, inp.source_question_id)
+
+    async def execute(
+        self, ctx: ExecutionContext, inp: DerivedQuestionCreateInput, target: Question
+    ) -> Question:
+        question_in = inp.data.model_copy(deep=True)
+        question_in.subject_id = target.subject_id
+        try:
+            question = await question_service.create_question(
+                db=ctx.db,
+                question_in=question_in,
+                user_id=ctx.actor.id,
+                commit=False,
+            )
+            await create_question_relation(
+                ctx.db,
+                source_question_id=target.id,
+                target_question_id=question.id,
+                actor=ctx.actor,
+                commit=False,
+                new_target=True,
+            )
+            await ctx.db.commit()
+            created = await crud.question.get(ctx.db, id=question.id)
+            if created is None:
+                raise NotFound("Question not found")
+            return created
+        except Exception:
+            await ctx.db.rollback()
+            raise
 
 
 @register
@@ -108,7 +213,7 @@ class BatchCreateQuestions(Capability[schemas.QuestionBatchCreate, List[Question
         await ctx.db.flush()
 
         async def create_recursive(
-            question_in: schemas.QuestionCreate, parent_id: Optional[int] = None
+            question_in: schemas.QuestionBatchItemCreate, parent_id: Optional[int] = None
         ) -> Question:
             children_in = question_in.children or []
             relation_source_id = parent_id or question_in.parent_id

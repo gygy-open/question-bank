@@ -6,6 +6,7 @@ from sqlalchemy import (
     Column,
     DateTime,
     ForeignKey,
+    Index,
     Integer,
     String,
     Text,
@@ -117,6 +118,11 @@ class QuestionRelation(Base):
         ),
         CheckConstraint(
             "source_question_id <> target_question_id", name="different_questions"
+        ),
+        Index(
+            "ix_question_relations_target_question_id_relation_type",
+            "target_question_id",
+            "relation_type",
         ),
     )
 

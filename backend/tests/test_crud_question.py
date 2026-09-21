@@ -3,6 +3,7 @@ import pytest
 from app.crud.crud_question import question as crud_question
 from app.models.knowledge_point import KnowledgePoint
 from app.models.question import QuestionStatus, QuestionType, SCHEMA_VERSION
+from app.models.question_group import QuestionRelation
 from app.models.subject import Subject
 from app.models.tag import Tag
 from app.schemas.question import Question as QuestionSchema
@@ -195,8 +196,15 @@ async def test_soft_delete_does_not_cascade_to_decomposed_questions(db_session):
     )
     child = await crud_question.create_with_tags(
         db_session,
-        obj_in=_single_choice(content="子题", subject_id=subject.id, parent_id=parent.id),
+        obj_in=_single_choice(content="子题", subject_id=subject.id),
     )
+    db_session.add(
+        QuestionRelation(
+            source_question_id=parent.id,
+            target_question_id=child.id,
+        )
+    )
+    await db_session.commit()
 
     # Drop the identity map so remove() reloads children like a fresh request would.
     db_session.expunge_all()

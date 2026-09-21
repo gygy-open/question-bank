@@ -12,6 +12,7 @@ from .question_group import (
     QuestionRelation,
     Stimulus,
 )
+from .question_relation_audit import LegacyQuestionParentAudit
 from .import_task import ImportTask
 from .activity_log import ActivityLog
 from .system_setting import SystemSetting

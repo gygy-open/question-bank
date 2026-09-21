@@ -9,6 +9,7 @@ from app.models.question import QuestionType, QuestionStatus
 from app.models.import_task import ImportTask, ImportTaskStatus
 from app.services.importing.contracts import ImportDefaults
 from app.services.importing.normalize import question_importer
+from app.services.question_group_service import get_question_relations
 
 router = APIRouter()
 
@@ -33,7 +34,6 @@ async def read_questions(
     id: Optional[int] = None,
     ids: List[int] = Query(None),
     source: Optional[str] = None,
-    root_only: bool = False,
     in_question_group: Optional[bool] = None,
     current_user: models.User = Depends(deps.get_current_active_user),
 ) -> Any:
@@ -57,7 +57,6 @@ async def read_questions(
         id=id,
         ids=ids,
         source=source,
-        root_only=root_only,
         in_question_group=in_question_group,
         viewer=current_user
     )
@@ -78,16 +77,24 @@ async def read_questions(
         id=id,
         ids=ids,
         source=source,
-        root_only=root_only,
         in_question_group=in_question_group,
         viewer=current_user
     )
     group_counts = await crud.question.get_question_group_counts(
         db, question_ids=[question.id for question in questions]
     )
+    relation_counts = await crud.question.get_relation_counts(
+        db,
+        question_ids=[question.id for question in questions],
+        viewer=current_user,
+    )
     items = [
         schemas.QuestionListItem.model_validate(question).model_copy(
-            update={"question_group_count": group_counts.get(question.id, 0)}
+            update={
+                "question_group_count": group_counts.get(question.id, 0),
+                "incoming_relation_count": relation_counts[question.id]["incoming"],
+                "outgoing_relation_count": relation_counts[question.id]["outgoing"],
+            }
         )
         for question in questions
     ]
@@ -173,6 +180,78 @@ async def create_questions_batch_legacy(
             for f in report.failed
         ],
     )
+
+@router.get("/{id}/relations", response_model=schemas.QuestionRelationsRead)
+async def read_question_relations(
+    *,
+    db: deps.SessionDep,
+    id: int,
+    current_user: models.User = Depends(deps.get_current_active_user),
+) -> Any:
+    return await get_question_relations(db, question_id=id, actor=current_user)
+
+
+@router.post(
+    "/{source_id}/relations",
+    response_model=schemas.QuestionRelationRead,
+    status_code=201,
+)
+async def create_question_relation(
+    *,
+    db: deps.SessionDep,
+    source_id: int,
+    relation_in: schemas.QuestionRelationCreate,
+    current_user: models.User = Depends(deps.get_current_active_user),
+) -> Any:
+    return await capabilities.run(
+        "question.relation.create",
+        deps.api_context(db, current_user),
+        question_caps.QuestionRelationInput(
+            source_question_id=source_id,
+            target_question_id=relation_in.target_question_id,
+        ),
+    )
+
+
+@router.delete("/{source_id}/relations/{target_id}", status_code=204)
+async def delete_question_relation(
+    *,
+    db: deps.SessionDep,
+    source_id: int,
+    target_id: int,
+    current_user: models.User = Depends(deps.get_current_active_user),
+) -> None:
+    await capabilities.run(
+        "question.relation.delete",
+        deps.api_context(db, current_user),
+        question_caps.QuestionRelationInput(
+            source_question_id=source_id,
+            target_question_id=target_id,
+        ),
+    )
+
+
+@router.post(
+    "/{source_id}/derived-questions",
+    response_model=schemas.Question,
+    status_code=201,
+)
+async def create_derived_question(
+    *,
+    db: deps.SessionDep,
+    source_id: int,
+    question_in: schemas.QuestionCreate,
+    current_user: models.User = Depends(deps.get_current_active_user),
+) -> Any:
+    return await capabilities.run(
+        "question.derived.create",
+        deps.api_context(db, current_user),
+        question_caps.DerivedQuestionCreateInput(
+            source_question_id=source_id,
+            data=question_in,
+        ),
+    )
+
 
 @router.get("/{id}", response_model=schemas.Question)
 async def read_question(

@@ -68,11 +68,13 @@ interface Props {
   subjects?: Subject[]
   mode?: 'import' | 'create' | 'edit'
   autoFillSubjectId?: number | null
+  derivedFromQuestionId?: number | null
 }
 
 const props = withDefaults(defineProps<Props>(), {
   mode: 'create',
   autoFillSubjectId: null,
+  derivedFromQuestionId: null,
 })
 
 const emit = defineEmits<{
@@ -146,13 +148,6 @@ const knowledgePointIds = computed<number[]>({
   get: () => draft.value?.knowledge_point_ids ?? [],
   set: (v) => {
     if (draft.value) draft.value.knowledge_point_ids = v
-  },
-})
-
-const parentId = computed<number | undefined>({
-  get: () => draft.value?.parent_id ?? undefined,
-  set: (v) => {
-    if (draft.value) draft.value.parent_id = v == null || Number.isNaN(v) ? null : Number(v)
   },
 })
 
@@ -239,6 +234,8 @@ const handlePublish = async () => {
     let saved: Question
     if (props.mode === 'edit' && draft.value.id) {
       saved = await $api<Question>(`/questions/${draft.value.id}`, { method: 'PUT', body: payload })
+    } else if (props.derivedFromQuestionId) {
+      saved = await $api<Question>(`/questions/${props.derivedFromQuestionId}/derived-questions`, { method: 'POST', body: payload })
     } else {
       saved = await $api<Question>('/questions', { method: 'POST', body: payload })
     }
@@ -347,10 +344,6 @@ const toggleTag = (tagId: number) => {
                         <SelectItem :value="5">难度 5</SelectItem>
                       </SelectContent>
                     </Select>
-                  </div>
-                  <div v-if="!isImportMode && draft" class="space-y-2">
-                    <Label>父题目 ID (可选)</Label>
-                    <Input v-model.number="parentId" type="number" placeholder="输入原题 ID" />
                   </div>
                 </div>
 

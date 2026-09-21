@@ -5,6 +5,7 @@ from typing import Any, Dict, List, Optional
 from pydantic import BaseModel, Field, field_validator, model_validator
 
 from app.models.question import QuestionStatus, QuestionVisibility
+from app.schemas.knowledge_point import KnowledgePoint
 from app.schemas.question import QuestionSummary, RichDoc
 
 
@@ -153,5 +154,41 @@ class QuestionGroupPage(BaseModel):
 
 
 class QuestionRelationCreate(BaseModel):
+    target_question_id: int
+
+
+class QuestionRelationRead(BaseModel):
+    id: int
     source_question_id: int
     target_question_id: int
+    relation_type: str
+    created_at: datetime
+    created_by: Optional[int] = None
+
+    class Config:
+        from_attributes = True
+
+
+class QuestionRelationQuestionRead(BaseModel):
+    id: int
+    subject_id: Optional[int] = None
+    content: RichDoc
+    q_type: str
+    knowledge_points: List[KnowledgePoint] = Field(default_factory=list)
+
+    class Config:
+        from_attributes = True
+
+
+class QuestionRelationPeerRead(BaseModel):
+    relation_id: int
+    relation_type: str
+    question: QuestionRelationQuestionRead
+    created_at: datetime
+    created_by: Optional[int] = None
+
+
+class QuestionRelationsRead(BaseModel):
+    question_id: int
+    sources: List[QuestionRelationPeerRead] = Field(default_factory=list)
+    targets: List[QuestionRelationPeerRead] = Field(default_factory=list)

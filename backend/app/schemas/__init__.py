@@ -9,10 +9,10 @@ from .knowledge_point import (
 )
 from .tag import Tag, TagCreate, TagUpdate, TagPage, TagImportRowError, TagImportResult
 from .tag_category import TagCategory, TagCategoryCreate, TagCategoryUpdate
-from .question import Question, QuestionCreate, QuestionUpdate, QuestionListItem, QuestionPage, QuestionBatchCreate, QuestionReview, QuestionBatchConfirm, QuestionBatchDelete, QuestionBatchUpdate, LegacyQuestionCreate, LegacyQuestionBatchCreate, LegacyBatchError, LegacyBatchResult
+from .question import Question, QuestionCreate, QuestionUpdate, QuestionListItem, QuestionPage, QuestionBatchCreate, QuestionBatchItemCreate, QuestionReview, QuestionBatchConfirm, QuestionBatchDelete, QuestionBatchUpdate, LegacyQuestionCreate, LegacyQuestionBatchCreate, LegacyBatchError, LegacyBatchResult
 from .question_group import (
     QuestionGroupCreate, QuestionGroupRead, QuestionGroupUpdate,
-    QuestionRelationCreate,
+    QuestionRelationCreate, QuestionRelationRead, QuestionRelationsRead,
     StimulusCreate, StimulusRead, StimulusUpdate,
 )
 from .system_setting import SystemSetting, SystemSettingCreate, SystemSettingUpdate

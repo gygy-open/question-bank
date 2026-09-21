@@ -134,7 +134,6 @@ async function search() {
       keyword: keyword.value || undefined,
       size: 20,
       page: 1,
-      root_only: true,
     }
     if (qType.value && qType.value !== '0') query.q_type = qType.value
     if (difficulty.value && difficulty.value !== '0') query.difficulty = difficulty.value

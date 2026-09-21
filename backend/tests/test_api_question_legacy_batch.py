@@ -108,7 +108,7 @@ async def test_batch_nested_children_create_relations_without_parent_id(
     assert response.status_code == 200, response.text
     rows = (await db_session.execute(select(Question).order_by(Question.id))).scalars().all()
     assert len(rows) == 2
-    assert all(row.parent_id is None for row in rows)
+    assert all(not hasattr(row, "parent_id") for row in rows)
     relation = (await db_session.execute(select(QuestionRelation))).scalars().one()
     assert relation.source_question_id == rows[0].id
     assert relation.target_question_id == rows[1].id

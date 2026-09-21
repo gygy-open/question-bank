@@ -140,6 +140,9 @@ def test_parent_id_backfill_skips_cross_subject_edges_and_preserves_parent_id(tm
                     },
                 ],
             )
+            assert conn.scalar(
+                sa.text("SELECT parent_id FROM questions WHERE id = 21")
+            ) == 20
     finally:
         engine.dispose()
 
@@ -157,9 +160,17 @@ def test_parent_id_backfill_skips_cross_subject_edges_and_preserves_parent_id(tm
                 (10, 11, "decomposed_from"),
                 (30, 31, "decomposed_from"),
             ]
-            assert conn.scalar(
-                sa.text("SELECT parent_id FROM questions WHERE id = 21")
-            ) == 20
+            question_columns = {
+                column["name"] for column in sa.inspect(conn).get_columns("questions")
+            }
+            assert "parent_id" not in question_columns
+            archived = conn.execute(
+                sa.text(
+                    "SELECT parent_question_id, is_cross_subject, was_converted "
+                    "FROM legacy_question_parent_audits WHERE child_question_id = 21"
+                )
+            ).one()
+            assert tuple(archived) == (20, 1, 0)
             assert conn.scalar(sa.text("SELECT COUNT(*) FROM question_groups")) == 0
     finally:
         engine.dispose()

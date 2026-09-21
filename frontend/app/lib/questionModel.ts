@@ -56,7 +56,6 @@ export interface QuestionDraft {
     knowledge_point_ids: number[]
     tag_ids: number[]
     subject_id?: number
-    parent_id?: number | null
 }
 
 export const CHOICE_TYPES: QuestionType[] = ['single_choice', 'multiple_choice']
@@ -100,7 +99,6 @@ export function createDefaultAnswer(
 /** 新建空白数据库题目草稿（默认单选，含合法答案/选项）。 */
 export function createEmptyDraft(opts: {
     subjectId?: number
-    parentId?: number | null
 } = {}): QuestionDraft {
     const options = createDefaultOptions()
     return {
@@ -118,7 +116,6 @@ export function createEmptyDraft(opts: {
         knowledge_point_ids: [],
         tag_ids: [],
         subject_id: opts.subjectId,
-        parent_id: opts.parentId ?? null,
     }
 }
 
@@ -154,7 +151,6 @@ export function dbQuestionToDraft(
             ?? [],
         tag_ids: (q.tags as Tag[] | undefined)?.map((t) => t.id) ?? [],
         subject_id: q.subject_id ?? opts.subjectId,
-        parent_id: q.parent_id ?? null,
     }
     // choice 题型缺省选项时补齐；草稿答案可以保持为空。
     if (isChoiceType(qType) && draft.options.length === 0) {
@@ -241,7 +237,6 @@ export function extractedItemToDraft(
         knowledge_point_ids: item.knowledge_point_ids ?? [],
         tag_ids: [],
         subject_id: item.subject_id ?? opts.subjectId ?? undefined,
-        parent_id: null,
     }
     if (isChoiceType(qType) && draft.options.length === 0) {
         draft.options = createDefaultOptions()
@@ -280,7 +275,6 @@ export interface QuestionWritePayload {
     tag_ids: number[]
     status: QuestionStatus
     subject_id?: number
-    parent_id: number | null
     visibility: 'public' | 'private'
 }
 
@@ -300,7 +294,6 @@ export function buildQuestionPayload(draft: QuestionDraft): QuestionWritePayload
         tag_ids: draft.tag_ids,
         status: draft.status,
         subject_id: draft.subject_id,
-        parent_id: draft.parent_id ?? null,
         visibility: draft.visibility,
     }
 }

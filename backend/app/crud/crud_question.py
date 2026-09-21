@@ -2,7 +2,7 @@ from typing import List, Optional, Union, Dict, Any
 from datetime import datetime
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func, or_, and_, true, false, exists
-from sqlalchemy.orm import selectinload
+from sqlalchemy.orm import aliased, selectinload
 from app.crud.base import CRUDBase
 from app.models.question import Question, QuestionStatus, QuestionType, QuestionVisibility
 from app.models.tag import Tag
@@ -20,10 +20,10 @@ from app.services.question_content import (
 from app.models.knowledge_point import KnowledgePoint
 from app.models.import_task import ImportTask
 from app.models.activity_log import ActivityLog
-from app.models.question_group import QuestionGroup, QuestionGroupItem
+from app.models.question_group import QuestionGroup, QuestionGroupItem, QuestionRelation
 
 
-def visible_questions_filter(viewer):
+def visible_questions_filter(viewer, question_model=Question):
     """题目可见性统一过滤条件。所有读路径(list/search/export/chat tools)都应套用。
 
     规则: 只能看到可访问学科内、且 公开或自己创建的题。admin(accessible=None)不受限。
@@ -39,10 +39,10 @@ def visible_questions_filter(viewer):
     if not subject_ids:
         return false()
     return and_(
-        Question.subject_id.in_(subject_ids),
+        question_model.subject_id.in_(subject_ids),
         or_(
-            Question.visibility == QuestionVisibility.PUBLIC.value,
-            Question.created_by == viewer.id,
+            question_model.visibility == QuestionVisibility.PUBLIC.value,
+            question_model.created_by == viewer.id,
         ),
     )
 
@@ -64,40 +64,14 @@ def is_question_visible(question, viewer) -> bool:
 
 class CRUDQuestion(CRUDBase[Question, QuestionCreate, QuestionUpdate]):
     async def get(self, db: AsyncSession, id: Any) -> Optional[Question]:
-        # Define recursive loading paths
-        l1 = selectinload(self.model.children)
-        l2 = l1.selectinload(Question.children)
-        l3 = l2.selectinload(Question.children)
-
         stmt = select(self.model).options(
-            # Root relationships
             selectinload(self.model.subject),
             selectinload(self.model.tags),
             selectinload(self.model.knowledge_points),
             selectinload(self.model.creator),
             selectinload(self.model.updater),
             selectinload(self.model.review_logs),
-            selectinload(self.model.parent), # Load parent
             selectinload(self.model.import_task),
-            
-            # Level 1 Children relationships
-            l1.selectinload(Question.subject),
-            l1.selectinload(Question.tags),
-            l1.selectinload(Question.knowledge_points),
-            l1.selectinload(Question.creator),
-            l1.selectinload(Question.updater),
-            l1.selectinload(Question.review_logs),
-
-            # Level 2 Children relationships
-            l2.selectinload(Question.subject),
-            l2.selectinload(Question.tags),
-            l2.selectinload(Question.knowledge_points),
-            l2.selectinload(Question.creator),
-            l2.selectinload(Question.updater),
-            l2.selectinload(Question.review_logs),
-
-            # Level 3 Structure (deepest level loaded)
-            l3
         ).filter(self.model.id == id, self.model.deleted_at.is_(None))
         result = await db.execute(stmt)
         return result.scalars().first()
@@ -121,15 +95,9 @@ class CRUDQuestion(CRUDBase[Question, QuestionCreate, QuestionUpdate]):
         id: Optional[int] = None,
         ids: Optional[List[int]] = None,
         source: Optional[str] = None,
-        root_only: bool = False,
         in_question_group: Optional[bool] = None,
         viewer=None,
     ):
-        # Define recursive loading paths
-        l1 = selectinload(self.model.children)
-        l2 = l1.selectinload(Question.children)
-        l3 = l2.selectinload(Question.children)
-
         query = select(self.model).options(
             selectinload(self.model.tags), 
             selectinload(self.model.knowledge_points),
@@ -137,27 +105,7 @@ class CRUDQuestion(CRUDBase[Question, QuestionCreate, QuestionUpdate]):
             selectinload(self.model.updater),
             selectinload(self.model.review_logs),
             selectinload(self.model.subject),
-            selectinload(self.model.parent),
             selectinload(self.model.import_task),
-            
-            # Level 1 Children relationships
-            l1.selectinload(Question.tags),
-            l1.selectinload(Question.knowledge_points),
-            l1.selectinload(Question.review_logs),
-            l1.selectinload(Question.subject),
-            l1.selectinload(Question.creator),
-            l1.selectinload(Question.updater),
-
-            # Level 2 Children relationships
-            l2.selectinload(Question.tags),
-            l2.selectinload(Question.knowledge_points),
-            l2.selectinload(Question.review_logs),
-            l2.selectinload(Question.subject),
-            l2.selectinload(Question.creator),
-            l2.selectinload(Question.updater),
-
-            # Level 3 Structure (deepest level loaded)
-            l3
         ).filter(self.model.deleted_at.is_(None))
         
         if id:
@@ -204,9 +152,6 @@ class CRUDQuestion(CRUDBase[Question, QuestionCreate, QuestionUpdate]):
         if source:
             query = query.filter(self.model.source.ilike(f"%{source}%"))
             
-        if root_only:
-            query = query.filter(self.model.parent_id.is_(None))
-
         if in_question_group is not None:
             active_membership = exists(
                 select(QuestionGroupItem.id)
@@ -260,7 +205,6 @@ class CRUDQuestion(CRUDBase[Question, QuestionCreate, QuestionUpdate]):
         id: Optional[int] = None,
         ids: Optional[List[int]] = None,
         source: Optional[str] = None,
-        root_only: bool = False,
         in_question_group: Optional[bool] = None,
         viewer=None
     ) -> List[Question]:
@@ -281,7 +225,6 @@ class CRUDQuestion(CRUDBase[Question, QuestionCreate, QuestionUpdate]):
             id=id,
             ids=ids,
             source=source,
-            root_only=root_only,
             in_question_group=in_question_group,
             viewer=viewer
         )
@@ -304,6 +247,55 @@ class CRUDQuestion(CRUDBase[Question, QuestionCreate, QuestionUpdate]):
             .group_by(QuestionGroupItem.question_id)
         )
         return {question_id: count for question_id, count in result.all()}
+
+    async def get_relation_counts(
+        self,
+        db: AsyncSession,
+        *,
+        question_ids: List[int],
+        viewer=None,
+    ) -> Dict[int, Dict[str, int]]:
+        counts = {
+            question_id: {"incoming": 0, "outgoing": 0}
+            for question_id in question_ids
+        }
+        if not question_ids:
+            return counts
+
+        source_peer = aliased(Question)
+        incoming = await db.execute(
+            select(
+                QuestionRelation.target_question_id,
+                func.count(QuestionRelation.id),
+            )
+            .join(source_peer, source_peer.id == QuestionRelation.source_question_id)
+            .where(
+                QuestionRelation.target_question_id.in_(question_ids),
+                source_peer.deleted_at.is_(None),
+                visible_questions_filter(viewer, source_peer),
+            )
+            .group_by(QuestionRelation.target_question_id)
+        )
+        for question_id, count in incoming.all():
+            counts[question_id]["incoming"] = count
+
+        target_peer = aliased(Question)
+        outgoing = await db.execute(
+            select(
+                QuestionRelation.source_question_id,
+                func.count(QuestionRelation.id),
+            )
+            .join(target_peer, target_peer.id == QuestionRelation.target_question_id)
+            .where(
+                QuestionRelation.source_question_id.in_(question_ids),
+                target_peer.deleted_at.is_(None),
+                visible_questions_filter(viewer, target_peer),
+            )
+            .group_by(QuestionRelation.source_question_id)
+        )
+        for question_id, count in outgoing.all():
+            counts[question_id]["outgoing"] = count
+        return counts
 
     async def get_multi_by_ids(self, db: AsyncSession, *, ids: List[int]) -> List[Question]:
         """
@@ -332,7 +324,6 @@ class CRUDQuestion(CRUDBase[Question, QuestionCreate, QuestionUpdate]):
         id: Optional[int] = None,
         ids: Optional[List[int]] = None,
         source: Optional[str] = None,
-        root_only: bool = False,
         in_question_group: Optional[bool] = None,
         viewer=None
     ) -> int:
@@ -353,7 +344,6 @@ class CRUDQuestion(CRUDBase[Question, QuestionCreate, QuestionUpdate]):
             id=id,
             ids=ids,
             source=source,
-            root_only=root_only,
             in_question_group=in_question_group,
             viewer=viewer
         )
@@ -369,15 +359,10 @@ class CRUDQuestion(CRUDBase[Question, QuestionCreate, QuestionUpdate]):
         knowledge_point_ids = obj_in_data.pop("knowledge_point_ids", [])
         obj_in_data.pop("ai_suggested_tags", None)
         
-        # Remove fields that are not in the Question model but are in QuestionCreate for processing
+        # Remove fields used only by the legacy recursive batch contract.
         obj_in_data.pop("children", None)
         obj_in_data.pop("temp_id", None)
-        
-        # Ensure parent_id is valid (it might be a UUID string from import, which we should ignore/handle elsewhere)
-        # If it's a string, we assume it's a temp ID reference and set it to None for now.
-        # The caller is responsible for setting the correct parent_id after the parent is created.
-        if isinstance(obj_in_data.get("parent_id"), str):
-            obj_in_data["parent_id"] = None
+        obj_in_data.pop("parent_id", None)
 
         # Centralized v2 JSON boundary: rich-text / answer -> JSON strings; options stays native JSON.
         obj_in_data = serialize_write_fields(obj_in_data)
@@ -415,8 +400,6 @@ class CRUDQuestion(CRUDBase[Question, QuestionCreate, QuestionUpdate]):
             selectinload(Question.creator),
             selectinload(Question.updater),
             selectinload(Question.review_logs),
-            selectinload(Question.children),
-            selectinload(Question.parent),
             selectinload(Question.import_task)
         ).where(Question.id == db_obj.id)
         
@@ -479,7 +462,7 @@ class CRUDQuestion(CRUDBase[Question, QuestionCreate, QuestionUpdate]):
 
         # content_revision 生命周期:仅当规范化后的题目内容(content/options/answer/
         # thinking/analysis/summary/q_type)真正变化时 +1;metadata(tag/kp/status/
-        # difficulty/source/subject_id/parent_id)变化不递增。
+        # difficulty/source/subject_id)变化不递增。
         before_thinking = parse_json_field(db_obj.thinking)
         before_analysis = parse_json_field(db_obj.analysis)
         before_summary = parse_json_field(db_obj.summary)
@@ -515,7 +498,7 @@ class CRUDQuestion(CRUDBase[Question, QuestionCreate, QuestionUpdate]):
         for field in ("thinking", "analysis", "summary"):
             if field in update_data:
                 setattr(db_obj, field, to_db_json(update_data[field]))
-        for field in ("status", "difficulty", "source", "subject_id", "parent_id"):
+        for field in ("status", "difficulty", "source", "subject_id"):
             if field in update_data:
                 setattr(db_obj, field, update_data[field])
 
@@ -546,9 +529,7 @@ class CRUDQuestion(CRUDBase[Question, QuestionCreate, QuestionUpdate]):
             selectinload(Question.knowledge_points),
             selectinload(Question.creator),
             selectinload(Question.updater),
-            selectinload(Question.review_logs),
-            selectinload(Question.children),
-            selectinload(Question.parent)
+            selectinload(Question.review_logs)
         ).where(Question.id == db_obj.id)
         
         result = await db.execute(stmt)

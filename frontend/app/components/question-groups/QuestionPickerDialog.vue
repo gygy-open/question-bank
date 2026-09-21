@@ -35,7 +35,7 @@ const load = async () => {
   if (!props.subjectId) return
   loading.value = true
   try {
-    const response = await $api<QuestionPage>('/questions', { query: { subject_id: props.subjectId, page: page.value, size: 10, keyword: keyword.value.trim() || undefined, q_type: qType.value === '0' ? undefined : qType.value, status: status.value === '0' ? undefined : status.value, root_only: true } })
+    const response = await $api<QuestionPage>('/questions', { query: { subject_id: props.subjectId, page: page.value, size: 10, keyword: keyword.value.trim() || undefined, q_type: qType.value === '0' ? undefined : qType.value, status: status.value === '0' ? undefined : status.value } })
     results.value = response.items
     pages.value = response.pages
   } finally { loading.value = false }

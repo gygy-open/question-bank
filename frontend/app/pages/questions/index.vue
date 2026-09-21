@@ -63,6 +63,7 @@ const pageSize = ref(10)
 const editingQuestion = ref<Question | null>(null)
 const isDialogOpen = ref(false)
 const dialogMode = ref<'create' | 'edit'>('create')
+const derivedFromQuestionId = ref<number | null>(null)
 
 // --- Selection & Batch Actions ---
 const selectedIds = ref<Set<number>>(new Set())
@@ -402,24 +403,21 @@ const deleteQuestion = async (id: number) => {
 
 const createQuestion = () => {
   editingQuestion.value = null
+  derivedFromQuestionId.value = null
   dialogMode.value = 'create'
   isDialogOpen.value = true
 }
 
 const decomposeQuestion = (parent: Question) => {
-  // Create a partial question object with parent_id set
-  // We cast to any to bypass strict type checking for the partial object
-  editingQuestion.value = {
-    parent_id: parent.id,
-    subject_id: parent.subject_id,
-    // Optional: copy tags or other metadata if desired
-  } as any
+  editingQuestion.value = null
+  derivedFromQuestionId.value = parent.id
   dialogMode.value = 'create'
   isDialogOpen.value = true
 }
 
 const editQuestion = (question: Question) => {
   editingQuestion.value = question
+  derivedFromQuestionId.value = null
   dialogMode.value = 'edit'
   isDialogOpen.value = true
 }
@@ -427,6 +425,7 @@ const editQuestion = (question: Question) => {
 const handleEditSuccess = () => {
   isDialogOpen.value = false
   editingQuestion.value = null
+  derivedFromQuestionId.value = null
   refreshQuestions()
 }
 
@@ -839,6 +838,7 @@ const viewStructure = (question: Question) => {
     :subjects="subjects"
     :mode="dialogMode"
     :auto-fill-subject-id="currentSubjectId ?? undefined"
+    :derived-from-question-id="derivedFromQuestionId"
     @update:open="(v) => isDialogOpen = v"
     @success="handleEditSuccess"
   />

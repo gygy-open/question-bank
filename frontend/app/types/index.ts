@@ -259,14 +259,15 @@ export interface Question {
   updater?: User
   review_logs?: ActivityLog[]
   subject?: Subject
-  parent_id?: number
-  parent?: Question
-  children?: Question[]
   question_group_count?: number
+  incoming_relation_count?: number
+  outgoing_relation_count?: number
 }
 
 export interface QuestionListItem extends Question {
   question_group_count: number
+  incoming_relation_count: number
+  outgoing_relation_count: number
 }
 
 export interface QuestionPage {
@@ -275,6 +276,20 @@ export interface QuestionPage {
   page: number
   size: number
   pages: number
+}
+
+export interface QuestionRelationPeer {
+  relation_id: number
+  relation_type: 'decomposed_from'
+  question: Pick<Question, 'id' | 'subject_id' | 'content' | 'q_type' | 'knowledge_points'>
+  created_at: string
+  created_by?: number
+}
+
+export interface QuestionRelations {
+  question_id: number
+  sources: QuestionRelationPeer[]
+  targets: QuestionRelationPeer[]
 }
 
 export interface StimulusListItem {

@@ -10,6 +10,7 @@ from app import capabilities
 from app.ai.contracts import AgentScene, ToolResult, ToolSpec, proposal_directive
 from app.ai.tools.registry import register
 from app.capabilities.context import ExecutionContext
+from app.capabilities.questions import DerivedQuestionCreateInput
 from app.crud.crud_question import question as crud_question
 from app.schemas.question import QuestionCreate
 from app.models.question import QuestionStatus, QuestionType
@@ -435,7 +436,6 @@ async def _build_question_create(
     data: Dict[str, Any],
     *,
     subject_id: Optional[int],
-    parent_id: Optional[int] = None,
 ) -> QuestionCreate:
     """模型给的松散字段 → 严格 v2 入参。无法解析答案时抛 LegacyQuestionError。"""
     data = await _enrich_question_with_knowledge_points(ctx.db, data, subject_id=subject_id)
@@ -464,7 +464,6 @@ async def _build_question_create(
         subject_id=subject_id,
         knowledge_point_ids=data.get("knowledge_point_ids", []),
         tag_ids=tag_ids,
-        parent_id=parent_id,
     )
 
 
@@ -496,10 +495,15 @@ async def propose_questions_batch(ctx: ExecutionContext, args: Dict[str, Any]) -
     failed_count = 0
 
     async def create_recursive(q_data: Dict[str, Any], parent_id: Optional[int] = None) -> List[int]:
-        obj_in = await _build_question_create(
-            ctx, q_data, subject_id=subject_id, parent_id=parent_id
-        )
-        question = await capabilities.run("question.create", ctx, obj_in)
+        obj_in = await _build_question_create(ctx, q_data, subject_id=subject_id)
+        if parent_id is None:
+            question = await capabilities.run("question.create", ctx, obj_in)
+        else:
+            question = await capabilities.run(
+                "question.derived.create",
+                ctx,
+                DerivedQuestionCreateInput(source_question_id=parent_id, data=obj_in),
+            )
         all_ids = [question.id]
         for child_data in q_data.get("children", []) or []:
             all_ids.extend(await create_recursive(child_data, parent_id=question.id))

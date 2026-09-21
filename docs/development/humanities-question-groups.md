@@ -1,8 +1,8 @@
 # 文科材料题与题目派生关系设计
 
-> 状态：智能导入、题库管理与题组原生组稿已完成
+> 状态：智能导入、题库管理、题组原生组稿与旧字段下线已完成
 > 实施分支：`feature/humanities-question-groups`  
-> 更新日期：2026-09-20
+> 更新日期：2026-09-21
 
 ## 背景
 
@@ -126,7 +126,19 @@ Alembic 迁移会创建对应表，并将合法的历史 `parent_id` 转换为�
 parent_id 指向的原题 -> 当前题，relation_type = decomposed_from
 ```
 
-迁移不会从历史父子结构自动创建材料或题组。自关联、父题不存在和跨学科关系不会被静默迁移，旧 `parent_id` 仍在兼容期保留。
+迁移不会从历史父子结构自动创建材料或题组。第二阶段迁移先把所有非空旧边归档到 `legacy_question_parent_audits`，再按首阶段相同的合法性条件幂等补齐缺失关系，最后删除 `questions.parent_id`。自关联、父题不存在、跨学科和软删除状态不一致的数据均保留诊断证据，不会阻塞部署启动。
+
+可使用只读 SQL 检查归档结果：
+
+```sql
+SELECT child_question_id, parent_question_id,
+       is_self_reference, is_parent_missing, is_cross_subject,
+       has_soft_delete_mismatch, was_converted, relation_id
+FROM legacy_question_parent_audits
+ORDER BY child_question_id;
+```
+
+降级只会从归档表恢复迁移时存在且父题仍存在的旧边。升级后新增的多来源、多目标关系无法无损压回单一 `parent_id`，因此降级是有损的。
 
 ### 材料与题组 API
 
@@ -152,6 +164,8 @@ parent_id 指向的原题 -> 当前题，relation_type = decomposed_from
 
 新的批量建题和导入流程不再写入 `questions.parent_id`。旧输入中的嵌套 `children`、`parent_id` 或 `parent_temp_id` 会被转换为 `QuestionRelation(decomposed_from)`。
 
+普通 Question 创建、更新和响应 Schema 已移除 `parent_id`、`parent` 与 `children`，并拒绝额外字段。旧结构只允许进入 `/questions/batch`、AI 提取和智能导入的专用兼容 DTO，不再渗入普通题目契约。
+
 派生关系服务已经实现：
 
 - 来源题和目标题存在性检查。
@@ -160,7 +174,14 @@ parent_id 指向的原题 -> 当前题，relation_type = decomposed_from
 - 自关联、重复边和有向环检查。
 - 并发写入前按学科锁定题目行；SQLite 使用单写者事务作为保守回退。
 
-目前派生关系主要由批量创建和导入流程调用，尚未提供独立的关系管理 REST API。
+派生关系 REST API：
+
+| 方法 | 路径 | 用途 |
+| --- | --- | --- |
+| `GET` | `/questions/{id}/relations` | 查询可见的来源与目标关系 |
+| `POST` | `/questions/{source_id}/relations` | 创建显式派生关系 |
+| `DELETE` | `/questions/{source_id}/relations/{target_id}` | 删除显式派生关系 |
+| `POST` | `/questions/{source_id}/derived-questions` | 原子创建派生题及其来源关系 |
 
 ### 智能导入
 
@@ -246,7 +267,7 @@ uv run pytest \
   tests/test_migrations.py -q
 ```
 
-当前分支于 2026-09-20 执行结果为：`189 passed, 1 skipped`。跳过项是未设置 `MYSQL_TEST_URL` 时的真实 MySQL 迁移测试；SQLite 测试、模型迁移漂移检查及其余聚焦测试均通过。测试过程中存在一个既有 SQLAlchemy 警告：`subjects` 与 `user` 的相互外键使表排序无法完全解析，本次改动未新增该警告。
+当前分支于 2026-09-21 执行全量后端测试结果为：`632 passed, 1 skipped`。跳过项是未设置 `MYSQL_TEST_URL` 时的真实 MySQL 迁移测试；SQLite 升级链、模型迁移漂移检查和旧边归档测试均通过。测试过程中存在既有 SQLAlchemy 关系和表排序警告，本次改动未新增失败。
 
 前端于 2026-09-20 执行：
 
@@ -256,7 +277,7 @@ pnpm test
 pnpm generate
 ```
 
-结果为：Vitest `23 passed` 个测试文件、`264 passed` 个测试；Nuxt 静态生成成功并预渲染 24 个路由。生成过程仅有 KaTeX quirks mode、较大 chunk 和 SPA 无 SSR 的既有提示。本次未执行手工浏览器验收，因此不声明题组 NodeView 的拖拽、焦点或响应式布局已通过视觉与交互验收。
+结果为：Vitest `23 passed` 个测试文件、`264 passed` 个测试；Nuxt 静态生成成功。生成过程有较大 chunk 和 SPA 无 SSR 的提示。本次未执行手工浏览器验收，因此不声明题组 NodeView 的拖拽、焦点或响应式布局已通过视觉与交互验收。
 
 重点验收场景：
 
@@ -291,7 +312,7 @@ TEST_MYSQL_URL='mysql+aiomysql://...' uv run pytest tests/test_migrations.py -q
 4. 使用正确 `expected_revision` 更新题组，确认 revision 增加；再次使用旧 revision 应返回 `409`。
 5. 尝试让公开题组引用私有材料或私有题目，应返回 `422`。
 6. 删除题组后确认题组不可读取，但原材料和成员题目仍存在。
-7. 导入带 `parent_temp_id` 的拆题结果，确认 `questions.parent_id` 为空且产生 `decomposed_from` 关系。
+7. 导入带 `parent_temp_id` 的拆题结果，确认 `questions` 表不存在 `parent_id` 列且产生 `decomposed_from` 关系。
 8. 导入显式材料和题组并保存为稿件，确认生成原生题组节点、小题按输入顺序出现，复用同一题目材料的多个题组各自保存材料快照。
 9. 从题组库把整个题组加入稿件，确认稿件保存 `question_group_id`、题组和题目材料 revision，以及有序小题快照。
 10. 修改题目材料、小题内容和题组成员顺序，确认稿件只提示过期且内容不自动变化。
@@ -300,17 +321,8 @@ TEST_MYSQL_URL='mysql+aiomysql://...' uv run pytest tests/test_migrations.py -q
 
 ## 待完成
 
-### 旧字段下线
-
-- 增加迁移诊断报告，列出自关联、父题缺失、跨学科和软删除状态异常的历史 `parent_id` 数据。
-- 完成所有调用方切换后禁止 `parent_id` 写入。
-- 移除 Question Schema 中的递归 `parent/children`。
-- 移除 CRUD 中固定三层加载和父题删除时递归删除子题的逻辑。
-- 数据核验完成后，通过独立迁移删除 `questions.parent_id`。
-
 ### 派生关系完善
 
-- 增加派生关系查询、创建和删除 API。
 - 明确后续是否增加 `variant_of` 等关系类型。
 - 为大规模关系图优化可达性检查，补充并发和性能测试。
 
@@ -324,10 +336,11 @@ TEST_MYSQL_URL='mysql+aiomysql://...' uv run pytest tests/test_migrations.py -q
 ## 关键实现位置
 
 - 数据模型：`backend/app/models/question_group.py`
-- 数据库迁移：`backend/alembic/versions/9417bea9971b_add_question_groups_and_relations.py`
+- 数据库迁移：`backend/alembic/versions/9417bea9971b_add_question_groups_and_relations.py`、`backend/alembic/versions/a8c4e7f19b2d_index_question_relation_targets.py`、`backend/alembic/versions/b9d5f0a21c3e_archive_and_drop_question_parent_id.py`
+- 旧边审计模型：`backend/app/models/question_relation_audit.py`
 - Schema：`backend/app/schemas/question_group.py`、`backend/app/schemas/paper_import.py`
 - 领域服务：`backend/app/services/question_group_service.py`
-- API：`backend/app/api/v1/endpoints/question_groups.py`
+- API：`backend/app/api/v1/endpoints/question_groups.py`、`backend/app/api/v1/endpoints/questions.py`
 - 导入服务：`backend/app/services/paper_import_service.py`
 - 组稿转换：`backend/app/services/composition_authoring.py`
 - 组稿模型与快照：`backend/app/models/composition.py`、`backend/app/schemas/composition.py`

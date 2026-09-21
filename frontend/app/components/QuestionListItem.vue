@@ -347,7 +347,7 @@ const sourceFileUrl = computed(() => {
                   创建派生题
                 </DropdownMenuItem>
                 <DropdownMenuItem
-                  v-if="(item as DbQuestion).children?.length || (item as DbQuestion).parent_id"
+                  v-if="(item as DbQuestion).incoming_relation_count || (item as DbQuestion).outgoing_relation_count"
                   @click="emit('view-structure', item as DbQuestion)"
                 >
                   <Workflow class="h-4 w-4" />
