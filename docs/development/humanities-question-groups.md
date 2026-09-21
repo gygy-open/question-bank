@@ -147,18 +147,21 @@ ORDER BY child_question_id;
 | 方法 | 路径 | 用途 |
 | --- | --- | --- |
 | `POST` | `/subjects/{subject_id}/stimuli` | 创建材料 |
-| `GET` | `/subjects/{subject_id}/stimuli` | 分页查询材料，支持关键词、状态和可见性筛选 |
+| `GET` | `/subjects/{subject_id}/stimuli` | 分页查询材料，支持关键词、状态、可见性和 `only_deleted` 筛选 |
 | `GET` | `/subjects/{subject_id}/stimuli/{stimulus_id}` | 获取材料 |
 | `PUT` | `/subjects/{subject_id}/stimuli/{stimulus_id}` | 更新材料 |
+| `DELETE` | `/subjects/{subject_id}/stimuli/{stimulus_id}?expected_revision=...` | 软删除没有活动题组引用的材料 |
+| `POST` | `/subjects/{subject_id}/stimuli/{stimulus_id}/restore` | 按 `expected_revision` 恢复材料 |
 | `POST` | `/subjects/{subject_id}/question-groups` | 创建题组 |
-| `GET` | `/subjects/{subject_id}/question-groups` | 分页查询题组，支持关键词、状态、可见性、材料 ID 和题目 ID 筛选 |
+| `GET` | `/subjects/{subject_id}/question-groups` | 分页查询题组，支持原有筛选及 `only_deleted` |
 | `GET` | `/subjects/{subject_id}/question-groups/{group_id}` | 获取材料及有序小题 |
 | `PUT` | `/subjects/{subject_id}/question-groups/{group_id}` | 更新材料引用、成员或顺序 |
 | `DELETE` | `/subjects/{subject_id}/question-groups/{group_id}` | 软删除题组 |
+| `POST` | `/subjects/{subject_id}/question-groups/{group_id}/restore` | 校验引用后按 `expected_revision` 恢复题组 |
 
-更新和删除使用 `expected_revision` 实现乐观锁。版本不匹配时返回 `409`，防止两个编辑者静默覆盖彼此的修改。
+更新、删除和恢复使用 `expected_revision` 实现乐观锁。DELETE 在 query、restore 在 JSON body 中传递该字段；版本不匹配时返回 `409`，防止两个编辑者静默覆盖彼此的修改。普通列表默认只返回活动资源，`only_deleted=true` 只返回回收站资源，原有分页、搜索、筛选和可见性规则不变。材料和题组响应均包含 `deleted_at`。
 
-题组删除只删除成员关系并软删除题组，不删除材料和题目。私有资源对无权用户按不存在处理，避免泄露资源信息。
+题组删除只软删除题组并递增 revision，保留 `QuestionGroupItem`，不删除材料和题目，也不需要数据库迁移。材料仍被任何活动题组引用时禁止删除。恢复题组时重新校验材料处于活动状态、成员非空、所有成员题目活动且与题组同学科、当前操作者可见私有引用，并重新执行公开题组不能引用私有资源的约束；历史空成员题组返回 `422`。私有资源对无权用户按不存在处理，避免泄露资源信息。
 
 ### 派生关系兼容
 
@@ -241,6 +244,8 @@ Composition AST 新增 `question_group` 模块节点：
 
 材料选择器避免重复选择当前材料，题目选择器避免重复添加已有成员。题组列表删除遇到 revision `409` 时会刷新列表并提示用户重新确认。题库题目项提供“创建派生题”和“查看派生关系”，关系面板使用“来源题/派生题”术语。
 
+材料和题组列表提供“当前 / 回收站”分段视图，沿用同一套分页、搜索和筛选交互。当前材料支持删除，当前题组支持删除；回收站支持按最新 revision 恢复。回收站题组不显示编辑、加入试题篮或加入稿件操作，回收站材料不显示编辑或再次删除操作。后端恢复校验失败时，界面直接显示服务端原因。
+
 ## 如何验收
 
 ### 自动化测试
@@ -267,9 +272,9 @@ uv run pytest \
   tests/test_migrations.py -q
 ```
 
-当前分支于 2026-09-21 执行全量后端测试结果为：`632 passed, 1 skipped`。跳过项是未设置 `MYSQL_TEST_URL` 时的真实 MySQL 迁移测试；SQLite 升级链、模型迁移漂移检查和旧边归档测试均通过。测试过程中存在既有 SQLAlchemy 关系和表排序警告，本次改动未新增失败。
+当前分支于 2026-09-21 执行全量后端测试结果为：`632 passed, 1 skipped`。本次回收站闭环实施后单独执行 `tests/test_question_groups.py` 为 `19 passed`。跳过项是未设置 `MYSQL_TEST_URL` 时的真实 MySQL 迁移测试；SQLite 升级链、模型迁移漂移检查和旧边归档测试均通过。测试过程中存在既有 SQLAlchemy 关系和表排序警告，本次改动未新增失败。
 
-前端于 2026-09-20 执行：
+前端于 2026-09-21 执行：
 
 ```bash
 cd frontend
@@ -277,12 +282,17 @@ pnpm test
 pnpm generate
 ```
 
-结果为：Vitest `23 passed` 个测试文件、`264 passed` 个测试；Nuxt 静态生成成功。生成过程有较大 chunk 和 SPA 无 SSR 的提示。本次未执行手工浏览器验收，因此不声明题组 NodeView 的拖拽、焦点或响应式布局已通过视觉与交互验收。
+本次回收站闭环实施后结果为：Vitest `24 passed` 个测试文件、`266 passed` 个测试；Nuxt 静态生成成功，共预渲染 24 个路由。生成过程有既有的较大 chunk 和 SPA 无 SSR 提示。本次未执行手工浏览器验收，因此不声明题组 NodeView 的拖拽、焦点或响应式布局已通过视觉与交互验收。
 
 重点验收场景：
 
 - 材料可被多个题组复用。
 - 题组创建、换序、更新和删除符合 revision 与生命周期约束。
+- 当前/回收站列表沿用原分页、搜索、筛选和可见性规则，并分别只返回对应删除态。
+- 有活动题组引用的材料不能删除；无活动引用的材料可删除并按 revision 恢复。
+- 题组删除后成员关系仍在，恢复后成员及顺序不变。
+- 题组恢复拒绝已删除材料、空成员、已删除或跨学科成员、不可见私有引用和公开/私有不兼容组合。
+- 无编辑权限的用户不能删除或恢复；过期 revision 返回 `409`。
 - 数据库拒绝重复成员、重复位置和负数位置。
 - 公开题组拒绝私有材料或私有题目。
 - 跨学科操作、无权限访问和已删除题目被拒绝。
@@ -311,13 +321,17 @@ TEST_MYSQL_URL='mysql+aiomysql://...' uv run pytest tests/test_migrations.py -q
 3. 用乱序成员位置创建题组，读取时确认按 `position` 返回。
 4. 使用正确 `expected_revision` 更新题组，确认 revision 增加；再次使用旧 revision 应返回 `409`。
 5. 尝试让公开题组引用私有材料或私有题目，应返回 `422`。
-6. 删除题组后确认题组不可读取，但原材料和成员题目仍存在。
-7. 导入带 `parent_temp_id` 的拆题结果，确认 `questions` 表不存在 `parent_id` 列且产生 `decomposed_from` 关系。
-8. 导入显式材料和题组并保存为稿件，确认生成原生题组节点、小题按输入顺序出现，复用同一题目材料的多个题组各自保存材料快照。
-9. 从题组库把整个题组加入稿件，确认稿件保存 `question_group_id`、题组和题目材料 revision，以及有序小题快照。
-10. 修改题目材料、小题内容和题组成员顺序，确认稿件只提示过期且内容不自动变化。
-11. 确认整组刷新后仍存在小题的题号、分值、选项布局和作答区被保留，新增和删除成员符合规则。
-12. 定稿后再次修改来源，确认旧版本预览及 DOCX、LaTeX 导出内容不变。
+6. 删除题组后确认当前列表不可见、回收站可见，`QuestionGroupItem`、原材料和成员题目仍存在；恢复后成员顺序不变。
+7. 尝试删除仍被活动题组引用的材料，应返回 `422`；删除题组后材料可删除，并可从回收站恢复。
+8. 将题组引用的材料或成员软删除后尝试恢复题组，应返回 `422`；历史空成员题组同样返回 `422`。
+9. 用旧 revision 删除或恢复材料、题组，应返回 `409`；无编辑权限用户应返回 `403`。
+10. 在回收站确认材料不显示编辑/删除，题组不显示编辑/加入试题篮/加入稿件，只显示恢复。
+11. 导入带 `parent_temp_id` 的拆题结果，确认 `questions` 表不存在 `parent_id` 列且产生 `decomposed_from` 关系。
+12. 导入显式材料和题组并保存为稿件，确认生成原生题组节点、小题按输入顺序出现，复用同一题目材料的多个题组各自保存材料快照。
+13. 从题组库把整个题组加入稿件，确认稿件保存 `question_group_id`、题组和题目材料 revision，以及有序小题快照。
+14. 修改题目材料、小题内容和题组成员顺序，确认稿件只提示过期且内容不自动变化。
+15. 确认整组刷新后仍存在小题的题号、分值、选项布局和作答区被保留，新增和删除成员符合规则。
+16. 定稿后再次修改来源，确认旧版本预览及 DOCX、LaTeX 导出内容不变。
 
 ## 待完成
 
@@ -328,7 +342,6 @@ TEST_MYSQL_URL='mysql+aiomysql://...' uv run pytest tests/test_migrations.py -q
 
 ### 其他工程工作
 
-- 补充材料和题组列表、分页、搜索及软删除恢复接口。
 - 评估材料状态与审核流程是否需要独立审核计数和日志。
 - 补充真实 MySQL 的迁移、约束和并发测试。
 - 在前后端闭环后更新用户文档，并评估 IMS QTI 导入导出映射；QTI 互操作不属于当前阶段。

@@ -21,6 +21,12 @@ class CRUDStimulus(CRUDBase[Stimulus, StimulusCreate, StimulusUpdate]):
         )
         return result.scalar_one_or_none()
 
+    async def get_deleted(self, db: AsyncSession, id: int) -> Optional[Stimulus]:
+        result = await db.execute(
+            select(Stimulus).where(Stimulus.id == id, Stimulus.deleted_at.is_not(None))
+        )
+        return result.scalar_one_or_none()
+
     async def get_page(
         self,
         db: AsyncSession,
@@ -33,10 +39,13 @@ class CRUDStimulus(CRUDBase[Stimulus, StimulusCreate, StimulusUpdate]):
         keyword: Optional[str] = None,
         status: Optional[str] = None,
         visibility: Optional[str] = None,
+        only_deleted: bool = False,
     ) -> tuple[List[tuple[Stimulus, int]], int]:
         conditions = [
             Stimulus.subject_id == subject_id,
-            Stimulus.deleted_at.is_(None),
+            Stimulus.deleted_at.is_not(None)
+            if only_deleted
+            else Stimulus.deleted_at.is_(None),
         ]
         if not is_superuser:
             conditions.append(
@@ -87,6 +96,18 @@ class CRUDQuestionGroup(CRUDBase[QuestionGroup, QuestionGroupCreate, QuestionGro
         )
         return result.scalar_one_or_none()
 
+    async def get_deleted(self, db: AsyncSession, id: int) -> Optional[QuestionGroup]:
+        result = await db.execute(
+            select(QuestionGroup)
+            .execution_options(populate_existing=True)
+            .options(
+                selectinload(QuestionGroup.stimulus),
+                selectinload(QuestionGroup.items).selectinload(QuestionGroupItem.question),
+            )
+            .where(QuestionGroup.id == id, QuestionGroup.deleted_at.is_not(None))
+        )
+        return result.scalar_one_or_none()
+
     async def get_page(
         self,
         db: AsyncSession,
@@ -101,10 +122,13 @@ class CRUDQuestionGroup(CRUDBase[QuestionGroup, QuestionGroupCreate, QuestionGro
         visibility: Optional[str] = None,
         stimulus_id: Optional[int] = None,
         question_id: Optional[int] = None,
+        only_deleted: bool = False,
     ) -> tuple[List[QuestionGroup], int]:
         conditions = [
             QuestionGroup.subject_id == subject_id,
-            QuestionGroup.deleted_at.is_(None),
+            QuestionGroup.deleted_at.is_not(None)
+            if only_deleted
+            else QuestionGroup.deleted_at.is_(None),
         ]
         if not is_superuser:
             conditions.append(

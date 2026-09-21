@@ -14,6 +14,7 @@ from app.schemas.question_group import (
     QuestionGroupPage,
     QuestionGroupRead,
     QuestionGroupUpdate,
+    RestoreRequest,
     StimulusCreate,
     StimulusListItem,
     StimulusPage,
@@ -65,6 +66,7 @@ async def read_stimuli(
     keyword: Optional[str] = None,
     status_value: Optional[str] = Query(None, alias="status"),
     visibility: Optional[str] = None,
+    only_deleted: bool = False,
     current_user: models.User = Depends(deps.get_current_active_user),
 ) -> Any:
     await _require_subject(db, subject_id)
@@ -79,6 +81,7 @@ async def read_stimuli(
         keyword=keyword,
         status=status_value,
         visibility=visibility,
+        only_deleted=only_deleted,
     )
     items = [
         StimulusListItem.model_validate(stimulus).model_copy(
@@ -136,6 +139,47 @@ async def update_stimulus(
     )
 
 
+@router.delete(
+    "/{subject_id}/stimuli/{stimulus_id}", status_code=status.HTTP_204_NO_CONTENT
+)
+async def delete_stimulus(
+    subject_id: int,
+    stimulus_id: int,
+    db: deps.SessionDep,
+    expected_revision: int = Query(..., ge=1),
+    current_user: models.User = Depends(deps.get_current_active_user),
+) -> Response:
+    await _require_subject(db, subject_id)
+    deps.require(current_user, Permission.EDIT_QUESTION, subject_id=subject_id)
+    stimulus = await question_group_service.get_stimulus(db, stimulus_id, current_user)
+    if stimulus.subject_id != subject_id:
+        raise HTTPException(status_code=404, detail="Stimulus not found")
+    await question_group_service.delete_stimulus(
+        db, stimulus=stimulus, expected_revision=expected_revision, actor=current_user
+    )
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@router.post("/{subject_id}/stimuli/{stimulus_id}/restore", response_model=StimulusRead)
+async def restore_stimulus(
+    subject_id: int,
+    stimulus_id: int,
+    payload: RestoreRequest,
+    db: deps.SessionDep,
+    current_user: models.User = Depends(deps.get_current_active_user),
+) -> Any:
+    await _require_subject(db, subject_id)
+    deps.require(current_user, Permission.EDIT_QUESTION, subject_id=subject_id)
+    stimulus = await question_group_service.get_deleted_stimulus(
+        db, stimulus_id, current_user
+    )
+    if stimulus.subject_id != subject_id:
+        raise HTTPException(status_code=404, detail="Stimulus not found")
+    return await question_group_service.restore_stimulus(
+        db, stimulus=stimulus, expected_revision=payload.expected_revision, actor=current_user
+    )
+
+
 @router.post(
     "/{subject_id}/question-groups",
     response_model=QuestionGroupRead,
@@ -173,6 +217,7 @@ async def read_question_groups(
     visibility: Optional[str] = None,
     stimulus_id: Optional[int] = None,
     question_id: Optional[int] = None,
+    only_deleted: bool = False,
     current_user: models.User = Depends(deps.get_current_active_user),
 ) -> Any:
     await _require_subject(db, subject_id)
@@ -189,6 +234,7 @@ async def read_question_groups(
         visibility=visibility,
         stimulus_id=stimulus_id,
         question_id=question_id,
+        only_deleted=only_deleted,
     )
     return {
         "items": items,
@@ -264,3 +310,24 @@ async def delete_question_group(
         db, group=group, expected_revision=expected_revision, actor=current_user
     )
     return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@router.post(
+    "/{subject_id}/question-groups/{group_id}/restore",
+    response_model=QuestionGroupRead,
+)
+async def restore_question_group(
+    subject_id: int,
+    group_id: int,
+    payload: RestoreRequest,
+    db: deps.SessionDep,
+    current_user: models.User = Depends(deps.get_current_active_user),
+) -> Any:
+    await _require_subject(db, subject_id)
+    deps.require(current_user, Permission.EDIT_QUESTION, subject_id=subject_id)
+    group = await question_group_service.get_deleted_group(db, group_id, current_user)
+    if group.subject_id != subject_id:
+        raise HTTPException(status_code=404, detail="Question group not found")
+    return await question_group_service.restore_group(
+        db, group=group, expected_revision=payload.expected_revision, actor=current_user
+    )

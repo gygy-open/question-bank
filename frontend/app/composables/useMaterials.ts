@@ -16,5 +16,15 @@ export function useMaterials() {
   const updateMaterial = (subjectId: number, materialId: number, payload: StimulusUpdateRequest) =>
     $api<Stimulus>(`${basePath(subjectId)}/${materialId}`, { method: 'PUT', body: payload })
 
-  return { listMaterials, getMaterial, createMaterial, updateMaterial }
+  const deleteMaterial = (subjectId: number, materialId: number, expectedRevision: number) =>
+    $api<void>(`${basePath(subjectId)}/${materialId}`, {
+      method: 'DELETE', query: { expected_revision: expectedRevision },
+    })
+
+  const restoreMaterial = (subjectId: number, materialId: number, expectedRevision: number) =>
+    $api<Stimulus>(`${basePath(subjectId)}/${materialId}/restore`, {
+      method: 'POST', body: { expected_revision: expectedRevision },
+    })
+
+  return { listMaterials, getMaterial, createMaterial, updateMaterial, deleteMaterial, restoreMaterial }
 }

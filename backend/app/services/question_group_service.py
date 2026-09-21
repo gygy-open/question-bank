@@ -51,6 +51,16 @@ async def get_stimulus(db: AsyncSession, stimulus_id: int, actor: User) -> Stimu
     return stimulus
 
 
+async def get_deleted_stimulus(
+    db: AsyncSession, stimulus_id: int, actor: User
+) -> Stimulus:
+    stimulus = await crud_stimulus.get_deleted(db, stimulus_id)
+    if stimulus is None:
+        raise _error(status.HTTP_404_NOT_FOUND, "Stimulus not found")
+    _assert_private_access(stimulus, actor)
+    return stimulus
+
+
 async def create_stimulus(
     db: AsyncSession,
     *,
@@ -127,6 +137,73 @@ async def update_stimulus(
     return await get_stimulus(db, stimulus.id, actor)
 
 
+async def delete_stimulus(
+    db: AsyncSession, *, stimulus: Stimulus, expected_revision: int, actor: User
+) -> None:
+    _assert_private_access(stimulus, actor)
+    locked_stimulus = await db.scalar(
+        select(Stimulus)
+        .where(Stimulus.id == stimulus.id, Stimulus.deleted_at.is_(None))
+        .with_for_update()
+    )
+    if locked_stimulus is None:
+        raise _error(status.HTTP_409_CONFLICT, "Stimulus revision mismatch")
+    _assert_private_access(locked_stimulus, actor)
+    if locked_stimulus.revision != expected_revision:
+        raise _error(status.HTTP_409_CONFLICT, "Stimulus revision mismatch")
+    active_group_id = await db.scalar(
+        select(QuestionGroup.id)
+        .where(
+            QuestionGroup.stimulus_id == locked_stimulus.id,
+            QuestionGroup.deleted_at.is_(None),
+        )
+        .limit(1)
+    )
+    if active_group_id is not None:
+        raise _error(422, "题目材料仍被活动题组引用，不能删除")
+    result = await db.execute(
+        update(Stimulus)
+        .where(
+            Stimulus.id == locked_stimulus.id,
+            Stimulus.revision == expected_revision,
+            Stimulus.deleted_at.is_(None),
+        )
+        .values(
+            deleted_at=datetime.utcnow(),
+            updated_at=datetime.utcnow(),
+            updated_by=actor.id,
+            revision=Stimulus.revision + 1,
+        )
+    )
+    if result.rowcount == 0:
+        raise _error(status.HTTP_409_CONFLICT, "Stimulus revision mismatch")
+    await db.commit()
+
+
+async def restore_stimulus(
+    db: AsyncSession, *, stimulus: Stimulus, expected_revision: int, actor: User
+) -> Stimulus:
+    _assert_private_access(stimulus, actor)
+    result = await db.execute(
+        update(Stimulus)
+        .where(
+            Stimulus.id == stimulus.id,
+            Stimulus.revision == expected_revision,
+            Stimulus.deleted_at.is_not(None),
+        )
+        .values(
+            deleted_at=None,
+            updated_at=datetime.utcnow(),
+            updated_by=actor.id,
+            revision=Stimulus.revision + 1,
+        )
+    )
+    if result.rowcount == 0:
+        raise _error(status.HTTP_409_CONFLICT, "Stimulus revision mismatch")
+    await db.commit()
+    return await get_stimulus(db, stimulus.id, actor)
+
+
 async def _validate_group_refs(
     db: AsyncSession,
     *,
@@ -136,7 +213,14 @@ async def _validate_group_refs(
     visibility: str,
     actor: User,
 ) -> tuple[Stimulus, List[Question]]:
-    stimulus = await get_stimulus(db, stimulus_id, actor)
+    stimulus = await db.scalar(
+        select(Stimulus)
+        .where(Stimulus.id == stimulus_id, Stimulus.deleted_at.is_(None))
+        .with_for_update()
+    )
+    if stimulus is None:
+        raise _error(status.HTTP_404_NOT_FOUND, "Stimulus not found")
+    _assert_private_access(stimulus, actor)
     if stimulus.subject_id != subject_id:
         raise _error(422, "材料与题组必须属于同一学科")
     ids = [item.question_id for item in items]
@@ -165,6 +249,16 @@ async def _validate_group_refs(
 
 async def get_group(db: AsyncSession, group_id: int, actor: User) -> QuestionGroup:
     group = await crud_question_group.get_active(db, group_id)
+    if group is None:
+        raise _error(status.HTTP_404_NOT_FOUND, "Question group not found")
+    _assert_private_access(group, actor)
+    return group
+
+
+async def get_deleted_group(
+    db: AsyncSession, group_id: int, actor: User
+) -> QuestionGroup:
+    group = await crud_question_group.get_deleted(db, group_id)
     if group is None:
         raise _error(status.HTTP_404_NOT_FOUND, "Question group not found")
     _assert_private_access(group, actor)
@@ -296,8 +390,49 @@ async def delete_group(
     )
     if result.rowcount == 0:
         raise _error(status.HTTP_409_CONFLICT, "Question group revision mismatch")
-    await db.execute(delete(QuestionGroupItem).where(QuestionGroupItem.group_id == group.id))
     await db.commit()
+
+
+async def restore_group(
+    db: AsyncSession, *, group: QuestionGroup, expected_revision: int, actor: User
+) -> QuestionGroup:
+    _assert_private_access(group, actor)
+    if group.revision != expected_revision:
+        raise _error(status.HTTP_409_CONFLICT, "Question group revision mismatch")
+    items = [
+        QuestionGroupItemInput(question_id=item.question_id, position=item.position)
+        for item in group.items
+    ]
+    if not items:
+        raise _error(422, "题组至少包含一道活动题目")
+    if group.stimulus is None or group.stimulus.deleted_at is not None:
+        raise _error(422, "题组引用的题目材料不存在或已删除")
+    await _validate_group_refs(
+        db,
+        subject_id=group.subject_id,
+        stimulus_id=group.stimulus_id,
+        items=items,
+        visibility=group.visibility,
+        actor=actor,
+    )
+    result = await db.execute(
+        update(QuestionGroup)
+        .where(
+            QuestionGroup.id == group.id,
+            QuestionGroup.revision == expected_revision,
+            QuestionGroup.deleted_at.is_not(None),
+        )
+        .values(
+            deleted_at=None,
+            updated_at=datetime.utcnow(),
+            updated_by=actor.id,
+            revision=QuestionGroup.revision + 1,
+        )
+    )
+    if result.rowcount == 0:
+        raise _error(status.HTTP_409_CONFLICT, "Question group revision mismatch")
+    await db.commit()
+    return await get_group(db, group.id, actor)
 
 
 async def create_question_relation(

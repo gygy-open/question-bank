@@ -13,5 +13,18 @@ export function useQuestionGroups() {
   const updateQuestionGroup = (subjectId: number, groupId: number, payload: QuestionGroupUpdateRequest) =>
     $api<QuestionGroup>(`${basePath(subjectId)}/${groupId}`, { method: 'PUT', body: payload })
 
-  return { getQuestionGroup, createQuestionGroup, updateQuestionGroup }
+  const deleteQuestionGroup = (subjectId: number, groupId: number, expectedRevision: number) =>
+    $api<void>(`${basePath(subjectId)}/${groupId}`, {
+      method: 'DELETE', query: { expected_revision: expectedRevision },
+    })
+
+  const restoreQuestionGroup = (subjectId: number, groupId: number, expectedRevision: number) =>
+    $api<QuestionGroup>(`${basePath(subjectId)}/${groupId}/restore`, {
+      method: 'POST', body: { expected_revision: expectedRevision },
+    })
+
+  return {
+    getQuestionGroup, createQuestionGroup, updateQuestionGroup,
+    deleteQuestionGroup, restoreQuestionGroup,
+  }
 }

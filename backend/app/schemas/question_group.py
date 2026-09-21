@@ -26,6 +26,10 @@ class StimulusUpdate(BaseModel):
     metadata: Optional[Dict[str, Any]] = None
 
 
+class RestoreRequest(BaseModel):
+    expected_revision: int = Field(ge=1)
+
+
 class StimulusRead(BaseModel):
     id: int
     subject_id: int
@@ -39,6 +43,7 @@ class StimulusRead(BaseModel):
     updated_by: Optional[int] = None
     created_at: datetime
     updated_at: datetime
+    deleted_at: Optional[datetime] = None
 
     @field_validator("metadata_json", mode="before")
     @classmethod
@@ -131,6 +136,7 @@ class QuestionGroupRead(BaseModel):
     updated_by: Optional[int] = None
     created_at: datetime
     updated_at: datetime
+    deleted_at: Optional[datetime] = None
     stimulus: StimulusRead
     items: List[QuestionGroupItemRead]
 

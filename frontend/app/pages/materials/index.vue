@@ -1,30 +1,36 @@
 <script setup lang="ts">
 import { computed, onActivated, ref, watch } from 'vue'
 import { AlertCircle, ChevronLeft, ChevronRight, Loader2, Plus, RotateCw } from '@lucide/vue'
+import { toast } from 'vue-sonner'
 import PageHeader from '@/components/PageHeader.vue'
 import MaterialListItem from '@/components/materials/MaterialListItem.vue'
 import ClearableInput from '@/components/ClearableInput.vue'
 import ClearableSelect from '@/components/ClearableSelect.vue'
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { buildLibraryQuery } from '@/lib/libraryQueries'
-import type { StimulusPage } from '@/types'
+import { getApiErrorDetail, isRevisionConflict } from '@/lib/questionGroupEditor'
+import type { StimulusListItem, StimulusPage } from '@/types'
 
 const { currentSubjectId } = useSubjectContext()
 const { can } = usePermissions()
 const canEdit = computed(() => can(Capability.EDIT_QUESTION, currentSubjectId.value))
+const { deleteMaterial, restoreMaterial } = useMaterials()
 
 const page = ref(1)
 const size = ref(10)
 const keyword = ref('')
 const statusFilter = ref('0')
 const visibility = ref('0')
+const view = ref<'active' | 'deleted'>('active')
 const query = computed(() => buildLibraryQuery({
   page: page.value,
   size: size.value,
   keyword: keyword.value.trim(),
   status: statusFilter.value,
   visibility: visibility.value,
+  only_deleted: view.value === 'deleted' ? true : undefined,
 }))
 
 const endpoint = computed(() => `/subjects/${currentSubjectId.value ?? 0}/stimuli`)
@@ -47,11 +53,11 @@ watch(currentSubjectId, () => {
   page.value = 1
   load()
 }, { immediate: true })
-watch([page, size, keyword, statusFilter, visibility], () => {
+watch([page, size, keyword, statusFilter, visibility, view], () => {
   if (page.value > 1 && (keyword.value || statusFilter.value !== '0' || visibility.value !== '0')) return
   load()
 })
-watch([keyword, statusFilter, visibility, size], () => {
+watch([keyword, statusFilter, visibility, size, view], () => {
   if (page.value !== 1) page.value = 1
 })
 
@@ -67,6 +73,32 @@ const visibilityOptions = [
   { label: '公开', value: 'public' },
   { label: '私有', value: 'private' },
 ]
+
+const deleteItem = async (material: StimulusListItem) => {
+  if (!currentSubjectId.value || !confirm(`确定删除题目材料 #${material.id} 吗？`)) return
+  try {
+    await deleteMaterial(currentSubjectId.value, material.id, material.revision)
+    toast.success('题目材料已移入回收站')
+    if (materials.value.length === 1 && page.value > 1) page.value--
+    else await refresh()
+  } catch (error) {
+    if (isRevisionConflict(error)) await refresh()
+    toast.error(getApiErrorDetail(error, '删除题目材料失败'))
+  }
+}
+
+const restoreItem = async (material: StimulusListItem) => {
+  if (!currentSubjectId.value) return
+  try {
+    await restoreMaterial(currentSubjectId.value, material.id, material.revision)
+    toast.success('题目材料已恢复')
+    if (materials.value.length === 1 && page.value > 1) page.value--
+    else await refresh()
+  } catch (error) {
+    if (isRevisionConflict(error)) await refresh()
+    toast.error(getApiErrorDetail(error, '恢复题目材料失败'))
+  }
+}
 </script>
 
 <template>
@@ -81,6 +113,9 @@ const visibilityOptions = [
 
   <main class="flex flex-1 flex-col gap-5 px-4 py-6">
     <p class="text-sm text-muted-foreground">供一道或多道题共同引用的文章、图表或背景内容；本身不可作答，也不包含答案和题型。</p>
+    <Tabs v-model="view">
+      <TabsList><TabsTrigger value="active">当前</TabsTrigger><TabsTrigger value="deleted">回收站</TabsTrigger></TabsList>
+    </Tabs>
     <div class="grid gap-3 bg-muted/40 p-4 sm:grid-cols-3">
       <div class="space-y-2">
         <Label class="text-xs">关键词</Label>
@@ -102,9 +137,9 @@ const visibilityOptions = [
       <AlertCircle class="size-6" /><span>题目材料加载失败</span>
       <Button variant="outline" size="sm" @click="load"><RotateCw class="mr-2 size-4" />重试</Button>
     </div>
-    <div v-else-if="materials.length === 0" class="py-16 text-center text-sm text-muted-foreground">暂无题目材料。创建后可在多个题组中复用。</div>
+    <div v-else-if="materials.length === 0" class="py-16 text-center text-sm text-muted-foreground">{{ view === 'deleted' ? '回收站中暂无题目材料。' : '暂无题目材料。创建后可在多个题组中复用。' }}</div>
     <section v-else class="border-y">
-      <MaterialListItem v-for="material in materials" :key="material.id" :material="material" :can-edit="canEdit" />
+      <MaterialListItem v-for="material in materials" :key="material.id" :material="material" :can-edit="canEdit" @delete="deleteItem" @restore="restoreItem" />
     </section>
 
     <div v-if="total > 0" class="flex flex-wrap items-center justify-between gap-3 text-sm text-muted-foreground">

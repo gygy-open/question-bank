@@ -305,6 +305,7 @@ export interface StimulusListItem {
   updated_by?: number | null
   created_at: string
   updated_at: string
+  deleted_at: string | null
   question_group_count: number
 }
 
@@ -366,6 +367,7 @@ export interface QuestionGroup {
   updated_by?: number | null
   created_at: string
   updated_at: string
+  deleted_at: string | null
   stimulus: Omit<StimulusListItem, 'question_group_count'>
   items: QuestionGroupItem[]
 }

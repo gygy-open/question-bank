@@ -9,17 +9,18 @@ import ClearableInput from '@/components/ClearableInput.vue'
 import ClearableSelect from '@/components/ClearableSelect.vue'
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { buildLibraryQuery } from '@/lib/libraryQueries'
-import { isRevisionConflict } from '@/lib/questionGroupEditor'
+import { getApiErrorDetail, isRevisionConflict } from '@/lib/questionGroupEditor'
 import { richDocToPlainText } from '@/components/rich-editor/richDoc'
 import type { QuestionGroup, QuestionGroupPage } from '@/types'
 
 const route = useRoute()
 const router = useRouter()
-const { $api } = useNuxtApp()
 const { currentSubjectId } = useSubjectContext()
 const { can } = usePermissions()
 const basket = useQuestionBasket()
+const { deleteQuestionGroup, restoreQuestionGroup } = useQuestionGroups()
 const canEdit = computed(() => can(Capability.EDIT_QUESTION, currentSubjectId.value))
 
 const page = ref(1)
@@ -29,9 +30,11 @@ const statusFilter = ref('0')
 const visibility = ref('0')
 const stimulusId = ref('')
 const questionId = ref(typeof route.query.question_id === 'string' ? route.query.question_id : '')
+const view = ref<'active' | 'deleted'>('active')
 const query = computed(() => buildLibraryQuery({
   page: page.value, size: size.value, keyword: keyword.value.trim(), status: statusFilter.value,
   visibility: visibility.value, stimulus_id: stimulusId.value, question_id: questionId.value,
+  only_deleted: view.value === 'deleted' ? true : undefined,
 }))
 
 const endpoint = computed(() => `/subjects/${currentSubjectId.value ?? 0}/question-groups`)
@@ -54,8 +57,8 @@ watch(() => route.query.question_id, value => {
   page.value = 1
 })
 watch(currentSubjectId, () => { page.value = 1; load() }, { immediate: true })
-watch([page, size, keyword, statusFilter, visibility, stimulusId, questionId], load)
-watch([size, keyword, statusFilter, visibility, stimulusId, questionId], () => {
+watch([page, size, keyword, statusFilter, visibility, stimulusId, questionId, view], load)
+watch([size, keyword, statusFilter, visibility, stimulusId, questionId, view], () => {
   if (page.value !== 1) page.value = 1
 })
 
@@ -71,10 +74,8 @@ const visibilityOptions = [
 const deleteGroup = async (group: QuestionGroup) => {
   if (!currentSubjectId.value || !confirm(`确定删除题组 #${group.id} 吗？题目材料和题目不会被删除。`)) return
   try {
-    await $api(`/subjects/${currentSubjectId.value}/question-groups/${group.id}`, {
-      method: 'DELETE', query: { expected_revision: group.revision },
-    })
-    toast.success('题组已删除')
+    await deleteQuestionGroup(currentSubjectId.value, group.id, group.revision)
+    toast.success('题组已移入回收站')
     if (groups.value.length === 1 && page.value > 1) page.value--
     else await refresh()
   } catch (error) {
@@ -82,8 +83,21 @@ const deleteGroup = async (group: QuestionGroup) => {
       await refresh()
       toast.error('题组已被其他人修改，列表已刷新，请确认后重试')
     } else {
-      toast.error('删除题组失败，请刷新后重试')
+      toast.error(getApiErrorDetail(error, '删除题组失败'))
     }
+  }
+}
+
+const restoreGroup = async (group: QuestionGroup) => {
+  if (!currentSubjectId.value) return
+  try {
+    await restoreQuestionGroup(currentSubjectId.value, group.id, group.revision)
+    toast.success('题组已恢复')
+    if (groups.value.length === 1 && page.value > 1) page.value--
+    else await refresh()
+  } catch (error) {
+    if (isRevisionConflict(error)) await refresh()
+    toast.error(getApiErrorDetail(error, '恢复题组失败'))
   }
 }
 
@@ -119,6 +133,9 @@ const clearQuestionFilter = () => {
 
   <main class="flex flex-1 flex-col gap-5 px-4 py-6">
     <p class="text-sm text-muted-foreground">由一份题目材料和若干有序题目组成；题号、分值和试卷版面由具体稿件管理。</p>
+    <Tabs v-model="view">
+      <TabsList><TabsTrigger value="active">当前</TabsTrigger><TabsTrigger value="deleted">回收站</TabsTrigger></TabsList>
+    </Tabs>
     <div class="grid gap-3 bg-muted/40 p-4 sm:grid-cols-2 xl:grid-cols-5">
       <div class="space-y-2 xl:col-span-2"><Label class="text-xs">关键词</Label><ClearableInput v-model="keyword" placeholder="搜索题目材料、题目或来源" /></div>
       <div class="space-y-2"><Label class="text-xs">状态</Label><ClearableSelect v-model="statusFilter" :options="statusOptions" /></div>
@@ -135,9 +152,9 @@ const clearQuestionFilter = () => {
     <div v-else-if="error" class="flex flex-col items-center gap-3 py-16 text-sm text-muted-foreground">
       <AlertCircle class="size-6" /><span>题组加载失败</span><Button variant="outline" size="sm" @click="load"><RotateCw class="mr-2 size-4" />重试</Button>
     </div>
-    <div v-else-if="groups.length === 0" class="py-16 text-center text-sm text-muted-foreground">暂无题组。创建后可选择题目材料并添加、排序题目。</div>
+    <div v-else-if="groups.length === 0" class="py-16 text-center text-sm text-muted-foreground">{{ view === 'deleted' ? '回收站中暂无题组。' : '暂无题组。创建后可选择题目材料并添加、排序题目。' }}</div>
     <section v-else class="border-y">
-      <QuestionGroupListItem v-for="group in groups" :key="group.id" :group="group" :can-edit="canEdit" @delete="deleteGroup" @add-basket="addToBasket" @add-composition="addToComposition" />
+      <QuestionGroupListItem v-for="group in groups" :key="group.id" :group="group" :can-edit="canEdit" @delete="deleteGroup" @restore="restoreGroup" @add-basket="addToBasket" @add-composition="addToComposition" />
     </section>
 
     <div v-if="total > 0" class="flex flex-wrap items-center justify-between gap-3 text-sm text-muted-foreground">

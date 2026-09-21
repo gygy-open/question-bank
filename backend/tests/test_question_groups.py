@@ -237,7 +237,7 @@ async def test_public_group_rejects_private_material_and_question(client, group_
     assert private_member.status_code == 422
 
 
-async def test_group_delete_removes_membership_not_questions(client, db_session, group_ctx):
+async def test_group_delete_preserves_membership_not_questions(client, db_session, group_ctx):
     stimulus = await _create_stimulus(client, group_ctx)
     question = group_ctx["questions"][0]
     created = await client.post(
@@ -260,10 +260,223 @@ async def test_group_delete_removes_membership_not_questions(client, db_session,
         select(func.count()).select_from(QuestionGroupItem).where(
             QuestionGroupItem.group_id == group["id"]
         )
-    ) == 0
+    ) == 1
+    deleted_page = await client.get(
+        f"{API}/subjects/{group_ctx['subject'].id}/question-groups",
+        params={"only_deleted": True},
+        headers=_auth(group_ctx["owner"]),
+    )
+    assert deleted_page.status_code == 200, deleted_page.text
+    assert deleted_page.json()["items"][0]["deleted_at"] is not None
     persisted = await db_session.get(Question, question.id)
     assert persisted is not None
     assert persisted.deleted_at is None
+
+
+async def test_stimulus_delete_requires_no_active_groups_and_can_restore(
+    client, group_ctx
+):
+    stimulus = await _create_stimulus(client, group_ctx)
+    question = group_ctx["questions"][0]
+    created = await client.post(
+        f"{API}/subjects/{group_ctx['subject'].id}/question-groups",
+        json={
+            "stimulus_id": stimulus["id"],
+            "items": [{"question_id": question.id, "position": 0}],
+        },
+        headers=_auth(group_ctx["owner"]),
+    )
+    group = created.json()
+
+    updated = await client.put(
+        f"{API}/subjects/{group_ctx['subject'].id}/stimuli/{stimulus['id']}",
+        json={"expected_revision": stimulus["revision"], "source": "updated"},
+        headers=_auth(group_ctx["owner"]),
+    )
+    assert updated.status_code == 200, updated.text
+    current_stimulus = updated.json()
+    stale_delete = await client.delete(
+        f"{API}/subjects/{group_ctx['subject'].id}/stimuli/{stimulus['id']}",
+        params={"expected_revision": stimulus["revision"]},
+        headers=_auth(group_ctx["owner"]),
+    )
+    assert stale_delete.status_code == 409, stale_delete.text
+
+    blocked = await client.delete(
+        f"{API}/subjects/{group_ctx['subject'].id}/stimuli/{stimulus['id']}",
+        params={"expected_revision": current_stimulus["revision"]},
+        headers=_auth(group_ctx["owner"]),
+    )
+    assert blocked.status_code == 422, blocked.text
+
+    await client.delete(
+        f"{API}/subjects/{group_ctx['subject'].id}/question-groups/{group['id']}",
+        params={"expected_revision": group["revision"]},
+        headers=_auth(group_ctx["owner"]),
+    )
+    deleted = await client.delete(
+        f"{API}/subjects/{group_ctx['subject'].id}/stimuli/{stimulus['id']}",
+        params={"expected_revision": current_stimulus["revision"]},
+        headers=_auth(group_ctx["owner"]),
+    )
+    assert deleted.status_code == 204, deleted.text
+
+    recycle_bin = await client.get(
+        f"{API}/subjects/{group_ctx['subject'].id}/stimuli",
+        params={"only_deleted": True},
+        headers=_auth(group_ctx["owner"]),
+    )
+    deleted_stimulus = recycle_bin.json()["items"][0]
+    assert deleted_stimulus["id"] == stimulus["id"]
+    assert deleted_stimulus["deleted_at"] is not None
+    assert deleted_stimulus["revision"] == current_stimulus["revision"] + 1
+
+    stale = await client.post(
+        f"{API}/subjects/{group_ctx['subject'].id}/stimuli/{stimulus['id']}/restore",
+        json={"expected_revision": current_stimulus["revision"]},
+        headers=_auth(group_ctx["owner"]),
+    )
+    assert stale.status_code == 409, stale.text
+    restored = await client.post(
+        f"{API}/subjects/{group_ctx['subject'].id}/stimuli/{stimulus['id']}/restore",
+        json={"expected_revision": deleted_stimulus["revision"]},
+        headers=_auth(group_ctx["owner"]),
+    )
+    assert restored.status_code == 200, restored.text
+    assert restored.json()["deleted_at"] is None
+    assert restored.json()["revision"] == deleted_stimulus["revision"] + 1
+
+
+async def test_group_restore_validates_revision_and_active_references(
+    client, db_session, group_ctx
+):
+    stimulus = await _create_stimulus(client, group_ctx)
+    question = group_ctx["questions"][0]
+    created = await client.post(
+        f"{API}/subjects/{group_ctx['subject'].id}/question-groups",
+        json={
+            "stimulus_id": stimulus["id"],
+            "items": [{"question_id": question.id, "position": 0}],
+        },
+        headers=_auth(group_ctx["owner"]),
+    )
+    group = created.json()
+    await client.delete(
+        f"{API}/subjects/{group_ctx['subject'].id}/question-groups/{group['id']}",
+        params={"expected_revision": group["revision"]},
+        headers=_auth(group_ctx["owner"]),
+    )
+    deleted_revision = group["revision"] + 1
+
+    stale = await client.post(
+        f"{API}/subjects/{group_ctx['subject'].id}/question-groups/{group['id']}/restore",
+        json={"expected_revision": group["revision"]},
+        headers=_auth(group_ctx["owner"]),
+    )
+    assert stale.status_code == 409, stale.text
+    denied = await client.post(
+        f"{API}/subjects/{group_ctx['subject'].id}/question-groups/{group['id']}/restore",
+        json={"expected_revision": deleted_revision},
+        headers=_auth(group_ctx["other"]),
+    )
+    assert denied.status_code == 403, denied.text
+    restored = await client.post(
+        f"{API}/subjects/{group_ctx['subject'].id}/question-groups/{group['id']}/restore",
+        json={"expected_revision": deleted_revision},
+        headers=_auth(group_ctx["owner"]),
+    )
+    assert restored.status_code == 200, restored.text
+    assert restored.json()["deleted_at"] is None
+    assert restored.json()["revision"] == deleted_revision + 1
+    assert restored.json()["items"][0]["question_id"] == question.id
+
+    await client.delete(
+        f"{API}/subjects/{group_ctx['subject'].id}/question-groups/{group['id']}",
+        params={"expected_revision": deleted_revision + 1},
+        headers=_auth(group_ctx["owner"]),
+    )
+    question.deleted_at = datetime.utcnow()
+    await db_session.commit()
+    inactive_member = await client.post(
+        f"{API}/subjects/{group_ctx['subject'].id}/question-groups/{group['id']}/restore",
+        json={"expected_revision": deleted_revision + 2},
+        headers=_auth(group_ctx["owner"]),
+    )
+    assert inactive_member.status_code == 422, inactive_member.text
+
+
+async def test_group_restore_rejects_deleted_material_private_public_mix_and_empty_legacy_group(
+    client, db_session, group_ctx
+):
+    owner = group_ctx["owner"]
+    question = group_ctx["questions"][0]
+
+    async def deleted_group() -> tuple[dict, dict]:
+        stimulus = await _create_stimulus(client, group_ctx)
+        response = await client.post(
+            f"{API}/subjects/{group_ctx['subject'].id}/question-groups",
+            json={
+                "stimulus_id": stimulus["id"],
+                "items": [{"question_id": question.id, "position": 0}],
+            },
+            headers=_auth(owner),
+        )
+        group = response.json()
+        await client.delete(
+            f"{API}/subjects/{group_ctx['subject'].id}/question-groups/{group['id']}",
+            params={"expected_revision": group["revision"]},
+            headers=_auth(owner),
+        )
+        return stimulus, group
+
+    stimulus, group = await deleted_group()
+    await client.delete(
+        f"{API}/subjects/{group_ctx['subject'].id}/stimuli/{stimulus['id']}",
+        params={"expected_revision": stimulus["revision"]},
+        headers=_auth(owner),
+    )
+    missing_material = await client.post(
+        f"{API}/subjects/{group_ctx['subject'].id}/question-groups/{group['id']}/restore",
+        json={"expected_revision": group["revision"] + 1},
+        headers=_auth(owner),
+    )
+    assert missing_material.status_code == 422, missing_material.text
+
+    stimulus, group = await deleted_group()
+    changed_visibility = await client.put(
+        f"{API}/subjects/{group_ctx['subject'].id}/stimuli/{stimulus['id']}",
+        json={"expected_revision": stimulus["revision"], "visibility": "private"},
+        headers=_auth(owner),
+    )
+    assert changed_visibility.status_code == 200, changed_visibility.text
+    incompatible = await client.post(
+        f"{API}/subjects/{group_ctx['subject'].id}/question-groups/{group['id']}/restore",
+        json={"expected_revision": group["revision"] + 1},
+        headers=_auth(owner),
+    )
+    assert incompatible.status_code == 422, incompatible.text
+
+    empty_stimulus = Stimulus(
+        subject_id=group_ctx["subject"].id,
+        content=json.dumps(doc("旧材料")),
+        created_by=owner.id,
+    )
+    db_session.add(empty_stimulus)
+    await db_session.flush()
+    empty_group = QuestionGroup(
+        subject_id=group_ctx["subject"].id,
+        stimulus_id=empty_stimulus.id,
+        created_by=owner.id,
+        deleted_at=datetime.utcnow(),
+    )
+    db_session.add(empty_group)
+    await db_session.commit()
+    empty = await client.post(
+        f"{API}/subjects/{group_ctx['subject'].id}/question-groups/{empty_group.id}/restore",
+        json={"expected_revision": empty_group.revision},
+        headers=_auth(owner),
+    )
+    assert empty.status_code == 422, empty.text
 
 
 async def test_database_enforces_item_position_constraints(db_session, group_ctx):

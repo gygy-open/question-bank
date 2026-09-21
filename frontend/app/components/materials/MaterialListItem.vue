@@ -1,14 +1,21 @@
 <script setup lang="ts">
-import { FilePenLine, Layers3, Lock } from '@lucide/vue'
+import { ArchiveRestore, FilePenLine, Layers3, Lock, Trash2 } from '@lucide/vue'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import RichContent from '@/components/rich-editor/RichContent.vue'
 import type { StimulusListItem } from '@/types'
 
-defineProps<{
+const props = defineProps<{
   material: StimulusListItem
   canEdit: boolean
 }>()
+
+defineEmits<{
+  delete: [material: StimulusListItem]
+  restore: [material: StimulusListItem]
+}>()
+
+const isDeleted = computed(() => props.material.deleted_at !== null)
 
 const statusLabel: Record<string, string> = {
   draft: '草稿',
@@ -36,11 +43,19 @@ const statusLabel: Record<string, string> = {
           {{ material.question_group_count }} 个题组使用
         </div>
       </div>
-      <Button v-if="canEdit" as-child variant="ghost" size="icon" title="编辑题目材料" aria-label="编辑题目材料">
-        <NuxtLink :to="`/materials/${material.id}/edit`">
-          <FilePenLine class="size-4" />
-        </NuxtLink>
-      </Button>
+      <div v-if="canEdit" class="flex shrink-0 items-center gap-1">
+        <Button v-if="isDeleted" variant="ghost" size="icon" title="恢复题目材料" aria-label="恢复题目材料" @click="$emit('restore', material)">
+          <ArchiveRestore class="size-4" />
+        </Button>
+        <template v-else>
+          <Button as-child variant="ghost" size="icon" title="编辑题目材料" aria-label="编辑题目材料">
+            <NuxtLink :to="`/materials/${material.id}/edit`"><FilePenLine class="size-4" /></NuxtLink>
+          </Button>
+          <Button variant="ghost" size="icon" class="text-destructive" title="删除题目材料" aria-label="删除题目材料" @click="$emit('delete', material)">
+            <Trash2 class="size-4" />
+          </Button>
+        </template>
+      </div>
     </div>
   </article>
 </template>

@@ -1,11 +1,11 @@
 <script setup lang="ts">
-import { FilePenLine, FilePlus2, Lock, ShoppingBasket, Trash2 } from '@lucide/vue'
+import { ArchiveRestore, FilePenLine, FilePlus2, Lock, ShoppingBasket, Trash2 } from '@lucide/vue'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import RichContent from '@/components/rich-editor/RichContent.vue'
 import type { QuestionGroup } from '@/types'
 
-defineProps<{
+const props = defineProps<{
   group: QuestionGroup
   canEdit: boolean
 }>()
@@ -14,7 +14,10 @@ defineEmits<{
   delete: [group: QuestionGroup]
   addBasket: [group: QuestionGroup]
   addComposition: [group: QuestionGroup]
+  restore: [group: QuestionGroup]
 }>()
+
+const isDeleted = computed(() => props.group.deleted_at !== null)
 
 const statusLabel: Record<string, string> = {
   draft: '草稿', pending: '待审核', published: '已发布', archived: '已归档',
@@ -36,12 +39,13 @@ const typeLabel: Record<string, string> = {
         <span v-if="group.source" class="truncate text-xs text-muted-foreground">{{ group.source }}</span>
       </div>
       <div class="flex shrink-0 items-center gap-1">
-        <Button variant="ghost" size="icon" title="全部加入试题篮" aria-label="全部加入试题篮" @click="$emit('addBasket', group)"><ShoppingBasket class="size-4" /></Button>
-        <Button variant="ghost" size="icon" title="全部直接加入稿件" aria-label="全部直接加入稿件" @click="$emit('addComposition', group)"><FilePlus2 class="size-4" /></Button>
-        <Button v-if="canEdit" as-child variant="ghost" size="icon" title="编辑题组" aria-label="编辑题组">
+        <Button v-if="isDeleted && canEdit" variant="ghost" size="icon" title="恢复题组" aria-label="恢复题组" @click="$emit('restore', group)"><ArchiveRestore class="size-4" /></Button>
+        <Button v-if="!isDeleted" variant="ghost" size="icon" title="全部加入试题篮" aria-label="全部加入试题篮" @click="$emit('addBasket', group)"><ShoppingBasket class="size-4" /></Button>
+        <Button v-if="!isDeleted" variant="ghost" size="icon" title="全部直接加入稿件" aria-label="全部直接加入稿件" @click="$emit('addComposition', group)"><FilePlus2 class="size-4" /></Button>
+        <Button v-if="!isDeleted && canEdit" as-child variant="ghost" size="icon" title="编辑题组" aria-label="编辑题组">
           <NuxtLink :to="`/question-groups/${group.id}/edit`"><FilePenLine class="size-4" /></NuxtLink>
         </Button>
-        <Button v-if="canEdit" variant="ghost" size="icon" class="text-destructive" title="删除题组" aria-label="删除题组" @click="$emit('delete', group)"><Trash2 class="size-4" /></Button>
+        <Button v-if="!isDeleted && canEdit" variant="ghost" size="icon" class="text-destructive" title="删除题组" aria-label="删除题组" @click="$emit('delete', group)"><Trash2 class="size-4" /></Button>
       </div>
     </div>
 
