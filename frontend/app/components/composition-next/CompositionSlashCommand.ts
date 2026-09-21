@@ -12,6 +12,7 @@ import {
   FileQuestion, Files, ListChecks, PencilLine,
 } from '@lucide/vue'
 import SlashCommandList from '@/components/rich-editor/SlashCommandList.vue'
+import { resolveAnswerSpacePropsOrFallback } from '@/lib/answerSpaceRules'
 
 export interface CompositionSlashOptions {
   onImageSelect?: () => void
@@ -80,9 +81,12 @@ const ITEMS: CompositionSlashItem[] = [
   {
     title: '作答空间', icon: PencilLine, group: '块',
     aliases: ['answer', 'space', 'zuoda', 'kongbai', 'liubai', 'zuodakongjian'],
-    command: ({ editor, range }) =>
-      editor.chain().focus().deleteRange(range)
-        .insertContent({ type: 'answerSpace', attrs: { lines: 3, style: 'blank' } }).run(),
+    command: ({ editor, range }) => {
+      // 根层插入无题目上下文，取与后端一致的兜底规则。
+      const { lines, style } = resolveAnswerSpacePropsOrFallback(null, null)
+      return editor.chain().focus().deleteRange(range)
+        .insertContent({ type: 'answerSpace', attrs: { lines, style } }).run()
+    },
   },
   {
     title: '题目', icon: FileQuestion, group: '组稿', aliases: ['question', 'timu', 'q'],

@@ -100,10 +100,7 @@ class CompositionDocxRenderer:
         before.paragraph_format.space_after = Pt(3)
         self.rich.render_doc(document, node.stimulus)
         for child in node.children:
-            if isinstance(child, ExportQuestionNode):
-                self._add_question(document, child)
-            else:
-                self._add_answer_space(document, child)
+            self._add_node(document, child)
         after = document.add_paragraph()
         after.paragraph_format.space_before = Pt(3)
 

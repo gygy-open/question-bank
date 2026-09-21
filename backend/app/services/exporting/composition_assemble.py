@@ -25,6 +25,7 @@ from app.services.exporting.composition_contracts import (
     ExportQuestionNode,
     ExportRichTextNode,
     QuestionDetailsChild,
+    QuestionGroupChild,
 )
 from app.services.question_content_converter import rich_doc_to_plain_text
 
@@ -191,7 +192,7 @@ class CompositionAssembler:
         raw_children = sorted(
             children_by_parent.get(n["id"], []), key=lambda child: (child["position"], child["id"])
         )
-        children: list[ExportQuestionNode | ExportAnswerSpaceNode] = []
+        children: list[QuestionGroupChild] = []
         previous_question_id: Optional[str] = None
         for child in raw_children:
             child_type = child.get("node_type")
@@ -226,6 +227,15 @@ class CompositionAssembler:
                     )
                 )
                 previous_question_id = None
+            elif child_type == "rich_text":
+                children.append(ExportRichTextNode(content=child.get("content")))
+            elif child_type == "heading":
+                props = child.get("props") or {}
+                children.append(
+                    ExportHeadingNode(
+                        level=int(props.get("level", 2)), content=child.get("content")
+                    )
+                )
             else:
                 raise CompositionExportError(
                     f"Unsupported question_group child node type: {child_type!r}",

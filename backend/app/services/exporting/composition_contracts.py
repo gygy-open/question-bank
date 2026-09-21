@@ -76,7 +76,13 @@ class ExportQuestionDetailsNode:
     children: list[QuestionDetailsChild] = field(default_factory=list)
 
 
-QuestionGroupChild = Union[ExportQuestionNode, ExportAnswerSpaceNode]
+# question_group 的子节点:小题、作答区,或用户在稿件内插入的说明块。
+QuestionGroupChild = Union[
+    ExportQuestionNode,
+    ExportAnswerSpaceNode,
+    ExportHeadingNode,
+    ExportRichTextNode,
+]
 
 
 @dataclass

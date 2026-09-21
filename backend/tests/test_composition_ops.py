@@ -73,11 +73,17 @@ def test_insert_anchor_defaults_to_end():
     assert out["after"] == "end"
 
 
-def test_answer_space_defaults_and_enum():
+def test_answer_space_defaults_are_deferred_and_enum_is_checked():
+    # 行数/样式缺省时不在 ops 层定下来,留给 authoring 按题型与分值推导。
     assert _one({
         "op": "insert_nodes",
         "nodes": [{"type": "answer_space"}],
-    })["nodes"][0] == {"type": "answer_space", "lines": 4, "style": "lined"}
+    })["nodes"][0] == {"type": "answer_space"}
+
+    assert _one({
+        "op": "insert_nodes",
+        "nodes": [{"type": "answer_space", "lines": 7, "style": "blank"}],
+    })["nodes"][0] == {"type": "answer_space", "lines": 7, "style": "blank"}
 
     with pytest.raises(AuthoringError, match="style must be one of"):
         _one({"op": "insert_nodes", "nodes": [{"type": "answer_space", "style": "dotted"}]})

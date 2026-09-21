@@ -3,6 +3,8 @@
 import type { InjectionKey, Ref } from 'vue'
 import { ref } from 'vue'
 import type { AnswerFieldKey, QuestionRevisionStatus } from '@/types/composition'
+import { DEFAULT_ANSWER_SPACE_RULES } from '@/lib/answerSpaceRules'
+import type { AnswerSpaceRules } from '@/lib/answerSpaceRules'
 
 export const NUMBERING_ENABLED_KEY: InjectionKey<Ref<boolean>> = Symbol('composition-numbering')
 export const SCORING_ENABLED_KEY: InjectionKey<Ref<boolean>> = Symbol('composition-scoring')
@@ -21,6 +23,10 @@ export const SYNC_DISABLED_KEY: InjectionKey<Ref<boolean>> = Symbol('composition
 // 有序根节点（含题目快照），供模块按 scope + 自身位置实时派生答案列表。
 export const ROOT_NODES_KEY: InjectionKey<Ref<EditorNodeLike[]>> =
   Symbol('composition-root-nodes')
+
+// 学科级作答区推导规则（自后端加载），供插入作答区时按题型/分值取默认值。
+export const ANSWER_SPACE_RULES_KEY: InjectionKey<Ref<AnswerSpaceRules>> =
+  Symbol('composition-answer-space-rules')
 
 // 避免与 lib/compositionDocument 形成导入环：此处仅需最小结构。
 export interface EditorNodeLike {
@@ -43,3 +49,4 @@ export const FALLBACK_STATUS = ref(new Map<number, QuestionRevisionStatus>())
 export const FALLBACK_SYNC_DISABLED = ref(true)
 export const noopSync = (_ids: string[]) => {}
 export const FALLBACK_ROOT_NODES = ref([] as EditorNodeLike[])
+export const FALLBACK_ANSWER_SPACE_RULES = ref(DEFAULT_ANSWER_SPACE_RULES)

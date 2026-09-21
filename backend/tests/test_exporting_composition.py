@@ -228,6 +228,42 @@ def test_v3_question_group_rejects_question_without_frozen_source():
         CompositionAssembler().assemble(snap)
 
 
+def test_v3_question_group_assembles_custom_blocks_in_place():
+    snap = _snapshot([
+        _group_node("g1", 0),
+        {**_rich_text_node("lead", 0), "parent_id": "g1", "slot": "body"},
+        _question_node("gq1", 1, qid=1, parent_id="g1"),
+        {
+            **_answer_space_node("space", 2, lines=2, style="lined"),
+            "parent_id": "g1", "slot": "body", "source_question_node_id": "gq1",
+        },
+        {
+            **_heading_node("mid", 3),
+            "parent_id": "g1", "slot": "body", "anchor_before_node_id": "gq2",
+        },
+        _question_node("gq2", 4, qid=2, parent_id="g1"),
+    ], schema_version=3)
+    doc = CompositionAssembler().assemble(snap)
+    group = doc.nodes[0]
+    assert isinstance(group, ExportQuestionGroupNode)
+    assert [type(child) for child in group.children] == [
+        ExportRichTextNode,
+        ExportQuestionNode,
+        ExportAnswerSpaceNode,
+        ExportHeadingNode,
+        ExportQuestionNode,
+    ]
+
+
+def test_v3_question_group_still_rejects_unsupported_child():
+    snap = _snapshot([
+        _group_node("g1", 0),
+        {**_page_break_node("pb", 0), "parent_id": "g1", "slot": "body"},
+    ], schema_version=3)
+    with pytest.raises(CompositionExportError, match="Unsupported question_group child"):
+        CompositionAssembler().assemble(snap)
+
+
 # --------------------------------------------------------------------------- #
 # 题号 / 赋分开关
 # --------------------------------------------------------------------------- #

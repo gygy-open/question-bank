@@ -17,6 +17,7 @@ from .import_task import ImportTask
 from .activity_log import ActivityLog
 from .system_setting import SystemSetting
 from .subject_prompt import SubjectPrompt
+from .subject_setting import SubjectSetting
 from .ai_config import AIProvider, AIModel
 from .chat import ChatSession, ChatMessage
 from .agent import AgentRun, AgentStep

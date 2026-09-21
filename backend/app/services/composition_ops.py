@@ -142,16 +142,18 @@ def _insert_node(spec: Any, *, field: str) -> Dict[str, Any]:
         return out
 
     if node_type == "answer_space":
+        # 缺省值不在此层定下来:留空交给 composition_authoring 按题型/分值推导。
+        out: Dict[str, Any] = {"type": "answer_space"}
         lines = spec.get("lines")
-        lines = 4 if lines is None else _require_int(lines, field=f"{field}.lines")
-        if lines < 1:
-            raise AuthoringError(f"{field}.lines must be >= 1")
-        style = spec.get("style") or "lined"
-        return {
-            "type": "answer_space",
-            "lines": lines,
-            "style": _require_enum(style, ANSWER_SPACE_STYLES, field=f"{field}.style"),
-        }
+        if lines is not None:
+            lines = _require_int(lines, field=f"{field}.lines")
+            if lines < 1:
+                raise AuthoringError(f"{field}.lines must be >= 1")
+            out["lines"] = lines
+        style = spec.get("style")
+        if style is not None:
+            out["style"] = _require_enum(style, ANSWER_SPACE_STYLES, field=f"{field}.style")
+        return out
 
     return {"type": "page_break"}
 

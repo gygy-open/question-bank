@@ -40,6 +40,7 @@ import { BlockInsertKeymap } from './blockInsert'
 import { CompositionSlashCommand } from './CompositionSlashCommand'
 import { editorDocumentToPmDoc, pmDocToEditorDocument } from './convert'
 import {
+  ANSWER_SPACE_RULES_KEY,
   DISPLAY_FIELDS_KEY, NUMBERING_ENABLED_KEY, QUESTION_STATUS_KEY, ROOT_NODES_KEY,
   SCORING_ENABLED_KEY, SYNC_DISABLED_KEY, SYNC_QUESTIONS_KEY, defaultDisplayFields,
   type EditorNodeLike,
@@ -72,6 +73,7 @@ provide(SYNC_DISABLED_KEY, computed(() => (props.syncDisabled ?? false) || (prop
 provide(SYNC_QUESTIONS_KEY, (ids: string[]) => emit('sync', ids))
 // 有序根节点（含题目快照），供模块按 scope + 位置实时派生答案。
 provide(ROOT_NODES_KEY, computed(() => model.value.nodes as unknown as EditorNodeLike[]))
+provide(ANSWER_SPACE_RULES_KEY, useSubjectAnswerSpaceRules(() => props.subjectId))
 
 const staleNodeIds = computed(() =>
   collectStaleQuestionNodeIds(model.value, props.questionStatus ?? new Map()),

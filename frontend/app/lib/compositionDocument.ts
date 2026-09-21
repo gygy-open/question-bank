@@ -26,6 +26,7 @@ import type {
   QuestionRevisionStatus,
 } from '@/types/composition'
 import { ANSWER_FIELD_KEYS, BODY_SLOT } from '@/types/composition'
+import { resolveAnswerSpacePropsOrFallback } from '@/lib/answerSpaceRules'
 import type { Question, RichDocNode, RichNode } from '@/types'
 import { isEmptyRichDoc, richDocToPlainText } from '@/components/rich-editor/richDoc'
 
@@ -118,13 +119,14 @@ export function createPageBreakNode(): EditorNode {
   return baseNode('page_break')
 }
 
-/** 作答空间：默认 3 行空白。 */
+/** 作答空间：缺省值与后端 resolver 的兜底规则一致。 */
 export function createAnswerSpaceNode(
-  lines = 3,
-  style: AnswerSpaceStyle = 'blank',
+  lines?: number,
+  style?: AnswerSpaceStyle,
 ): EditorNode {
+  const fallback = resolveAnswerSpacePropsOrFallback(null, null)
   const node = baseNode('answer_space')
-  node.props = { lines, style }
+  node.props = { lines: lines ?? fallback.lines, style: style ?? fallback.style }
   return node
 }
 
@@ -483,11 +485,70 @@ function normalizeSingleModule(
   return ordered
 }
 
+/**
+ * 规范化单个题组的子节点序列（镜像服务端 _normalize_question_group_children）。
+ * - 小题顺序不变；作答区按 sourceQuestionNodeId 紧跟其小题。
+ * - 自定义 heading/rich_text 按 anchorBeforeNodeId 排在目标小题之前；未锚定者按其相对
+ *   首道小题的位置置顶（材料之后、首题之前）或置尾，悬空锚点同此规则。
+ */
+function normalizeQuestionGroup(groupNode: EditorNode): EditorNode[] {
+  const questions = groupNode.children.filter(child => child.nodeType === 'question')
+  const questionIds = new Set(questions.map(q => q.id))
+  const answerSpaceBySource = new Map<string, EditorNode>()
+  for (const child of groupNode.children) {
+    if (child.nodeType === 'answer_space' && child.sourceQuestionNodeId) {
+      answerSpaceBySource.set(child.sourceQuestionNodeId, child)
+    }
+  }
+
+  const anchored = new Map<string, EditorNode[]>()
+  const leading: EditorNode[] = []
+  const trailing: EditorNode[] = []
+  let seenQuestion = false
+  for (const child of groupNode.children) {
+    if (child.nodeType === 'question') {
+      seenQuestion = true
+      continue
+    }
+    if (child.nodeType !== 'heading' && child.nodeType !== 'rich_text') continue
+    if (child.anchorBeforeNodeId && questionIds.has(child.anchorBeforeNodeId)) {
+      const arr = anchored.get(child.anchorBeforeNodeId) ?? []
+      arr.push(child)
+      anchored.set(child.anchorBeforeNodeId, arr)
+    } else if (!seenQuestion) {
+      leading.push({ ...child, anchorBeforeNodeId: null })
+    } else {
+      trailing.push({ ...child, anchorBeforeNodeId: null })
+    }
+  }
+
+  const ordered: EditorNode[] = [...leading]
+  const consumed = new Set<string>()
+  for (const q of questions) {
+    for (const custom of anchored.get(q.id) ?? []) ordered.push(custom)
+    ordered.push(q)
+    const space = answerSpaceBySource.get(q.id)
+    if (space) {
+      ordered.push(space)
+      consumed.add(space.id)
+    }
+  }
+  // 源小题已不在children中的作答区仍保留，交由服务端裁决，避免本地静默丢弃。
+  for (const child of groupNode.children) {
+    if (child.nodeType === 'answer_space' && !consumed.has(child.id)) ordered.push(child)
+  }
+  ordered.push(...trailing)
+  return ordered
+}
+
 /** 规范化整篇文档的所有 module 子节点，返回新文档（不改入参）。 */
 export function normalizeDocument(doc: EditorDocument): EditorDocument {
   const questions = documentQuestionNodes(doc)
 
   const nodes = doc.nodes.map((node, rootIndex) => {
+    if (node.nodeType === 'question_group') {
+      return { ...node, children: normalizeQuestionGroup(node) }
+    }
     if (node.nodeType !== 'question_details') return node
     const props = detailPropsOf(node)
     const scoped =

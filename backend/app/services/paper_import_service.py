@@ -36,6 +36,7 @@ from app.models.question_group import (
     Stimulus,
 )
 from app.services import composition_service
+from app.services.answer_space import resolve_answer_space_props_or_fallback
 from app.services.composition_authoring import AuthoringError, build_nodes
 from app.services.importing.contracts import (
     OUTLINE_ANSWER_SPACE,
@@ -375,6 +376,7 @@ def _resolve_outline_nodes(
     """outline → build_nodes 可消费的意图节点。跳过引用不存在题目的占位。"""
     specs: List[Dict[str, Any]] = []
     sequence = 0
+    previous_question_score: Optional[float] = None
 
     for item in outline:
         kind = item.get("kind")
@@ -390,6 +392,7 @@ def _resolve_outline_nodes(
                 spec["number"] = number
             if item.get("score") is not None:
                 spec["score"] = item["score"]
+            previous_question_score = item.get("score")
             specs.append(spec)
         elif kind == OUTLINE_QUESTION_GROUP_REF:
             group = group_specs.get(str(item.get("temp_id")))
@@ -410,11 +413,15 @@ def _resolve_outline_nodes(
         elif kind == OUTLINE_PAGE_BREAK:
             specs.append({"type": "page_break"})
         elif kind == OUTLINE_ANSWER_SPACE:
+            # AI 未给出行数时，按紧邻上一道题的分值推导，而不是固定行数。
+            defaults = resolve_answer_space_props_or_fallback(
+                q_type=None, score=previous_question_score
+            )
             specs.append(
                 {
                     "type": "answer_space",
-                    "lines": item.get("lines") or 4,
-                    "style": item.get("style") or "lined",
+                    "lines": item.get("lines") or defaults["lines"],
+                    "style": item.get("style") or defaults["style"],
                 }
             )
         elif kind == OUTLINE_DETAILS_MODULE:

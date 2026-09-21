@@ -37,6 +37,7 @@ import {
   totalScore,
   collectStaleQuestionGroupNodeIds,
 } from '@/lib/compositionDocument'
+import { resolveAnswerSpacePropsOrFallback } from '@/lib/answerSpaceRules'
 import type { EditorDocument, EditorNode } from '@/lib/compositionDocument'
 import type { CompositionNode, QuestionRevisionStatus } from '@/types/composition'
 import type { Question } from '@/types'
@@ -100,11 +101,11 @@ describe('根节点工厂与预设', () => {
     expect(q.questionContent?.q_type).toBe('single_choice')
   })
 
-  it('作答空间默认 3 行空白，属性可读回', () => {
+  it('作答空间缺省值取兜底规则，属性可读回', () => {
     const a = createAnswerSpaceNode()
     expect(a.nodeType).toBe('answer_space')
     expect(a.content).toBeNull()
-    expect(answerSpacePropsOf(a)).toEqual({ lines: 3, style: 'blank' })
+    expect(answerSpacePropsOf(a)).toEqual(resolveAnswerSpacePropsOrFallback(null, null))
     expect(answerSpacePropsOf(createAnswerSpaceNode(8, 'lined'))).toEqual({ lines: 8, style: 'lined' })
   })
 
@@ -404,6 +405,32 @@ describe('documentFromNodes 重建（含 module 子树）', () => {
     expect(documentToReplaceRequest({ nodes: [group] }, 1).nodes).toEqual([
       { id: group.id, node_kind: 'module', node_type: 'question_group', question_group_id: 23 },
     ])
+  })
+
+  it('题组内说明文字按锚点重排到目标小题之前', () => {
+    const group = createQuestionGroupNode(8)
+    group.content = richDoc('材料')
+    const q1 = createQuestionNode(fakeQuestion(7, 2))
+    const q2 = createQuestionNode(fakeQuestion(9, 1))
+    const space = createAnswerSpaceNode(5, 'lined')
+    space.sourceQuestionNodeId = q1.id
+    const lead = createRichTextNode()
+    lead.content = richDoc('阅读下面的文字，完成 1～2 题。')
+    const mid = createRichTextNode()
+    mid.content = richDoc('请结合上述材料作答。')
+    mid.anchorBeforeNodeId = q2.id
+    // 故意把锚定块放在末尾：规范化应把它移到锚点小题之前。
+    group.children = [lead, q1, space, q2, mid]
+
+    const request = documentToReplaceRequest({ nodes: [group] }, 1)
+    expect(request.nodes.slice(1).map(n => n.id)).toEqual([
+      lead.id, q1.id, space.id, mid.id, q2.id,
+    ])
+    expect(request.nodes[1]).toMatchObject({
+      node_type: 'rich_text', parent_id: group.id, slot: 'body',
+    })
+    expect(request.nodes[1]).not.toHaveProperty('anchor_before_node_id')
+    expect(request.nodes[4]).toMatchObject({ anchor_before_node_id: q2.id })
   })
 
   it('从服务端读回题组 answer_space source 后再次保存不丢失', () => {

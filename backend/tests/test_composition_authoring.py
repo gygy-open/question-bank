@@ -153,9 +153,16 @@ def test_output_satisfies_the_ast_contract():
         CompositionNodeInput.model_validate(n.model_dump())
 
 
-def test_answer_space_defaults_are_valid():
+def test_answer_space_defaults_are_derived_from_score():
+    # 无分值 → 解答题规则的下限;有分值 → 按每分行数推导。
     (node,) = build_nodes([{"type": "answer_space"}])
-    assert node.props == {"lines": 4, "style": "lined"}
+    assert node.props == {"lines": 2, "style": "lined"}
+
+    (scored,) = build_nodes([{"type": "answer_space", "score": 6}])
+    assert scored.props == {"lines": 5, "style": "lined"}
+
+    (explicit,) = build_nodes([{"type": "answer_space", "lines": 9, "style": "blank"}])
+    assert explicit.props == {"lines": 9, "style": "blank"}
 
 
 def test_invalid_answer_space_style_is_rejected_by_the_contract():

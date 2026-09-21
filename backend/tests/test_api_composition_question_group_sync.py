@@ -592,3 +592,257 @@ async def test_sync_multiple_groups_bumps_composition_revision_once(
     }
     assert modules[module_ids[0]]["question_group_revision"] == 6
     assert modules[module_ids[1]]["question_group_revision"] == 3
+
+
+async def _put_group_with_custom_blocks(client, subject, composition, headers, group, questions):
+    """在题组内插入一个导语块和一个锚定到第二小题的说明块。"""
+    module_id, frozen = await _put_group(client, subject.id, composition["id"], headers, group.id)
+    question_nodes = {
+        node["question_id"]: node["id"]
+        for node in frozen["nodes"]
+        if node["node_type"] == "question"
+    }
+    lead_id, mid_id, space_id = _uid(), _uid(), _uid()
+    response = await client.put(
+        f"{API}/subjects/{subject.id}/compositions/{composition['id']}/nodes?scope=shared",
+        json={
+            "expected_revision": 2,
+            "nodes": [
+                {
+                    "id": module_id,
+                    "node_kind": "module",
+                    "node_type": "question_group",
+                    "question_group_id": group.id,
+                },
+                {
+                    "id": lead_id,
+                    "parent_id": module_id,
+                    "slot": "body",
+                    "node_kind": "block",
+                    "node_type": "rich_text",
+                    "content": _rich_doc("阅读下面的文字，完成1～2题。"),
+                },
+                {
+                    "id": question_nodes[questions[0].id],
+                    "parent_id": module_id,
+                    "slot": "body",
+                    "node_kind": "block",
+                    "node_type": "question",
+                    "question_id": questions[0].id,
+                },
+                {
+                    "id": space_id,
+                    "parent_id": module_id,
+                    "slot": "body",
+                    "node_kind": "block",
+                    "node_type": "answer_space",
+                    "source_question_node_id": question_nodes[questions[0].id],
+                    "props": {"lines": 5, "style": "lined"},
+                },
+                {
+                    "id": question_nodes[questions[1].id],
+                    "parent_id": module_id,
+                    "slot": "body",
+                    "node_kind": "block",
+                    "node_type": "question",
+                    "question_id": questions[1].id,
+                },
+                # 故意放在末尾:规范化应把它移到锚点小题之前。
+                {
+                    "id": mid_id,
+                    "parent_id": module_id,
+                    "slot": "body",
+                    "node_kind": "block",
+                    "node_type": "rich_text",
+                    "content": _rich_doc("请结合上述材料作答。"),
+                    "anchor_before_node_id": question_nodes[questions[1].id],
+                },
+            ],
+        },
+        headers=headers,
+    )
+    assert response.status_code == 200, response.text
+    return module_id, question_nodes, lead_id, mid_id, space_id, response.json()
+
+
+def _ordered_children(nodes: list[dict], module_id: str) -> list[dict]:
+    return sorted(
+        [node for node in nodes if node["parent_id"] == module_id],
+        key=lambda node: node["position"],
+    )
+
+
+@pytest.mark.asyncio
+async def test_question_group_accepts_custom_blocks_and_normalizes_order(
+    client, db_session, grant_role
+):
+    actor, subject, group, _stimulus, questions = await _seed_group(db_session)
+    await grant_role(actor, subject)
+    headers = _auth(actor)
+    composition = await _create_composition(client, subject.id, headers)
+    module_id, question_nodes, lead_id, mid_id, space_id, body = (
+        await _put_group_with_custom_blocks(
+            client, subject, composition, headers, group, questions
+        )
+    )
+    children = _ordered_children(body["nodes"], module_id)
+    assert [node["id"] for node in children] == [
+        lead_id,
+        question_nodes[questions[0].id],
+        space_id,
+        mid_id,
+        question_nodes[questions[1].id],
+    ]
+    assert children[0]["anchor_before_node_id"] is None
+    assert children[3]["anchor_before_node_id"] == question_nodes[questions[1].id]
+
+
+@pytest.mark.asyncio
+async def test_sync_group_preserves_custom_blocks_and_reanchors_removed_target(
+    client, db_session, grant_role
+):
+    actor, subject, group, stimulus, questions = await _seed_group(db_session)
+    await grant_role(actor, subject)
+    headers = _auth(actor)
+    composition = await _create_composition(client, subject.id, headers)
+    module_id, question_nodes, lead_id, mid_id, _space_id, _body = (
+        await _put_group_with_custom_blocks(
+            client, subject, composition, headers, group, questions
+        )
+    )
+
+    # 把锚点小题(第二题)移出题组,并让材料过期。
+    await db_session.execute(
+        delete(QuestionGroupItem).where(
+            QuestionGroupItem.group_id == group.id,
+            QuestionGroupItem.question_id == questions[1].id,
+        )
+    )
+    group.revision = 6
+    stimulus.content = json.dumps(_rich_doc("新材料"), ensure_ascii=False)
+    stimulus.revision = 4
+    await db_session.commit()
+
+    response = await _sync_groups(
+        client, subject.id, composition["id"], headers, revision=3, node_ids=[module_id]
+    )
+    assert response.status_code == 200, response.text
+    children = _ordered_children(response.json()["nodes"], module_id)
+    by_id = {node["id"]: node for node in children}
+
+    # 用户插入的两个说明块都不能被刷新吞掉。
+    assert lead_id in by_id
+    assert mid_id in by_id
+    assert by_id[lead_id]["content"] == _rich_doc("阅读下面的文字，完成1～2题。")
+    # 导语仍在材料之后、首题之前;锚点失效的说明块顺延到末尾。
+    assert children[0]["id"] == lead_id
+    assert by_id[mid_id]["anchor_before_node_id"] is None
+    assert children[-1]["id"] == mid_id
+    assert [node["question_id"] for node in children if node["node_type"] == "question"] == [
+        questions[0].id
+    ]
+
+
+@pytest.mark.asyncio
+async def test_sync_group_reanchors_custom_block_to_next_surviving_question(
+    client, db_session, grant_role
+):
+    actor, subject, group, _stimulus, questions = await _seed_group(db_session)
+    await grant_role(actor, subject)
+    headers = _auth(actor)
+    composition = await _create_composition(client, subject.id, headers)
+    module_id, question_nodes, _lead_id, mid_id, _space_id, _body = (
+        await _put_group_with_custom_blocks(
+            client, subject, composition, headers, group, questions
+        )
+    )
+    # 新增第三题排在末尾,再移除锚点小题(第二题):说明块应顺延锚定到第三题。
+    third = Question(
+        subject_id=subject.id,
+        q_type=QuestionType.FREE_RESPONSE,
+        content=json.dumps(_rich_doc("小题三"), ensure_ascii=False),
+        content_revision=1,
+        created_by=actor.id,
+    )
+    db_session.add(third)
+    await db_session.flush()
+    db_session.add(QuestionGroupItem(group_id=group.id, question_id=third.id, position=2))
+    await db_session.commit()
+    first_sync = await _sync_groups(
+        client, subject.id, composition["id"], headers, revision=3, node_ids=[module_id]
+    )
+    assert first_sync.status_code == 200, first_sync.text
+
+    await db_session.execute(
+        delete(QuestionGroupItem).where(
+            QuestionGroupItem.group_id == group.id,
+            QuestionGroupItem.question_id == questions[1].id,
+        )
+    )
+    group.revision = 7
+    await db_session.commit()
+    response = await _sync_groups(
+        client, subject.id, composition["id"], headers, revision=4, node_ids=[module_id]
+    )
+    assert response.status_code == 200, response.text
+    children = _ordered_children(response.json()["nodes"], module_id)
+    third_node_id = next(
+        node["id"] for node in children if node.get("question_id") == third.id
+    )
+    by_id = {node["id"]: node for node in children}
+    assert by_id[mid_id]["anchor_before_node_id"] == third_node_id
+    ids = [node["id"] for node in children]
+    assert ids.index(mid_id) == ids.index(third_node_id) - 1
+
+
+@pytest.mark.asyncio
+async def test_question_group_rejects_unsupported_child_and_foreign_anchor(
+    client, db_session, grant_role
+):
+    actor, subject, group, _stimulus, questions = await _seed_group(db_session)
+    await grant_role(actor, subject)
+    headers = _auth(actor)
+    composition = await _create_composition(client, subject.id, headers)
+    module_id, frozen = await _put_group(client, subject.id, composition["id"], headers, group.id)
+    base = _group_replacement_nodes(module_id, group.id, frozen["nodes"])
+
+    page_break = await client.put(
+        f"{API}/subjects/{subject.id}/compositions/{composition['id']}/nodes?scope=shared",
+        json={
+            "expected_revision": 2,
+            "nodes": [
+                *base,
+                {
+                    "id": _uid(),
+                    "parent_id": module_id,
+                    "slot": "body",
+                    "node_kind": "block",
+                    "node_type": "page_break",
+                },
+            ],
+        },
+        headers=headers,
+    )
+    # page_break 在 schema 层就被拦下(必须是 root 节点),不会走到服务层白名单。
+    assert page_break.status_code == 422, page_break.text
+
+    foreign_anchor = await client.put(
+        f"{API}/subjects/{subject.id}/compositions/{composition['id']}/nodes?scope=shared",
+        json={
+            "expected_revision": 2,
+            "nodes": [
+                *base,
+                {
+                    "id": _uid(),
+                    "parent_id": module_id,
+                    "slot": "body",
+                    "node_kind": "block",
+                    "node_type": "rich_text",
+                    "content": _rich_doc("说明"),
+                    "anchor_before_node_id": _uid(),
+                },
+            ],
+        },
+        headers=headers,
+    )
+    assert foreign_anchor.status_code == 400, foreign_anchor.text

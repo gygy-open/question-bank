@@ -27,6 +27,7 @@ from app.models.composition import (
     CompositionNodeKind,
 )
 from app.schemas.composition import ANSWER_FIELD_KEYS, CompositionNodeInput
+from app.services.answer_space import resolve_answer_space_props_or_fallback
 from app.services.question_content_converter import markdown_to_rich_doc
 
 # AI 可以直接书写的节点类型。answer_item 不在其中 —— 它由服务端按 module scope 派生。
@@ -248,13 +249,18 @@ def build_nodes(specs: List[Dict[str, Any]]) -> List[CompositionNodeInput]:
             continue
 
         if node_type == NODE_TYPE_ANSWER_SPACE:
-            lines = _int_or_none(spec.get("lines"), field=f"nodes[{idx}].lines") or 4
-            style = spec.get("style") or "lined"
+            lines = _int_or_none(spec.get("lines"), field=f"nodes[{idx}].lines")
+            defaults = resolve_answer_space_props_or_fallback(
+                q_type=spec.get("q_type"), score=spec.get("score")
+            )
             nodes.append(CompositionNodeInput(
                 id=_new_id(),
                 node_kind=CompositionNodeKind.BLOCK,
                 node_type=NODE_TYPE_ANSWER_SPACE,
-                props={"lines": lines, "style": style},
+                props={
+                    "lines": lines or defaults["lines"],
+                    "style": spec.get("style") or defaults["style"],
+                },
             ))
             continue
 

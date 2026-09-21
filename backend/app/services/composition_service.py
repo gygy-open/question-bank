@@ -717,7 +717,12 @@ def _validate_ast(items: List[CompositionNodeInput]) -> None:
             allowed = (
                 {NODE_TYPE_ANSWER_ITEM, NODE_TYPE_HEADING, NODE_TYPE_RICH_TEXT}
                 if parent.node_type == NODE_TYPE_QUESTION_DETAILS
-                else {NODE_TYPE_QUESTION, NODE_TYPE_ANSWER_SPACE}
+                else {
+                    NODE_TYPE_QUESTION,
+                    NODE_TYPE_ANSWER_SPACE,
+                    NODE_TYPE_HEADING,
+                    NODE_TYPE_RICH_TEXT,
+                }
             )
             if it.node_type not in allowed:
                 raise _bad_request(f"node {it.id} is not valid inside {parent.node_type}")
@@ -736,13 +741,21 @@ def _validate_ast(items: List[CompositionNodeInput]) -> None:
                 )
         if it.anchor_before_node_id is not None:
             target = by_id.get(it.anchor_before_node_id)
+            anchor_parent = by_id.get(it.parent_id) if it.parent_id is not None else None
+            # 锚点目标是所在 module 的“可排序主体”:详情模块为 answer_item,题组为小题。
+            expected = (
+                NODE_TYPE_QUESTION
+                if anchor_parent is not None
+                and anchor_parent.node_type == NODE_TYPE_QUESTION_GROUP
+                else NODE_TYPE_ANSWER_ITEM
+            )
             if (
                 target is None
-                or target.node_type != NODE_TYPE_ANSWER_ITEM
+                or target.node_type != expected
                 or target.parent_id != it.parent_id
             ):
                 raise _bad_request(
-                    f"node {it.id} anchor must point to an answer_item in the same module"
+                    f"node {it.id} anchor must point to a {expected} in the same module"
                 )
 
     for parent_id, children in children_by_parent.items():
@@ -751,6 +764,9 @@ def _validate_ast(items: List[CompositionNodeInput]) -> None:
             continue
         previous_question_id: Optional[str] = None
         for child in children:
+            # 自定义说明块由规范化统一重排,不参与作答区相邻性判定。
+            if child.node_type in (NODE_TYPE_HEADING, NODE_TYPE_RICH_TEXT):
+                continue
             if child.node_type == NODE_TYPE_QUESTION:
                 previous_question_id = child.id
             elif child.source_question_node_id != previous_question_id:
@@ -845,6 +861,58 @@ def _normalize_module_children(
         for c in anchored.get(ai["id"], []):
             ordered.append({"kind": "custom", "item": c})
         ordered.append({"kind": "answer_item", **ai})
+    for c in trailing:
+        ordered.append({"kind": "custom", "item": c})
+    return ordered
+
+
+def _normalize_question_group_children(
+    children: List[CompositionNodeInput],
+) -> List[Dict[str, Any]]:
+    """规范化 question_group 子节点顺序,使版面结构与相邻性不变量由服务端保证。
+
+    - 小题顺序跟随题组成员顺序(调用方已校验客户端未改动它)。
+    - 作答区按 source_question_node_id 紧跟其小题,与客户端传入位置无关。
+    - 自定义 heading/rich_text 按 anchor_before_node_id 排在目标小题之前;
+      未锚定者按其相对首道小题的位置置顶(材料之后、首题之前)或置尾,悬空锚点同此规则。
+
+    返回子节点规范化描述列表(dict),position 由列表下标决定。
+    """
+    questions = [c for c in children if c.node_type == NODE_TYPE_QUESTION]
+    question_ids = {c.id for c in questions}
+    answer_space_by_source = {
+        c.source_question_node_id: c
+        for c in children
+        if c.node_type == NODE_TYPE_ANSWER_SPACE
+    }
+
+    anchored: Dict[str, List[CompositionNodeInput]] = defaultdict(list)
+    leading: List[CompositionNodeInput] = []
+    trailing: List[CompositionNodeInput] = []
+    seen_question = False
+    for c in children:
+        if c.node_type == NODE_TYPE_QUESTION:
+            seen_question = True
+            continue
+        if c.node_type not in (NODE_TYPE_HEADING, NODE_TYPE_RICH_TEXT):
+            continue
+        if c.anchor_before_node_id in question_ids:
+            anchored[c.anchor_before_node_id].append(c)
+        elif not seen_question:
+            leading.append(c)
+        else:
+            trailing.append(c)
+
+    ordered: List[Dict[str, Any]] = []
+    for c in leading:
+        ordered.append({"kind": "custom", "item": c})
+    for q in questions:
+        for c in anchored.get(q.id, []):
+            ordered.append({"kind": "custom", "item": c})
+        ordered.append({"kind": "question", "item": q})
+        space = answer_space_by_source.get(q.id)
+        if space is not None:
+            ordered.append({"kind": "answer_space", "item": space})
     for c in trailing:
         ordered.append({"kind": "custom", "item": c})
     return ordered
@@ -1065,8 +1133,11 @@ async def replace_nodes(
                 )
         else:
             question_index = 0
-            for pos, child in enumerate(plan["children"]):
-                if child.node_type == NODE_TYPE_QUESTION:
+            for pos, entry in enumerate(
+                _normalize_question_group_children(plan["children"])
+            ):
+                child = entry["item"]
+                if entry["kind"] == "question":
                     previous_question = previous_questions[question_index]
                     question_index += 1
                     child_nodes.append(
@@ -1084,7 +1155,7 @@ async def replace_nodes(
                             question_revision=previous_question.question_revision,
                         )
                     )
-                else:
+                elif entry["kind"] == "answer_space":
                     child_nodes.append(
                         _new_node(
                             id=child.id,
@@ -1097,6 +1168,21 @@ async def replace_nodes(
                             props=child.props,
                             schema_version=child.schema_version,
                             source_question_node_id=child.source_question_node_id,
+                        )
+                    )
+                else:
+                    child_nodes.append(
+                        _new_node(
+                            id=child.id,
+                            parent_id=it.id,
+                            slot=BODY_SLOT,
+                            position=pos,
+                            node_kind=child.node_kind,
+                            node_type=child.node_type,
+                            content=child.content,
+                            props=child.props,
+                            schema_version=child.schema_version,
+                            anchor_before_node_id=child.anchor_before_node_id,
                         )
                     )
 
@@ -1508,6 +1594,16 @@ async def sync_question_group_nodes(
             for child in old_children
             if child.node_type == NODE_TYPE_ANSWER_SPACE
         }
+        # 用户在稿件内插入的说明块:记录其相对首道小题的位置,刷新时据此回落。
+        old_customs: List[Dict[str, Any]] = []
+        seen_question = False
+        for child in old_children:
+            if child.node_type == NODE_TYPE_QUESTION:
+                seen_question = True
+                continue
+            if child.node_type not in (NODE_TYPE_HEADING, NODE_TYPE_RICH_TEXT):
+                continue
+            old_customs.append({"node": child, "after_first_question": seen_question})
         old_question_ids = [child.question_id for child in old_questions]
         new_question_ids = [item.question_id for item in group.items]
         old_set = set(old_question_ids)
@@ -1517,8 +1613,10 @@ async def sync_question_group_nodes(
             "node": node,
             "group": group,
             "old_children": old_children,
+            "old_questions": old_questions,
             "old_questions_by_id": old_questions_by_id,
             "answer_spaces_by_source": answer_spaces_by_source,
+            "old_customs": old_customs,
             "added": [question_id for question_id in new_question_ids if question_id not in old_set],
             "removed": [question_id for question_id in old_question_ids if question_id not in new_set],
             "reordered": (
@@ -1560,10 +1658,74 @@ async def sync_question_group_nodes(
         db.add(node)
 
         position = 0
-        for group_item in sorted(group.items, key=lambda item: item.position):
+        ordered_items = sorted(group.items, key=lambda item: item.position)
+        # 小题节点 ID 先定下来,自定义块才能把锚点重指到刷新后的节点上。
+        node_id_by_question_id: Dict[int, str] = {}
+        for group_item in ordered_items:
+            previous = plan["old_questions_by_id"].get(group_item.question_id)
+            node_id_by_question_id[group_item.question_id] = (
+                previous.id if previous is not None else str(uuid.uuid4())
+            )
+
+        old_question_order = [child.question_id for child in plan["old_questions"]]
+        old_question_id_by_node_id = {
+            child.id: child.question_id for child in plan["old_questions"]
+        }
+
+        def _resolve_anchor(anchor_node_id: Optional[str]) -> Optional[str]:
+            """锚点题被移除时顺延到其后第一道仍存在的小题,保持"排在它之前"的相对位置。"""
+            question_id = old_question_id_by_node_id.get(anchor_node_id)
+            if question_id is None or question_id not in old_question_order:
+                return None
+            start = old_question_order.index(question_id)
+            for candidate in old_question_order[start:]:
+                if candidate in node_id_by_question_id:
+                    return node_id_by_question_id[candidate]
+            return None
+
+        anchored_customs: Dict[str, List[Any]] = defaultdict(list)
+        leading_customs: List[Any] = []
+        trailing_customs: List[Any] = []
+        for entry in plan["old_customs"]:
+            child = entry["node"]
+            target = _resolve_anchor(child.anchor_before_node_id)
+            if target is not None:
+                anchored_customs[target].append(child)
+            elif entry["after_first_question"]:
+                trailing_customs.append(child)
+            else:
+                leading_customs.append(child)
+
+        def _emit_custom(child: Any, anchor: Optional[str]) -> None:
+            nonlocal position
+            new_children.append(
+                CompositionNode(
+                    id=child.id,
+                    composition_id=comp.id,
+                    parent_id=node.id,
+                    slot=BODY_SLOT,
+                    position=position,
+                    node_kind=child.node_kind,
+                    node_type=child.node_type,
+                    content=child.content,
+                    props=child.props,
+                    schema_version=child.schema_version,
+                    anchor_before_node_id=anchor,
+                    created_by=actor.id,
+                    updated_by=actor.id,
+                )
+            )
+            position += 1
+
+        for child in leading_customs:
+            _emit_custom(child, None)
+
+        for group_item in ordered_items:
             question = group_item.question
             previous = plan["old_questions_by_id"].get(question.id)
-            question_node_id = previous.id if previous is not None else str(uuid.uuid4())
+            question_node_id = node_id_by_question_id[question.id]
+            for child in anchored_customs.get(question_node_id, []):
+                _emit_custom(child, question_node_id)
             new_children.append(
                 CompositionNode(
                     id=question_node_id,
@@ -1607,6 +1769,9 @@ async def sync_question_group_nodes(
                     )
                 )
                 position += 1
+
+        for child in trailing_customs:
+            _emit_custom(child, None)
 
         event_groups.append({
             "node_id": node.id,
