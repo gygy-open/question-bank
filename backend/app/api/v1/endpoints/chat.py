@@ -191,6 +191,7 @@ async def chat_generator(session_id: str, new_user_message: ChatMessageCreate, m
         select(AIModel)
         .options(selectinload(AIModel.provider))
         .where(AIModel.id == model_id)
+        .with_for_update()
     )
     ai_model = result.scalars().first()
     if not ai_model:
@@ -212,7 +213,12 @@ async def chat_generator(session_id: str, new_user_message: ChatMessageCreate, m
 
     final_text = ""
     async for event in runner.run(
-        ctx, ai_messages, session_id=session_id, model_id=model_id,
+        ctx,
+        ai_messages,
+        session_id=session_id,
+        model_id=model_id,
+        model_name=ai_model.name,
+        provider_name=ai_model.provider.name,
         scene=AgentScene.parse(scene),
     ):
         # 工具往返落库,供下一轮重建上下文;它们不进用户可见的对话记录(见 API 层过滤)。

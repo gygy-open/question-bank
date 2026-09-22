@@ -29,7 +29,11 @@ class AgentRun(Base):
     subject_id = Column(Integer, ForeignKey("subjects.id"), nullable=True)
     surface = Column(String(16), nullable=False)
     status = Column(String(24), nullable=False, default=AgentRunStatus.RUNNING)
-    model_id = Column(Integer, ForeignKey("ai_models.id"), nullable=True)
+    model_id = Column(
+        Integer, ForeignKey("ai_models.id", ondelete="SET NULL"), nullable=True
+    )
+    model_name = Column(String(100), nullable=True)
+    provider_name = Column(String(100), nullable=True)
     error = Column(Text, nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())

@@ -76,6 +76,8 @@ class AgentRunner:
         *,
         session_id: Optional[str] = None,
         model_id: Optional[int] = None,
+        model_name: Optional[str] = None,
+        provider_name: Optional[str] = None,
         scene: AgentScene = AgentScene.UNSCOPED,
     ) -> AsyncIterator[AgentEvent]:
         run = AgentRun(
@@ -86,6 +88,8 @@ class AgentRunner:
             surface=ctx.surface.value,
             status=AgentRunStatus.RUNNING,
             model_id=model_id,
+            model_name=model_name,
+            provider_name=provider_name,
         )
         ctx.db.add(run)
         await ctx.db.commit()

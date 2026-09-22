@@ -171,10 +171,26 @@ const updateProvider = async () => {
   }
 }
 
+const deleteAIConfig = async (path: string) => {
+  try {
+    await $api(path, { method: 'DELETE' })
+    return true
+  } catch (error: any) {
+    const status = error?.response?.status ?? error?.statusCode
+    if (status !== 409) throw error
+
+    const detail = error?.response?._data?.detail ?? error?.data?.detail
+    const message = typeof detail === 'string' ? detail : '该配置仍在使用中。'
+    if (!confirm(`${message}\n\n继续将清空相关活动模型配置。确定删除吗？`)) return false
+    await $api(path, { method: 'DELETE', query: { force: true } })
+    return true
+  }
+}
+
 const deleteProvider = async (id: number) => {
   if (!confirm('确定要删除这个供应商吗？这将同时删除其下的所有模型。')) return
   try {
-    await $api(`/ai-config/providers/${id}`, { method: 'DELETE' })
+    if (!await deleteAIConfig(`/ai-config/providers/${id}`)) return
     toast.success('供应商已删除')
     fetchData()
   } catch (error: any) {
@@ -207,7 +223,7 @@ const createModel = async () => {
 const deleteModel = async (id: number) => {
   if (!confirm('确定要删除这个模型吗？')) return
   try {
-    await $api(`/ai-config/models/${id}`, { method: 'DELETE' })
+    if (!await deleteAIConfig(`/ai-config/models/${id}`)) return
     toast.success('模型已删除')
     fetchData()
   } catch (error: any) {

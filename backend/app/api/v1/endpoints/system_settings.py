@@ -3,6 +3,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from app import crud, models, schemas
 from app.api import deps
 from app.services.embedding import reload_embedding_function
+from app.services.ai_config_service import validate_active_model
 
 router = APIRouter()
 
@@ -30,6 +31,7 @@ async def update_system_setting(
     """
     Update a system setting. Only for superusers.
     """
+    await validate_active_model(db, key=key, value=setting_in.value)
     setting = await crud.system_setting.get_by_key(db, key=key)
     if not setting:
         # Allow creating if not exists, or raise 404. 
