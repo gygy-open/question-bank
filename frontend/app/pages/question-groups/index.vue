@@ -132,7 +132,7 @@ const clearQuestionFilter = () => {
   <QuestionBankNav />
 
   <main class="flex flex-1 flex-col gap-5 px-4 py-6">
-    <p class="text-sm text-muted-foreground">由一份题目材料和若干有序题目组成；题号、分值和试卷版面由具体稿件管理。</p>
+    <p class="text-sm text-muted-foreground">由一份题目材料和若干有序题目组成。</p>
     <Tabs v-model="view">
       <TabsList><TabsTrigger value="active">当前</TabsTrigger><TabsTrigger value="deleted">回收站</TabsTrigger></TabsList>
     </Tabs>
