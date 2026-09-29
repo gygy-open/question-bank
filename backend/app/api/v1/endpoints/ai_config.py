@@ -1,11 +1,16 @@
 from typing import Any, List
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Response, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.api import deps
-from app.crud.crud_ai_config import ai_provider, ai_model
+from app.crud.crud_ai_config import ai_provider
 from app.crud.crud_system_setting import system_setting
 from app.schemas.ai_config import AIProvider as AIProviderSchema, AIProviderCreate, AIProviderUpdate, AIModel as AIModelSchema, AIModelCreate
-from app.schemas.system_setting import SystemSettingCreate, SystemSettingUpdate
+from app.services.ai_config_service import (
+    EMBEDDING_MODEL_KEY,
+    delete_model,
+    delete_provider,
+    validate_active_model,
+)
 
 router = APIRouter()
 
@@ -41,17 +46,19 @@ async def update_ai_provider(
     provider = await ai_provider.update(db, db_obj=provider, obj_in=provider_in)
     return await ai_provider.get_with_models(db, id=provider.id)
 
-@router.delete("/providers/{provider_id}", response_model=AIProviderSchema)
+@router.delete("/providers/{provider_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_ai_provider(
     *,
     db: AsyncSession = Depends(deps.get_db),
     provider_id: int,
+    force: bool = False,
     current_user = Depends(deps.get_current_active_superuser),
-) -> Any:
-    provider = await ai_provider.get(db, id=provider_id)
-    if not provider:
-        raise HTTPException(status_code=404, detail="Provider not found")
-    return await ai_provider.remove(db, id=provider_id)
+) -> Response:
+    reload_embedding = await delete_provider(db, provider_id=provider_id, force=force)
+    if reload_embedding:
+        from app.services.embedding import reload_embedding_function
+        await reload_embedding_function()
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 @router.post("/providers/{provider_id}/models", response_model=AIModelSchema)
 async def create_ai_model(
@@ -78,17 +85,19 @@ async def create_ai_model(
     await db.refresh(db_model)
     return db_model
 
-@router.delete("/models/{model_id}", response_model=AIModelSchema)
+@router.delete("/models/{model_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_ai_model(
     *,
     db: AsyncSession = Depends(deps.get_db),
     model_id: int,
+    force: bool = False,
     current_user = Depends(deps.get_current_active_superuser),
-) -> Any:
-    model = await ai_model.get(db, id=model_id)
-    if not model:
-        raise HTTPException(status_code=404, detail="Model not found")
-    return await ai_model.remove(db, id=model_id)
+) -> Response:
+    reload_embedding = await delete_model(db, model_id=model_id, force=force)
+    if reload_embedding:
+        from app.services.embedding import reload_embedding_function
+        await reload_embedding_function()
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 @router.get("/active-config")
 async def get_active_config(
@@ -120,37 +129,29 @@ async def update_active_config(
     config: dict,
     current_user = Depends(deps.get_current_active_superuser),
 ) -> Any:
-    if "text_model_id" in config:
-        key = "AI_TEXT_MODEL_ID"
-        raw_val = config["text_model_id"]
-        val = str(raw_val) if raw_val is not None else ""
+    fields = {
+        "text_model_id": ("AI_TEXT_MODEL_ID", "Active AI Text Model ID"),
+        "vision_model_id": ("AI_VISION_MODEL_ID", "Active AI Vision Model ID"),
+        "embedding_model_id": (EMBEDDING_MODEL_KEY, "Active AI Embedding Model ID"),
+    }
+    embedding_changed = False
+    for field, (key, description) in fields.items():
+        if field not in config:
+            continue
+        raw_value = config[field]
+        value = str(raw_value) if raw_value is not None else ""
+        await validate_active_model(db, key=key, value=value)
         existing = await system_setting.get_by_key(db, key)
         if existing:
-            await system_setting.update(db, db_obj=existing, obj_in=SystemSettingUpdate(value=val))
+            existing.value = value
         else:
-            await system_setting.create(db, obj_in=SystemSettingCreate(key=key, value=val, description="Active AI Text Model ID"))
-            
-    if "vision_model_id" in config:
-        key = "AI_VISION_MODEL_ID"
-        raw_val = config["vision_model_id"]
-        val = str(raw_val) if raw_val is not None else ""
-        existing = await system_setting.get_by_key(db, key)
-        if existing:
-            await system_setting.update(db, db_obj=existing, obj_in=SystemSettingUpdate(value=val))
-        else:
-            await system_setting.create(db, obj_in=SystemSettingCreate(key=key, value=val, description="Active AI Vision Model ID"))
+            from app.models.system_setting import SystemSetting
+            db.add(SystemSetting(key=key, value=value, description=description))
+        embedding_changed = embedding_changed or key == EMBEDDING_MODEL_KEY
 
-    if "embedding_model_id" in config:
-        key = "AI_EMBEDDING_MODEL_ID"
-        raw_val = config["embedding_model_id"]
-        val = str(raw_val) if raw_val is not None else ""
-        existing = await system_setting.get_by_key(db, key)
-        if existing:
-            await system_setting.update(db, db_obj=existing, obj_in=SystemSettingUpdate(value=val))
-        else:
-            await system_setting.create(db, obj_in=SystemSettingCreate(key=key, value=val, description="Active AI Embedding Model ID"))
-        # Reload the in-memory embedding function so the change applies without a restart.
+    await db.commit()
+    if embedding_changed:
         from app.services.embedding import reload_embedding_function
         await reload_embedding_function()
-    
+
     return {"status": "success"}

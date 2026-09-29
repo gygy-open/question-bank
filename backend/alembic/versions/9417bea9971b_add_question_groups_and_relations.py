@@ -1,7 +1,7 @@
 """add question groups and relations
 
 Revision ID: 9417bea9971b
-Revises: b7c1e94d2a35
+Revises: e5f6a7b8c9d0
 Create Date: 2026-09-19 21:19:50.988693
 
 """
@@ -13,7 +13,7 @@ from sqlalchemy.dialects import mysql
 
 # revision identifiers, used by Alembic.
 revision: str = '9417bea9971b'
-down_revision: Union[str, Sequence[str], None] = 'b7c1e94d2a35'
+down_revision: Union[str, Sequence[str], None] = 'e5f6a7b8c9d0'
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 

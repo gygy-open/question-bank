@@ -4,6 +4,7 @@ import { ChevronRight, ChevronDown, Plus, Pencil, Trash2, Folder, FolderOpen, Sa
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import type { KnowledgePoint } from '@/types'
+import ManagerKnowledgePointTreeItem from './KnowledgePointTreeItem.vue'
 
 // Extend KnowledgePoint to include children for the tree view
 interface KnowledgePointNode extends KnowledgePoint {
@@ -216,7 +217,7 @@ watch(newName, (val) => {
     <!-- Children Container -->
     <div v-if="isOpen">
       <!-- Existing Children -->
-      <KnowledgePointTreeItem
+      <ManagerKnowledgePointTreeItem
         v-for="child in knowledgePoint.children"
         :key="child.id"
         :knowledge-point="child"

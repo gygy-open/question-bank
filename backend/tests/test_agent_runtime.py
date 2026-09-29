@@ -99,6 +99,24 @@ async def test_plain_answer_emits_text_and_finishes(ctx):
     assert finished.stop_reason == "completed"
 
 
+async def test_run_persists_model_identity_snapshot(ctx):
+    runner = AgentRunner(FakeProvider([["ok"]]), {})
+    events = [
+        event
+        async for event in runner.run(
+            ctx,
+            [{"role": "user", "content": "hi"}],
+            model_name="zz-runtime-model",
+            provider_name="zz-runtime-provider",
+        )
+    ]
+
+    finished = events[-1]
+    run = await ctx.db.get(AgentRun, finished.run_id)
+    assert run.model_name == "zz-runtime-model"
+    assert run.provider_name == "zz-runtime-provider"
+
+
 async def test_tool_round_trip_feeds_result_back_to_the_model(ctx):
     provider = FakeProvider([
         [_tool_call("c1", "get_available_tags")],
