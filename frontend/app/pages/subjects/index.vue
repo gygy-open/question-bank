@@ -27,6 +27,7 @@ import SubjectMembersDialog from '~/components/manager/SubjectMembersDialog.vue'
 // State
 const { $api } = useNuxtApp()
 const { data: subjects, refresh } = await useAPI<Subject[]>('/api/v1/subjects')
+const { refreshSubjects } = useSubjectContext()
 const isDialogOpen = ref(false)
 const isEditing = ref(false)
 const membersDialogOpen = ref(false)
@@ -73,6 +74,7 @@ const saveSubject = async () => {
       })
     }
     await refresh()
+    await refreshSubjects()
     isDialogOpen.value = false
   } catch (error) {
     console.error('Failed to save subject', error)
@@ -84,6 +86,7 @@ const deleteSubject = async (id: number) => {
   try {
     await $api(`/api/v1/subjects/${id}`, { method: 'DELETE' })
     await refresh()
+    await refreshSubjects()
   } catch (error) {
     console.error('Failed to delete subject', error)
   }
