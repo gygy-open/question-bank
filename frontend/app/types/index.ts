@@ -14,6 +14,8 @@ export type {
   TrueFalseAnswer,
   FillBlankAnswer,
   FreeResponseAnswer,
+  MatchingSlot,
+  OptionMatchingAnswer,
   LegacyUnresolvedAnswer,
   Blank,
 } from './question'
@@ -259,13 +261,13 @@ export interface Question {
   updater?: User
   review_logs?: ActivityLog[]
   subject?: Subject
-  question_group_count?: number
+  stimulus_id?: number | null
+  stimulus_position?: number | null
   incoming_relation_count?: number
   outgoing_relation_count?: number
 }
 
 export interface QuestionListItem extends Question {
-  question_group_count: number
   incoming_relation_count: number
   outgoing_relation_count: number
 }
@@ -301,12 +303,13 @@ export interface StimulusListItem {
   source?: string | null
   metadata: Record<string, unknown>
   revision: number
+  content_revision: number
   created_by?: number | null
   updated_by?: number | null
   created_at: string
   updated_at: string
   deleted_at: string | null
-  question_group_count: number
+  question_count: number
 }
 
 export interface StimulusPage {
@@ -317,7 +320,17 @@ export interface StimulusPage {
   pages: number
 }
 
-export type Stimulus = Omit<StimulusListItem, 'question_group_count'>
+export type Stimulus = Omit<StimulusListItem, 'question_count'>
+
+/** GET 材料详情:附带按 stimulus_position 排列、当前用户可见的小题。 */
+export interface StimulusDetail extends Stimulus {
+  questions: QuestionSummary[]
+}
+
+export interface StimulusQuestionsUpdateRequest {
+  expected_revision: number
+  question_ids: number[]
+}
 
 export interface StimulusCreateRequest {
   content: RichDoc
@@ -343,53 +356,10 @@ export interface QuestionSummary {
   difficulty: number
   visibility: 'public' | 'private'
   source?: string | null
-  parent_id?: number | null
+  stimulus_id?: number | null
+  stimulus_position?: number | null
   created_at: string
   updated_at: string
-}
-
-export interface QuestionGroupItem {
-  question_id: number
-  position: number
-  question: QuestionSummary
-}
-
-export interface QuestionGroup {
-  id: number
-  subject_id: number
-  stimulus_id: number
-  status: QuestionStatus
-  visibility: 'public' | 'private'
-  source?: string | null
-  metadata: Record<string, unknown>
-  revision: number
-  created_by?: number | null
-  updated_by?: number | null
-  created_at: string
-  updated_at: string
-  deleted_at: string | null
-  stimulus: Omit<StimulusListItem, 'question_group_count'>
-  items: QuestionGroupItem[]
-}
-
-export interface QuestionGroupPage {
-  items: QuestionGroup[]
-  total: number
-  page: number
-  size: number
-  pages: number
-}
-
-export interface QuestionGroupWriteRequest {
-  stimulus_id: number
-  status: QuestionStatus
-  visibility: 'public' | 'private'
-  source?: string | null
-  items: Array<{ question_id: number, position: number }>
-}
-
-export interface QuestionGroupUpdateRequest extends QuestionGroupWriteRequest {
-  expected_revision: number
 }
 
 

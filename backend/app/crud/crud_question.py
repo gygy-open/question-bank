@@ -1,7 +1,7 @@
 from typing import List, Optional, Union, Dict, Any
 from datetime import datetime
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func, or_, and_, true, false, exists
+from sqlalchemy import select, func, or_, and_, true, false, update
 from sqlalchemy.orm import aliased, selectinload
 from app.crud.base import CRUDBase
 from app.models.question import Question, QuestionStatus, QuestionType, QuestionVisibility
@@ -20,7 +20,42 @@ from app.services.question_content import (
 from app.models.knowledge_point import KnowledgePoint
 from app.models.import_task import ImportTask
 from app.models.activity_log import ActivityLog
-from app.models.question_group import QuestionGroup, QuestionGroupItem, QuestionRelation
+from app.models.question_relation import QuestionRelation
+from app.models.stimulus import Stimulus
+
+
+async def release_stimulus_slot(db: AsyncSession, question: Question) -> None:
+    """软删除小题时让出材料内位置(保留 stimulus_id 供恢复),并递增材料乐观锁。"""
+    if question.stimulus_id is None:
+        return
+    question.stimulus_position = None
+    await db.execute(
+        update(Stimulus)
+        .where(Stimulus.id == question.stimulus_id)
+        .values(revision=Stimulus.revision + 1)
+    )
+
+
+async def reclaim_stimulus_slot(db: AsyncSession, question: Question) -> None:
+    """恢复小题时追加到材料末尾;材料已删除则转为独立题。"""
+    if question.stimulus_id is None:
+        return
+    stimulus = await db.scalar(
+        select(Stimulus)
+        .where(Stimulus.id == question.stimulus_id, Stimulus.deleted_at.is_(None))
+        .with_for_update()
+    )
+    if stimulus is None:
+        question.stimulus_id = None
+        question.stimulus_position = None
+        return
+    current = await db.scalar(
+        select(func.max(Question.stimulus_position)).where(
+            Question.stimulus_id == stimulus.id
+        )
+    )
+    question.stimulus_position = 0 if current is None else int(current) + 1
+    stimulus.revision = stimulus.revision + 1
 
 
 def visible_questions_filter(viewer, question_model=Question):
@@ -95,7 +130,8 @@ class CRUDQuestion(CRUDBase[Question, QuestionCreate, QuestionUpdate]):
         id: Optional[int] = None,
         ids: Optional[List[int]] = None,
         source: Optional[str] = None,
-        in_question_group: Optional[bool] = None,
+        has_stimulus: Optional[bool] = None,
+        stimulus_id: Optional[int] = None,
         viewer=None,
     ):
         query = select(self.model).options(
@@ -152,16 +188,15 @@ class CRUDQuestion(CRUDBase[Question, QuestionCreate, QuestionUpdate]):
         if source:
             query = query.filter(self.model.source.ilike(f"%{source}%"))
             
-        if in_question_group is not None:
-            active_membership = exists(
-                select(QuestionGroupItem.id)
-                .join(QuestionGroup, QuestionGroup.id == QuestionGroupItem.group_id)
-                .where(
-                    QuestionGroupItem.question_id == self.model.id,
-                    QuestionGroup.deleted_at.is_(None),
-                )
+        if has_stimulus is not None:
+            query = query.filter(
+                self.model.stimulus_id.is_not(None)
+                if has_stimulus
+                else self.model.stimulus_id.is_(None)
             )
-            query = query.filter(active_membership if in_question_group else ~active_membership)
+
+        if stimulus_id is not None:
+            query = query.filter(self.model.stimulus_id == stimulus_id)
 
         if review_count is not None:
             query = query.filter(self.model.review_count == review_count)
@@ -205,7 +240,8 @@ class CRUDQuestion(CRUDBase[Question, QuestionCreate, QuestionUpdate]):
         id: Optional[int] = None,
         ids: Optional[List[int]] = None,
         source: Optional[str] = None,
-        in_question_group: Optional[bool] = None,
+        has_stimulus: Optional[bool] = None,
+        stimulus_id: Optional[int] = None,
         viewer=None
     ) -> List[Question]:
         query = await self._get_filter_query(
@@ -225,28 +261,13 @@ class CRUDQuestion(CRUDBase[Question, QuestionCreate, QuestionUpdate]):
             id=id,
             ids=ids,
             source=source,
-            in_question_group=in_question_group,
+            has_stimulus=has_stimulus,
+            stimulus_id=stimulus_id,
             viewer=viewer
         )
         query = query.offset(skip).limit(limit).order_by(self.model.created_at.desc())
         result = await db.execute(query)
         return result.scalars().all()
-
-    async def get_question_group_counts(
-        self, db: AsyncSession, *, question_ids: List[int]
-    ) -> Dict[int, int]:
-        if not question_ids:
-            return {}
-        result = await db.execute(
-            select(QuestionGroupItem.question_id, func.count(QuestionGroupItem.group_id))
-            .join(QuestionGroup, QuestionGroup.id == QuestionGroupItem.group_id)
-            .where(
-                QuestionGroupItem.question_id.in_(question_ids),
-                QuestionGroup.deleted_at.is_(None),
-            )
-            .group_by(QuestionGroupItem.question_id)
-        )
-        return {question_id: count for question_id, count in result.all()}
 
     async def get_relation_counts(
         self,
@@ -324,7 +345,8 @@ class CRUDQuestion(CRUDBase[Question, QuestionCreate, QuestionUpdate]):
         id: Optional[int] = None,
         ids: Optional[List[int]] = None,
         source: Optional[str] = None,
-        in_question_group: Optional[bool] = None,
+        has_stimulus: Optional[bool] = None,
+        stimulus_id: Optional[int] = None,
         viewer=None
     ) -> int:
         query = await self._get_filter_query(
@@ -344,7 +366,8 @@ class CRUDQuestion(CRUDBase[Question, QuestionCreate, QuestionUpdate]):
             id=id,
             ids=ids,
             source=source,
-            in_question_group=in_question_group,
+            has_stimulus=has_stimulus,
+            stimulus_id=stimulus_id,
             viewer=viewer
         )
         # Use subquery for count to handle joins correctly
@@ -433,6 +456,21 @@ class CRUDQuestion(CRUDBase[Question, QuestionCreate, QuestionUpdate]):
             await self._validate_subject_change(
                 db, question=db_obj, new_subject_id=new_subject_id
             )
+        new_visibility = update_data.get("visibility", db_obj.visibility)
+        if isinstance(new_visibility, QuestionVisibility):
+            new_visibility = new_visibility.value
+            update_data["visibility"] = new_visibility
+        if (
+            new_visibility == QuestionVisibility.PUBLIC.value
+            and db_obj.stimulus_id is not None
+        ):
+            from app.capabilities.errors import Unprocessable
+
+            stimulus_visibility = await db.scalar(
+                select(Stimulus.visibility).where(Stimulus.id == db_obj.stimulus_id)
+            )
+            if stimulus_visibility == QuestionVisibility.PRIVATE.value:
+                raise Unprocessable("公开题目不能挂在私有材料下")
 
         # Merge v2 content state (current DB row + overlay), then run full domain validation
         # before persisting. This is the authoritative net for partial updates.
@@ -498,7 +536,7 @@ class CRUDQuestion(CRUDBase[Question, QuestionCreate, QuestionUpdate]):
         for field in ("thinking", "analysis", "summary"):
             if field in update_data:
                 setattr(db_obj, field, to_db_json(update_data[field]))
-        for field in ("status", "difficulty", "source", "subject_id"):
+        for field in ("status", "difficulty", "source", "subject_id", "visibility"):
             if field in update_data:
                 setattr(db_obj, field, update_data[field])
 
@@ -549,11 +587,6 @@ class CRUDQuestion(CRUDBase[Question, QuestionCreate, QuestionUpdate]):
         new_subject_id: Optional[int],
     ) -> None:
         from app.capabilities.errors import Unprocessable
-        from app.models.question_group import (
-            QuestionGroup,
-            QuestionGroupItem,
-            QuestionRelation,
-        )
 
         subject_ids = [subject_id for subject_id in (question.subject_id, new_subject_id) if subject_id is not None]
         if subject_ids:
@@ -567,17 +600,14 @@ class CRUDQuestion(CRUDBase[Question, QuestionCreate, QuestionUpdate]):
                 .with_for_update()
             )
 
-        group_subjects = await db.scalars(
-            select(QuestionGroup.subject_id)
-            .join(QuestionGroupItem, QuestionGroupItem.group_id == QuestionGroup.id)
-            .where(
-                QuestionGroupItem.question_id == question.id,
-                QuestionGroup.deleted_at.is_(None),
+        if question.stimulus_id is not None:
+            stimulus_subject = await db.scalar(
+                select(Stimulus.subject_id)
+                .where(Stimulus.id == question.stimulus_id)
+                .with_for_update()
             )
-            .with_for_update()
-        )
-        if any(subject_id != new_subject_id for subject_id in group_subjects):
-            raise Unprocessable("Question subject must match its question group")
+            if stimulus_subject != new_subject_id:
+                raise Unprocessable("小题学科必须与所属题目材料一致")
 
         relations = await db.execute(
             select(
@@ -609,6 +639,7 @@ class CRUDQuestion(CRUDBase[Question, QuestionCreate, QuestionUpdate]):
         if obj:
             now = datetime.utcnow()
             obj.deleted_at = now
+            await release_stimulus_slot(db, obj)
             if user_id:
                 obj.updated_by = user_id
 
@@ -628,6 +659,7 @@ class CRUDQuestion(CRUDBase[Question, QuestionCreate, QuestionUpdate]):
         obj = result.scalars().first()
         if obj:
             obj.deleted_at = None
+            await reclaim_stimulus_slot(db, obj)
             if user_id:
                 obj.updated_by = user_id
             db.add(obj)

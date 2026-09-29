@@ -55,7 +55,7 @@ import {
   createEmptyDraft,
   dbQuestionToDraft,
   generateOptionId,
-  isChoiceType,
+  hasOptionPool,
   nextOptionLabel,
   pruneAnswerOptionRef,
   validateQuestionDraft,
@@ -156,7 +156,7 @@ function switchDraftType(d: QuestionDraft, newType: QuestionType) {
   const oldType = d.q_type
   if (oldType === newType) return
   d.q_type = newType
-  if (isChoiceType(newType) && d.options.length === 0) {
+  if (hasOptionPool(newType) && d.options.length === 0) {
     d.options = createDefaultOptions()
   }
   d.answer = null
@@ -317,6 +317,7 @@ const toggleTag = (tagId: number) => {
                         <SelectItem value="true_false">判断题</SelectItem>
                         <SelectItem value="fill_in_the_blank">填空题</SelectItem>
                         <SelectItem value="free_response">解答题</SelectItem>
+                        <SelectItem value="option_matching">选项匹配</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
@@ -443,11 +444,11 @@ const toggleTag = (tagId: number) => {
                 <template v-if="draft">
                   <div class="space-y-2">
                     <Label>题干</Label>
-                    <RichEditor v-model="draft.content" :allow-blank="qType === 'fill_in_the_blank'" />
+                    <RichEditor v-model="draft.content" :allow-blank="qType === 'fill_in_the_blank' || qType === 'option_matching'" />
                   </div>
 
-                  <div v-if="qType === 'single_choice' || qType === 'multiple_choice'" class="space-y-2">
-                    <Label>选项</Label>
+                  <div v-if="hasOptionPool(qType)" class="space-y-2">
+                    <Label>{{ qType === 'option_matching' ? '选项池（各空位共用）' : '选项' }}</Label>
                     <div class="grid grid-cols-1 gap-4">
                       <div v-for="(opt, optIndex) in draft.options" :key="opt.id" class="flex gap-2 items-start">
                         <div class="w-8 h-9 flex items-center justify-center bg-muted rounded font-medium shrink-0 mt-0.5">{{ opt.label }}</div>
@@ -499,7 +500,7 @@ const toggleTag = (tagId: number) => {
                       <RichContent :content="draft.content" empty-text="（空）" />
                     </div>
                   </div>
-                  <div v-if="(qType === 'single_choice' || qType === 'multiple_choice') && draft.options.length > 0" class="space-y-2">
+                  <div v-if="hasOptionPool(qType) && draft.options.length > 0" class="space-y-2">
                     <h3 class="font-semibold text-sm text-muted-foreground">选项预览</h3>
                     <div class="space-y-2 bg-background p-4 rounded border border-border">
                       <div v-for="opt in draft.options" :key="opt.id" class="flex gap-2">

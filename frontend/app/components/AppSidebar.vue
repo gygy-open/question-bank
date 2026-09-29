@@ -101,7 +101,7 @@ const navActiveClass = 'border-l-2 border-transparent data-[active=true]:border-
               <SidebarMenuItem>
                 <SidebarMenuButton
                   as-child
-                  :is-active="route.path === '/questions' || route.path.startsWith('/questions/') || route.path === '/question-groups' || route.path.startsWith('/question-groups/') || route.path === '/materials' || route.path.startsWith('/materials/')"
+                  :is-active="route.path === '/questions' || route.path.startsWith('/questions/') || route.path === '/materials' || route.path.startsWith('/materials/')"
                   :class="navActiveClass"
                 >
                   <NuxtLink to="/questions">

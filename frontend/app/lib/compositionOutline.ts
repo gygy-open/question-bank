@@ -15,9 +15,12 @@ import {
   answerSpacePropsOf,
   detailPropsOf,
   headingLevelOf,
+  isOptionMatchingNode,
   questionNumberOf,
   questionScoreOf,
   questionShowOverride,
+  questionSlotsOf,
+  slotNumbersOf,
 } from '@/lib/compositionDocument'
 
 const SUMMARY_LIMIT = 60
@@ -48,6 +51,8 @@ export function describeNode(node: EditorNode): string {
     }
     case 'question_details':
       return `参考答案模块（${detailPropsOf(node).scope === 'all' ? '全稿' : '模块之前'}）`
+    case 'question_group':
+      return `材料题（题目材料 #${node.stimulusId ?? '?'}）`
     case 'answer_space': {
       const props = answerSpacePropsOf(node)
       return `作答空间（${props.lines} 行${props.style === 'lined' ? '横线' : '空白'}）`
@@ -67,6 +72,10 @@ function questionLine(node: EditorNode): string {
   if (number) parts.push(`题号${number}`)
   const score = questionScoreOf(node)
   if (score != null) parts.push(`${score}分`)
+  if (isOptionMatchingNode(node)) {
+    const slotNumbers = Object.values(slotNumbersOf(questionSlotsOf(node)))
+    parts.push(slotNumbers.length ? `空位题号${slotNumbers.join(',')}` : '空位未编号')
+  }
   const overrides = ANSWER_FIELD_KEYS
     .map((key) => {
       const v = questionShowOverride(node, key)
@@ -99,6 +108,8 @@ function nodeLine(node: EditorNode): string {
     }
     case 'answer_item':
       return `answer_item ← ${node.sourceQuestionNodeId ?? '?'}`
+    case 'question_group':
+      return `question_group 材料#${node.stimulusId ?? '?'} 「${truncate(richDocToPlainText(node.content))}」`
   }
 }
 

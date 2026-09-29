@@ -36,6 +36,13 @@ import {
   orderedScorableQuestions,
   totalScore,
   collectStaleQuestionGroupNodeIds,
+  appendQuestionsToDocument,
+  mergeQuestionsIntoGroupNode,
+  questionsToRootNodes,
+  removeQuestionFromGroupNode,
+  questionPropsWithSlot,
+  questionSlotsOf,
+  stemWithSlotNumbers,
 } from '@/lib/compositionDocument'
 import { resolveAnswerSpacePropsOrFallback } from '@/lib/answerSpaceRules'
 import type { EditorDocument, EditorNode } from '@/lib/compositionDocument'
@@ -48,7 +55,7 @@ function richDoc(text: string) {
   return { type: 'doc' as const, content: [{ type: 'paragraph', content: [{ type: 'text', text }] }] }
 }
 
-function fakeQuestion(id: number, revision = 1): Question {
+function fakeQuestion(id: number, revision = 1, stimulus?: { id: number; position: number }): Question {
   return {
     id,
     content_revision: revision,
@@ -68,6 +75,8 @@ function fakeQuestion(id: number, revision = 1): Question {
     updated_at: '',
     review_count: 0,
     source: 'seed',
+    stimulus_id: stimulus?.id ?? null,
+    stimulus_position: stimulus?.position ?? null,
   } as unknown as Question
 }
 
@@ -379,10 +388,8 @@ describe('documentFromNodes 重建（含 module 子树）', () => {
     expect(d.nodes[1]!.children.map((c) => c.id)).toEqual(['ai1'])
   })
 
-  it('题组材料与 question/answer_space children 无损往返', () => {
-    const group = createQuestionGroupNode(8)
-    group.questionGroupRevision = 3
-    group.stimulusId = 12
+  it('材料题材料与 question/answer_space children 无损往返', () => {
+    const group = createQuestionGroupNode(12, [])
     group.stimulusRevision = 4
     group.content = richDoc('材料')
     const question = createQuestionNode(fakeQuestion(7, 2))
@@ -392,7 +399,9 @@ describe('documentFromNodes 重建（含 module 子树）', () => {
     group.children = [question, space]
 
     const request = documentToReplaceRequest({ nodes: [group] }, 9)
-    expect(request.nodes[0]).toMatchObject({ node_type: 'question_group', question_group_id: 8 })
+    expect(request.nodes[0]).toEqual({
+      id: group.id, node_kind: 'module', node_type: 'question_group', stimulus_id: 12,
+    })
     expect(request.nodes[1]).toMatchObject({ node_type: 'question', parent_id: group.id, slot: 'body', question_id: 7 })
     expect(request.nodes[2]).toMatchObject({
       node_type: 'answer_space', parent_id: group.id, slot: 'body', source_question_node_id: question.id,
@@ -400,15 +409,17 @@ describe('documentFromNodes 重建（含 module 子树）', () => {
     })
   })
 
-  it('新题组首次 replace 只发送 root module', () => {
-    const group = createQuestionGroupNode(23)
-    expect(documentToReplaceRequest({ nodes: [group] }, 1).nodes).toEqual([
-      { id: group.id, node_kind: 'module', node_type: 'question_group', question_group_id: 23 },
-    ])
+  it('新材料题按材料顺序携带所选小题', () => {
+    const later = fakeQuestion(9, 1, { id: 23, position: 3 })
+    const earlier = fakeQuestion(4, 1, { id: 23, position: 0 })
+    const group = createQuestionGroupNode(23, [later, earlier])
+    const nodes = documentToReplaceRequest({ nodes: [group] }, 1).nodes
+    expect(nodes[0]).toEqual({ id: group.id, node_kind: 'module', node_type: 'question_group', stimulus_id: 23 })
+    expect(nodes.slice(1).map(n => n.question_id)).toEqual([4, 9])
   })
 
   it('题组内说明文字按锚点重排到目标小题之前', () => {
-    const group = createQuestionGroupNode(8)
+    const group = createQuestionGroupNode(8, [])
     group.content = richDoc('材料')
     const q1 = createQuestionNode(fakeQuestion(7, 2))
     const q2 = createQuestionNode(fakeQuestion(9, 1))
@@ -438,27 +449,78 @@ describe('documentFromNodes 重建（含 module 子树）', () => {
       {
         id: 'group', composition_id: 1, parent_id: null, slot: null, position: 0,
         node_kind: 'module', node_type: 'question_group', content: richDoc('材料'), props: null,
-        schema_version: 1, question_id: null, question_revision: null, question_group_id: 8,
-        question_group_revision: 2, stimulus_id: 3, stimulus_revision: 4,
+        schema_version: 1, question_id: null, question_revision: null,
+        stimulus_id: 3, stimulus_revision: 4,
         source_question_node_id: null, anchor_before_node_id: null,
       },
       {
         id: 'space', composition_id: 1, parent_id: 'group', slot: 'body', position: 0,
         node_kind: 'block', node_type: 'answer_space', content: null, props: { lines: 4, style: 'lined' },
-        schema_version: 1, question_id: null, question_revision: null, question_group_id: null,
-        question_group_revision: null, stimulus_id: null, stimulus_revision: null,
+        schema_version: 1, question_id: null, question_revision: null,
+        stimulus_id: null, stimulus_revision: null,
         source_question_node_id: 'child-q', anchor_before_node_id: null,
       },
     ] as CompositionNode[]
     const request = documentToReplaceRequest(documentFromNodes(server), 2)
+    expect(request.nodes[0]).toMatchObject({ stimulus_id: 3 })
     expect(request.nodes[1]).toMatchObject({ source_question_node_id: 'child-q' })
   })
 })
 
-describe('题组递归题目行为', () => {
-  it('统一参与编号、赋分、题目 stale 与题组 stale 收集', () => {
+describe('材料题成组与并入', () => {
+  it('同材料小题在首次出现处合成一个节点，独立题保持单题', () => {
+    const rows = questionsToRootNodes([
+      fakeQuestion(1),
+      fakeQuestion(3, 1, { id: 7, position: 1 }),
+      fakeQuestion(2),
+      fakeQuestion(4, 1, { id: 7, position: 0 }),
+    ])
+    expect(rows.map(row => row.nodeType)).toEqual(['question', 'question_group', 'question'])
+    expect(rows[1]!.stimulusId).toBe(7)
+    expect(rows[1]!.children.map(child => child.questionId)).toEqual([4, 3])
+  })
+
+  it('并入已有节点时按实时位置插入、跳过已存在小题，且不重排已有小题', () => {
+    const group = createQuestionGroupNode(7, [
+      fakeQuestion(10, 1, { id: 7, position: 0 }),
+      fakeQuestion(30, 1, { id: 7, position: 4 }),
+    ])
+    const positions = new Map([[10, 0], [20, 2], [30, 4]])
+    const { node, added } = mergeQuestionsIntoGroupNode(group, [
+      fakeQuestion(20, 1, { id: 7, position: 2 }),
+      fakeQuestion(10, 1, { id: 7, position: 0 }),
+    ], positions)
+    expect(added).toBe(1)
+    expect(node.children.map(child => child.questionId)).toEqual([10, 20, 30])
+  })
+
+  it('追加到文档时优先并入同材料节点，其余在末尾新建', () => {
+    const existing = createQuestionGroupNode(7, [fakeQuestion(10, 1, { id: 7, position: 0 })])
+    const { doc: next, added } = appendQuestionsToDocument(
+      { nodes: [existing] },
+      [fakeQuestion(11, 1, { id: 7, position: 1 }), fakeQuestion(50, 1, { id: 8, position: 0 }), fakeQuestion(99)],
+      new Map([[10, 0]]),
+    )
+    expect(added).toBe(3)
+    expect(next.nodes.map(node => node.nodeType)).toEqual(['question_group', 'question_group', 'question'])
+    expect(next.nodes[0]!.children.map(child => child.questionId)).toEqual([10, 11])
+    expect(next.nodes[1]!.stimulusId).toBe(8)
+  })
+
+  it('移除小题时连同其作答区一并移除', () => {
+    const q1 = createQuestionNode(fakeQuestion(1))
+    const q2 = createQuestionNode(fakeQuestion(2))
+    const space = createAnswerSpaceNode(3, 'lined')
+    space.sourceQuestionNodeId = q1.id
+    const group = { ...createQuestionGroupNode(7, []), children: [q1, space, q2] }
+    expect(removeQuestionFromGroupNode(group, q1.id).children.map(child => child.id)).toEqual([q2.id])
+  })
+})
+
+describe('材料题递归题目行为', () => {
+  it('统一参与编号、赋分；题目 stale 只收集根级题，材料题走自身状态', () => {
     const root = createQuestionNode(fakeQuestion(1, 1))
-    const group = createQuestionGroupNode(5)
+    const group = createQuestionGroupNode(5, [])
     const child = createQuestionNode(fakeQuestion(2, 1))
     child.props = { score: 2.5 }
     group.children = [child]
@@ -466,22 +528,85 @@ describe('题组递归题目行为', () => {
     expect(orderedScorableQuestions(numbered).map((item) => item.number)).toEqual(['1', '2'])
     expect(totalScore(numbered)).toBe(2.5)
     expect(collectStaleQuestionNodeIds(numbered, new Map([
+      [1, { question_id: 1, current_revision: 2, available: true }],
       [2, { question_id: 2, current_revision: 2, available: true }],
-    ]))).toEqual([child.id])
+    ]))).toEqual([root.id])
     expect(collectStaleQuestionGroupNodeIds([{
-      node_id: group.id, question_group_id: 5, pinned_revision: 1, current_revision: 2,
-      stimulus_pinned_revision: 1, stimulus_current_revision: 1, members: [],
-      group_available: true, stimulus_available: true, structure_changed: true, stale: true,
+      node_id: group.id, stimulus_id: 5, stimulus_pinned_revision: 1, stimulus_current_revision: 1,
+      stimulus_available: true, members: [], new_question_ids: [], structure_changed: true, stale: true,
     }])).toEqual([group.id])
   })
 
-  it('question_details scope=all 为题组成员生成 answer_item', () => {
-    const group = createQuestionGroupNode(5)
+  it('question_details scope=all 为材料题小题生成 answer_item', () => {
+    const group = createQuestionGroupNode(5, [])
     const child = createQuestionNode(fakeQuestion(2))
     group.children = [child]
     const details = createQuestionDetailsModule('all')
     const normalized = normalizeDocument({ nodes: [group, details] })
     expect(normalized.nodes[1]!.children.map((node) => node.sourceQuestionNodeId)).toEqual([child.id])
+  })
+})
+
+describe('选项匹配按空位编号与赋分', () => {
+  function matchingNode(): EditorNode {
+    const question = {
+      ...fakeQuestion(40),
+      q_type: 'option_matching',
+      content: {
+        type: 'doc',
+        content: [{ type: 'paragraph', content: [
+          { type: 'blank', attrs: { blankId: 'b1' } },
+          { type: 'blank', attrs: { blankId: 'b2' } },
+        ] }],
+      },
+      answer: {
+        kind: 'option_matching',
+        slots: [{ id: 'b1', correct: 'opt_a' }, { id: 'b2', correct: 'opt_a' }],
+        allow_reuse: true,
+      },
+    } as unknown as Question
+    return createQuestionNode(question)
+  }
+
+  it('每个空位占一个题号，整题不带题号', () => {
+    const before = createQuestionNode(fakeQuestion(1))
+    const matching = matchingNode()
+    const after = createQuestionNode(fakeQuestion(2))
+    const numbered = applyQuestionNumbers(doc([before, matching, after]), 'global')
+    expect(questionNumberOf(numbered.nodes[1]!)).toBe('')
+    expect(questionSlotsOf(numbered.nodes[1]!)).toEqual({ b1: { number: '2' }, b2: { number: '3' } })
+    expect(questionNumberOf(numbered.nodes[2]!)).toBe('4')
+    expect(hasAnyQuestionNumber(doc([matching]))).toBe(false)
+    expect(hasAnyQuestionNumber(applyQuestionNumbers(doc([matching]), 'global'))).toBe(true)
+  })
+
+  it('分数分布与合计按空位展开，写分值保留题号', () => {
+    let node = matchingNode()
+    node = { ...node, props: questionPropsWithSlot(node, 'b1', { number: '36' }) }
+    node = { ...node, props: questionPropsWithSlot(node, 'b1', { score: 2 }) }
+    node = { ...node, props: questionPropsWithSlot(node, 'b2', { score: 3 }) }
+    const d = doc([node])
+    expect(orderedScorableQuestions(d)).toEqual([
+      { nodeId: node.id, slotId: 'b1', number: '36', score: 2 },
+      { nodeId: node.id, slotId: 'b2', number: '', score: 3 },
+    ])
+    expect(totalScore(d)).toBe(5)
+    node = { ...node, props: questionPropsWithSlot(node, 'b2', { score: null }) }
+    expect(questionSlotsOf(node)).toEqual({ b1: { number: '36', score: 2 } })
+  })
+
+  it('序列化只发 slots，丢弃整题题号/分值与未知空位', () => {
+    const node = matchingNode()
+    node.props = { number: '9', score: 5, slots: { b1: { number: '1' }, zz: { number: '2' } } }
+    const req = documentToReplaceRequest(doc([node]), 1)
+    expect(req.nodes[0]!.props).toEqual({ slots: { b1: { number: '1' } } })
+  })
+
+  it('只读题干把已编号空位换成带下划线的题号', () => {
+    const stem = stemWithSlotNumbers(matchingNode().questionContent!.content, { b1: '36' })
+    const inline = stem!.content![0]!.content!
+    expect(inline[0]).toEqual({ type: 'text', text: '\u00a0\u00a036\u00a0\u00a0', marks: [{ type: 'underline' }] })
+    expect(inline[1]).toEqual({ type: 'blank', attrs: { blankId: 'b2' } })
   })
 })
 

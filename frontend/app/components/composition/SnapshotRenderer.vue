@@ -10,9 +10,12 @@ import { FileQuestion, Files, ListChecks, AlertTriangle } from '@lucide/vue'
 import { questionTypeLabel } from '@/lib/answerFormat'
 import {
   buildSnapshotTree, effectiveAnswerFields, effectiveQuestionDisplay,
-  resolvedQuestionNumber, resolvedQuestionScore, snapshotQuestionNodeMap,
+  resolvedQuestionNumber, resolvedQuestionScore, resolvedSlotNumbers, resolvedSlotScoreText,
+  snapshotQuestionNodeMap,
 } from '@/lib/compositionSnapshot'
-import { headingClassFor, questionOptionLayoutOf, resolveOptionColumns } from '@/lib/compositionDocument'
+import {
+  headingClassFor, questionOptionLayoutOf, resolveOptionColumns, stemWithSlotNumbers,
+} from '@/lib/compositionDocument'
 import type { SnapshotTreeNode } from '@/lib/compositionSnapshot'
 import { ANSWER_FIELD_KEYS } from '@/types/composition'
 import type {
@@ -66,6 +69,11 @@ function sourceQuestion(child: SnapshotAnswerItemNode) {
   return questionNodeMap.value.get(child.source_question_node_id)?.question ?? null
 }
 
+function sourceSlotNumbers(child: SnapshotAnswerItemNode): Record<string, string> {
+  const source = questionNodeMap.value.get(child.source_question_node_id)
+  return source ? resolvedSlotNumbers(source, props.snapshot) : {}
+}
+
 function anyVisible(moduleNode: SnapshotTreeNode, child: SnapshotAnswerItemNode): boolean {
   const fields = moduleFieldsVisible(moduleNode, child)
   return ANSWER_FIELD_KEYS.some((k) => fields[k])
@@ -99,8 +107,9 @@ function groupChildSnapshot(node: SnapshotTreeNode): CompositionSnapshot {
             <Badge variant="secondary" class="text-xs">{{ questionTypeLabel(node.question.q_type) }}</Badge>
             <span class="text-xs text-muted-foreground">#{{ node.question.id }} · 版本 r{{ node.question_revision }}</span>
             <span v-if="resolvedQuestionScore(node, props.snapshot) != null" class="ml-auto text-xs text-muted-foreground">（{{ resolvedQuestionScore(node, props.snapshot) }} 分）</span>
+            <span v-else-if="resolvedSlotScoreText(node, props.snapshot)" class="ml-auto text-xs text-muted-foreground">（{{ resolvedSlotScoreText(node, props.snapshot) }}）</span>
           </div>
-          <RichContent :content="node.question.content" empty-text="（无题干）" />
+          <RichContent :content="stemWithSlotNumbers(node.question.content, resolvedSlotNumbers(node, props.snapshot))" empty-text="（无题干）" />
           <ul
             v-if="node.question.options?.length"
             class="grid gap-x-6 gap-y-1"
@@ -119,6 +128,7 @@ function groupChildSnapshot(node: SnapshotTreeNode): CompositionSnapshot {
                   v-if="key === 'answer'"
                   :answer="node.question.answer"
                   :options="node.question.options"
+                  :slot-numbers="resolvedSlotNumbers(node, props.snapshot)"
                 />
                 <RichContent v-else :content="node.question[key]" class="[&_.prose]:my-0" empty-text="（空）" />
               </div>
@@ -134,12 +144,12 @@ function groupChildSnapshot(node: SnapshotTreeNode): CompositionSnapshot {
         <div class="h-px flex-1 border-t-2 border-dashed border-muted-foreground/40" />
       </div>
 
-      <!-- 题组：保持边界，材料冻结显示；成员复用本组件的题目/作答区只读路径。 -->
+      <!-- 材料题：保持边界，材料冻结显示；小题复用本组件的题目/作答区只读路径。 -->
       <section v-else-if="node.node_type === 'question_group'" class="border-y bg-muted/20 px-4 py-4">
         <div class="mb-3 flex items-center gap-2">
           <Files class="h-4 w-4 text-muted-foreground" />
-          <span class="text-sm font-medium">题组 #{{ node.question_group_id }}</span>
-          <Badge variant="secondary" class="text-[11px]">r{{ node.question_group_revision }}</Badge>
+          <span class="text-sm font-medium">材料题 · 题目材料 #{{ node.stimulus_id }}</span>
+          <Badge variant="secondary" class="text-[11px]">材料 v{{ node.stimulus_revision }}</Badge>
         </div>
         <div class="mb-5 border-l-2 border-primary/30 pl-4">
           <RichContent :content="node.content" empty-text="（无材料）" />
@@ -201,6 +211,7 @@ function groupChildSnapshot(node: SnapshotTreeNode): CompositionSnapshot {
                         v-if="key === 'answer'"
                         :answer="sourceQuestion(child)!.answer"
                         :options="sourceQuestion(child)!.options"
+                        :slot-numbers="sourceSlotNumbers(child)"
                       />
                       <RichContent v-else :content="sourceQuestion(child)![key]" class="[&_.prose]:my-0" empty-text="（空）" />
                     </div>

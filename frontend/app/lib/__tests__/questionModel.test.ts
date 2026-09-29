@@ -7,12 +7,13 @@ import {
     dbQuestionToDraft,
     fillBlanksFromStem,
     generateOptionId,
+    matchingSlotsFromStem,
     pruneAnswerOptionRef,
     validateQuestionDraft,
     buildQuestionPayload,
     createEmptyDraft,
 } from '@/lib/questionModel'
-import { answerToPlainText, optionLabelsForAnswer } from '@/lib/answerFormat'
+import { answerToPlainText, matchingAnswerEntries, optionLabelsForAnswer } from '@/lib/answerFormat'
 
 function doc(text: string): RichDoc {
     return { type: 'doc', content: [{ type: 'paragraph', content: [{ type: 'text', text }] }] }
@@ -207,6 +208,7 @@ describe('dbQuestionToDraft + buildQuestionPayload', () => {
                 { id: 'opt_b', label: 'B', content: doc('乙') },
             ],
             answer: { kind: 'single_choice', correct: 'opt_a' },
+            thinking: doc('思路'),
             knowledge_points: [{ id: 3, name: 'x', slug: 'x', subject_id: 1 }],
             tags: [{ id: 5, name: 't', category_id: null, color: '#000', subject_id: 1 }],
             subject_id: 1,
@@ -214,6 +216,7 @@ describe('dbQuestionToDraft + buildQuestionPayload', () => {
             status: 'published',
         })
         expect(draft.id).toBe(7)
+        expect(draft.thinking).toEqual(doc('思路'))
         expect(draft.knowledge_point_ids).toEqual([3])
         expect(draft.tag_ids).toEqual([5])
         const payload = buildQuestionPayload(draft)
@@ -223,5 +226,77 @@ describe('dbQuestionToDraft + buildQuestionPayload', () => {
         // 非选择题时 options 为 null
         draft.q_type = 'free_response'
         expect(buildQuestionPayload(draft).options).toBeNull()
+        // 选项匹配保留共享选项池
+        draft.q_type = 'option_matching'
+        expect(buildQuestionPayload(draft).options).toHaveLength(2)
+    })
+})
+
+describe('option_matching', () => {
+    const pool: OptionSpec[] = ['A', 'B', 'C'].map((label) => ({
+        id: `opt_${label.toLowerCase()}`,
+        label,
+        content: doc(label),
+    }))
+
+    function matchingDraft(slots: { id: string; correct: string }[], allowReuse = false) {
+        const d = createEmptyDraft()
+        d.q_type = 'option_matching'
+        d.content = stemWithBlanks('b1', 'b2')
+        d.options = pool
+        d.answer = { kind: 'option_matching', slots, allow_reuse: allowReuse }
+        return d
+    }
+
+    it('默认答案按题干空位生成未选空位；缺选项时补默认选项', () => {
+        expect(createDefaultAnswer('option_matching', pool, stemWithBlanks('b1', 'b2'))).toEqual({
+            kind: 'option_matching',
+            slots: [{ id: 'b1', correct: '' }, { id: 'b2', correct: '' }],
+            allow_reuse: false,
+        })
+        expect(dbQuestionToDraft({ q_type: 'option_matching', content: doc('x') }).options).toHaveLength(4)
+    })
+
+    it('空位随题干同步并保留已选答案', () => {
+        expect(matchingSlotsFromStem(stemWithBlanks('b2', 'b3'), [{ id: 'b2', correct: 'opt_a' }])).toEqual([
+            { id: 'b2', correct: 'opt_a' },
+            { id: 'b3', correct: '' },
+        ])
+    })
+
+    it('重复选用需开启 allow_reuse；发布前每空必须作答', () => {
+        expect(validateQuestionDraft(matchingDraft([{ id: 'b1', correct: 'opt_a' }, { id: 'b2', correct: 'opt_a' }])))
+            .toContain('互不相同')
+        expect(validateQuestionDraft(matchingDraft([{ id: 'b1', correct: 'opt_a' }, { id: 'b2', correct: 'opt_a' }], true)))
+            .toBeNull()
+        const pending = matchingDraft([{ id: 'b1', correct: 'opt_a' }, { id: 'b2', correct: '' }])
+        expect(validateQuestionDraft(pending)).toBeNull()
+        pending.status = 'pending'
+        expect(validateQuestionDraft(pending)).toBe('第 2 空尚未选择答案')
+    })
+
+    it('删除选项时清空引用它的空位', () => {
+        const answer: AnswerSpec = {
+            kind: 'option_matching',
+            slots: [{ id: 'b1', correct: 'opt_a' }, { id: 'b2', correct: 'opt_b' }],
+            allow_reuse: false,
+        }
+        expect(pruneAnswerOptionRef(answer, 'opt_a')).toEqual({
+            ...answer,
+            slots: [{ id: 'b1', correct: '' }, { id: 'b2', correct: 'opt_b' }],
+        })
+    })
+
+    it('答案纯文本按空位列出，可带稿件题号', () => {
+        const answer: AnswerSpec = {
+            kind: 'option_matching',
+            slots: [{ id: 'b1', correct: 'opt_c' }, { id: 'b2', correct: '' }],
+            allow_reuse: false,
+        }
+        expect(answerToPlainText(answer, pool)).toBe('1. C；2. ？')
+        expect(matchingAnswerEntries(answer, pool, { b1: '36' })).toEqual([
+            { number: '36', label: 'C' },
+            { number: '2', label: '' },
+        ])
     })
 })

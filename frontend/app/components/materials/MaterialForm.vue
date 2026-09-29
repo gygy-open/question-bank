@@ -1,24 +1,42 @@
 <script setup lang="ts">
 import { computed, nextTick, onActivated, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { onBeforeRouteLeave } from 'vue-router'
-import { AlertTriangle, ArrowLeft, Loader2, Save } from '@lucide/vue'
+import draggable from 'vuedraggable'
+import { AlertTriangle, ArrowDown, ArrowLeft, ArrowUp, FilePlus2, GripVertical, Loader2, Plus, Save, Unlink } from '@lucide/vue'
 import { toast } from 'vue-sonner'
+import MaterialQuestionPickerDialog from '@/components/materials/MaterialQuestionPickerDialog.vue'
+import QuestionEditDialog from '@/components/QuestionEditDialog.vue'
+import CompositionTargetPicker from '@/components/CompositionTargetPicker.vue'
+import RichContent from '@/components/rich-editor/RichContent.vue'
 import RichEditor from '@/components/rich-editor/RichEditor.vue'
 import { isEmptyRichDoc } from '@/components/rich-editor/richDoc'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
+import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { getApiErrorDetail, hasEditorSubjectMismatch, isRevisionConflict } from '@/lib/questionGroupEditor'
-import type { QuestionStatus, RichDoc, Stimulus } from '@/types'
+import { questionTypeLabel } from '@/lib/answerFormat'
+import { getApiErrorDetail, isRevisionConflict } from '@/lib/apiErrors'
+import {
+  addMember,
+  hasEditorSubjectMismatch,
+  moveMember,
+  publicQuestionsUnderPrivateMaterial,
+  removeMember,
+  sameOrder,
+} from '@/lib/materialEditor'
+import type { Question, QuestionStatus, QuestionSummary, RichDoc, StimulusDetail } from '@/types'
 
 const props = defineProps<{ materialId?: number }>()
 const router = useRouter()
 const { currentSubjectId, setSubject } = useSubjectContext()
 const { can } = usePermissions()
-const { createMaterial, getMaterial, updateMaterial } = useMaterials()
+const { createMaterial, getMaterial, updateMaterial, setMaterialQuestions } = useMaterials()
 const editorSubjectId = ref<number | null>(null)
+// 新建材料后若保存小题失败，重试应更新这份材料而不是再建一份。
+const createdId = ref<number | null>(null)
+const materialId = computed(() => props.materialId ?? createdId.value)
 const canEdit = computed(() => can(Capability.EDIT_QUESTION, editorSubjectId.value))
 const isEdit = computed(() => props.materialId != null)
 const subjectMismatch = computed(() => hasEditorSubjectMismatch(editorSubjectId.value, currentSubjectId.value))
@@ -28,20 +46,32 @@ const status = ref<QuestionStatus>('draft')
 const visibility = ref<'public' | 'private'>('public')
 const source = ref('')
 const revision = ref<number | null>(null)
+const members = ref<QuestionSummary[]>([])
+const savedMembers = ref<QuestionSummary[]>([])
 const loading = ref(false)
 const saving = ref(false)
-const dirty = ref(false)
+const metaDirty = ref(false)
 const hydrating = ref(false)
 const conflict = ref(false)
 const errorMessage = ref('')
+const pickerOpen = ref(false)
+const createOpen = ref(false)
+const compositionPickerOpen = ref(false)
 
-const applyMaterial = (material: Stimulus) => {
+const membersDirty = computed(() => !sameOrder(members.value, savedMembers.value))
+const dirty = computed(() => metaDirty.value || membersDirty.value)
+const selectedIds = computed(() => members.value.map(member => member.id))
+const incompatibleIds = computed(() => publicQuestionsUnderPrivateMaterial(visibility.value, members.value))
+
+const applyMaterial = (material: StimulusDetail) => {
   content.value = structuredClone(material.content)
   status.value = material.status
   visibility.value = material.visibility
   source.value = material.source ?? ''
   revision.value = material.revision
-  dirty.value = false
+  members.value = material.questions.slice()
+  savedMembers.value = material.questions.slice()
+  metaDirty.value = false
   conflict.value = false
   errorMessage.value = ''
 }
@@ -57,12 +87,12 @@ const load = async (force = false) => {
   } finally {
     loading.value = false
     await nextTick()
-    dirty.value = false
+    metaDirty.value = false
     hydrating.value = false
   }
 }
 
-watch([content, status, visibility, source], () => { if (!hydrating.value) dirty.value = true }, { deep: true })
+watch([content, status, visibility, source], () => { if (!hydrating.value) metaDirty.value = true }, { deep: true })
 watch(currentSubjectId, (subjectId) => {
   if (editorSubjectId.value === null && subjectId !== null) {
     editorSubjectId.value = subjectId
@@ -85,24 +115,61 @@ onMounted(() => window.addEventListener('beforeunload', beforeUnloadHandler))
 onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnloadHandler))
 onBeforeRouteLeave(() => !dirty.value || window.confirm('题目材料有未保存的修改，确定要离开吗？'))
 
+const addQuestions = (questions: QuestionSummary[]) => {
+  members.value = questions.reduce((current, question) => addMember(current, question), members.value)
+}
+const addCreatedQuestion = (question: Question) => {
+  addQuestions([question as unknown as QuestionSummary])
+  createOpen.value = false
+}
+const detachQuestion = (questionId: number) => { members.value = removeMember(members.value, questionId) }
+const moveQuestion = (from: number, to: number) => { members.value = moveMember(members.value, from, to) }
+
+const validationMessage = (): string => {
+  if (!editorSubjectId.value) return '请先选择学科'
+  if (subjectMismatch.value) return '请先切回草稿所属学科'
+  if (!canEdit.value) return '你没有编辑该学科题目材料的权限'
+  if (isEmptyRichDoc(content.value)) return '请填写题目材料内容'
+  if (incompatibleIds.value.length) {
+    return `私有题目材料下不能挂公开题目（${incompatibleIds.value.map(id => `#${id}`).join('、')}）。请移出这些小题，或把题目材料改为公开。`
+  }
+  return ''
+}
+
+// 正文/元数据与小题成员走两条接口；共用同一乐观锁，先存正文再用新 revision 存成员。
 const submit = async () => {
-  if (!editorSubjectId.value || subjectMismatch.value || !canEdit.value || isEmptyRichDoc(content.value)) {
-    errorMessage.value = !editorSubjectId.value ? '请先选择学科' : subjectMismatch.value ? '请先切回草稿所属学科' : !canEdit.value ? '你没有编辑该学科题目材料的权限' : '请填写题目材料内容'
+  const invalid = validationMessage()
+  if (invalid) {
+    errorMessage.value = invalid
     return
   }
+  const subjectId = editorSubjectId.value!
   saving.value = true
   conflict.value = false
   errorMessage.value = ''
   const payload = { content: content.value, status: status.value, visibility: visibility.value, source: source.value.trim() || null }
   try {
-    if (isEdit.value && props.materialId && revision.value) {
-      await updateMaterial(editorSubjectId.value, props.materialId, { ...payload, expected_revision: revision.value })
-    } else {
-      await createMaterial(editorSubjectId.value, payload)
+    let currentRevision = revision.value
+    if (materialId.value == null) {
+      const created = await createMaterial(subjectId, payload)
+      createdId.value = created.id
+      currentRevision = created.revision
+    } else if (metaDirty.value && currentRevision) {
+      currentRevision = (await updateMaterial(subjectId, materialId.value, { ...payload, expected_revision: currentRevision })).revision
+    }
+    metaDirty.value = false
+    revision.value = currentRevision
+    if (materialId.value != null && currentRevision && membersDirty.value) {
+      const detail = await setMaterialQuestions(subjectId, materialId.value, {
+        expected_revision: currentRevision,
+        question_ids: members.value.map(member => member.id),
+      })
+      revision.value = detail.revision
+      savedMembers.value = detail.questions.slice()
+      members.value = detail.questions.slice()
     }
     toast.success(isEdit.value ? '题目材料已保存' : '题目材料已创建')
-    dirty.value = false
-    await router.push('/materials')
+    if (!isEdit.value && createdId.value != null) await router.push(`/materials/${createdId.value}/edit`)
   } catch (error) {
     if (isRevisionConflict(error)) conflict.value = true
     else errorMessage.value = getApiErrorDetail(error, '保存题目材料失败')
@@ -119,7 +186,18 @@ const submit = async () => {
         <Button variant="ghost" size="icon" title="返回题目材料列表" aria-label="返回题目材料列表" @click="router.push('/materials')"><ArrowLeft class="size-4" /></Button>
         <h1 class="text-base font-semibold">{{ isEdit ? '编辑题目材料' : '创建题目材料' }}</h1>
       </div>
-      <Button :disabled="saving || loading || !canEdit || subjectMismatch" @click="submit"><Loader2 v-if="saving" class="mr-2 size-4 animate-spin" /><Save v-else class="mr-2 size-4" />保存</Button>
+      <div class="flex items-center gap-2">
+        <Button
+          v-if="isEdit"
+          variant="outline"
+          :disabled="dirty || savedMembers.length === 0"
+          :title="dirty ? '请先保存修改' : '把材料和全部小题作为一道材料题加入稿件'"
+          @click="compositionPickerOpen = true"
+        >
+          <FilePlus2 class="mr-2 size-4" />加入稿件
+        </Button>
+        <Button :disabled="saving || loading || !canEdit || subjectMismatch || (materialId != null && !dirty)" @click="submit"><Loader2 v-if="saving" class="mr-2 size-4 animate-spin" /><Save v-else class="mr-2 size-4" />保存</Button>
+      </div>
     </header>
 
     <main class="mx-auto flex w-full max-w-5xl flex-1 flex-col gap-5 px-4 py-6">
@@ -127,8 +205,9 @@ const submit = async () => {
       <Alert v-if="subjectMismatch"><AlertTriangle class="size-4" /><AlertTitle>当前学科已切换</AlertTitle><AlertDescription class="space-y-3"><p>本地草稿仍属于学科 #{{ editorSubjectId }}，未被重新加载或覆盖。请切回原学科后继续保存，或返回列表放弃草稿。</p><div class="flex flex-wrap gap-2"><Button size="sm" variant="outline" @click="restoreSubject">切回原学科</Button><Button size="sm" variant="ghost" @click="router.push('/materials')">返回题目材料列表</Button></div></AlertDescription></Alert>
       <Alert v-if="conflict" variant="destructive">
         <AlertTriangle class="size-4" /><AlertTitle>题目材料已被其他人修改</AlertTitle>
-        <AlertDescription class="space-y-3"><p>你的本地内容仍然保留。可以加载服务器最新版本，或继续编辑本地草稿后再决定。</p><div class="flex flex-wrap gap-2"><Button size="sm" variant="destructive" @click="load(true)">加载最新并放弃本地</Button><Button size="sm" variant="outline" @click="conflict = false">继续编辑本地</Button></div></AlertDescription>
+        <AlertDescription class="space-y-3"><p>你的本地内容与小题顺序仍然保留。可以加载服务器最新版本，或继续编辑本地草稿后再决定。</p><div class="flex flex-wrap gap-2"><Button size="sm" variant="destructive" @click="load(true)">加载最新并放弃本地</Button><Button size="sm" variant="outline" @click="conflict = false">继续编辑本地</Button></div></AlertDescription>
       </Alert>
+      <Alert v-if="incompatibleIds.length" variant="destructive"><AlertTriangle class="size-4" /><AlertTitle>私有题目材料下有公开小题</AlertTitle><AlertDescription>{{ validationMessage() }}</AlertDescription></Alert>
       <Alert v-if="errorMessage" variant="destructive"><AlertTriangle class="size-4" /><AlertTitle>操作失败</AlertTitle><AlertDescription>{{ errorMessage }}</AlertDescription></Alert>
       <div v-if="loading" class="flex justify-center py-20"><Loader2 class="size-7 animate-spin text-muted-foreground" /></div>
       <template v-else>
@@ -138,7 +217,48 @@ const submit = async () => {
           <div class="space-y-2"><Label for="material-source">来源</Label><Input id="material-source" v-model="source" placeholder="可选" /></div>
         </div>
         <div class="space-y-2"><Label>题目材料内容</Label><RichEditor v-model="content" /></div>
+
+        <section class="space-y-3">
+          <div class="flex flex-wrap items-center justify-between gap-2">
+            <div>
+              <h2 class="text-sm font-semibold">小题（{{ members.length }}）</h2>
+              <p class="text-xs text-muted-foreground">小题依赖本材料作答，按此顺序出现在稿件中；移出材料后题目保留为独立题。</p>
+            </div>
+            <div class="flex gap-2">
+              <Button variant="outline" size="sm" :disabled="!canEdit" @click="createOpen = true"><Plus class="mr-2 size-4" />新建小题</Button>
+              <Button size="sm" :disabled="!canEdit" @click="pickerOpen = true"><Plus class="mr-2 size-4" />添加已有题目</Button>
+            </div>
+          </div>
+          <draggable v-model="members" item-key="id" handle=".drag-handle" class="divide-y border-y">
+            <template #item="{ element: member, index }">
+              <article class="flex items-start gap-2 py-3">
+                <button type="button" class="drag-handle mt-1 cursor-grab text-muted-foreground" title="拖动排序" aria-label="拖动排序"><GripVertical class="size-4" /></button>
+                <span class="mt-1 w-6 text-center text-xs text-muted-foreground">{{ index + 1 }}</span>
+                <div class="min-w-0 flex-1">
+                  <div class="mb-1 flex flex-wrap gap-2">
+                    <Badge variant="outline">#{{ member.id }}</Badge>
+                    <Badge variant="secondary">{{ questionTypeLabel(member.q_type) }}</Badge>
+                    <Badge variant="outline">{{ member.status }}</Badge>
+                    <Badge v-if="member.visibility === 'private'" variant="outline">私有</Badge>
+                    <Badge v-if="incompatibleIds.includes(member.id)" variant="destructive">公开题不能挂私有材料</Badge>
+                  </div>
+                  <RichContent :content="member.content" class="line-clamp-3 text-sm" />
+                </div>
+                <div class="flex shrink-0">
+                  <Button variant="ghost" size="icon" :disabled="index === 0" title="上移" aria-label="上移" @click="moveQuestion(index, index - 1)"><ArrowUp class="size-4" /></Button>
+                  <Button variant="ghost" size="icon" :disabled="index === members.length - 1" title="下移" aria-label="下移" @click="moveQuestion(index, index + 1)"><ArrowDown class="size-4" /></Button>
+                  <Button variant="ghost" size="icon" title="移出材料（保留为独立题）" aria-label="移出材料" @click="detachQuestion(member.id)"><Unlink class="size-4" /></Button>
+                </div>
+              </article>
+            </template>
+          </draggable>
+          <p v-if="members.length === 0" class="border border-dashed py-12 text-center text-sm text-muted-foreground">尚无小题。可以新建小题，或把已有的独立题添加到本材料下。</p>
+        </section>
       </template>
     </main>
   </div>
+
+  <MaterialQuestionPickerDialog v-model:open="pickerOpen" :subject-id="editorSubjectId" :selected-ids="selectedIds" :material-visibility="visibility" @select="addQuestions" />
+  <QuestionEditDialog v-model:open="createOpen" mode="create" :auto-fill-subject-id="editorSubjectId" @success="addCreatedQuestion" />
+  <CompositionTargetPicker v-model:open="compositionPickerOpen" :subject-id="editorSubjectId" :question-ids="savedMembers.map(member => member.id)" />
 </template>

@@ -91,6 +91,59 @@ def _resolve_option_columns(options: list[ExportOption], layout: Any) -> int:
     return min(desired, count)
 
 
+def _slot_props(q: dict[str, Any], props: dict[str, Any]) -> Optional[dict[str, Any]]:
+    """选项匹配题返回 {slotId: {number?, score?}};其他题型返回 None。"""
+    if q.get("q_type") != "option_matching":
+        return None
+    slots = props.get("slots")
+    return {k: v for k, v in slots.items() if isinstance(v, dict)} if isinstance(slots, dict) else {}
+
+
+def _slot_numbers(slots: dict[str, Any], numbering_enabled: bool) -> dict[str, str]:
+    if not numbering_enabled:
+        return {}
+    return {k: str(v["number"]) for k, v in slots.items() if v.get("number")}
+
+
+def _label_blanks(node: Any, numbers: dict[str, str]) -> Any:
+    """深拷贝 RichDoc,把空位题号写到 blank 节点 attrs.label 供渲染器显示。"""
+    if isinstance(node, list):
+        return [_label_blanks(child, numbers) for child in node]
+    if not isinstance(node, dict):
+        return node
+    out = {key: _label_blanks(value, numbers) for key, value in node.items()}
+    if node.get("type") == "blank":
+        blank_id = (node.get("attrs") or {}).get("blankId")
+        if blank_id in numbers:
+            out["attrs"] = {**(node.get("attrs") or {}), "label": numbers[blank_id]}
+    return out
+
+
+def _number_answer_slots(answer: Any, numbers: dict[str, str]) -> Any:
+    if not numbers or not isinstance(answer, dict):
+        return answer
+    return {
+        **answer,
+        "slots": [
+            {**slot, "number": numbers[slot.get("id")]} if slot.get("id") in numbers else slot
+            for slot in answer.get("slots") or []
+            if isinstance(slot, dict)
+        ],
+    }
+
+
+def _slot_score_text(slots: dict[str, Any], slot_count: int) -> Optional[str]:
+    scores = [
+        v["score"] for v in slots.values()
+        if isinstance(v.get("score"), (int, float)) and not isinstance(v.get("score"), bool)
+    ]
+    if not scores:
+        return None
+    if len(scores) == slot_count and len(set(scores)) == 1:
+        return f"每空 {scores[0]:g} 分"
+    return f"共 {sum(scores):g} 分"
+
+
 class CompositionAssembler:
     def assemble(self, snapshot: dict[str, Any]) -> CompositionExportDoc:
         schema_version = snapshot.get("schema_version")
@@ -255,11 +308,17 @@ class CompositionAssembler:
         q = n.get("question") or {}
         props = n.get("props") or {}
         options = _parse_options(q.get("options"))
+        slots = _slot_props(q, props)
+        slot_numbers = _slot_numbers(slots or {}, numbering_enabled)
 
-        number = (props.get("number") or "") if numbering_enabled else ""
+        number = (props.get("number") or "") if numbering_enabled and slots is None else ""
         score = props.get("score") if scoring_enabled else None
         if isinstance(score, bool) or not isinstance(score, (int, float)):
             score = None
+        score_text = None
+        if slots is not None and scoring_enabled:
+            answer_slots = ((q.get("answer") or {}).get("slots")) or []
+            score_text = _slot_score_text(slots, len(answer_slots))
 
         columns = _resolve_option_columns(options, props.get("optionLayout"))
         show = props.get("show") or {}
@@ -273,13 +332,14 @@ class CompositionAssembler:
             number=number,
             score=score,
             q_type=str(q.get("q_type", "")),
-            stem=q.get("content"),
+            stem=_label_blanks(q.get("content"), slot_numbers) if slot_numbers else q.get("content"),
             options=options,
             option_columns=columns,
-            answer=field_or_none("answer"),
+            answer=_number_answer_slots(field_or_none("answer"), slot_numbers),
             thinking=field_or_none("thinking"),
             analysis=field_or_none("analysis"),
             summary=field_or_none("summary"),
+            score_text=score_text,
         )
 
     def _assemble_question_details(
@@ -341,8 +401,15 @@ class CompositionAssembler:
 
         q = source.get("question") or {}
         overrides = props.get("overrides") or {}
+        source_props = source.get("props") or {}
+        slots = _slot_props(q, source_props)
+        slot_numbers = _slot_numbers(slots or {}, numbering_enabled)
         # 题号取自源 question 节点自身的 props(与本体题目块同一个值),而非 answer_item 自身的 props。
-        number = str((source.get("props") or {}).get("number") or "") if numbering_enabled else ""
+        number = (
+            str(source_props.get("number") or "")
+            if numbering_enabled and slots is None
+            else ""
+        )
 
         def field_or_none(key: str) -> Any:
             override = overrides.get(key)
@@ -355,7 +422,7 @@ class CompositionAssembler:
             q_type=str(q.get("q_type", "")),
             stem=q.get("content"),
             options=_parse_options(q.get("options")),
-            answer=field_or_none("answer"),
+            answer=_number_answer_slots(field_or_none("answer"), slot_numbers),
             thinking=field_or_none("thinking"),
             analysis=field_or_none("analysis"),
             summary=field_or_none("summary"),

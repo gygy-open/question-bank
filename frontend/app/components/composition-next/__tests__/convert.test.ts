@@ -112,7 +112,7 @@ describe('composition-next convert round-trip', () => {
     const group: EditorNode = {
       id: 'group-1', nodeType: 'question_group', content: richTextRow('x', '材料').content,
       props: null, questionId: null, questionRevision: null, questionContent: null,
-      questionGroupId: 9, questionGroupRevision: 3, stimulusId: 8, stimulusRevision: 2,
+      stimulusId: 8, stimulusRevision: 2,
       sourceQuestionNodeId: null, anchorBeforeNodeId: null, children: [question, space],
     }
     const back = pmDocToEditorDocument(editorDocumentToPmDoc({ nodes: [group] })).nodes[0]!

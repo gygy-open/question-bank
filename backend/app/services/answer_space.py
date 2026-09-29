@@ -40,6 +40,7 @@ DEFAULT_RULES: Dict[str, AnswerSpaceRule] = {
     QuestionType.TRUE_FALSE.value: AnswerSpaceRule(False, 1, 0.0, 1, "blank"),
     QuestionType.FILL_IN_THE_BLANK.value: AnswerSpaceRule(True, 1, 0.5, 3, "blank"),
     QuestionType.FREE_RESPONSE.value: AnswerSpaceRule(True, 2, 0.8, 20, "lined"),
+    QuestionType.OPTION_MATCHING.value: AnswerSpaceRule(False, 1, 0.0, 1, "blank"),
 }
 # 题型未知时（旧数据，或用户在没有题目上下文处手工插入）：按解答题口径推导，
 # 因为显式插入作答区的场景几乎都是主观题。

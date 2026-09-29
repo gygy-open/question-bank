@@ -49,8 +49,8 @@ _INSERT_NODE_SCHEMA = {
             "description": "rich_text 的正文,Markdown 格式(支持公式与表格),服务端会转成富文本。",
         },
         "question_id": {"type": "integer", "description": "question 引用的题库题目 id。"},
-        "number": {"type": "string", "description": "question 的题号。"},
-        "score": {"type": "number", "description": "question 的分值。"},
+        "number": {"type": "string", "description": "question 的题号。选项匹配题不要填。"},
+        "score": {"type": "number", "description": "question 的分值。选项匹配题不要填。"},
         "lines": {"type": "integer", "description": "answer_space 的行数,缺省 4。"},
         "style": {
             "type": "string",
@@ -109,8 +109,8 @@ _OPERATION_SCHEMA = {
         "props": {
             "type": "object",
             "properties": {
-                "number": {"type": "string", "description": "question 的题号。"},
-                "score": {"type": "number", "description": "question 的分值。"},
+                "number": {"type": "string", "description": "question 的题号(选项匹配题不适用)。"},
+                "score": {"type": "number", "description": "question 的分值(选项匹配题不适用)。"},
                 "level": {"type": "integer", "description": "heading 的层级 1-4。"},
                 "lines": {"type": "integer", "description": "answer_space 的行数。"},
                 "style": {"type": "string", "enum": list(ANSWER_SPACE_STYLES)},

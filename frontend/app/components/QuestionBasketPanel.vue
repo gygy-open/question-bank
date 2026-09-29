@@ -39,6 +39,7 @@ const qTypeLabels: Record<string, string> = {
   true_false: '判断',
   fill_in_the_blank: '填空',
   free_response: '解答',
+  option_matching: '匹配',
 }
 
 const pickerOpen = ref(false)

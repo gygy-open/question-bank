@@ -3,7 +3,7 @@ import pytest
 from app.crud.crud_question import question as crud_question
 from app.models.knowledge_point import KnowledgePoint
 from app.models.question import QuestionStatus, QuestionType, SCHEMA_VERSION
-from app.models.question_group import QuestionRelation
+from app.models.question_relation import QuestionRelation
 from app.models.subject import Subject
 from app.models.tag import Tag
 from app.schemas.question import Question as QuestionSchema

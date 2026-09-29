@@ -11,14 +11,12 @@ export interface ImportStimulus {
   source?: string | null
 }
 
+/** 原文中的一组材料题：只描述结构，写库时转为小题的 stimulus_id 与顺序。 */
 export interface ImportQuestionGroup {
   temp_id: string
   stimulus_temp_id: string
   question_temp_ids: string[]
   metadata?: Record<string, unknown>
-  status?: string
-  visibility?: string
-  source?: string | null
 }
 
 export type ImportReviewEntry =
@@ -65,6 +63,7 @@ export function validateImportStructure(
   const questionIdSet = new Set(questionIds)
   const stimulusIdSet = new Set(stimulusIds)
   const groupIdSet = new Set(groupIds)
+  const groupOfQuestion = new Map<string, string>()
   for (const group of groups) {
     if (!stimulusIdSet.has(group.stimulus_temp_id)) {
       errors.push(`题组 ${group.temp_id} 引用了不存在的题目材料：${group.stimulus_temp_id}`)
@@ -75,6 +74,11 @@ export function validateImportStructure(
     }
     for (const id of group.question_temp_ids) {
       if (!questionIdSet.has(id)) errors.push(`题组 ${group.temp_id} 引用了不存在的小题：${id}`)
+      const other = groupOfQuestion.get(id)
+      if (other && other !== group.temp_id) {
+        errors.push(`小题 ${id} 同时属于题组 ${other} 和 ${group.temp_id}，一道题只能依赖一份题目材料`)
+      }
+      groupOfQuestion.set(id, other ?? group.temp_id)
     }
   }
 
@@ -165,5 +169,11 @@ export function buildImportStructurePayload(
           number: entry.kind === 'question' ? entry.question.source_number : null,
         }))
 
-  return { questions: payloadQuestions, outline, stimuli, question_groups: groups }
+  const questionGroups = groups.map(({ temp_id, stimulus_temp_id, question_temp_ids, metadata }) => ({
+    temp_id,
+    stimulus_temp_id,
+    question_temp_ids,
+    ...(metadata ? { metadata } : {}),
+  }))
+  return { questions: payloadQuestions, outline, stimuli, question_groups: questionGroups }
 }

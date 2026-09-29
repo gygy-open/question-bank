@@ -1,12 +1,13 @@
 import type { RichDoc } from './richContent'
 
-/** 五种题型，取值与后端 QuestionType 枚举一一对应。 */
+/** 题型，取值与后端 QuestionType 枚举一一对应。 */
 export type QuestionType =
   | 'single_choice'
   | 'multiple_choice'
   | 'true_false'
   | 'fill_in_the_blank'
   | 'free_response'
+  | 'option_matching'
 
 export type QuestionStatus = 'draft' | 'pending' | 'published' | 'archived'
 
@@ -50,6 +51,19 @@ export interface FreeResponseAnswer {
   reference: RichDoc
 }
 
+/** 选项匹配的一个空位：id 对应题干 blankId，correct 为选项池中的 option id（草稿可为空串）。 */
+export interface MatchingSlot {
+  id: string
+  correct: string
+}
+
+/** 选项匹配：多个空位共用 options 选项池。 */
+export interface OptionMatchingAnswer {
+  kind: 'option_matching'
+  slots: MatchingSlot[]
+  allow_reuse: boolean
+}
+
 /** 只读态：旧数据未解析的答案。仅用于展示，写请求禁止出现。 */
 export interface LegacyUnresolvedAnswer {
   kind: 'legacy_unresolved'
@@ -64,4 +78,5 @@ export type AnswerSpec =
   | TrueFalseAnswer
   | FillBlankAnswer
   | FreeResponseAnswer
+  | OptionMatchingAnswer
   | LegacyUnresolvedAnswer

@@ -45,7 +45,7 @@ QUESTION_SCHEMA_PROPERTIES = {
     "q_type": {
         "type": "string",
         "enum": sorted(_QUESTION_TYPE_VALUES),
-        "description": "题目类型。'single_choice' 代表单选题，'multiple_choice' 代表多选题，'true_false' 代表判断题，'fill_in_the_blank' 代表填空题，'free_response' 代表解答题。"
+        "description": "题目类型。'single_choice' 代表单选题，'multiple_choice' 代表多选题，'true_false' 代表判断题，'fill_in_the_blank' 代表填空题，'free_response' 代表解答题，'option_matching' 代表选项匹配题（多个空位共用一组选项，answer 按空位顺序给出选项字母，如 'CAGDE'）。"
     },
     "options": {
         "type": "array",
@@ -56,7 +56,7 @@ QUESTION_SCHEMA_PROPERTIES = {
                 "content": {"type": "string", "description": "选项内容"}
             }
         },
-        "description": "选择题的选项。如果是单选题或多选题，则此项必填。"
+        "description": "选择题或选项匹配题的选项。单选、多选、选项匹配题此项必填。"
     },
     "answer": {
         "type": "string",

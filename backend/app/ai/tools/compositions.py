@@ -127,8 +127,8 @@ WRITE_COMPOSITION_NODES_PARAMS = {
                         "type": "integer",
                         "description": "仅 question:题库中的题目 id,先用 search_questions 找到。",
                     },
-                    "score": {"type": "number", "description": "仅 question:本题分值。"},
-                    "number": {"type": "string", "description": "仅 question:自定义题号。"},
+                    "score": {"type": "number", "description": "仅 question:本题分值。选项匹配题不要填(按空位由用户在画布上设置)。"},
+                    "number": {"type": "string", "description": "仅 question:自定义题号。选项匹配题不要填。"},
                     "show": {
                         "type": "object",
                         "description": (

@@ -9,7 +9,7 @@ from app.models.question import QuestionType, QuestionStatus
 from app.models.import_task import ImportTask, ImportTaskStatus
 from app.services.importing.contracts import ImportDefaults
 from app.services.importing.normalize import question_importer
-from app.services.question_group_service import get_question_relations
+from app.services.question_relation_service import get_question_relations
 
 router = APIRouter()
 
@@ -34,7 +34,8 @@ async def read_questions(
     id: Optional[int] = None,
     ids: List[int] = Query(None),
     source: Optional[str] = None,
-    in_question_group: Optional[bool] = None,
+    has_stimulus: Optional[bool] = None,
+    stimulus_id: Optional[int] = None,
     current_user: models.User = Depends(deps.get_current_active_user),
 ) -> Any:
     skip = (page - 1) * size
@@ -57,7 +58,8 @@ async def read_questions(
         id=id,
         ids=ids,
         source=source,
-        in_question_group=in_question_group,
+        has_stimulus=has_stimulus,
+        stimulus_id=stimulus_id,
         viewer=current_user
     )
     total = await crud.question.count_with_filters(
@@ -77,11 +79,9 @@ async def read_questions(
         id=id,
         ids=ids,
         source=source,
-        in_question_group=in_question_group,
+        has_stimulus=has_stimulus,
+        stimulus_id=stimulus_id,
         viewer=current_user
-    )
-    group_counts = await crud.question.get_question_group_counts(
-        db, question_ids=[question.id for question in questions]
     )
     relation_counts = await crud.question.get_relation_counts(
         db,
@@ -91,7 +91,6 @@ async def read_questions(
     items = [
         schemas.QuestionListItem.model_validate(question).model_copy(
             update={
-                "question_group_count": group_counts.get(question.id, 0),
                 "incoming_relation_count": relation_counts[question.id]["incoming"],
                 "outgoing_relation_count": relation_counts[question.id]["outgoing"],
             }

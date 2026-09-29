@@ -250,11 +250,7 @@ class CompositionNode(Base):
     question_id = Column(Integer, ForeignKey("questions.id"), nullable=True, index=True)
     question_revision = Column(Integer, nullable=True)
 
-    # 仅 question_group module 使用：题组、材料及其冻结修订来源。
-    question_group_id = Column(
-        Integer, ForeignKey("question_groups.id"), nullable=True, index=True
-    )
-    question_group_revision = Column(Integer, nullable=True)
+    # 仅 question_group module 使用：题目材料及被钉住的材料内容版本(Stimulus.content_revision)。
     stimulus_id = Column(Integer, ForeignKey("stimuli.id"), nullable=True, index=True)
     stimulus_revision = Column(Integer, nullable=True)
 
@@ -297,11 +293,9 @@ class CompositionNode(Base):
             name="question_ref_matches_type",
         ),
         CheckConstraint(
-            "(node_type = 'question_group' AND question_group_id IS NOT NULL AND "
-            "question_group_revision IS NOT NULL AND stimulus_id IS NOT NULL AND "
+            "(node_type = 'question_group' AND stimulus_id IS NOT NULL AND "
             "stimulus_revision IS NOT NULL AND content IS NOT NULL) OR "
-            "(node_type <> 'question_group' AND question_group_id IS NULL AND "
-            "question_group_revision IS NULL AND stimulus_id IS NULL AND "
+            "(node_type <> 'question_group' AND stimulus_id IS NULL AND "
             "stimulus_revision IS NULL)",
             name="question_group_ref_matches_type",
         ),

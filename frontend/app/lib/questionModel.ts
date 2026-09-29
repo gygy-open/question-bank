@@ -3,6 +3,8 @@ import type {
     Blank,
     FillBlankAnswer,
     KnowledgePoint,
+    MatchingSlot,
+    OptionMatchingAnswer,
     OptionSpec,
     Question,
     QuestionStatus,
@@ -21,17 +23,15 @@ export function generateOptionId(): string {
     return `opt_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 10)}`
 }
 
-const OPTION_LABELS = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H']
-
 export function nextOptionLabel(count: number): string {
-    return OPTION_LABELS[count] ?? '?'
+    return count >= 0 && count < 26 ? String.fromCharCode(65 + count) : '?'
 }
 
 /** 新建默认 4 个空选项（含稳定 id）。 */
 export function createDefaultOptions(): OptionSpec[] {
-    return OPTION_LABELS.slice(0, 4).map((label) => ({
+    return Array.from({ length: 4 }, (_, i) => ({
         id: generateOptionId(),
-        label,
+        label: nextOptionLabel(i),
         content: null,
     }))
 }
@@ -64,6 +64,32 @@ export function isChoiceType(qType: QuestionType): boolean {
     return CHOICE_TYPES.includes(qType)
 }
 
+/** 携带 options 的题型：选择题 + 选项匹配（options 是共享选项池）。 */
+export function hasOptionPool(qType: QuestionType): boolean {
+    return isChoiceType(qType) || qType === 'option_matching'
+}
+
+/** 按题干 blank 节点顺序同步选项匹配空位，保留已选答案；题干无 blank 时保留原空位。 */
+export function matchingSlotsFromStem(stem: RichDoc, prev?: MatchingSlot[]): MatchingSlot[] {
+    const stemIds = collectBlankIds(stem)
+    if (stemIds.length === 0) return prev ?? []
+    const byId = new Map((prev ?? []).map((slot) => [slot.id, slot]))
+    return stemIds.map((id) => byId.get(id) ?? { id, correct: '' })
+}
+
+/** 未允许重复选用时被多个空位选中的选项 id。 */
+export function duplicatedMatchingOptions(answer: OptionMatchingAnswer): Set<string> {
+    if (answer.allow_reuse) return new Set()
+    const seen = new Set<string>()
+    const duplicated = new Set<string>()
+    for (const slot of answer.slots) {
+        if (!slot.correct) continue
+        if (seen.has(slot.correct)) duplicated.add(slot.correct)
+        seen.add(slot.correct)
+    }
+    return duplicated
+}
+
 /** 用 stem 中的 blank 节点顺序构造填空 blanks；无 blank 节点时回退到一个空 blank。 */
 export function fillBlanksFromStem(stem: RichDoc, prev?: Blank[]): Blank[] {
     const stemIds = collectBlankIds(stem)
@@ -93,6 +119,8 @@ export function createDefaultAnswer(
             return { kind: 'fill_in_the_blank', blanks: fillBlanksFromStem(stem ?? null) }
         case 'free_response':
             return { kind: 'free_response', reference: null }
+        case 'option_matching':
+            return { kind: 'option_matching', slots: matchingSlotsFromStem(stem ?? null), allow_reuse: false }
     }
 }
 
@@ -143,6 +171,7 @@ export function dbQuestionToDraft(
         visibility: (q.visibility ?? 'public') as 'public' | 'private',
         options,
         answer: q.answer ? (JSON.parse(JSON.stringify(q.answer)) as AnswerSpec) : null,
+        thinking: cloneRich(q.thinking),
         analysis: cloneRich(q.analysis),
         summary: cloneRich(q.summary),
         source: q.source ?? '',
@@ -152,8 +181,8 @@ export function dbQuestionToDraft(
         tag_ids: (q.tags as Tag[] | undefined)?.map((t) => t.id) ?? [],
         subject_id: q.subject_id ?? opts.subjectId,
     }
-    // choice 题型缺省选项时补齐；草稿答案可以保持为空。
-    if (isChoiceType(qType) && draft.options.length === 0) {
+    // 带选项题型缺省选项时补齐；草稿答案可以保持为空。
+    if (hasOptionPool(qType) && draft.options.length === 0) {
         draft.options = createDefaultOptions()
     }
     return draft
@@ -238,7 +267,7 @@ export function extractedItemToDraft(
         tag_ids: [],
         subject_id: item.subject_id ?? opts.subjectId ?? undefined,
     }
-    if (isChoiceType(qType) && draft.options.length === 0) {
+    if (hasOptionPool(qType) && draft.options.length === 0) {
         draft.options = createDefaultOptions()
     }
     return draft
@@ -257,6 +286,12 @@ export function pruneAnswerOptionRef(answer: AnswerSpec | null, removedId: strin
     }
     if (answer.kind === 'multiple_choice') {
         return { ...answer, correct: answer.correct.filter((id) => id !== removedId) }
+    }
+    if (answer.kind === 'option_matching') {
+        return {
+            ...answer,
+            slots: answer.slots.map((slot) => (slot.correct === removedId ? { ...slot, correct: '' } : slot)),
+        }
     }
     return answer
 }
@@ -283,7 +318,7 @@ export function buildQuestionPayload(draft: QuestionDraft): QuestionWritePayload
     return {
         content: draft.content,
         q_type: draft.q_type,
-        options: isChoiceType(draft.q_type) ? draft.options : null,
+        options: hasOptionPool(draft.q_type) ? draft.options : null,
         answer: draft.answer,
         thinking: draft.thinking,
         analysis: draft.analysis,
@@ -351,12 +386,49 @@ export function validateQuestionDraft(draft: QuestionDraft): string | null {
         )
         if (err) return err
     }
+    if (answer.kind === 'option_matching') {
+        const err = validateMatching(
+            answer,
+            draft,
+            draft.status === 'pending' || draft.status === 'published',
+        )
+        if (err) return err
+    }
     if (
         answer.kind === 'free_response'
         && (draft.status === 'pending' || draft.status === 'published')
         && isRichEmpty(answer.reference)
     ) {
         return '提交审核或发布前请填写参考答案'
+    }
+    return null
+}
+
+function validateMatching(
+    answer: OptionMatchingAnswer,
+    draft: QuestionDraft,
+    requireComplete: boolean,
+): string | null {
+    const optionIds = new Set(draft.options.map((o) => o.id))
+    if (answer.slots.some((slot) => slot.correct && !optionIds.has(slot.correct))) {
+        return '答案引用了不存在的选项'
+    }
+    if (duplicatedMatchingOptions(answer).size > 0) {
+        return '未允许重复选用时，各空位答案必须互不相同'
+    }
+    const stemIds = collectBlankIds(draft.content)
+    const slotIds = answer.slots.map((slot) => slot.id)
+    if (
+        stemIds.length > 0
+        && (requireComplete || slotIds.length > 0)
+        && (stemIds.length !== slotIds.length || stemIds.some((id, i) => id !== slotIds[i]))
+    ) {
+        return '题干空位与答案数量/顺序不一致'
+    }
+    if (requireComplete) {
+        if (answer.slots.length === 0) return '选项匹配题至少需要一个空位，请在题干中插入空位'
+        const missing = answer.slots.findIndex((slot) => !slot.correct)
+        if (missing >= 0) return `第 ${missing + 1} 空尚未选择答案`
     }
     return null
 }

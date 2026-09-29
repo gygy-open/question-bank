@@ -558,8 +558,35 @@ def convert_answer(
             return _legacy_unresolved(qt, raw_str)
         return {"kind": "true_false", "correct": value}, False
 
+    if qt == "option_matching":
+        return _convert_matching_answer(raw_answer, raw_str, options)
+
     # 未知题型:兜底为 legacy_unresolved,不丢原文。
     return _legacy_unresolved(str(qt), raw_str)
+
+
+def _convert_matching_answer(
+    raw_answer: Any, raw_str: str, options: list[Node]
+) -> tuple[AnswerSpec, bool]:
+    """按空位顺序的选项字母("CAGDE" / "C A G D E" / ["C", "A"])→ slots;不去重。"""
+    if isinstance(raw_answer, list):
+        letters = [str(item).strip().upper() for item in raw_answer]
+    else:
+        letters = _extract_choice_letters(raw_str)
+    label_to_id: dict[str, str] = {}
+    for opt in options:
+        label = str(opt.get("label", "")).strip().upper()
+        if label:
+            label_to_id.setdefault(label, str(opt.get("id", "")))
+    ids = [label_to_id.get(letter) for letter in letters]
+    if not ids or any(not oid for oid in ids):
+        return _legacy_unresolved("option_matching", raw_str)
+    slots = [{"id": f"blk_{i + 1}", "correct": oid} for i, oid in enumerate(ids)]
+    return {
+        "kind": "option_matching",
+        "slots": slots,
+        "allow_reuse": len(set(ids)) != len(ids),
+    }, False
 
 
 def _convert_fill_answer(raw_answer: Any) -> tuple[AnswerSpec, bool]:

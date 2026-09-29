@@ -20,6 +20,7 @@ export const DEFAULT_ANSWER_SPACE_RULES: AnswerSpaceRules = {
   true_false: { enabled: false, min_lines: 1, lines_per_score: 0, max_lines: 1, style: 'blank' },
   fill_in_the_blank: { enabled: true, min_lines: 1, lines_per_score: 0.5, max_lines: 3, style: 'blank' },
   free_response: { enabled: true, min_lines: 2, lines_per_score: 0.8, max_lines: 20, style: 'lined' },
+  option_matching: { enabled: false, min_lines: 1, lines_per_score: 0, max_lines: 1, style: 'blank' },
 }
 
 const FALLBACK_RULE = DEFAULT_ANSWER_SPACE_RULES.free_response!

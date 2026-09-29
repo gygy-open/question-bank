@@ -254,6 +254,13 @@ def _render_answer(answer: Any, options: Any, render, join_sep: str) -> str:
     if kind == "free_response":
         return render(ans.get("reference"))
 
+    if kind == "option_matching":
+        return "；".join(
+            f"{slot.get('number') or i}. {labels.get(str(slot.get('correct', '')), '')}"
+            for i, slot in enumerate(ans.get("slots") or [], start=1)
+            if isinstance(slot, dict)
+        )
+
     if kind == "legacy_unresolved":
         return render(ans.get("raw"))
 

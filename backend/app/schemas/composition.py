@@ -179,17 +179,29 @@ def _validate_question_details_props(props: Optional[Dict[str, Any]]) -> None:
             raise ValueError(f"question_details props.fields.{key} must be a boolean")
 
 
+def _validate_number_and_score(values: Dict[str, Any], *, field: str) -> None:
+    number = values.get("number")
+    if number is not None:
+        if not isinstance(number, str):
+            raise ValueError(f"{field}.number must be a string")
+        if len(number) > 16:
+            raise ValueError(f"{field}.number must be at most 16 characters")
+    score = values.get("score")
+    if score is not None:
+        if isinstance(score, bool) or not isinstance(score, (int, float)):
+            raise ValueError(f"{field}.score must be a number")
+        if not (0 <= score <= 1000):
+            raise ValueError(f"{field}.score must be between 0 and 1000")
+
+
 def _validate_question_props(props: Optional[Dict[str, Any]]) -> None:
     if not props:
         return
-    if set(props.keys()) - {"number", "show", "optionLayout", "score"}:
-        raise ValueError("question props may only contain 'number', 'show', 'optionLayout' and 'score'")
-    number = props.get("number")
-    if number is not None:
-        if not isinstance(number, str):
-            raise ValueError("question props.number must be a string")
-        if len(number) > 16:
-            raise ValueError("question props.number must be at most 16 characters")
+    if set(props.keys()) - {"number", "show", "optionLayout", "score", "slots"}:
+        raise ValueError(
+            "question props may only contain 'number', 'show', 'optionLayout', 'score' and 'slots'"
+        )
+    _validate_number_and_score(props, field="question props")
     show = props.get("show")
     if show is not None:
         if not isinstance(show, dict):
@@ -202,12 +214,17 @@ def _validate_question_props(props: Optional[Dict[str, Any]]) -> None:
     layout = props.get("optionLayout")
     if layout is not None and (isinstance(layout, bool) or layout not in ("auto", 1, 2, 4)):
         raise ValueError("question props.optionLayout must be one of 'auto', 1, 2, 4")
-    score = props.get("score")
-    if score is not None:
-        if isinstance(score, bool) or not isinstance(score, (int, float)):
-            raise ValueError("question props.score must be a number")
-        if not (0 <= score <= 1000):
-            raise ValueError("question props.score must be between 0 and 1000")
+    # 选项匹配题按空位编号/赋分:{slotId: {number?, score?}};与题型的对应关系由服务端按冻结内容校验。
+    slots = props.get("slots")
+    if slots is not None:
+        if not isinstance(slots, dict):
+            raise ValueError("question props.slots must be an object")
+        for slot_id, values in slots.items():
+            if not slot_id:
+                raise ValueError("question props.slots keys must be non-empty slot ids")
+            if not isinstance(values, dict) or set(values.keys()) - {"number", "score"}:
+                raise ValueError("question props.slots values may only contain 'number' and 'score'")
+            _validate_number_and_score(values, field=f"question props.slots.{slot_id}")
 
 
 def _validate_answer_space_props(props: Optional[Dict[str, Any]]) -> None:
@@ -260,7 +277,7 @@ class CompositionNodeInput(BaseModel):
     props: Optional[Dict[str, Any]] = None
     schema_version: int = 1
     question_id: Optional[int] = None
-    question_group_id: Optional[int] = None
+    stimulus_id: Optional[int] = None
     source_question_node_id: Optional[str] = None
     anchor_before_node_id: Optional[str] = None
 
@@ -292,8 +309,8 @@ class CompositionNodeInput(BaseModel):
         # question_id / source / anchor 只允许挂在对应节点类型上。
         if nt != NODE_TYPE_QUESTION and self.question_id is not None:
             raise ValueError("question_id is only valid on question nodes")
-        if nt != NODE_TYPE_QUESTION_GROUP and self.question_group_id is not None:
-            raise ValueError("question_group_id is only valid on question_group nodes")
+        if nt != NODE_TYPE_QUESTION_GROUP and self.stimulus_id is not None:
+            raise ValueError("stimulus_id is only valid on question_group nodes")
         if nt not in (NODE_TYPE_ANSWER_ITEM, NODE_TYPE_ANSWER_SPACE) and self.source_question_node_id is not None:
             raise ValueError(
                 "source_question_node_id is only valid on answer_item and answer_space nodes"
@@ -331,8 +348,8 @@ class CompositionNodeInput(BaseModel):
                 raise ValueError("question_group content must be null (frozen by server)")
             if self.props:
                 raise ValueError("question_group nodes must not carry props")
-            if self.question_group_id is None:
-                raise ValueError("question_group node requires question_group_id")
+            if self.stimulus_id is None:
+                raise ValueError("question_group node requires stimulus_id")
         elif nt == NODE_TYPE_PAGE_BREAK:
             if self.content is not None or self.props is not None:
                 raise ValueError("page_break node must not carry content or props")
@@ -385,8 +402,6 @@ class CompositionNodeRead(BaseModel):
     schema_version: int
     question_id: Optional[int] = None
     question_revision: Optional[int] = None
-    question_group_id: Optional[int] = None
-    question_group_revision: Optional[int] = None
     stimulus_id: Optional[int] = None
     stimulus_revision: Optional[int] = None
     source_question_node_id: Optional[str] = None
@@ -416,20 +431,20 @@ class QuestionGroupMemberRevisionStatus(BaseModel):
     question_id: int
     pinned_revision: int
     current_revision: Optional[int] = None
+    # 实时题目缺失/删除/不可见,或已不再属于该材料时为 False。
     available: bool
 
 
 class QuestionGroupRevisionStatus(BaseModel):
-    """稿件内一个 question_group 节点的来源状态，不携带实时内容。"""
+    """稿件内一个材料题(question_group)节点的来源状态,不携带实时内容。"""
     node_id: str
-    question_group_id: int
-    pinned_revision: int
-    current_revision: Optional[int] = None
+    stimulus_id: int
     stimulus_pinned_revision: int
     stimulus_current_revision: Optional[int] = None
-    members: List[QuestionGroupMemberRevisionStatus] = Field(default_factory=list)
-    group_available: bool
     stimulus_available: bool
+    members: List[QuestionGroupMemberRevisionStatus] = Field(default_factory=list)
+    # 材料下尚未加入本节点的活动小题,仅作提示,不计入 stale。
+    new_question_ids: List[int] = Field(default_factory=list)
     structure_changed: bool
     stale: bool
 

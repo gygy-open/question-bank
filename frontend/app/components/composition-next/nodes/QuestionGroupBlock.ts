@@ -2,7 +2,7 @@ import { Node, mergeAttributes } from '@tiptap/core'
 import { VueNodeViewRenderer } from '@tiptap/vue-3'
 import QuestionGroupBlockView from './QuestionGroupBlockView.vue'
 
-/** 原生题组 atom：材料与成员结构冻结，完整 children 通过 attrs JSON 往返。 */
+/** 材料题 atom：材料冻结，所选小题及版面子节点通过 attrs JSON 往返。 */
 export const QuestionGroupBlock = Node.create({
   name: 'questionGroup',
   group: 'block',
@@ -12,8 +12,6 @@ export const QuestionGroupBlock = Node.create({
 
   addAttributes() {
     return {
-      questionGroupId: { default: null },
-      questionGroupRevision: { default: null },
       stimulusId: { default: null },
       stimulusRevision: { default: null },
       stimulus: { default: null },

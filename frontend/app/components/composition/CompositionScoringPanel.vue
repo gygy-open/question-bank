@@ -5,30 +5,31 @@ import { Switch } from '@/components/ui/switch'
 import { Separator } from '@/components/ui/separator'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import { Award } from '@lucide/vue'
+import type { ScorableItem } from '@/lib/compositionDocument'
 
 const props = defineProps<{
   enabled: boolean
   numberingEnabled: boolean
   disabled?: boolean
-  items: { nodeId: string; number: string; score: number | null }[]
+  items: ScorableItem[]
 }>()
 
 const emit = defineEmits<{
   'update:enabled': [value: boolean]
-  'update-score': [nodeId: string, score: number | null]
+  'update-score': [nodeId: string, score: number | null, slotId?: string]
 }>()
 
 const total = computed(() => props.items.reduce((sum, it) => sum + (it.score ?? 0), 0))
 
-function onInput(nodeId: string, raw: string) {
+function onInput(item: ScorableItem, raw: string) {
   const trimmed = raw.trim()
   if (!trimmed) {
-    emit('update-score', nodeId, null)
+    emit('update-score', item.nodeId, null, item.slotId)
     return
   }
   const n = Number(trimmed)
   if (Number.isNaN(n)) return
-  emit('update-score', nodeId, n)
+  emit('update-score', item.nodeId, n, item.slotId)
 }
 </script>
 
@@ -71,7 +72,7 @@ function onInput(nodeId: string, raw: string) {
       <div v-else class="mt-3 flex flex-wrap gap-2">
         <div
           v-for="item in items"
-          :key="item.nodeId"
+          :key="`${item.nodeId}:${item.slotId ?? ''}`"
           class="flex w-12 flex-col items-center gap-0.5"
         >
           <span class="text-[10px] text-muted-foreground">{{ item.number || '—' }}</span>
@@ -84,7 +85,7 @@ function onInput(nodeId: string, raw: string) {
             class="h-7 w-12 px-1 text-center text-xs"
             :disabled="disabled"
             :model-value="item.score ?? ''"
-            @update:model-value="onInput(item.nodeId, String($event))"
+            @update:model-value="onInput(item, String($event))"
           />
         </div>
       </div>

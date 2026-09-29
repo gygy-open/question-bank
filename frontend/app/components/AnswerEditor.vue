@@ -4,13 +4,19 @@ import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
 import { Checkbox } from '@/components/ui/checkbox'
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Eraser, Plus, Trash2, X, RotateCcw } from '@lucide/vue'
-import type { AnswerSpec, Blank, OptionSpec, QuestionType, RichDoc } from '@/types'
+import type { AnswerSpec, Blank, MatchingSlot, OptionSpec, QuestionType, RichDoc } from '@/types'
 import RichEditor from '@/components/rich-editor/RichEditor.vue'
 import RichContent from '@/components/rich-editor/RichContent.vue'
 import AnswerDisplay from '@/components/AnswerDisplay.vue'
-import { collectBlankIds, generateBlankId } from '@/components/rich-editor/richDoc'
-import { createDefaultAnswer, fillBlanksFromStem } from '@/lib/questionModel'
+import { collectBlankIds, generateBlankId, richDocToPlainText } from '@/components/rich-editor/richDoc'
+import {
+    createDefaultAnswer,
+    duplicatedMatchingOptions,
+    fillBlanksFromStem,
+    matchingSlotsFromStem,
+} from '@/lib/questionModel'
 
 const model = defineModel<AnswerSpec | null>({ default: null })
 
@@ -30,6 +36,15 @@ const stemDriven = computed(() => stemBlankIds.value.length > 0)
 watch(
     () => stemBlankIds.value.join('|'),
     () => {
+        if (props.qType === 'option_matching') {
+            const current = model.value?.kind === 'option_matching' ? model.value : null
+            model.value = {
+                kind: 'option_matching',
+                slots: matchingSlotsFromStem(props.stem ?? null, current?.slots),
+                allow_reuse: current?.allow_reuse ?? false,
+            }
+            return
+        }
         if (props.qType !== 'fill_in_the_blank') return
         const current = model.value?.kind === 'fill_in_the_blank' ? model.value.blanks : undefined
         const synced = fillBlanksFromStem(props.stem ?? null, current)
@@ -106,6 +121,33 @@ const freeReference = computed<RichDoc>({
         model.value = { kind: 'free_response', reference: v }
     },
 })
+
+// --- option matching ---
+// Select 不接受空串作为选项值，用哨兵表示“未选”。
+const UNSET = '__unset__'
+const matching = computed(() =>
+    model.value?.kind === 'option_matching'
+        ? model.value
+        : { kind: 'option_matching' as const, slots: matchingSlotsFromStem(props.stem ?? null), allow_reuse: false },
+)
+const duplicatedOptions = computed(() => duplicatedMatchingOptions(matching.value))
+function commitMatching(slots: MatchingSlot[], allowReuse = matching.value.allow_reuse) {
+    model.value = { kind: 'option_matching', slots, allow_reuse: allowReuse }
+}
+function setSlotCorrect(index: number, value: unknown) {
+    const correct = typeof value === 'string' && value !== UNSET ? value : ''
+    commitMatching(matching.value.slots.map((slot, i) => (i === index ? { ...slot, correct } : slot)))
+}
+function addSlot() {
+    commitMatching([...matching.value.slots, { id: generateBlankId(), correct: '' }])
+}
+function removeSlot(index: number) {
+    commitMatching(matching.value.slots.filter((_, i) => i !== index))
+}
+function optionPreview(opt: OptionSpec): string {
+    const text = richDocToPlainText(opt.content).trim()
+    return text.length > 24 ? `${text.slice(0, 24)}…` : text
+}
 
 // --- legacy unresolved ---
 function refillFromLegacy() {
@@ -246,6 +288,59 @@ function clearAnswer() {
         <!-- 解答 -->
         <div v-else-if="qType === 'free_response'">
             <RichEditor v-model="freeReference" placeholder="输入参考答案 / 解答…" />
+        </div>
+
+        <!-- 选项匹配 -->
+        <div v-else-if="qType === 'option_matching'" class="space-y-3">
+            <p class="text-xs text-muted-foreground">
+                {{ stemDriven
+                    ? '空位数量与顺序由题干中的空位占位符决定，为每个空位从选项池中选择正确项。'
+                    : '可在题干中插入空位占位符，或在此手动增减空位。' }}
+            </p>
+            <div class="flex items-center gap-2">
+                <Checkbox
+                    id="ans-matching-reuse"
+                    :model-value="matching.allow_reuse"
+                    @update:model-value="(v) => commitMatching(matching.slots, v === true)"
+                />
+                <Label for="ans-matching-reuse" class="cursor-pointer font-normal">允许同一选项用于多个空位</Label>
+            </div>
+            <div v-for="(slot, sIdx) in matching.slots" :key="slot.id" class="flex items-center gap-2">
+                <span class="w-14 shrink-0 text-sm text-muted-foreground">第 {{ sIdx + 1 }} 空</span>
+                <Select
+                    :model-value="slot.correct || UNSET"
+                    @update:model-value="(v) => setSlotCorrect(sIdx, v)"
+                >
+                    <SelectTrigger
+                        class="flex-1"
+                        :class="slot.correct && duplicatedOptions.has(slot.correct) ? 'border-destructive' : ''"
+                    >
+                        <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                        <SelectItem :value="UNSET">（未选择）</SelectItem>
+                        <SelectItem v-for="opt in options" :key="opt.id" :value="opt.id">
+                            {{ opt.label }}. {{ optionPreview(opt) }}
+                        </SelectItem>
+                    </SelectContent>
+                </Select>
+                <Button
+                    v-if="!stemDriven"
+                    variant="ghost"
+                    size="icon"
+                    class="h-8 w-8 shrink-0"
+                    @click="removeSlot(sIdx)"
+                >
+                    <Trash2 class="h-3 w-3" />
+                </Button>
+            </div>
+            <p v-if="duplicatedOptions.size > 0" class="text-xs text-destructive">
+                有选项被多个空位重复选用；如确需复用请勾选上方开关。
+            </p>
+            <p v-if="options.length === 0" class="text-xs text-muted-foreground">请先添加选项</p>
+            <Button v-if="!stemDriven" variant="outline" class="w-full border-dashed" @click="addSlot">
+                <Plus class="mr-2 h-4 w-4" /> 添加空位
+            </Button>
         </div>
     </div>
 </template>

@@ -80,6 +80,9 @@ _Q_TYPE_MAP = {
     "解答": "free_response", "解答题": "free_response",
     "简答": "free_response", "简答题": "free_response",
     "主观": "free_response", "主观题": "free_response", "free_response": "free_response",
+    "选项匹配": "option_matching", "选项匹配题": "option_matching",
+    "信息匹配": "option_matching",
+    "匹配题": "option_matching", "option_matching": "option_matching",
 }
 
 _CN_DIFFICULTY = {"简单": 1, "容易": 1, "较易": 2, "中等": 3, "普通": 3, "较难": 4, "困难": 5, "难": 5}
@@ -454,6 +457,11 @@ def _finalize_question(question: dict) -> None:
                 if ch.upper() not in labels:
                     warnings.append(f"答案 {ch.upper()} 超出选项范围")
                     break
+    if q_type == "option_matching":
+        if not options:
+            warnings.append("选项匹配题缺少选项")
+        if not answer:
+            warnings.append("选项匹配题缺少答案")
 
     question["q_type"] = q_type
     question["answer"] = answer

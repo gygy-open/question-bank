@@ -1,17 +1,36 @@
 <script setup lang="ts">
-import { computed, inject } from 'vue'
+import { computed, inject, ref } from 'vue'
 import { NodeViewWrapper } from '@tiptap/vue-3'
-import { Files, Plus, Trash2 } from '@lucide/vue'
+import { Files, ListPlus, Loader2, Plus, Trash2 } from '@lucide/vue'
 import RichContent from '@/components/rich-editor/RichContent.vue'
 import RichEditor from '@/components/rich-editor/RichEditor.vue'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
 import QuestionBlockView from './QuestionBlockView.vue'
-import { createAnswerSpaceNode, createRichTextNode, generateNodeId } from '@/lib/compositionDocument'
+import {
+  createAnswerSpaceNode,
+  createRichTextNode,
+  generateNodeId,
+  mergeQuestionsIntoGroupNode,
+  removeQuestionFromGroupNode,
+} from '@/lib/compositionDocument'
 import type { EditorNode } from '@/lib/compositionDocument'
 import { clampAnswerSpaceLines, resolveAnswerSpacePropsOrFallback } from '@/lib/answerSpaceRules'
-import { ANSWER_SPACE_RULES_KEY, FALLBACK_ANSWER_SPACE_RULES } from '../editorContext'
-import type { RichDoc, RichDocNode } from '@/types'
+import { richDocToPlainText } from '@/components/rich-editor/richDoc'
+import {
+  ANSWER_SPACE_RULES_KEY,
+  FALLBACK_ANSWER_SPACE_RULES,
+  STIMULUS_QUESTIONS_KEY,
+  noStimulusQuestions,
+} from '../editorContext'
+import type { Question, RichDoc, RichDocNode } from '@/types'
 
 const props = defineProps<{
   node: { attrs: Record<string, unknown> }
@@ -21,9 +40,49 @@ const props = defineProps<{
 }>()
 
 const answerSpaceRules = inject(ANSWER_SPACE_RULES_KEY, FALLBACK_ANSWER_SPACE_RULES)
+const loadStimulusQuestions = inject(STIMULUS_QUESTIONS_KEY, noStimulusQuestions)
 
 const children = computed(() => (props.node.attrs.children as EditorNode[] | null) ?? [])
 const stimulus = computed(() => (props.node.attrs.stimulus as RichDocNode | null) ?? null)
+const questionCount = computed(() => children.value.filter(child => child.nodeType === 'question').length)
+
+function asGroupNode(): EditorNode {
+  return { children: children.value } as EditorNode
+}
+
+// 至少保留一道小题；要去掉整道材料题请删除整个节点。
+function removeQuestion(questionNodeId: string) {
+  if (questionCount.value <= 1) return
+  props.updateAttributes({ children: removeQuestionFromGroupNode(asGroupNode(), questionNodeId).children })
+}
+
+const candidates = ref<Question[]>([])
+const candidatesLoading = ref(false)
+const candidatePositions = ref(new Map<number, number>())
+async function loadCandidates(open: boolean) {
+  if (!open) return
+  const stimulusId = props.node.attrs.stimulusId as number | null
+  if (stimulusId == null) return
+  candidatesLoading.value = true
+  try {
+    const live = await loadStimulusQuestions(stimulusId)
+    const present = new Set(children.value.map(child => child.questionId))
+    candidatePositions.value = new Map(live.map(q => [q.id, q.stimulus_position ?? 0]))
+    candidates.value = live.filter(q => !present.has(q.id))
+  } finally {
+    candidatesLoading.value = false
+  }
+}
+
+function addQuestion(question: Question) {
+  const { node } = mergeQuestionsIntoGroupNode(asGroupNode(), [question], candidatePositions.value)
+  props.updateAttributes({ children: node.children })
+}
+
+function preview(question: Question): string {
+  const text = richDocToPlainText(question.content)
+  return text.length > 40 ? `${text.slice(0, 40)}…` : text
+}
 
 function replaceChild(index: number, child: EditorNode) {
   const next = children.value.slice()
@@ -123,9 +182,24 @@ function patchAnswerSpace(index: number, patch: { lines?: number; style?: 'blank
   >
     <div class="mb-3 flex items-center gap-2">
       <Files class="size-4 text-muted-foreground" />
-      <span class="text-sm font-medium">题组 #{{ node.attrs.questionGroupId }}</span>
-      <Badge variant="secondary" class="text-[11px]">r{{ node.attrs.questionGroupRevision }}</Badge>
-      <Button class="ml-auto size-7" variant="ghost" size="icon" title="删除整个题组" aria-label="删除整个题组" @click="deleteNode">
+      <span class="text-sm font-medium">材料题 · 题目材料 #{{ node.attrs.stimulusId }}</span>
+      <Badge v-if="node.attrs.stimulusRevision != null" variant="secondary" class="text-[11px]">材料 v{{ node.attrs.stimulusRevision }}</Badge>
+      <DropdownMenu @update:open="loadCandidates">
+        <DropdownMenuTrigger as-child>
+          <Button class="ml-auto h-7 text-xs" variant="ghost" size="sm" title="从题目材料添加小题">
+            <ListPlus class="mr-1 size-3.5" />添加小题
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end" class="w-80">
+          <DropdownMenuLabel class="text-xs text-muted-foreground">按材料顺序插入；已在本题中的小题不再列出</DropdownMenuLabel>
+          <div v-if="candidatesLoading" class="flex justify-center py-4"><Loader2 class="size-4 animate-spin" /></div>
+          <p v-else-if="candidates.length === 0" class="px-2 py-3 text-xs text-muted-foreground">材料下没有可添加的小题</p>
+          <DropdownMenuItem v-for="question in candidates" :key="question.id" @click="addQuestion(question)">
+            <span class="truncate text-xs">#{{ question.id }} {{ preview(question) }}</span>
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
+      <Button class="size-7" variant="ghost" size="icon" title="删除整道材料题" aria-label="删除整道材料题" @click="deleteNode">
         <Trash2 class="size-4 text-destructive" />
       </Button>
     </div>
@@ -150,8 +224,8 @@ function patchAnswerSpace(index: number, patch: { lines?: number; style?: 'blank
           <QuestionBlockView
             :node="{ attrs: { uid: child.id, questionId: child.questionId, questionRevision: child.questionRevision, snapshot: child.questionContent, props: child.props } }"
             :update-attributes="attrs => updateQuestion(index, attrs)"
-            :delete-node="() => {}"
-            :deletable="false"
+            :delete-node="() => removeQuestion(child.id)"
+            :deletable="questionCount > 1"
             :syncable="false"
           />
           <Button

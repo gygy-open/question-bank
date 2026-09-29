@@ -180,9 +180,50 @@ def test_parent_id_backfill_skips_cross_subject_edges_and_preserves_parent_id(tm
                 )
             ).one()
             assert tuple(archived) == (20, 1, 0)
-            assert conn.scalar(sa.text("SELECT COUNT(*) FROM question_groups")) == 0
+            assert {"stimulus_id", "stimulus_position"} <= question_columns
+            assert not sa.inspect(conn).has_table("question_groups")
     finally:
         engine.dispose()
+
+
+def test_branch_migrations_downgrade_and_reupgrade_on_sqlite(tmp_path):
+    async_url, sync_url = _sqlite_urls(tmp_path)
+    cfg = _alembic_config(async_url)
+    command.upgrade(cfg, "head")
+    command.downgrade(cfg, "e5f6a7b8c9d0")
+
+    engine = create_engine(sync_url)
+    try:
+        with engine.connect() as conn:
+            inspector = sa.inspect(conn)
+            assert not inspector.has_table("stimuli")
+            columns = {column["name"] for column in inspector.get_columns("questions")}
+            assert "parent_id" in columns
+            assert "stimulus_id" not in columns
+    finally:
+        engine.dispose()
+
+    command.upgrade(cfg, "head")
+    command.check(cfg)
+
+
+def test_q_type_varchar_downgrade_refuses_newer_types(tmp_path):
+    async_url, sync_url = _sqlite_urls(tmp_path)
+    cfg = _alembic_config(async_url)
+    command.upgrade(cfg, "head")
+
+    engine = create_engine(sync_url)
+    try:
+        with engine.begin() as conn:
+            conn.exec_driver_sql(
+                "INSERT INTO questions (content, q_type, status) "
+                "VALUES ('{\"type\":\"doc\"}', 'option_matching', 'draft')"
+            )
+    finally:
+        engine.dispose()
+
+    with pytest.raises(RuntimeError, match="option_matching"):
+        command.downgrade(cfg, "842a88641edd")
 
 def test_agent_run_model_snapshot_migration_backfills_history(tmp_path):
     async_url, sync_url = _sqlite_urls(tmp_path)

@@ -171,6 +171,5 @@ class CommitPaperImport(Capability[PaperImportCommitInput, PaperImportCommitResp
             composition_title=result.composition_title,
             temp_id_map=result.temp_id_map,
             stimulus_temp_id_map=result.stimulus_temp_id_map,
-            question_group_temp_id_map=result.question_group_temp_id_map,
             reused_existing=result.reused_existing,
         )

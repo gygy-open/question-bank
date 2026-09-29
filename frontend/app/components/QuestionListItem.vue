@@ -18,6 +18,7 @@ import CompositionQuickAdd from './CompositionQuickAdd.vue'
 import { useQuestionBasket } from '@/composables/useQuestionBasket'
 import type { Question as DbQuestion, KnowledgePoint, OptionSpec } from '@/types'
 import type { ImportDraft } from '@/lib/questionModel'
+import { hasOptionPool } from '@/lib/questionModel'
 import { toast } from 'vue-sonner'
 
 // Support both import drafts (v2, not yet persisted) and database questions
@@ -83,7 +84,8 @@ const typeLabel = computed(() => {
     'multiple_choice': '多选题',
     'true_false': '判断题',
     'fill_in_the_blank': '填空题',
-    'free_response': '解答题'
+    'free_response': '解答题',
+    'option_matching': '选项匹配'
   }
   return types[props.item.q_type] || props.item.q_type
 })
@@ -95,7 +97,8 @@ const typeColor = computed(() => {
     'multiple_choice': 'bg-violet-50 text-violet-700 dark:bg-violet-500/10 dark:text-violet-400',
     'true_false': 'bg-teal-50 text-teal-700 dark:bg-teal-500/10 dark:text-teal-400',
     'fill_in_the_blank': 'bg-orange-50 text-orange-700 dark:bg-orange-500/10 dark:text-orange-400',
-    'free_response': 'bg-amber-50 text-amber-700 dark:bg-amber-500/10 dark:text-amber-400'
+    'free_response': 'bg-amber-50 text-amber-700 dark:bg-amber-500/10 dark:text-amber-400',
+    'option_matching': 'bg-rose-50 text-rose-700 dark:bg-rose-500/10 dark:text-rose-400'
   }
   return colors[props.item.q_type] || 'bg-muted text-muted-foreground'
 })
@@ -258,9 +261,9 @@ const sourceFileUrl = computed(() => {
                 <Lock class="w-3 h-3" /> 私有
               </Badge>
 
-              <Badge v-if="((item as DbQuestion).question_group_count ?? 0) > 0" as-child variant="secondary">
-                <NuxtLink :to="{ path: '/question-groups', query: { question_id: item.id } }">
-                  属于 {{ (item as DbQuestion).question_group_count }} 个题组
+              <Badge v-if="(item as DbQuestion).stimulus_id != null" as-child variant="secondary">
+                <NuxtLink :to="`/materials/${(item as DbQuestion).stimulus_id}/edit`">
+                  材料题 · 题目材料 #{{ (item as DbQuestion).stimulus_id }}
                 </NuxtLink>
               </Badge>
 
@@ -406,7 +409,7 @@ const sourceFileUrl = computed(() => {
           </div>
           
           <!-- Options for choice questions -->
-          <div v-if="mode === 'library' && dbOptions.length > 0 && (item.q_type === 'single_choice' || item.q_type === 'multiple_choice')" class="mt-2 mb-3 flex flex-wrap gap-x-6 gap-y-1.5">
+          <div v-if="mode === 'library' && dbOptions.length > 0 && hasOptionPool(item.q_type)" class="mt-2 mb-3 flex flex-wrap gap-x-6 gap-y-1.5">
             <div v-for="opt in dbOptions" :key="opt.id" class="flex max-w-full gap-2 items-baseline text-xs">
               <span class="font-bold text-muted-foreground shrink-0">{{ opt.label }}.</span>
               <div class="min-w-0 text-foreground/80 [&_.prose]:my-0 [&_.prose_p]:my-0 [&_.prose]:text-xs [&_.prose]:leading-normal">
@@ -414,7 +417,7 @@ const sourceFileUrl = computed(() => {
               </div>
             </div>
           </div>
-          <div v-else-if="mode !== 'library' && importOptions.length > 0 && (item.q_type === 'single_choice' || item.q_type === 'multiple_choice')" class="mt-2 mb-3 flex flex-wrap gap-x-6 gap-y-1.5">
+          <div v-else-if="mode !== 'library' && importOptions.length > 0 && hasOptionPool(item.q_type)" class="mt-2 mb-3 flex flex-wrap gap-x-6 gap-y-1.5">
             <div v-for="opt in importOptions" :key="opt.id" class="flex max-w-full gap-2 items-baseline text-xs">
               <span class="font-bold text-muted-foreground shrink-0">{{ opt.label }}.</span>
               <div class="min-w-0 text-foreground/80 [&_.prose]:my-0 [&_.prose_p]:my-0 [&_.prose]:text-xs [&_.prose]:leading-normal">

@@ -24,6 +24,8 @@ RichDoc = Dict[str, Any]
 
 # 需要 options 的选择类题型(判断题不使用 options)。
 CHOICE_TYPES = {QuestionType.SINGLE_CHOICE, QuestionType.MULTIPLE_CHOICE}
+# 携带 options 的题型:选择题 + 选项匹配(options 作共享选项池)。
+OPTION_TYPES = CHOICE_TYPES | {QuestionType.OPTION_MATCHING}
 
 # ORM 中以 JSON 字符串存储的富文本 / AnswerSpec 列(options 是原生 JSON 列,不在此列)。
 JSON_STRING_FIELDS = ("content", "answer", "thinking", "analysis", "summary")
@@ -153,8 +155,8 @@ def collect_blank_ids(doc: Optional[RichDoc]) -> List[str]:
 # options 规范化
 # --------------------------------------------------------------------------- #
 def normalize_options(q_type: Optional[QuestionType], options: Any) -> Optional[List[Dict[str, Any]]]:
-    """非 choice 题型的 options 规范化为 None;choice 题型透传(空 list → None)。"""
-    if q_type is not None and q_type not in CHOICE_TYPES:
+    """不带选项的题型 options 规范化为 None;带选项题型透传(空 list → None)。"""
+    if q_type is not None and q_type not in OPTION_TYPES:
         return None
     if not options:
         return None
@@ -199,8 +201,8 @@ def validate_question_domain(
         if len(set(ids)) != len(ids):
             raise ValueError("option id 必须唯一")
 
-    # 3. 非 choice 题型不得携带 options(规范化后应为 None)。
-    if q_type is not None and q_type not in CHOICE_TYPES and options:
+    # 3. 不带选项的题型不得携带 options(规范化后应为 None)。
+    if q_type is not None and q_type not in OPTION_TYPES and options:
         raise ValueError(f"{q_type.value} 题型不应包含 options")
 
     if answer is None:
@@ -249,6 +251,50 @@ def validate_question_domain(
 
     if kind == "free_response" and must_be_complete and answer.get("reference") is None:
         raise ValueError("free_response reference 不能为空")
+
+    if kind == "option_matching":
+        _validate_option_matching(
+            content=content,
+            options=options,
+            answer=answer,
+            check_options=not (partial and options is None),
+            must_be_complete=must_be_complete,
+        )
+
+
+def _validate_option_matching(
+    *,
+    content: Any,
+    options: Any,
+    answer: Dict[str, Any],
+    check_options: bool,
+    must_be_complete: bool,
+) -> None:
+    """选项匹配:每个空位从共享选项池选一项;默认一项只用一次。"""
+    slots = answer.get("slots") or []
+    slot_ids = [slot.get("id") for slot in slots]
+    if len(set(slot_ids)) != len(slot_ids):
+        raise ValueError("option_matching slot id 必须唯一")
+
+    if content is not None:
+        blank_ids = collect_blank_ids(content)
+        if blank_ids and (must_be_complete or slots) and blank_ids != slot_ids:
+            raise ValueError("题干 blank 节点的 blankId 必须与 answer slots 顺序一一对应")
+
+    chosen = [slot.get("correct") for slot in slots if slot.get("correct")]
+    if check_options:
+        option_ids = {o.get("id") for o in (options or [])}
+        for correct in chosen:
+            if correct not in option_ids:
+                raise ValueError(f"option_matching correct '{correct}' 不在 options 中")
+    if not answer.get("allow_reuse") and len(set(chosen)) != len(chosen):
+        raise ValueError("option_matching 未允许重复选用时,各空位答案必须互不相同")
+
+    if must_be_complete:
+        if not slots:
+            raise ValueError("option_matching slots 不能为空")
+        if len(chosen) != len(slots):
+            raise ValueError("option_matching 每个空位都必须指定答案")
 
 
 def validate_question_for_exam(question: Any) -> None:

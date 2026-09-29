@@ -33,10 +33,12 @@ import { useCompositions, CompositionConflictError } from '~/composables/useComp
 import { useCompositionAiTools } from '~/composables/useCompositionAiTools'
 import { Capability, usePermissions } from '~/composables/usePermissions'
 import { folderBreadcrumb, normalizeScope } from '~/lib/compositions'
+import { getApiErrorDetail } from '~/lib/apiErrors'
 import {
   applyQuestionNumbers, collectDocumentIssues, collectStaleQuestionNodeIds, documentFromNodes,
-  documentToReplaceRequest, hasAnyQuestionNumber, normalizeDocument, orderedScorableQuestions, patchNode,
-  questionPropsWithScore, snapshotDocument, totalScore,
+  documentQuestionNodes, documentToReplaceRequest, hasAnyQuestionNumber, normalizeDocument,
+  orderedScorableQuestions, patchNode, questionPropsWithScore, questionPropsWithSlot, snapshotDocument,
+  totalScore,
 } from '~/lib/compositionDocument'
 import type { EditorDocument, NumberingMode } from '~/lib/compositionDocument'
 import type { DocumentChange } from '~/lib/compositionDiff'
@@ -157,14 +159,15 @@ const questionGroupUpdateSummary = computed(() => {
   const structure = statuses.filter((status) => status.structure_changed)
   const questions = statuses.filter((status) => status.members.some((member) =>
     !member.available || member.current_revision !== member.pinned_revision))
-  const categorized = new Set([...material, ...structure, ...questions].map((status) => status.node_id))
   return {
     material: material.length,
     structure: structure.length,
     questions: questions.length,
-    group: statuses.filter((status) => !categorized.has(status.node_id)).length,
   }
 })
+// 材料下新增了小题但尚未加入稿件：只提示，不算过期；在材料题内“添加小题”手动选用。
+const newMaterialQuestionCount = computed(() =>
+  questionGroupStatus.value.reduce((sum, status) => sum + status.new_question_ids.length, 0))
 const numberingEnabled = computed(() => composition.value?.numbering_enabled ?? false)
 const scoringEnabled = computed(() => composition.value?.scoring_enabled ?? false)
 const questionDisplay = computed<Record<AnswerFieldKey, boolean>>(
@@ -376,7 +379,7 @@ async function syncQuestionGroups() {
   if (!currentSubjectId.value || !composition.value || syncingQuestionGroups.value) return
   const nodeIds = staleQuestionGroups.value.map((status) => status.node_id)
   if (dirty.value || !nodeIds.length) return
-  if (!window.confirm('同步会整组替换冻结的材料、成员结构和小题内容，并保留稿件内可兼容的题号、分值与作答区。确定继续？')) return
+  if (!window.confirm('同步会刷新冻结的材料和已选小题内容、按材料顺序重排，并移除已脱离材料的小题；保留稿件内的题号、分值与作答区，不会自动加入新小题。确定继续？')) return
   syncingQuestionGroups.value = true
   try {
     const response = await api.syncQuestionGroupNodes(
@@ -388,14 +391,14 @@ async function syncQuestionGroups() {
     document.value = documentFromNodes(response.nodes)
     composition.value = { ...composition.value, revision: response.revision }
     savedSnapshot.value = snapshotDocument(document.value)
-    toast.success(`已同步 ${nodeIds.length} 个题组`)
+    toast.success(`已同步 ${nodeIds.length} 道材料题`)
     await loadSourceStatus()
   } catch (error) {
     if (error instanceof CompositionConflictError && error.kind === 'revision') {
       editConflict.value = true
       toast.error('组稿已被他人更新，同步失败；本地内容仍保留')
     } else {
-      toast.error('同步题组失败')
+      toast.error(getApiErrorDetail(error, '同步材料题失败'))
     }
   } finally {
     syncingQuestionGroups.value = false
@@ -467,11 +470,12 @@ async function toggleScoring(value: boolean) {
   }
 }
 
-// 单题分值：仅改本地文档 props.score，经“保存内容”落库（与题号同一持久化路径）。
-function updateQuestionScore(nodeId: string, score: number | null) {
-  const node = document.value.nodes.find((n) => n.id === nodeId)
+// 单题（或选项匹配空位）分值：仅改本地文档 props，经“保存内容”落库（与题号同一持久化路径）。
+function updateQuestionScore(nodeId: string, score: number | null, slotId?: string) {
+  const node = documentQuestionNodes(document.value).find((n) => n.id === nodeId)
   if (!node) return
-  document.value = patchNode(document.value, nodeId, { props: questionPropsWithScore(node, score) })
+  const props = slotId ? questionPropsWithSlot(node, slotId, { score }) : questionPropsWithScore(node, score)
+  document.value = patchNode(document.value, nodeId, { props })
 }
 
 // 题目显示：全局字段开关即时持久化（bump revision）。
@@ -795,21 +799,25 @@ onBeforeRouteLeave(() => {
       </div>
 
       <div
-        v-if="staleQuestionGroups.length"
+        v-if="staleQuestionGroups.length || newMaterialQuestionCount"
         class="flex flex-wrap items-center gap-3 rounded-md border border-amber-400 bg-amber-50 px-4 py-3 text-sm dark:border-amber-700 dark:bg-amber-900/20"
       >
         <AlertTriangle class="h-4 w-4 shrink-0 text-amber-600 dark:text-amber-400" />
         <span class="min-w-0 flex-1">
-          {{ staleQuestionGroups.length }} 个题组有来源更新：
-          <template v-if="questionGroupUpdateSummary.material">材料 {{ questionGroupUpdateSummary.material }} 个</template>
-          <template v-if="questionGroupUpdateSummary.structure">{{ questionGroupUpdateSummary.material ? '，' : '' }}结构 {{ questionGroupUpdateSummary.structure }} 个</template>
-          <template v-if="questionGroupUpdateSummary.questions">{{ questionGroupUpdateSummary.material || questionGroupUpdateSummary.structure ? '，' : '' }}小题 {{ questionGroupUpdateSummary.questions }} 个</template>
-          <template v-if="questionGroupUpdateSummary.group">{{ questionGroupUpdateSummary.material || questionGroupUpdateSummary.structure || questionGroupUpdateSummary.questions ? '，' : '' }}题组版本 {{ questionGroupUpdateSummary.group }} 个</template>。
-          当前仍显示冻结版本，不会自动刷新。
+          <template v-if="staleQuestionGroups.length">
+            {{ staleQuestionGroups.length }} 道材料题有来源更新：
+            <template v-if="questionGroupUpdateSummary.material">材料 {{ questionGroupUpdateSummary.material }} 个</template>
+            <template v-if="questionGroupUpdateSummary.structure">{{ questionGroupUpdateSummary.material ? '，' : '' }}小题顺序 {{ questionGroupUpdateSummary.structure }} 个</template>
+            <template v-if="questionGroupUpdateSummary.questions">{{ questionGroupUpdateSummary.material || questionGroupUpdateSummary.structure ? '，' : '' }}小题内容或归属 {{ questionGroupUpdateSummary.questions }} 个</template>。
+            当前仍显示冻结版本，不会自动刷新。
+          </template>
+          <template v-if="newMaterialQuestionCount">
+            题目材料下新增了 {{ newMaterialQuestionCount }} 道未选用的小题，可在对应材料题中“添加小题”。
+          </template>
         </span>
-        <Button size="sm" variant="outline" :disabled="dirty || syncingQuestionGroups" @click="syncQuestionGroups">
+        <Button v-if="staleQuestionGroups.length" size="sm" variant="outline" :disabled="dirty || syncingQuestionGroups" @click="syncQuestionGroups">
           <Loader2 v-if="syncingQuestionGroups" class="mr-2 h-4 w-4 animate-spin" />
-          <RefreshCw v-else class="mr-2 h-4 w-4" />同步整组
+          <RefreshCw v-else class="mr-2 h-4 w-4" />同步材料题
         </Button>
       </div>
 

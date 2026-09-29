@@ -117,6 +117,13 @@ export interface QuestionProps {
   optionLayout?: OptionLayout
   // 题目分值（0~1000，允许 0.5 步进小数）；仅在组稿 scoring_enabled 为真时展示/可编辑。
   score?: number | null
+  // 选项匹配题按空位编号/赋分（blankId → 题号/分值），该题型不使用 number/score。
+  slots?: Record<string, QuestionSlotProps>
+}
+
+export interface QuestionSlotProps {
+  number?: string
+  score?: number
 }
 
 // question_details / answer_item 覆盖涉及的四个可发布字段。
@@ -169,8 +176,6 @@ interface CompositionNodeCommon {
   slot: string | null
   position: number
   schema_version: number
-  question_group_id: number | null
-  question_group_revision: number | null
   stimulus_id: number | null
   stimulus_revision: number | null
 }
@@ -216,9 +221,8 @@ export interface QuestionGroupNode extends CompositionNodeCommon {
   props: null
   question_id: null
   question_revision: null
-  question_group_id: number
-  question_group_revision: number
   stimulus_id: number
+  /** 钉住的材料 content_revision。 */
   stimulus_revision: number
   source_question_node_id: null
   anchor_before_node_id: null
@@ -298,7 +302,7 @@ export interface CompositionNodeInput {
   props?: Record<string, unknown> | null
   schema_version?: number
   question_id?: number | null
-  question_group_id?: number | null
+  stimulus_id?: number | null
   source_question_node_id?: string | null
   anchor_before_node_id?: string | null
 }
@@ -341,19 +345,19 @@ export interface QuestionGroupMemberRevisionStatus {
   question_id: number
   pinned_revision: number
   current_revision: number | null
+  // 题目缺失/删除/不可见,或已不属于该材料时为 false。
   available: boolean
 }
 
 export interface QuestionGroupRevisionStatus {
   node_id: string
-  question_group_id: number
-  pinned_revision: number
-  current_revision: number | null
+  stimulus_id: number
   stimulus_pinned_revision: number
   stimulus_current_revision: number | null
-  members: QuestionGroupMemberRevisionStatus[]
-  group_available: boolean
   stimulus_available: boolean
+  members: QuestionGroupMemberRevisionStatus[]
+  // 材料下尚未加入该节点的小题,仅作提示,不计入 stale。
+  new_question_ids: number[]
   structure_changed: boolean
   stale: boolean
 }
@@ -492,8 +496,6 @@ export interface SnapshotQuestionNode extends SnapshotNodeCommon {
 export interface SnapshotQuestionGroupNode extends SnapshotNodeCommon {
   node_kind: 'module'
   node_type: 'question_group'
-  question_group_id: number
-  question_group_revision: number
   stimulus_id: number
   stimulus_revision: number
   content: RichDocNode | null

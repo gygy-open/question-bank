@@ -26,11 +26,13 @@ import {
   createHeadingNode,
   createPageBreakNode,
   createQuestionDetailsModule,
+  createQuestionGroupNode,
   createQuestionNode,
   createRichTextNode,
   detailPropsOf,
   headingTextToDoc,
   insertRootNodesAfter,
+  isOptionMatchingNode,
   normalizeDocument,
   patchNode,
   questionPropsWithNumber,
@@ -136,8 +138,16 @@ function buildInsertNode(spec: AiInsertNode, questions: Map<number, Question>): 
         throw new Error(`题库里找不到 id 为 ${spec.question_id} 的题目（可能已删除或不属于本学科）。`)
       }
       let node = createQuestionNode(question)
-      if (spec.number != null) node = { ...node, props: questionPropsWithNumber(node, String(spec.number)) }
-      if (spec.score != null) node = { ...node, props: questionPropsWithScore(node, spec.score) }
+      // 选项匹配题按空位编号/赋分，整题题号与分值不适用。
+      if (question.q_type !== 'option_matching') {
+        if (spec.number != null) node = { ...node, props: questionPropsWithNumber(node, String(spec.number)) }
+        if (spec.score != null) node = { ...node, props: questionPropsWithScore(node, spec.score) }
+      }
+      if (question.stimulus_id != null) {
+        // 依赖材料的小题只能以材料题节点进入稿件。
+        const group = createQuestionGroupNode(question.stimulus_id, [])
+        return [{ ...group, children: [node] }]
+      }
       return [node]
     }
     case 'answer_space':
@@ -217,6 +227,9 @@ function applySetProps(
   let props = node.props
 
   if (node.nodeType === 'question') {
+    if (isOptionMatchingNode(node) && touched.some((k) => k === 'number' || k === 'score')) {
+      throw new Error('选项匹配题按空位编号和赋分，不支持设置整题题号或分值；请让用户在画布上设置。')
+    }
     let staged: EditorNode = node
     if ('number' in op.props || cleared.has('number')) {
       const value = cleared.has('number') ? '' : String(op.props.number)

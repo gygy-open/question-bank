@@ -136,7 +136,9 @@ class CompositionDocxRenderer:
             p.paragraph_format.left_indent = Pt(_NUMBER_INDENT_PT)
             p.paragraph_format.first_line_indent = Pt(-_NUMBER_INDENT_PT)
             p.add_run(f"{q.number}. ").bold = True
-        if q.score is not None:
+        if q.score_text:
+            p.add_run(f"（{q.score_text}）").italic = True
+        elif q.score is not None:
             p.add_run(f"（{_format_score(q.score)} 分）").italic = True
         self._append_richdoc(p, document, q.stem)
         self._add_options(document, q.options, q.option_columns, indent=bool(q.number))

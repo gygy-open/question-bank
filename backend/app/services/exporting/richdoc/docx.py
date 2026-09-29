@@ -180,7 +180,14 @@ class DocxRichRenderer:
             return
 
         if t == "blank":
-            run = paragraph.add_run("\u00a0" * self._blank_len(node))
+            length = self._blank_len(node)
+            label = str((node.get("attrs") or {}).get("label") or "")
+            if label:
+                pad = max(1, (length - len(label)) // 2)
+                text = "\u00a0" * pad + label + "\u00a0" * pad
+            else:
+                text = "\u00a0" * length
+            run = paragraph.add_run(text)
             run.underline = True
             return
 

@@ -138,7 +138,9 @@ class CompositionLatexRenderer:
         # 题号(粗体)+ 分值(斜体)同挤在题干首段前,而非各占一行,与编辑器内联展示口径一致。
         hang = f"\\hangindent={_NUMBER_INDENT}\\hangafter=1 " if q.number else ""
         prefix = f"\\textbf{{{latex_escape(q.number)}.}}\\ " if q.number else ""
-        if q.score is not None:
+        if q.score_text:
+            prefix += f"\\textit{{（{latex_escape(q.score_text)}）}}\\ "
+        elif q.score is not None:
             prefix += f"\\textit{{（{_format_score(q.score)} 分）}}\\ "
         parts = [f"{hang}{prefix}{rich_doc_to_latex(q.stem, image_path)}\n"]
         if q.options:

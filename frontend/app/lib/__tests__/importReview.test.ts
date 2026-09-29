@@ -64,9 +64,33 @@ describe('validateImportStructure', () => {
       expect.stringContaining('不存在的题组'),
     ]))
   })
+
+  it('拒绝同一小题出现在两个题组中', () => {
+    const errors = validateImportStructure(
+      [draft('q1')],
+      stimuli,
+      [
+        { temp_id: 'g1', stimulus_temp_id: 's1', question_temp_ids: ['q1'] },
+        { temp_id: 'g2', stimulus_temp_id: 's1', question_temp_ids: ['q1'] },
+      ],
+    )
+
+    expect(errors).toEqual([expect.stringContaining('只能依赖一份题目材料')])
+  })
 })
 
 describe('buildImportStructurePayload', () => {
+  it('题组载荷只保留结构字段', () => {
+    const result = buildImportStructurePayload(
+      [{ temp_id: 'q1' }],
+      [draft('q1')],
+      stimuli,
+      [{ ...groups[0]!, visibility: 'public', status: 'draft' } as ImportQuestionGroup],
+    )
+
+    expect(result.question_groups).toEqual(groups)
+  })
+
   it('只裁掉未选独立题引用，不改变题组引用、成员或顺序', () => {
     const questions = [draft('q1'), draft('q2'), draft('solo', false)]
     const outline = [

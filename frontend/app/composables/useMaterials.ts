@@ -1,4 +1,11 @@
-import type { Stimulus, StimulusCreateRequest, StimulusPage, StimulusUpdateRequest } from '@/types'
+import type {
+  Stimulus,
+  StimulusCreateRequest,
+  StimulusDetail,
+  StimulusPage,
+  StimulusQuestionsUpdateRequest,
+  StimulusUpdateRequest,
+} from '@/types'
 
 export function useMaterials() {
   const { $api } = useNuxtApp()
@@ -8,13 +15,22 @@ export function useMaterials() {
     $api<StimulusPage>(basePath(subjectId), { query })
 
   const getMaterial = (subjectId: number, materialId: number) =>
-    $api<Stimulus>(`${basePath(subjectId)}/${materialId}`)
+    $api<StimulusDetail>(`${basePath(subjectId)}/${materialId}`)
 
   const createMaterial = (subjectId: number, payload: StimulusCreateRequest) =>
     $api<Stimulus>(basePath(subjectId), { method: 'POST', body: payload })
 
   const updateMaterial = (subjectId: number, materialId: number, payload: StimulusUpdateRequest) =>
     $api<Stimulus>(`${basePath(subjectId)}/${materialId}`, { method: 'PUT', body: payload })
+
+  const setMaterialQuestions = (
+    subjectId: number,
+    materialId: number,
+    payload: StimulusQuestionsUpdateRequest,
+  ) =>
+    $api<StimulusDetail>(`${basePath(subjectId)}/${materialId}/questions`, {
+      method: 'PUT', body: payload,
+    })
 
   const deleteMaterial = (subjectId: number, materialId: number, expectedRevision: number) =>
     $api<void>(`${basePath(subjectId)}/${materialId}`, {
@@ -26,5 +42,13 @@ export function useMaterials() {
       method: 'POST', body: { expected_revision: expectedRevision },
     })
 
-  return { listMaterials, getMaterial, createMaterial, updateMaterial, deleteMaterial, restoreMaterial }
+  return {
+    listMaterials,
+    getMaterial,
+    createMaterial,
+    updateMaterial,
+    setMaterialQuestions,
+    deleteMaterial,
+    restoreMaterial,
+  }
 }

@@ -92,6 +92,13 @@ def answer_spec_to_inline(answer: Any, options: list[ExportOption]) -> list[Inli
     if kind == "free_response":
         return _flatten_doc_inline(ans.get("reference"))
 
+    if kind == "option_matching":
+        return [_text("；".join(
+            f"{slot.get('number') or i}. {labels.get(str(slot.get('correct', '')), '')}"
+            for i, slot in enumerate(ans.get("slots") or [], start=1)
+            if isinstance(slot, dict)
+        ))]
+
     if kind == "legacy_unresolved":
         return _flatten_doc_inline(ans.get("raw"))
 

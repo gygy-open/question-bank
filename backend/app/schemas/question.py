@@ -83,6 +83,24 @@ class FreeResponseAnswer(BaseModel):
     reference: RichDoc = None
 
 
+class MatchingSlot(BaseModel):
+    id: str
+    correct: str = ""
+
+    @field_validator("id")
+    @classmethod
+    def _id_non_empty(cls, v: str) -> str:
+        if not v or not v.strip():
+            raise ValueError("slot id 不能为空")
+        return v
+
+
+class OptionMatchingAnswer(BaseModel):
+    kind: Literal["option_matching"]
+    slots: List[MatchingSlot]
+    allow_reuse: bool = False
+
+
 class LegacyUnresolvedAnswer(BaseModel):
     kind: Literal["legacy_unresolved"]
     expected_kind: QuestionType
@@ -97,6 +115,7 @@ AnswerSpec = Annotated[
         TrueFalseAnswer,
         FillBlankAnswer,
         FreeResponseAnswer,
+        OptionMatchingAnswer,
         LegacyUnresolvedAnswer,
     ],
     Field(discriminator="kind"),
@@ -210,6 +229,8 @@ class QuestionReview(BaseModel):
 
 class QuestionSummary(QuestionBase):
     id: int
+    stimulus_id: Optional[int] = None
+    stimulus_position: Optional[int] = None
     created_at: datetime
     updated_at: datetime
 
@@ -221,6 +242,8 @@ class Question(QuestionBase):
     id: int
     import_task_id: Optional[int] = None
     subject_id: Optional[int] = None
+    stimulus_id: Optional[int] = None
+    stimulus_position: Optional[int] = None
     content_revision: int = 1
     knowledge_points: List[KnowledgePoint] = []
     created_at: datetime
@@ -243,7 +266,6 @@ class Question(QuestionBase):
 
 
 class QuestionListItem(Question):
-    question_group_count: int = 0
     incoming_relation_count: int = 0
     outgoing_relation_count: int = 0
 

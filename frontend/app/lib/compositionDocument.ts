@@ -22,6 +22,7 @@ import type {
   QuestionContentSnapshot,
   QuestionDetailsProps,
   QuestionProps,
+  QuestionSlotProps,
   QuestionGroupRevisionStatus,
   QuestionRevisionStatus,
 } from '@/types/composition'
@@ -40,9 +41,8 @@ export interface EditorNode {
   questionId: number | null
   questionRevision: number | null
   questionContent: QuestionContentSnapshot | null
-  // question_group root 的冻结来源；content 为材料快照，children 为成员 question/answer_space。
-  questionGroupId?: number | null
-  questionGroupRevision?: number | null
+  // question_group root 的冻结来源：content 为材料快照，children 为所选小题/作答区/说明块。
+  // stimulusRevision 钉住材料 content_revision。
   stimulusId?: number | null
   stimulusRevision?: number | null
   // module 子节点专用软指针。
@@ -92,8 +92,6 @@ function baseNode(nodeType: CompositionNodeType): EditorNode {
     questionId: null,
     questionRevision: null,
     questionContent: null,
-    questionGroupId: null,
-    questionGroupRevision: null,
     stimulusId: null,
     stimulusRevision: null,
     sourceQuestionNodeId: null,
@@ -154,11 +152,126 @@ export function createQuestionNode(question: Question): EditorNode {
   return node
 }
 
-/** 首次 replace 只创建题组 root；服务端负责冻结材料并生成成员 children。 */
-export function createQuestionGroupNode(groupId: number): EditorNode {
+function byStimulusPosition(left: Question, right: Question): number {
+  return (left.stimulus_position ?? 0) - (right.stimulus_position ?? 0) || left.id - right.id
+}
+
+/**
+ * 新建材料题节点：所选小题按材料顺序排列；材料正文与 revision 由服务端在首次保存时冻结。
+ * 调用方保证 questions 均属于 stimulusId。
+ */
+export function createQuestionGroupNode(stimulusId: number, questions: Question[]): EditorNode {
   const node = baseNode('question_group')
-  node.questionGroupId = groupId
+  node.stimulusId = stimulusId
+  node.children = [...questions].sort(byStimulusPosition).map(createQuestionNode)
   return node
+}
+
+/**
+ * 把同材料的小题并入已有材料题节点（已存在的 question_id 跳过）。
+ * 已有小题顺序不动（服务端禁止重排），新小题按实时位置插到首个位置更靠后的已有小题之前。
+ */
+export function mergeQuestionsIntoGroupNode(
+  groupNode: EditorNode,
+  questions: Question[],
+  livePositionById: ReadonlyMap<number, number>,
+): { node: EditorNode; added: number } {
+  const existingIds = new Set(
+    groupNode.children.filter(child => child.nodeType === 'question').map(child => child.questionId),
+  )
+  const fresh = questions.filter(question => !existingIds.has(question.id)).sort(byStimulusPosition)
+  const children = groupNode.children.slice()
+  for (const question of fresh) {
+    const position = question.stimulus_position ?? Number.MAX_SAFE_INTEGER
+    const before = children.findIndex(child =>
+      child.nodeType === 'question'
+      && child.questionId != null
+      && (livePositionById.get(child.questionId) ?? -1) > position,
+    )
+    const inserted = createQuestionNode(question)
+    if (before < 0) {
+      children.push(inserted)
+    } else {
+      // 锚定到该小题的说明块仍紧贴它，新题插在这些说明块之前。
+      let at = before
+      while (at > 0 && children[at - 1]!.anchorBeforeNodeId === children[before]!.id) at -= 1
+      children.splice(at, 0, inserted)
+    }
+  }
+  return { node: { ...groupNode, children }, added: fresh.length }
+}
+
+/** 从材料题节点移除一道小题及其作答区；锚定到它的说明块交给规范化顺延。 */
+export function removeQuestionFromGroupNode(groupNode: EditorNode, questionNodeId: string): EditorNode {
+  return {
+    ...groupNode,
+    children: groupNode.children.filter(child =>
+      child.id !== questionNodeId
+      && !(child.nodeType === 'answer_space' && child.sourceQuestionNodeId === questionNodeId),
+    ),
+  }
+}
+
+/**
+ * 把一批题目转成待插入的 root 行：依赖同一材料的小题在其首次出现处合成一个材料题节点，
+ * 独立题保持单题节点。依赖材料的小题不能以独立节点进入稿件（服务端会拒绝）。
+ */
+export function questionsToRootNodes(questions: Question[]): EditorNode[] {
+  const byStimulus = new Map<number, Question[]>()
+  for (const question of questions) {
+    if (question.stimulus_id == null) continue
+    const bucket = byStimulus.get(question.stimulus_id) ?? []
+    bucket.push(question)
+    byStimulus.set(question.stimulus_id, bucket)
+  }
+  const rows: EditorNode[] = []
+  const emitted = new Set<number>()
+  for (const question of questions) {
+    if (question.stimulus_id == null) {
+      rows.push(createQuestionNode(question))
+    } else if (!emitted.has(question.stimulus_id)) {
+      emitted.add(question.stimulus_id)
+      rows.push(createQuestionGroupNode(question.stimulus_id, byStimulus.get(question.stimulus_id)!))
+    }
+  }
+  return rows
+}
+
+/**
+ * 追加题目到文档末尾：同材料小题优先并入已有的第一个同材料节点，否则新建材料题节点。
+ * livePositionById 需覆盖被并入节点里已有小题的实时 stimulus_position，用于确定插入位置。
+ */
+export function appendQuestionsToDocument(
+  doc: EditorDocument,
+  questions: Question[],
+  livePositionById: ReadonlyMap<number, number>,
+): { doc: EditorDocument; added: number } {
+  let nodes = doc.nodes.slice()
+  let added = 0
+  const pending: Question[] = []
+  const byStimulus = new Map<number, Question[]>()
+  for (const question of questions) {
+    if (question.stimulus_id == null) {
+      pending.push(question)
+      continue
+    }
+    const bucket = byStimulus.get(question.stimulus_id) ?? []
+    bucket.push(question)
+    byStimulus.set(question.stimulus_id, bucket)
+  }
+  for (const [stimulusId, bucket] of byStimulus) {
+    const index = nodes.findIndex(node => node.nodeType === 'question_group' && node.stimulusId === stimulusId)
+    if (index < 0) {
+      pending.push(...bucket)
+      continue
+    }
+    const merged = mergeQuestionsIntoGroupNode(nodes[index]!, bucket, livePositionById)
+    nodes = nodes.map((node, i) => (i === index ? merged.node : node))
+    added += merged.added
+  }
+  const appended = questionsToRootNodes(questions.filter(question => pending.includes(question)))
+  added += pending.length
+  return { doc: insertRootNodesAfter({ nodes }, nodes.length - 1, appended), added }
 }
 
 function defaultDetailFields(): Record<AnswerFieldKey, boolean> {
@@ -220,6 +333,76 @@ export function questionNumberOf(node: EditorNode): string {
   return typeof n === 'string' ? n : ''
 }
 
+/** 选项匹配题：每个空位单独编号、赋分，不使用整题 number/score。 */
+export function isOptionMatchingNode(node: EditorNode): boolean {
+  return node.nodeType === 'question' && node.questionContent?.q_type === 'option_matching'
+}
+
+/** 冻结答案中的空位 id（按题干顺序）。 */
+export function questionSlotIds(node: EditorNode): string[] {
+  const answer = node.questionContent?.answer
+  return answer?.kind === 'option_matching' ? answer.slots.map((slot) => slot.id) : []
+}
+
+export function questionSlotsOf(node: EditorNode): Record<string, QuestionSlotProps> {
+  return (node.props as QuestionProps | null)?.slots ?? {}
+}
+
+/** 空位题号映射（blankId → 题号），未编号的空位不出现。 */
+export function slotNumbersOf(slots: Record<string, QuestionSlotProps> | null | undefined): Record<string, string> {
+  const out: Record<string, string> = {}
+  for (const [slotId, entry] of Object.entries(slots ?? {})) {
+    if (entry?.number) out[slotId] = entry.number
+  }
+  return out
+}
+
+/** 只读渲染用：把已编号的 blank 换成带下划线的题号文本（不改 schema，不回写）。 */
+export function stemWithSlotNumbers(
+  content: RichDocNode | null | undefined,
+  numbers: Record<string, string>,
+): RichDocNode | null {
+  if (!content) return null
+  if (!Object.keys(numbers).length) return content
+  const visit = (node: RichNode): RichNode => {
+    const blankId = node.type === 'blank' ? (node.attrs?.blankId as string | undefined) : undefined
+    if (blankId && numbers[blankId]) {
+      return { type: 'text', text: `\u00a0\u00a0${numbers[blankId]}\u00a0\u00a0`, marks: [{ type: 'underline' }] }
+    }
+    return node.content ? { ...node, content: node.content.map(visit) } : node
+  }
+  return { ...content, content: (content.content ?? []).map(visit) }
+}
+
+function carrySlots(cur: QuestionProps, next: QuestionProps): QuestionProps {
+  if (cur.slots && Object.keys(cur.slots).length) next.slots = cur.slots
+  return next
+}
+
+/** 合并出新的 question props（写入/清除某个空位的题号或分值，其他属性保留）。 */
+export function questionPropsWithSlot(
+  node: EditorNode,
+  slotId: string,
+  patch: { number?: string | null; score?: number | null },
+): QuestionProps {
+  const cur = (node.props as QuestionProps | null) ?? {}
+  const entry: QuestionSlotProps = { ...(cur.slots?.[slotId] ?? {}) }
+  if ('number' in patch) {
+    if (patch.number) entry.number = patch.number
+    else delete entry.number
+  }
+  if ('score' in patch) {
+    if (patch.score != null) entry.score = patch.score
+    else delete entry.score
+  }
+  const slots = { ...(cur.slots ?? {}) }
+  if (Object.keys(entry).length) slots[slotId] = entry
+  else delete slots[slotId]
+  const next: QuestionProps = { ...cur }
+  delete next.slots
+  return Object.keys(slots).length ? { ...next, slots } : next
+}
+
 /** 合并出新的 question props（保留 show/optionLayout/score，写入/清除题号）。 */
 export function questionPropsWithNumber(node: EditorNode, number: string): QuestionProps {
   const cur = (node.props as QuestionProps | null) ?? {}
@@ -228,7 +411,7 @@ export function questionPropsWithNumber(node: EditorNode, number: string): Quest
   if (cur.show && Object.keys(cur.show).length) next.show = cur.show
   if (cur.optionLayout && cur.optionLayout !== 'auto') next.optionLayout = cur.optionLayout
   if (cur.score != null) next.score = cur.score
-  return next
+  return carrySlots(cur, next)
 }
 
 /** 题目分值（null 表示未填）。 */
@@ -245,7 +428,7 @@ export function questionPropsWithScore(node: EditorNode, score: number | null): 
   if (cur.show && Object.keys(cur.show).length) next.show = cur.show
   if (cur.optionLayout && cur.optionLayout !== 'auto') next.optionLayout = cur.optionLayout
   if (score != null) next.score = score
-  return next
+  return carrySlots(cur, next)
 }
 
 /** 题目级字段显隐覆盖：true/false=显式，null=继承全局。 */
@@ -279,7 +462,7 @@ export function questionPropsWithShow(
   if (Object.keys(show).length) next.show = show
   if (cur.optionLayout && cur.optionLayout !== 'auto') next.optionLayout = cur.optionLayout
   if (cur.score != null) next.score = cur.score
-  return next
+  return carrySlots(cur, next)
 }
 
 /** 读取选项排版覆盖；缺省/非法值视为 'auto'。 */
@@ -296,7 +479,7 @@ export function questionPropsWithOptionLayout(node: EditorNode, layout: OptionLa
   if (cur.show && Object.keys(cur.show).length) next.show = { ...cur.show }
   if (layout !== 'auto') next.optionLayout = layout
   if (cur.score != null) next.score = cur.score
-  return next
+  return carrySlots(cur, next)
 }
 
 // 选项含图片/表格/块公式时视为“宽内容”，auto 模式强制单列。
@@ -371,8 +554,6 @@ export function documentFromNodes(nodes: CompositionNode[]): EditorDocument {
       node.questionContent = (n.content as QuestionContentSnapshot | null) ?? null
     } else if (n.node_type === 'question_group') {
       node.content = n.content
-      node.questionGroupId = n.question_group_id
-      node.questionGroupRevision = n.question_group_revision
       node.stimulusId = n.stimulus_id
       node.stimulusRevision = n.stimulus_revision
     } else if (n.node_type === 'answer_item' || n.node_type === 'answer_space') {
@@ -486,7 +667,7 @@ function normalizeSingleModule(
 }
 
 /**
- * 规范化单个题组的子节点序列（镜像服务端 _normalize_question_group_children）。
+ * 规范化单个材料题节点的子节点序列（镜像服务端 _normalize_question_group_children）。
  * - 小题顺序不变；作答区按 sourceQuestionNodeId 紧跟其小题。
  * - 自定义 heading/rich_text 按 anchorBeforeNodeId 排在目标小题之前；未锚定者按其相对
  *   首道小题的位置置顶（材料之后、首题之前）或置尾，悬空锚点同此规则。
@@ -567,13 +748,15 @@ export function normalizeDocument(doc: EditorDocument): EditorDocument {
 
 export type NumberingMode = 'global' | 'heading'
 
-/** 是否已有任意 root question 节点带题号。 */
+/** 是否已有任意 question 节点（或选项匹配空位）带题号。 */
 export function hasAnyQuestionNumber(doc: EditorDocument): boolean {
-  return documentQuestionNodes(doc).some((n) => questionNumberOf(n) !== '')
+  return documentQuestionNodes(doc).some(
+    (n) => questionNumberOf(n) !== '' || Object.values(questionSlotsOf(n)).some((slot) => slot.number),
+  )
 }
 
 /**
- * 填充所有 root question 节点的题号（覆盖已有）。
+ * 填充所有 question 节点的题号（覆盖已有）；选项匹配题每个空位占一个题号。
  * - global：按顺序 1,2,3…
  * - heading：以 H2 标题为分组边界（H1 不分组），组内 g.n；首个 H2 前的题目归第 1 组，空组跳过。
  */
@@ -582,60 +765,81 @@ export function applyQuestionNumbers(doc: EditorDocument, mode: NumberingMode): 
   let group = 0
   let inGroup = 0
   let pendingNewGroup = false
+  const nextNumber = (): string => {
+    if (mode === 'global') {
+      global += 1
+      return String(global)
+    }
+    if (group === 0) {
+      group = 1
+      inGroup = 0
+    } else if (pendingNewGroup) {
+      group += 1
+      inGroup = 0
+      pendingNewGroup = false
+    }
+    inGroup += 1
+    return `${group}.${inGroup}`
+  }
   const numberNode = (node: EditorNode): EditorNode => {
     if (node.nodeType === 'heading' && headingLevelOf(node) === 2) {
       if (group > 0) pendingNewGroup = true
       return { ...node, children: node.children.map(numberNode) }
     }
     if (node.nodeType !== 'question') return { ...node, children: node.children.map(numberNode) }
-    let number: string
-    if (mode === 'global') {
-      global += 1
-      number = String(global)
-    } else {
-      if (group === 0) {
-        group = 1
-        inGroup = 0
-      } else if (pendingNewGroup) {
-        group += 1
-        inGroup = 0
-        pendingNewGroup = false
+    if (isOptionMatchingNode(node)) {
+      let numbered: EditorNode = node
+      for (const slotId of questionSlotIds(node)) {
+        numbered = { ...numbered, props: questionPropsWithSlot(numbered, slotId, { number: nextNumber() }) }
       }
-      inGroup += 1
-      number = `${group}.${inGroup}`
+      return numbered
     }
-    return { ...node, props: questionPropsWithNumber(node, number) }
+    return { ...node, props: questionPropsWithNumber(node, nextNumber()) }
   }
   const nodes = doc.nodes.map(numberNode)
   return { nodes }
 }
 
-/** 按文档顺序列出可赋分的 root question 节点（题号 + 分值），供分数分布卡片渲染。 */
-export function orderedScorableQuestions(
-  doc: EditorDocument,
-): { nodeId: string; number: string; score: number | null }[] {
-  return documentQuestionNodes(doc)
-    .map((n) => ({ nodeId: n.id, number: questionNumberOf(n), score: questionScoreOf(n) }))
+export interface ScorableItem {
+  nodeId: string
+  /** 选项匹配题的空位 id；普通题为 undefined。 */
+  slotId?: string
+  number: string
+  score: number | null
+}
+
+/** 按文档顺序列出计分点（题号 + 分值），选项匹配题按空位展开，供分数分布卡片渲染。 */
+export function orderedScorableQuestions(doc: EditorDocument): ScorableItem[] {
+  return documentQuestionNodes(doc).flatMap((n): ScorableItem[] => {
+    if (!isOptionMatchingNode(n)) {
+      return [{ nodeId: n.id, number: questionNumberOf(n), score: questionScoreOf(n) }]
+    }
+    const slots = questionSlotsOf(n)
+    return questionSlotIds(n).map((slotId) => ({
+      nodeId: n.id,
+      slotId,
+      number: slots[slotId]?.number ?? '',
+      score: slots[slotId]?.score ?? null,
+    }))
+  })
 }
 
 /** 已填分值之和（未填不计入）。 */
 export function totalScore(doc: EditorDocument): number {
-  return documentQuestionNodes(doc).reduce((sum, n) => {
-    const s = questionScoreOf(n)
-    return s == null ? sum : sum + s
-  }, 0)
+  return orderedScorableQuestions(doc).reduce((sum, item) => sum + (item.score ?? 0), 0)
 }
 
 // --------------------------------------------------------------------------- //
 // 序列化为 PUT .../nodes 载荷
 // --------------------------------------------------------------------------- //
 
-/** 组装 question 节点上送的 props（number + 有效的 show 覆盖）；无内容时返回 undefined。 */
+/** 组装 question 节点上送的 props；选项匹配题只送有效空位的 slots，其他题型不送 slots。 */
 function questionInputProps(node: EditorNode): Record<string, unknown> | undefined {
   const props = node.props as QuestionProps | null
+  const matching = isOptionMatchingNode(node)
   const out: Record<string, unknown> = {}
   const number = questionNumberOf(node)
-  if (number) out.number = number
+  if (number && !matching) out.number = number
   if (props?.show) {
     const show: Record<string, boolean> = {}
     for (const key of ANSWER_FIELD_KEYS) {
@@ -647,7 +851,16 @@ function questionInputProps(node: EditorNode): Record<string, unknown> | undefin
   const layout = questionOptionLayoutOf(node)
   if (layout !== 'auto') out.optionLayout = layout
   const score = questionScoreOf(node)
-  if (score != null) out.score = score
+  if (score != null && !matching) out.score = score
+  if (matching) {
+    const current = questionSlotsOf(node)
+    const slots: Record<string, QuestionSlotProps> = {}
+    for (const slotId of questionSlotIds(node)) {
+      const entry = current[slotId]
+      if (entry && (entry.number || entry.score != null)) slots[slotId] = { ...entry }
+    }
+    if (Object.keys(slots).length) out.slots = slots
+  }
   return Object.keys(out).length ? out : undefined
 }
 
@@ -672,7 +885,7 @@ function nodeToInput(node: EditorNode, parentId: string | null): CompositionNode
         id: node.id,
         node_kind: 'module',
         node_type: 'question_group',
-        question_group_id: node.questionGroupId,
+        stimulus_id: node.stimulusId,
       }
     case 'page_break':
       return { id: node.id, node_kind: 'block', node_type: 'page_break' }
@@ -809,7 +1022,7 @@ function snapNode(node: EditorNode): Record<string, unknown> {
       base.p = questionInputProps(node) ?? null
       break
     case 'question_group':
-      base.qg = node.questionGroupId
+      base.st = node.stimulusId
       base.children = node.children.map(snapNode)
       break
     case 'question_details': {
@@ -883,20 +1096,20 @@ export function questionNodeStatus(
   return { stale, deleted: false }
 }
 
-/** 收集全部过期（stale）question 节点的 UUID（“同步全部”用）。 */
+/** 收集全部过期（stale）的根级 question 节点 UUID（“同步全部”用）；材料题内小题只能随材料题整体同步。 */
 export function collectStaleQuestionNodeIds(
   doc: EditorDocument,
   statusMap: Map<number, QuestionRevisionStatus>,
 ): string[] {
   const ids: string[] = []
-  for (const node of documentQuestionNodes(doc)) {
+  for (const node of doc.nodes) {
     if (node.nodeType !== 'question' || node.questionId == null) continue
     if (questionNodeStatus(node, statusMap.get(node.questionId)).stale) ids.push(node.id)
   }
   return ids
 }
 
-/** 收集后端已判定 stale 的题组 root UUID；材料、结构、成员题更新均由状态契约区分。 */
+/** 收集后端已判定 stale 的材料题 root UUID；材料正文、小题内容/归属/顺序变化均由状态契约区分。 */
 export function collectStaleQuestionGroupNodeIds(
   statuses: ReadonlyArray<QuestionGroupRevisionStatus>,
 ): string[] {

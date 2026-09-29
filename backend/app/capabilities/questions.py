@@ -18,12 +18,12 @@ from sqlalchemy import select
 from app import crud, models, schemas
 from app.core import permissions
 from app.core.permissions import Permission
-from app.crud.crud_question import is_question_visible
+from app.crud.crud_question import is_question_visible, release_stimulus_slot
 from app.models.import_task import ImportTask, ImportTaskStatus
 from app.models.question import Question, QuestionStatus
-from app.models.question_group import QuestionRelation, QuestionRelationType
+from app.models.question_relation import QuestionRelation, QuestionRelationType
 from app.services.activity_logger import log_activity
-from app.services.question_group_service import (
+from app.services.question_relation_service import (
     create_question_relation,
     delete_question_relation,
 )
@@ -389,6 +389,7 @@ class BatchDeleteQuestions(Capability[schemas.QuestionBatchDelete, dict]):
                 continue
             question.deleted_at = datetime.utcnow()
             question.updated_by = ctx.actor.id
+            await release_stimulus_slot(ctx.db, question)
             ctx.db.add(question)
             deleted_count += 1
             await log_activity(
@@ -476,6 +477,7 @@ class BatchConfirmQuestions(Capability[schemas.QuestionBatchConfirm, dict]):
                 elif inp.action == "reject":
                     question.deleted_at = datetime.utcnow()
                     question.updated_by = ctx.actor.id
+                    await release_stimulus_slot(ctx.db, question)
                     ctx.db.add(question)
                 processed_count += 1
 

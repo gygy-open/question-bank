@@ -27,14 +27,9 @@ from app.models.import_task import (
     ImportTask,
     ImportTaskStatus,
 )
-from app.models.question import Question, QuestionStatus, QuestionVisibility
-from app.models.question_group import (
-    QuestionGroup,
-    QuestionGroupItem,
-    QuestionRelation,
-    QuestionRelationType,
-    Stimulus,
-)
+from app.models.question import Question, QuestionStatus, QuestionType, QuestionVisibility
+from app.models.question_relation import QuestionRelation, QuestionRelationType
+from app.models.stimulus import Stimulus
 from app.services import composition_service
 from app.services.answer_space import resolve_answer_space_props_or_fallback
 from app.services.composition_authoring import AuthoringError, build_nodes
@@ -48,7 +43,7 @@ from app.services.importing.contracts import (
     OUTLINE_QUESTION_REF,
     OUTLINE_RICH_TEXT,
 )
-from app.services.question_content import to_db_json
+from app.services.question_content import parse_json_field, to_db_json
 from app.services.question_content_converter import markdown_to_rich_doc
 from app.services.question_service import question_service
 
@@ -96,7 +91,6 @@ class PaperImportResult:
     composition_title: Optional[str] = None
     temp_id_map: Dict[str, int] = field(default_factory=dict)
     stimulus_temp_id_map: Dict[str, int] = field(default_factory=dict)
-    question_group_temp_id_map: Dict[str, int] = field(default_factory=dict)
     reused_existing: bool = False
 
 
@@ -239,6 +233,7 @@ def _validate_temp_references(
             seen.add(cursor)
             cursor = relation_edges.get(cursor)
 
+    group_of_question: Dict[str, str] = {}
     for group in question_groups:
         group_ref = str(group.get("temp_id") or "")
         stimulus_ref = str(group.get("stimulus_temp_id") or "")
@@ -256,23 +251,26 @@ def _validate_temp_references(
             raise PaperImportError(
                 f"题组 {group_ref!r} 引用了不存在的题目 temp_id：{missing[0]!r}。"
             )
-        visibility = _enum_value(
-            group.get("visibility"), QuestionVisibility.PUBLIC.value
-        )
-        if visibility == QuestionVisibility.PUBLIC.value and (
+        for member_ref in member_refs:
+            other = group_of_question.setdefault(member_ref, group_ref)
+            if other != group_ref:
+                raise PaperImportError(
+                    f"题目 {member_ref!r} 同时属于题组 {other!r} 和 {group_ref!r}；"
+                    "一道题只能依赖一份题目材料。"
+                )
+        stimulus_private = (
             _enum_value(
                 stimuli_by_id[stimulus_ref].get("visibility"),
                 QuestionVisibility.PUBLIC.value,
             )
             == QuestionVisibility.PRIVATE.value
-            or any(
-                _visibility_of(questions_by_id[member_ref])
-                == QuestionVisibility.PRIVATE.value
-                for member_ref in member_refs
-            )
+        )
+        if stimulus_private and any(
+            _visibility_of(questions_by_id[member_ref]) == QuestionVisibility.PUBLIC.value
+            for member_ref in member_refs
         ):
             raise PaperImportError(
-                f"公开题组 {group_ref!r} 不能引用私有材料或题目。"
+                f"题组 {group_ref!r} 的公开题目不能挂在私有材料下。"
             )
 
 
@@ -372,8 +370,12 @@ def _resolve_outline_nodes(
     group_specs: Mapping[str, Mapping[str, Any]],
     *,
     renumber: bool,
+    slot_ids_by_question: Mapping[int, List[str]],
 ) -> List[Dict[str, Any]]:
-    """outline → build_nodes 可消费的意图节点。跳过引用不存在题目的占位。"""
+    """outline → build_nodes 可消费的意图节点。跳过引用不存在题目的占位。
+
+    选项匹配题每个空位占一个题号;原卷分值无法可靠拆到空位,留给用户在稿件中设置。
+    """
     specs: List[Dict[str, Any]] = []
     sequence = 0
     previous_question_score: Optional[float] = None
@@ -385,9 +387,26 @@ def _resolve_outline_nodes(
             question_id = temp_id_map.get(str(item.get("temp_id")))
             if question_id is None:
                 continue
+            spec: Dict[str, Any] = {"type": "question", "question_id": question_id}
+            slot_ids = slot_ids_by_question.get(question_id)
+            if slot_ids is not None:
+                source_number = str(item.get("number") or "")
+                first = (
+                    sequence + 1 if renumber
+                    else int(source_number) if source_number.isdigit()
+                    else None
+                )
+                if first is not None and slot_ids:
+                    spec["slots"] = {
+                        slot_id: {"number": str(first + offset)}
+                        for offset, slot_id in enumerate(slot_ids)
+                    }
+                sequence += max(1, len(slot_ids))
+                previous_question_score = None
+                specs.append(spec)
+                continue
             sequence += 1
             number = str(sequence) if renumber else item.get("number")
-            spec: Dict[str, Any] = {"type": "question", "question_id": question_id}
             if number is not None:
                 spec["number"] = number
             if item.get("score") is not None:
@@ -399,9 +418,16 @@ def _resolve_outline_nodes(
             if group is None:
                 continue
             specs.append(
-                {"type": "question_group", "question_group_id": group["group_id"]}
+                {
+                    "type": "question_group",
+                    "stimulus_id": group["stimulus_id"],
+                    "question_ids": group["question_ids"],
+                }
             )
-            sequence += len(group["question_ids"])
+            sequence += sum(
+                max(1, len(slot_ids_by_question.get(question_id) or []))
+                for question_id in group["question_ids"]
+            )
         elif kind == OUTLINE_HEADING:
             specs.append(
                 {"type": "heading", "text": item.get("text") or "", "level": item.get("level") or 2}
@@ -502,10 +528,6 @@ async def _result_from_task(db: AsyncSession, task: ImportTask) -> PaperImportRe
             key: int(value)
             for key, value in summary.get("stimulus_temp_id_map", {}).items()
         },
-        question_group_temp_id_map={
-            key: int(value)
-            for key, value in summary.get("question_group_temp_id_map", {}).items()
-        },
         reused_existing=True,
     )
     if result.composition_id is None and task.composition_state is CompositionImportState.CREATED:
@@ -526,7 +548,6 @@ def _store_result_summary(task: ImportTask, result: PaperImportResult) -> None:
             "composition_title": result.composition_title,
             "temp_id_map": result.temp_id_map,
             "stimulus_temp_id_map": result.stimulus_temp_id_map,
-            "question_group_temp_id_map": result.question_group_temp_id_map,
         },
         ensure_ascii=False,
     )
@@ -647,6 +668,7 @@ async def commit_paper_import(
 
     created: List[Question] = []
     temp_id_map: Dict[str, int] = {}
+    question_by_ref: Dict[str, Question] = {}
 
     for raw, question_in in plans:
         question = await question_service.create_question(
@@ -659,6 +681,7 @@ async def commit_paper_import(
         created.append(question)
         if raw.get("temp_id"):
             temp_id_map[str(raw["temp_id"])] = question.id
+            question_by_ref[str(raw["temp_id"])] = question
 
     for raw, _question_in in plans:
         parent_ref = _relation_ref(raw)
@@ -691,32 +714,20 @@ async def commit_paper_import(
         stimulus_ref = str(raw["temp_id"])
         stimulus_temp_id_map[stimulus_ref] = stimulus.id
 
-    question_group_temp_id_map: Dict[str, int] = {}
     group_specs: Dict[str, Dict[str, Any]] = {}
+    next_position: Dict[int, int] = {}
     for raw in question_groups:
         group_ref = str(raw["temp_id"])
-        stimulus_ref = str(raw["stimulus_temp_id"])
-        visibility = _enum_value(raw.get("visibility"), QuestionVisibility.PUBLIC.value)
-        group = QuestionGroup(
-            subject_id=subject_id,
-            stimulus_id=stimulus_temp_id_map[stimulus_ref],
-            status=_enum_value(raw.get("status"), default_status.value),
-            visibility=visibility,
-            source=raw.get("source") or filename,
-            metadata_json=json.dumps(raw.get("metadata") or {}, ensure_ascii=False),
-            created_by=actor.id,
-            updated_by=actor.id,
-        )
-        db.add(group)
-        await db.flush()
-        question_ids = [temp_id_map[str(ref)] for ref in raw["question_temp_ids"]]
-        db.add_all(
-            QuestionGroupItem(group_id=group.id, question_id=question_id, position=position)
-            for position, question_id in enumerate(question_ids)
-        )
-        question_group_temp_id_map[group_ref] = group.id
+        stimulus_id = stimulus_temp_id_map[str(raw["stimulus_temp_id"])]
+        question_ids: List[int] = []
+        for ref in raw["question_temp_ids"]:
+            question = question_by_ref[str(ref)]
+            question.stimulus_id = stimulus_id
+            question.stimulus_position = next_position.get(stimulus_id, 0)
+            next_position[stimulus_id] = question.stimulus_position + 1
+            question_ids.append(question.id)
         group_specs[group_ref] = {
-            "group_id": group.id,
+            "stimulus_id": stimulus_id,
             "question_ids": question_ids,
         }
     await db.flush()
@@ -728,7 +739,6 @@ async def commit_paper_import(
         degraded=_collect_degraded(outline),
         temp_id_map=temp_id_map,
         stimulus_temp_id_map=stimulus_temp_id_map,
-        question_group_temp_id_map=question_group_temp_id_map,
     )
 
     if not save_as_composition:
@@ -741,6 +751,14 @@ async def commit_paper_import(
         temp_id_map,
         group_specs,
         renumber=renumber,
+        slot_ids_by_question={
+            question.id: [
+                slot["id"]
+                for slot in (parse_json_field(question.answer) or {}).get("slots") or []
+            ]
+            for question in created
+            if question.q_type == QuestionType.OPTION_MATCHING
+        },
     )
     try:
         nodes = build_nodes(specs)

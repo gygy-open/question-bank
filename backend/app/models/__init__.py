@@ -6,12 +6,8 @@ from .knowledge_point import KnowledgePoint
 from .tag import Tag
 from .tag_category import TagCategory
 from .question import Question
-from .question_group import (
-    QuestionGroup,
-    QuestionGroupItem,
-    QuestionRelation,
-    Stimulus,
-)
+from .stimulus import Stimulus
+from .question_relation import QuestionRelation
 from .question_relation_audit import LegacyQuestionParentAudit
 from .import_task import ImportTask
 from .activity_log import ActivityLog

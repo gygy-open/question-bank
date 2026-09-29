@@ -96,6 +96,11 @@ def _question_props(spec: Dict[str, Any]) -> Optional[Dict[str, Any]]:
                 f"question.show keys must be within {list(ANSWER_FIELD_KEYS)}, got {sorted(unknown)}"
             )
         props["show"] = {k: bool(v) for k, v in show.items()}
+    slots = spec.get("slots")
+    if slots is not None:
+        if not isinstance(slots, dict):
+            raise AuthoringError("question.slots must be an object")
+        props["slots"] = slots
     return props or None
 
 
@@ -224,20 +229,35 @@ def build_nodes(specs: List[Dict[str, Any]]) -> List[CompositionNodeInput]:
             continue
 
         if node_type == NODE_TYPE_QUESTION_GROUP:
-            question_group_id = _int_or_none(
-                spec.get("question_group_id"),
-                field=f"nodes[{idx}].question_group_id",
+            stimulus_id = _int_or_none(
+                spec.get("stimulus_id"),
+                field=f"nodes[{idx}].stimulus_id",
             )
-            if question_group_id is None:
+            if stimulus_id is None:
+                raise AuthoringError(f"nodes[{idx}] question_group requires stimulus_id")
+            question_ids = spec.get("question_ids")
+            if not isinstance(question_ids, list) or not question_ids:
                 raise AuthoringError(
-                    f"nodes[{idx}] question_group requires question_group_id"
+                    f"nodes[{idx}] question_group requires a non-empty question_ids list"
                 )
+            group_id = _new_id()
             nodes.append(CompositionNodeInput(
-                id=_new_id(),
+                id=group_id,
                 node_kind=CompositionNodeKind.MODULE,
                 node_type=NODE_TYPE_QUESTION_GROUP,
-                question_group_id=question_group_id,
+                stimulus_id=stimulus_id,
             ))
+            for q_idx, question_id in enumerate(question_ids):
+                nodes.append(CompositionNodeInput(
+                    id=_new_id(),
+                    parent_id=group_id,
+                    slot=BODY_SLOT,
+                    node_kind=CompositionNodeKind.BLOCK,
+                    node_type=NODE_TYPE_QUESTION,
+                    question_id=_int_or_none(
+                        question_id, field=f"nodes[{idx}].question_ids[{q_idx}]"
+                    ),
+                ))
             continue
 
         if node_type == NODE_TYPE_PAGE_BREAK:

@@ -3,8 +3,7 @@ const route = useRoute()
 
 const items = [
   { label: '题目', to: '/questions' },
-  { label: '题组', to: '/question-groups' },
-  { label: '材料', to: '/materials' },
+  { label: '题目材料', to: '/materials' },
 ]
 
 const isActive = (to: string) => route.path === to || route.path.startsWith(`${to}/`)
@@ -12,7 +11,7 @@ const isActive = (to: string) => route.path === to || route.path.startsWith(`${t
 
 <template>
   <nav aria-label="题库分类" class="border-b px-4">
-    <div class="grid h-11 w-full grid-cols-3 sm:flex sm:w-auto sm:gap-6">
+    <div class="grid h-11 w-full grid-cols-2 sm:flex sm:w-auto sm:gap-6">
       <NuxtLink
         v-for="item in items"
         :key="item.to"

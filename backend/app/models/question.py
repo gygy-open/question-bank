@@ -1,6 +1,6 @@
 from sqlalchemy import (
     Column, Integer, SmallInteger, Boolean, Text, ForeignKey, Table, Enum,
-    DateTime, JSON, String, text,
+    DateTime, JSON, String, text, CheckConstraint, UniqueConstraint,
 )
 from sqlalchemy.dialects.mysql import LONGTEXT
 from sqlalchemy.orm import relationship
@@ -36,6 +36,7 @@ class QuestionType(str, enum.Enum):
     TRUE_FALSE = "true_false"           # 判断
     FILL_IN_THE_BLANK = "fill_in_the_blank" # 填空
     FREE_RESPONSE = "free_response"   # 解答
+    OPTION_MATCHING = "option_matching"  # 选项匹配:多个空位共用一组选项
 
 class QuestionStatus(str, enum.Enum):
     DRAFT = "draft"
@@ -50,6 +51,14 @@ class QuestionVisibility(str, enum.Enum):
 class Question(Base):
     """题目表"""
     __tablename__ = 'questions'
+    __table_args__ = (
+        # 软删除的小题 stimulus_position 置 NULL,不占用位置。
+        UniqueConstraint("stimulus_id", "stimulus_position", name="uq_questions_stimulus_position"),
+        CheckConstraint(
+            "stimulus_position IS NULL OR stimulus_position >= 0",
+            name="stimulus_position_non_negative",
+        ),
+    )
 
     id = Column(Integer, primary_key=True, index=True)
     content = Column(_RichTextColumn, nullable=False) # 题干 RichDoc JSON 字符串
@@ -74,7 +83,16 @@ class Question(Base):
 
     deleted_at = Column(DateTime, nullable=True) # 软删除时间
     
-    q_type = Column(Enum(QuestionType, values_callable=lambda obj: [e.value for e in obj]), nullable=False) # 题目类型
+    # 库内存 VARCHAR,新增题型无需改表;合法值由 QuestionType 与应用层校验约束。
+    q_type = Column(
+        Enum(
+            QuestionType,
+            native_enum=False,
+            length=32,
+            values_callable=lambda obj: [e.value for e in obj],
+        ),
+        nullable=False,
+    )
     status = Column(String(20), default=QuestionStatus.DRAFT.value, nullable=False) # 状态
     # 可见性:public=学科内共享;private=仅创建者+超管可见。存字符串以便 v2 追加 group 值。
     visibility = Column(
@@ -85,6 +103,9 @@ class Question(Base):
     review_count = Column(Integer, default=0) # 审核次数
 
     subject_id = Column(Integer, ForeignKey('subjects.id'), nullable=True)
+    # 材料题小题:依赖的题目材料及其在材料下的顺序;独立题两者均为 NULL。
+    stimulus_id = Column(Integer, ForeignKey('stimuli.id'), nullable=True, index=True)
+    stimulus_position = Column(Integer, nullable=True)
     import_task_id = Column(Integer, ForeignKey('import_tasks.id'), nullable=True)
     source = Column(String(255), nullable=True) # 来源 (例如导入的文件名)
     
@@ -99,6 +120,7 @@ class Question(Base):
     
     import_task = relationship("ImportTask", back_populates="questions")
     subject = relationship("Subject", backref="questions")
+    stimulus = relationship("Stimulus", back_populates="questions")
 
     # 审核记录关联
     review_logs = relationship(

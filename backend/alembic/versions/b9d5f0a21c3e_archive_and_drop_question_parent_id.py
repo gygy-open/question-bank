@@ -1,7 +1,7 @@
 """archive and drop question parent id
 
 Revision ID: b9d5f0a21c3e
-Revises: a8c4e7f19b2d
+Revises: d53ff6ff31fe
 Create Date: 2026-09-21 00:00:00.000000
 
 """
@@ -14,7 +14,7 @@ import sqlalchemy as sa
 
 
 revision: str = "b9d5f0a21c3e"
-down_revision: Union[str, Sequence[str], None] = "a8c4e7f19b2d"
+down_revision: Union[str, Sequence[str], None] = "d53ff6ff31fe"
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
@@ -181,24 +181,21 @@ def downgrade() -> None:
             batch_op.create_index("ix_questions_parent_id", ["parent_id"], unique=False)
 
     if sa.inspect(bind).has_table(_ARCHIVE_TABLE):
+        # MySQL 1093 forbids reading `questions` inside UPDATE questions, so prune orphans first.
+        op.execute(sa.text("""
+            DELETE FROM legacy_question_parent_audits
+            WHERE parent_question_id NOT IN (SELECT id FROM questions)
+        """))
         op.execute(sa.text("""
             UPDATE questions
             SET parent_id = (
                 SELECT archived.parent_question_id
                 FROM legacy_question_parent_audits AS archived
                 WHERE archived.child_question_id = questions.id
-                  AND EXISTS (
-                      SELECT 1 FROM questions AS parent
-                      WHERE parent.id = archived.parent_question_id
-                  )
             )
             WHERE EXISTS (
                 SELECT 1 FROM legacy_question_parent_audits AS archived
                 WHERE archived.child_question_id = questions.id
-                  AND EXISTS (
-                      SELECT 1 FROM questions AS parent
-                      WHERE parent.id = archived.parent_question_id
-                  )
             )
         """))
         op.drop_table(_ARCHIVE_TABLE)

@@ -11,7 +11,6 @@ import { Search, Check, Plus, Loader2 } from '@lucide/vue'
 import { toast } from 'vue-sonner'
 import { useCompositions, CompositionConflictError } from '@/composables/useCompositions'
 import { useAddQuestionsToComposition } from '@/composables/useAddQuestionsToComposition'
-import { useAddQuestionGroupToComposition } from '@/composables/useAddQuestionGroupToComposition'
 import { formatRelativeTime } from '@/lib/utils'
 import type { Composition, CompositionScope } from '~/types'
 
@@ -19,7 +18,6 @@ const props = defineProps<{
   open: boolean
   subjectId: number | null
   questionIds?: number[]
-  questionGroupId?: number
 }>()
 
 const emit = defineEmits<{
@@ -29,8 +27,6 @@ const emit = defineEmits<{
 
 const { listCompositions, createComposition } = useCompositions()
 const { addQuestionsToComposition } = useAddQuestionsToComposition()
-const { addQuestionGroupToComposition } = useAddQuestionGroupToComposition()
-const isQuestionGroup = computed(() => props.questionGroupId != null)
 
 const loading = ref(false)
 const submitting = ref(false)
@@ -95,10 +91,8 @@ const confirmAdd = async () => {
   if (!selected.value || !props.subjectId) return
   submitting.value = true
   try {
-    const result = isQuestionGroup.value
-      ? await addQuestionGroupToComposition(props.subjectId, selected.value.scope_type, selected.value.id, props.questionGroupId!)
-      : await addQuestionsToComposition(props.subjectId, selected.value.scope_type, selected.value.id, props.questionIds ?? [])
-    toast.success(`已将${isQuestionGroup.value ? '题组' : ` ${'addedCount' in result ? result.addedCount : 0} 道题`}加入《${result.compositionTitle}》`, jumpAction({
+    const result = await addQuestionsToComposition(props.subjectId, selected.value.scope_type, selected.value.id, props.questionIds ?? [])
+    toast.success(`已将 ${result.addedCount} 道题加入《${result.compositionTitle}》`, jumpAction({
       scope: selected.value.scope_type,
       id: selected.value.id,
     }))
@@ -118,10 +112,8 @@ const createAndAdd = async () => {
     const composition = await createComposition(props.subjectId, 'personal', {
       title: `新稿件 ${new Date().toLocaleDateString()}`,
     })
-    const result = isQuestionGroup.value
-      ? await addQuestionGroupToComposition(props.subjectId, 'personal', composition.id, props.questionGroupId!)
-      : await addQuestionsToComposition(props.subjectId, 'personal', composition.id, props.questionIds ?? [])
-    toast.success(`已创建并加入${isQuestionGroup.value ? '题组' : ` ${'addedCount' in result ? result.addedCount : 0} 道题`}`, jumpAction({ scope: 'personal', id: composition.id }))
+    const result = await addQuestionsToComposition(props.subjectId, 'personal', composition.id, props.questionIds ?? [])
+    toast.success(`已创建并加入 ${result.addedCount} 道题`, jumpAction({ scope: 'personal', id: composition.id }))
     emit('added')
     emit('update:open', false)
   } catch (err) {
@@ -138,7 +130,7 @@ const createAndAdd = async () => {
       <DialogHeader>
         <DialogTitle>选择稿件</DialogTitle>
         <DialogDescription>
-          {{ isQuestionGroup ? '将整个题组加入稿件' : `将 ${(questionIds ?? []).length} 道题加入稿件` }}
+          {{ `将 ${(questionIds ?? []).length} 道题加入稿件（依赖同一题目材料的小题会合成材料题）` }}
         </DialogDescription>
       </DialogHeader>
 

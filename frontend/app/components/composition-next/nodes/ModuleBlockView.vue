@@ -12,7 +12,7 @@ import {
 } from '@/components/ui/select'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { AlertTriangle, Eye, ListChecks, Trash2 } from '@lucide/vue'
-import { detailPropsOf, questionNumberOf } from '@/lib/compositionDocument'
+import { detailPropsOf, questionNumberOf, questionSlotsOf, slotNumbersOf } from '@/lib/compositionDocument'
 import type { EditorNode } from '@/lib/compositionDocument'
 import { ANSWER_FIELD_KEYS } from '@/types/composition'
 import type { AnswerFieldKey, DetailScope } from '@/types/composition'
@@ -113,7 +113,7 @@ const visibleFieldKeys = computed(() => ANSWER_FIELD_KEYS.filter((k) => detail.v
             <span class="font-medium">{{ idx === 0 && numberingEnabled && questionNumberOf(q) ? `${questionNumberOf(q)}.` : '' }}</span>
             <div>
               <span class="font-medium">【{{ FIELD_LABELS[key] }}】</span>
-              <AnswerDisplay v-if="key === 'answer'" :answer="q.questionContent.answer" :options="q.questionContent.options" class="inline" />
+              <AnswerDisplay v-if="key === 'answer'" :answer="q.questionContent.answer" :options="q.questionContent.options" :slot-numbers="numberingEnabled ? slotNumbersOf(questionSlotsOf(q)) : undefined" class="inline" />
               <RichContent v-else :content="q.questionContent[key]" class="inline [&_p]:my-0 [&_p]:inline" empty-text="（空）" />
             </div>
           </div>

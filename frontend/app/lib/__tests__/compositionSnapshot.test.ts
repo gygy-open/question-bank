@@ -124,8 +124,8 @@ describe('buildSnapshotTree', () => {
     const groupId = 'group-1'
     const group = {
       id: groupId, parent_id: null, slot: null, position: 0, schema_version: 1,
-      node_kind: 'module', node_type: 'question_group', question_group_id: 4,
-      question_group_revision: 2, stimulus_id: 6, stimulus_revision: 3, content: richDoc('材料'),
+      node_kind: 'module', node_type: 'question_group',
+      stimulus_id: 6, stimulus_revision: 3, content: richDoc('材料'),
     } as SnapshotNode
     const child = { ...questionNode('child-q', 0, qsnap(2)), parent_id: groupId, slot: 'body' } as SnapshotNode
     const answerSpace = {

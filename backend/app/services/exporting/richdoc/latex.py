@@ -145,6 +145,9 @@ def _inline_node(node: dict[str, Any], image_path: ImagePathFn) -> str:
         return _image(node, image_path)
 
     if t == "blank":
+        label = str((node.get("attrs") or {}).get("label") or "")
+        if label:
+            return f"\\underline{{\\makebox[{_blank_width_em(node):g}em]{{{latex_escape(label)}}}}}"
         return f"\\underline{{\\hspace{{{_blank_width_em(node):g}em}}}}"
 
     if node.get("content"):

@@ -26,7 +26,7 @@ from app.services.question_content_converter import (
 
 __all__ = ["LegacyQuestionError", "adapt_legacy_question"]
 
-_CHOICE_TYPES = {"single_choice", "multiple_choice"}
+_OPTION_TYPES = {"single_choice", "multiple_choice", "option_matching"}
 # 旧选项字符串的行首 label,如 "A. xxx" / "A、xxx" / "A) xxx" / "A：xxx"。
 _OPTION_LABEL_RE = re.compile(r"^\s*([A-Za-z])\s*[\.、\)．:：]\s*(.*)$", re.DOTALL)
 
@@ -102,7 +102,7 @@ def adapt_legacy_question(
         raise LegacyQuestionError("题干为空,无法导入")
 
     v2_options = None
-    if qt in _CHOICE_TYPES:
+    if qt in _OPTION_TYPES:
         v2_options = _normalize_legacy_options(options) or None
 
     answer_spec: Optional[dict[str, Any]] = None

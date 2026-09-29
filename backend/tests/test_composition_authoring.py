@@ -46,11 +46,23 @@ def test_question_content_is_left_to_the_server():
     assert node.question_id == 7
 
 
-def test_question_group_children_are_left_to_the_server():
-    (node,) = build_nodes([{"type": "question_group", "question_group_id": 9}])
-    assert node.node_kind.value == "module"
-    assert node.question_group_id == 9
-    assert node.content is None
+def test_question_group_expands_to_stimulus_module_with_question_children():
+    group, first, second = build_nodes(
+        [{"type": "question_group", "stimulus_id": 9, "question_ids": [3, 4]}]
+    )
+    assert group.node_kind.value == "module"
+    assert group.stimulus_id == 9
+    assert group.content is None
+    assert [(n.parent_id, n.node_type, n.question_id) for n in (first, second)] == [
+        (group.id, "question", 3),
+        (group.id, "question", 4),
+    ]
+    assert first.content is None
+
+
+def test_question_group_requires_question_ids():
+    with pytest.raises(AuthoringError, match="question_ids"):
+        build_nodes([{"type": "question_group", "stimulus_id": 9}])
 
 
 # --------------------------------------------------------------------------- #

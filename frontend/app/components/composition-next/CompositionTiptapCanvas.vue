@@ -30,10 +30,10 @@ import { createBlankNodeView } from '@/components/rich-editor/blankNodeView'
 import { MATH_EDITOR_KEY, type OpenMathEditorParams } from '@/components/rich-editor/mathEditorKey'
 import { BLANK_EDITOR_KEY, type OpenBlankEditorParams } from '@/components/rich-editor/blankEditorKey'
 import {
-  cloneNodesForInsert, collectStaleQuestionNodeIds, createQuestionNode, DETAIL_PRESETS,
+  cloneNodesForInsert, collectStaleQuestionNodeIds, questionsToRootNodes, DETAIL_PRESETS,
   documentFromNodes, type EditorDocument,
 } from '@/lib/compositionDocument'
-import type { CompositionDetail, CompositionScope, Question } from '@/types'
+import type { CompositionDetail, CompositionScope, Question, QuestionPage } from '@/types'
 import type { AnswerFieldKey, QuestionRevisionStatus } from '@/types/composition'
 import { getCompositionExtensions } from './schema'
 import { BlockInsertKeymap } from './blockInsert'
@@ -42,7 +42,7 @@ import { editorDocumentToPmDoc, pmDocToEditorDocument } from './convert'
 import {
   ANSWER_SPACE_RULES_KEY,
   DISPLAY_FIELDS_KEY, NUMBERING_ENABLED_KEY, QUESTION_STATUS_KEY, ROOT_NODES_KEY,
-  SCORING_ENABLED_KEY, SYNC_DISABLED_KEY, SYNC_QUESTIONS_KEY, defaultDisplayFields,
+  SCORING_ENABLED_KEY, STIMULUS_QUESTIONS_KEY, SYNC_DISABLED_KEY, SYNC_QUESTIONS_KEY, defaultDisplayFields,
   type EditorNodeLike,
 } from './editorContext'
 
@@ -74,6 +74,11 @@ provide(SYNC_QUESTIONS_KEY, (ids: string[]) => emit('sync', ids))
 // 有序根节点（含题目快照），供模块按 scope + 位置实时派生答案。
 provide(ROOT_NODES_KEY, computed(() => model.value.nodes as unknown as EditorNodeLike[]))
 provide(ANSWER_SPACE_RULES_KEY, useSubjectAnswerSpaceRules(() => props.subjectId))
+const { $api } = useNuxtApp()
+provide(STIMULUS_QUESTIONS_KEY, async (stimulusId: number) => {
+  const page = await $api<QuestionPage>('/questions', { query: { stimulus_id: stimulusId, size: 200 } })
+  return page.items
+})
 
 const staleNodeIds = computed(() =>
   collectStaleQuestionNodeIds(model.value, props.questionStatus ?? new Map()),
@@ -242,7 +247,7 @@ function insertRows(nodes: EditorDocument['nodes']) {
 }
 
 function onQuestionsSelected(questions: Question[]) {
-  insertRows(questions.map((q) => createQuestionNode(q)))
+  insertRows(questionsToRootNodes(questions))
 }
 
 function onCompositionSelected(detail: CompositionDetail) {

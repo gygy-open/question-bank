@@ -18,7 +18,8 @@ import { questionTypeLabel } from '@/lib/answerFormat'
 import {
   effectiveQuestionField, questionNodeStatus, questionNumberOf, questionOptionLayoutOf,
   questionPropsWithNumber, questionPropsWithOptionLayout, questionPropsWithScore,
-  questionPropsWithShow, questionScoreOf, questionShowOverride, resolveOptionColumns,
+  questionPropsWithShow, questionPropsWithSlot, questionScoreOf, questionShowOverride,
+  resolveOptionColumns, slotNumbersOf, stemWithSlotNumbers,
 } from '@/lib/compositionDocument'
 import type { EditorNode } from '@/lib/compositionDocument'
 import { ANSWER_FIELD_KEYS } from '@/types/composition'
@@ -78,6 +79,26 @@ const questionScore = computed<number | null>({
   get: () => questionScoreOf(shim.value),
   set: (v) => setProps(questionPropsWithScore(shim.value, v)),
 })
+
+// 选项匹配：每个空位单独编号/赋分，不显示整题题号与分值。
+const isMatching = computed(() => snapshot.value?.q_type === 'option_matching')
+const slotIds = computed(() => {
+  const answer = snapshot.value?.answer
+  return answer?.kind === 'option_matching' ? answer.slots.map((slot) => slot.id) : []
+})
+const slotProps = computed(() => qProps.value?.slots ?? {})
+const slotNumbers = computed(() => (numberingEnabled.value ? slotNumbersOf(slotProps.value) : {}))
+const stemContent = computed(() =>
+  isMatching.value ? stemWithSlotNumbers(snapshot.value?.content, slotNumbers.value) : snapshot.value?.content ?? null,
+)
+function setSlotNumber(slotId: string, value: string) {
+  setProps(questionPropsWithSlot(shim.value, slotId, { number: value.trim() || null }))
+}
+function setSlotScore(slotId: string, raw: string) {
+  const score = raw.trim() === '' ? null : Number(raw)
+  if (score != null && Number.isNaN(score)) return
+  setProps(questionPropsWithSlot(shim.value, slotId, { score }))
+}
 
 const OPTION_LAYOUT_ITEMS: { value: OptionLayout; label: string }[] = [
   { value: 'auto', label: '自动' },
@@ -231,7 +252,7 @@ const scoreDisplay = computed(() => `（${questionScore.value != null ? `${quest
     </div>
     <div v-else class="space-y-3">
       <div class="flex items-baseline gap-2 text-sm">
-        <template v-if="numberingEnabled">
+        <template v-if="numberingEnabled && !isMatching">
           <!-- 静息态显示纯文本；点击才切换为可编辑输入框，无需先选中整块即可编辑 -->
           <span class="inline-flex shrink-0 items-baseline">
             <input
@@ -256,7 +277,7 @@ const scoreDisplay = computed(() => `（${questionScore.value != null ? `${quest
         </template>
         <div class="min-w-0 flex-1 space-y-2">
           <div class="flow-root">
-            <template v-if="scoringEnabled">
+            <template v-if="scoringEnabled && !isMatching">
               <!-- 浮动的归并词需与题干段落同行高，否则两者的盒顶不在同一行高内会看起来错位 -->
               <span class="float-left inline-flex items-baseline font-medium leading-5 text-muted-foreground">
                 <template v-if="editingScore">（<input
@@ -278,7 +299,7 @@ const scoreDisplay = computed(() => `（${questionScore.value != null ? `${quest
                 >{{ scoreDisplay }}</button>
               </span>
             </template>
-            <RichContent :content="snapshot.content" empty-text="（无题干）" class="[&_p]:my-0 [&_p]:!leading-5" />
+            <RichContent :content="stemContent" empty-text="（无题干）" class="[&_p]:my-0 [&_p]:!leading-5" />
           </div>
           <ul
             v-if="snapshot.options?.length"
@@ -290,12 +311,36 @@ const scoreDisplay = computed(() => `（${questionScore.value != null ? `${quest
               <RichContent :content="opt.content" class="min-w-0 [&_p]:my-0" />
             </li>
           </ul>
+          <div
+            v-if="isMatching && slotIds.length && (numberingEnabled || scoringEnabled)"
+            class="flex flex-wrap gap-x-4 gap-y-1.5 rounded-md border border-dashed px-2 py-1.5 text-xs text-muted-foreground"
+          >
+            <span v-for="(slotId, i) in slotIds" :key="slotId" class="inline-flex items-center gap-1">
+              第 {{ i + 1 }} 空
+              <input
+                v-if="numberingEnabled"
+                :value="slotProps[slotId]?.number ?? ''"
+                placeholder="题号"
+                class="h-6 w-12 rounded border border-input bg-background px-1 text-center text-xs text-foreground outline-none focus-visible:border-ring"
+                @change="setSlotNumber(slotId, ($event.target as HTMLInputElement).value)"
+              >
+              <template v-if="scoringEnabled">
+                <input
+                  type="number" min="0" max="1000" step="0.5"
+                  :value="slotProps[slotId]?.score ?? ''"
+                  placeholder="分值"
+                  class="no-spinner h-6 w-12 rounded border border-input bg-background px-1 text-center text-xs text-foreground outline-none focus-visible:border-ring"
+                  @change="setSlotScore(slotId, ($event.target as HTMLInputElement).value)"
+                >分
+              </template>
+            </span>
+          </div>
         </div>
       </div>
       <template v-for="key in ANSWER_FIELD_KEYS" :key="key">
         <div v-if="fieldVisible(key)" class="rounded-md bg-muted/50 px-3 py-2">
           <p class="mb-1 text-xs font-medium text-muted-foreground">{{ FIELD_LABELS[key] }}</p>
-          <AnswerDisplay v-if="key === 'answer'" :answer="snapshot.answer" :options="snapshot.options" />
+          <AnswerDisplay v-if="key === 'answer'" :answer="snapshot.answer" :options="snapshot.options" :slot-numbers="slotNumbers" />
           <RichContent v-else :content="snapshot[key]" class="[&_.prose]:my-0" empty-text="（空）" />
         </div>
       </template>

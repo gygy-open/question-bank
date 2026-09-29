@@ -4,7 +4,7 @@ from sqlalchemy import select
 
 from app.core.security import create_access_token, get_password_hash
 from app.models.question import Question
-from app.models.question_group import QuestionRelation
+from app.models.question_relation import QuestionRelation
 from app.models.subject import Subject
 from app.models.user import User
 

@@ -3,6 +3,7 @@
 import type { InjectionKey, Ref } from 'vue'
 import { ref } from 'vue'
 import type { AnswerFieldKey, QuestionRevisionStatus } from '@/types/composition'
+import type { Question } from '@/types'
 import { DEFAULT_ANSWER_SPACE_RULES } from '@/lib/answerSpaceRules'
 import type { AnswerSpaceRules } from '@/lib/answerSpaceRules'
 
@@ -28,6 +29,10 @@ export const ROOT_NODES_KEY: InjectionKey<Ref<EditorNodeLike[]>> =
 export const ANSWER_SPACE_RULES_KEY: InjectionKey<Ref<AnswerSpaceRules>> =
   Symbol('composition-answer-space-rules')
 
+// 加载某题目材料下当前的活动小题（含 stimulus_position），供材料题节点补回/追加小题。
+export const STIMULUS_QUESTIONS_KEY: InjectionKey<(stimulusId: number) => Promise<Question[]>> =
+  Symbol('composition-stimulus-questions')
+
 // 避免与 lib/compositionDocument 形成导入环：此处仅需最小结构。
 export interface EditorNodeLike {
   id: string
@@ -50,3 +55,4 @@ export const FALLBACK_SYNC_DISABLED = ref(true)
 export const noopSync = (_ids: string[]) => {}
 export const FALLBACK_ROOT_NODES = ref([] as EditorNodeLike[])
 export const FALLBACK_ANSWER_SPACE_RULES = ref(DEFAULT_ANSWER_SPACE_RULES)
+export const noStimulusQuestions = async (_stimulusId: number): Promise<Question[]> => []

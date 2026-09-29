@@ -38,6 +38,7 @@ class ExportQuestionNode:
     thinking: RichDoc
     analysis: RichDoc
     summary: RichDoc
+    score_text: Optional[str] = None  # 有值时取代 score 显示(选项匹配题按空位汇总)
 
 
 @dataclass

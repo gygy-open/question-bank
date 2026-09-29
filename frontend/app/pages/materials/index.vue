@@ -10,13 +10,27 @@ import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { buildLibraryQuery } from '@/lib/libraryQueries'
-import { getApiErrorDetail, isRevisionConflict } from '@/lib/questionGroupEditor'
+import { getApiErrorDetail, isRevisionConflict } from '@/lib/apiErrors'
+import CompositionTargetPicker from '@/components/CompositionTargetPicker.vue'
 import type { StimulusListItem, StimulusPage } from '@/types'
 
 const { currentSubjectId } = useSubjectContext()
 const { can } = usePermissions()
 const canEdit = computed(() => can(Capability.EDIT_QUESTION, currentSubjectId.value))
-const { deleteMaterial, restoreMaterial } = useMaterials()
+const { deleteMaterial, restoreMaterial, getMaterial } = useMaterials()
+
+const pickerOpen = ref(false)
+const pickerQuestionIds = ref<number[]>([])
+const addToComposition = async (material: StimulusListItem) => {
+  if (!currentSubjectId.value) return
+  try {
+    const detail = await getMaterial(currentSubjectId.value, material.id)
+    pickerQuestionIds.value = detail.questions.map(question => question.id)
+    pickerOpen.value = pickerQuestionIds.value.length > 0
+  } catch (error) {
+    toast.error(getApiErrorDetail(error, '加载题目材料失败'))
+  }
+}
 
 const page = ref(1)
 const size = ref(10)
@@ -112,7 +126,7 @@ const restoreItem = async (material: StimulusListItem) => {
   <QuestionBankNav />
 
   <main class="flex flex-1 flex-col gap-5 px-4 py-6">
-    <p class="text-sm text-muted-foreground">供一道或多道题共同引用的文章、图表或背景内容；本身不可作答，也不包含答案和题型。</p>
+    <p class="text-sm text-muted-foreground">供一道或多道小题共同依赖的文章、图表或背景内容；本身不可作答。小题在编辑题目材料时维护，加入稿件时会带上材料。</p>
     <Tabs v-model="view">
       <TabsList><TabsTrigger value="active">当前</TabsTrigger><TabsTrigger value="deleted">回收站</TabsTrigger></TabsList>
     </Tabs>
@@ -137,9 +151,9 @@ const restoreItem = async (material: StimulusListItem) => {
       <AlertCircle class="size-6" /><span>题目材料加载失败</span>
       <Button variant="outline" size="sm" @click="load"><RotateCw class="mr-2 size-4" />重试</Button>
     </div>
-    <div v-else-if="materials.length === 0" class="py-16 text-center text-sm text-muted-foreground">{{ view === 'deleted' ? '回收站中暂无题目材料。' : '暂无题目材料。创建后可在多个题组中复用。' }}</div>
+    <div v-else-if="materials.length === 0" class="py-16 text-center text-sm text-muted-foreground">{{ view === 'deleted' ? '回收站中暂无题目材料。' : '暂无题目材料。创建后可在其下添加小题。' }}</div>
     <section v-else class="border-y">
-      <MaterialListItem v-for="material in materials" :key="material.id" :material="material" :can-edit="canEdit" @delete="deleteItem" @restore="restoreItem" />
+      <MaterialListItem v-for="material in materials" :key="material.id" :material="material" :can-edit="canEdit" @delete="deleteItem" @restore="restoreItem" @add-composition="addToComposition" />
     </section>
 
     <div v-if="total > 0" class="flex flex-wrap items-center justify-between gap-3 text-sm text-muted-foreground">
@@ -151,4 +165,5 @@ const restoreItem = async (material: StimulusListItem) => {
       </div>
     </div>
   </main>
+  <CompositionTargetPicker v-model:open="pickerOpen" :subject-id="currentSubjectId" :question-ids="pickerQuestionIds" />
 </template>

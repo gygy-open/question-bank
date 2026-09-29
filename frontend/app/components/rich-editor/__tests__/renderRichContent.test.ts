@@ -49,6 +49,14 @@ describe('renderRichContentToHTML', () => {
         expect(renderRichContentToHTML(emptyParagraphDoc)).toBe('')
     })
 
+    it('渲染下划线（选项匹配题号占位用）', () => {
+        const html = renderRichContentToHTML({
+            type: 'doc',
+            content: [{ type: 'paragraph', content: [{ type: 'text', text: '36', marks: [{ type: 'underline' }] }] }],
+        })
+        expect(html).toContain('<u>36</u>')
+    })
+
     it('非法输入不抛错，降级为空串', () => {
         const broken = { type: 'doc', content: [{ type: 'no_such_node' }] } as unknown as RichDoc
         expect(() => renderRichContentToHTML(broken)).not.toThrow()

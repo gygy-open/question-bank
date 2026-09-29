@@ -17,6 +17,20 @@ export function optionLabelsForAnswer(
     return []
 }
 
+/** 选项匹配：按空位顺序得到 { 空位序号或稿件题号, 选项 label }，未选为空串。 */
+export function matchingAnswerEntries(
+    answer: AnswerSpec | null | undefined,
+    options: OptionSpec[] | null | undefined,
+    numbers?: Record<string, string | undefined>,
+): { number: string; label: string }[] {
+    if (answer?.kind !== 'option_matching') return []
+    const byId = new Map((options ?? []).map((o) => [o.id, o.label]))
+    return answer.slots.map((slot, i) => ({
+        number: numbers?.[slot.id] || String(i + 1),
+        label: slot.correct ? (byId.get(slot.correct) ?? slot.correct) : '',
+    }))
+}
+
 /**
  * 把 AnswerSpec 抽成纯文本摘要（列表卡片/预览用），不渲染富文本，只取纯文本。
  * 空答案返回 ''。
@@ -38,6 +52,10 @@ export function answerToPlainText(
                 .join('；')
         case 'free_response':
             return richDocToPlainText(answer.reference)
+        case 'option_matching':
+            return matchingAnswerEntries(answer, options)
+                .map((entry) => `${entry.number}. ${entry.label || '？'}`)
+                .join('；')
         case 'legacy_unresolved':
             return richDocToPlainText(answer.raw)
         default:
@@ -51,6 +69,7 @@ const TYPE_LABELS: Record<QuestionType, string> = {
     true_false: '判断题',
     fill_in_the_blank: '填空题',
     free_response: '解答题',
+    option_matching: '选项匹配',
 }
 
 export function questionTypeLabel(qType: QuestionType | string): string {

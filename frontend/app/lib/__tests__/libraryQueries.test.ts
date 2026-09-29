@@ -7,9 +7,9 @@ describe('buildLibraryQuery', () => {
   })
 
   it('preserves explicit false membership filters and deep-link ids', () => {
-    expect(buildLibraryQuery({ page: 2, in_question_group: false, question_id: 18 })).toEqual({
+    expect(buildLibraryQuery({ page: 2, has_stimulus: false, question_id: 18 })).toEqual({
       page: 2,
-      in_question_group: false,
+      has_stimulus: false,
       question_id: 18,
     })
   })

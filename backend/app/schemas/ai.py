@@ -8,6 +8,7 @@ class QuestionTypeEnum(str, Enum):
     TRUE_FALSE = "true_false"
     FILL_IN_THE_BLANK = "fill_in_the_blank"
     FREE_RESPONSE = "free_response"
+    OPTION_MATCHING = "option_matching"
 
 class AIQuestion(BaseModel):
     id: Optional[str] = None

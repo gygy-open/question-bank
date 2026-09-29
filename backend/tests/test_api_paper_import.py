@@ -14,12 +14,8 @@ from app.core.security import create_access_token
 from app.models.composition import Composition, CompositionNode
 from app.models.import_task import CompositionImportState, ImportTask
 from app.models.question import Question
-from app.models.question_group import (
-    QuestionGroup,
-    QuestionGroupItem,
-    QuestionRelation,
-    Stimulus,
-)
+from app.models.question_relation import QuestionRelation
+from app.models.stimulus import Stimulus
 from app.models.subject import Subject
 from app.models.subject_member import SubjectMember
 from app.models.user import User
@@ -294,7 +290,7 @@ async def test_legacy_nested_children_create_relation_not_material_group(
     assert all(not hasattr(question, "parent_id") for question in questions)
     assert len((await db_session.execute(select(QuestionRelation))).scalars().all()) == 1
     assert (await db_session.execute(select(Stimulus))).scalars().all() == []
-    assert (await db_session.execute(select(QuestionGroup))).scalars().all() == []
+    assert all(question.stimulus_id is None for question in questions)
 
 
 async def test_explicit_material_group_persists_and_builds_ordered_composition(
@@ -331,23 +327,22 @@ async def test_explicit_material_group_persists_and_builds_ordered_composition(
     assert response.status_code == 200, response.text
     body = response.json()
     assert set(body["stimulus_temp_id_map"]) == {"s1"}
-    assert set(body["question_group_temp_id_map"]) == {"g1"}
+    assert "question_group_temp_id_map" not in body
 
     stimulus = (await db_session.execute(select(Stimulus))).scalars().one()
     assert json.loads(stimulus.content)["type"] == "doc"
     assert stimulus.source == "material.md"
     assert json.loads(stimulus.metadata_json) == {"source_page": 3}
-    group = (await db_session.execute(select(QuestionGroup))).scalars().one()
-    items = (
+    members = (
         await db_session.execute(
-            select(QuestionGroupItem)
-            .where(QuestionGroupItem.group_id == group.id)
-            .order_by(QuestionGroupItem.position)
+            select(Question)
+            .where(Question.stimulus_id == stimulus.id)
+            .order_by(Question.stimulus_position)
         )
     ).scalars().all()
-    assert [item.question_id for item in items] == [
-        body["temp_id_map"]["q2"],
-        body["temp_id_map"]["q1"],
+    assert [(q.id, q.stimulus_position) for q in members] == [
+        (body["temp_id_map"]["q2"], 0),
+        (body["temp_id_map"]["q1"], 1),
     ]
 
     detail = await client.get(
@@ -356,7 +351,8 @@ async def test_explicit_material_group_persists_and_builds_ordered_composition(
     )
     nodes = detail.json()["nodes"]
     module = next(node for node in nodes if node["node_type"] == "question_group")
-    assert module["question_group_id"] == body["question_group_temp_id_map"]["g1"]
+    assert module["stimulus_id"] == body["stimulus_temp_id_map"]["s1"]
+    assert module["stimulus_revision"] == 1
     children = sorted(
         [node for node in nodes if node["parent_id"] == module["id"]],
         key=lambda node: node["position"],
@@ -384,9 +380,43 @@ async def test_stimulus_can_be_reused_by_two_imported_groups(client, ctx, db_ses
         headers=_auth(ctx["editor"]),
     )
     assert response.status_code == 200, response.text
-    groups = (await db_session.execute(select(QuestionGroup))).scalars().all()
-    assert len(groups) == 2
-    assert len({group.stimulus_id for group in groups}) == 1
+    stimulus = (await db_session.execute(select(Stimulus))).scalars().one()
+    members = (
+        await db_session.execute(
+            select(Question)
+            .where(Question.stimulus_id == stimulus.id)
+            .order_by(Question.stimulus_position)
+        )
+    ).scalars().all()
+    body = response.json()
+    assert [(q.id, q.stimulus_position) for q in members] == [
+        (body["temp_id_map"]["q1"], 0),
+        (body["temp_id_map"]["q2"], 1),
+    ]
+
+
+async def test_question_cannot_belong_to_two_imported_groups(client, ctx, db_session):
+    sid = ctx["subject"].id
+    response = await client.post(
+        f"{API}/subjects/{sid}/paper-imports",
+        json={
+            "scope": "shared",
+            "questions": [_question("q1", "题一")],
+            "stimuli": [
+                {"temp_id": "s1", "markdown": "材料一"},
+                {"temp_id": "s2", "markdown": "材料二"},
+            ],
+            "question_groups": [
+                {"temp_id": "g1", "stimulus_temp_id": "s1", "question_temp_ids": ["q1"]},
+                {"temp_id": "g2", "stimulus_temp_id": "s2", "question_temp_ids": ["q1"]},
+            ],
+            "save_as_composition": False,
+        },
+        headers=_auth(ctx["editor"]),
+    )
+    assert response.status_code == 422, response.text
+    assert "只能依赖一份题目材料" in response.json()["detail"]
+    assert (await db_session.execute(select(Question))).scalars().all() == []
 
 
 async def test_shared_stimulus_is_self_contained_per_group_and_outline_order_is_preserved(
@@ -508,7 +538,6 @@ async def test_bad_group_temp_reference_fails_before_any_write(client, ctx, db_s
     assert "不存在的题目 temp_id" in response.json()["detail"]
     assert (await db_session.execute(select(Question))).scalars().all() == []
     assert (await db_session.execute(select(Stimulus))).scalars().all() == []
-    assert (await db_session.execute(select(QuestionGroup))).scalars().all() == []
     assert (await db_session.execute(select(ImportTask))).scalars().all() == []
 
 
@@ -602,7 +631,6 @@ async def test_replace_nodes_failure_rolls_back_all_import_entities(
         Question,
         QuestionRelation,
         Stimulus,
-        QuestionGroup,
         Composition,
         CompositionNode,
     ):
@@ -759,7 +787,6 @@ async def test_replay_with_same_idempotency_key_does_not_duplicate(client, ctx, 
         "composition_title",
         "temp_id_map",
         "stimulus_temp_id_map",
-        "question_group_temp_id_map",
     ):
         assert second.json()[field] == first.json()[field]
 

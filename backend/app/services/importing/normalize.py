@@ -30,6 +30,8 @@ def coerce_q_type(raw: Any) -> QuestionType:
     if isinstance(raw, QuestionType):
         return raw
     s = str(raw or "single_choice").lower()
+    if "match" in s or "匹配" in s:
+        return QuestionType.OPTION_MATCHING
     if "multiple" in s:
         return QuestionType.MULTIPLE_CHOICE
     if "true" in s or "false" in s:

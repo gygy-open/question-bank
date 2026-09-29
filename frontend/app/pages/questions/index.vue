@@ -162,7 +162,7 @@ const queryParams = computed(() => {
   if (filters.keyword) params.keyword = filters.keyword
   if (filters.source) params.source = filters.source
   if (filters.root_only) params.root_only = true
-  if (filters.membership !== 'all') params.in_question_group = filters.membership === 'grouped'
+  if (filters.membership !== 'all') params.has_stimulus = filters.membership === 'grouped'
   
   return params
 })
@@ -366,6 +366,7 @@ const qTypeOptions = [
   { label: '判断题', value: 'true_false' },
   { label: '填空题', value: 'fill_in_the_blank' },
   { label: '解答题', value: 'free_response' },
+  { label: '选项匹配', value: 'option_matching' },
 ]
 
 const difficultyOptions = [
@@ -546,7 +547,7 @@ const viewStructure = (question: Question) => {
   <QuestionBankNav />
   <div class="flex flex-1 flex-col">
     <div class="@container/main flex flex-1 flex-col px-4 space-y-6 py-6">
-      <p class="text-sm text-muted-foreground">可独立作答和评分的基本单元；加入题组只建立引用，不改变题目本身。</p>
+      <p class="text-sm text-muted-foreground">可独立作答和评分的基本单元；材料题的小题依赖题目材料，加入稿件时会带上材料。</p>
       
       <div v-if="filters.import_task_id" class="bg-primary/10 text-primary px-4 py-3 rounded-md flex items-center justify-between">
           <span class="text-sm font-medium">正在查看最新导入的题目任务</span>
@@ -653,7 +654,7 @@ const viewStructure = (question: Question) => {
                     >
                       <ToggleGroupItem value="all">全部</ToggleGroupItem>
                       <ToggleGroupItem value="independent">独立题</ToggleGroupItem>
-                      <ToggleGroupItem value="grouped">题组成员</ToggleGroupItem>
+                      <ToggleGroupItem value="grouped">材料题小题</ToggleGroupItem>
                     </ToggleGroup>
                   </div>
 

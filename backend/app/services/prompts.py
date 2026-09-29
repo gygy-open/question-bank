@@ -64,13 +64,14 @@ DEFAULT_EXTRACT_PROMPT = r"""你是一个专业的{subject_name}题目提取助�
 ## 提取规则
 
 ### 1. 基础信息提取
-- **题目类型 (q_type)**：识别为 `single_choice` (单选), `multiple_choice` (多选), `fill_in_the_blank` (填空), `free_response` (解答), `true_false` (判断)。
+- **题目类型 (q_type)**：识别为 `single_choice` (单选), `multiple_choice` (多选), `fill_in_the_blank` (填空), `free_response` (解答), `true_false` (判断), `option_matching` (选项匹配：多个空位共用一组选项，整体作为一道题)。
 - **题干 (content)**：
     - **必须**去除开头的题号（如 "1.", "2、", "(1)" 等）。
     - **必须**原样保留形如 `@@IMG0@@`、`@@IMG1@@` 的图片占位符标记（每个代表一张图片），放在它在原文中
       出现的位置，**不要**删除、翻译、修改或尝试解释其含义。
-- **选项 (options)**：如果是选择题，提取选项列表。
+- **选项 (options)**：如果是选择题或选项匹配题，提取选项列表（选项匹配题为共享的全部备选项）。
 - **答案 (answer)**：
+    - **选项匹配题**：按空位顺序给出选项字母字符串，如 `"CAGDE"`。
     - **填空题**：必须返回一个二维数组 `[["答案1A", "答案1B"], ["答案2"]]`。
         - 外层列表对应空的顺序。
         - 内层列表对应每个空允许的备选答案。
@@ -103,7 +104,8 @@ DEFAULT_EXTRACT_PROMPT = r"""你是一个专业的{subject_name}题目提取助�
 - 阅读材料单独放入 `stimuli`：`temp_id`、`markdown`、`metadata`。
 - 材料下的小题仍放入 `questions`，每题具有唯一 `id`；题组放入 `question_groups`：
     `temp_id`、`stimulus_temp_id`、按原卷顺序排列的 `question_temp_ids`、`metadata`。
-- 同一材料可被多个题组引用。不得用 `children` 表示材料题。
+- 每道小题最多只能出现在一个题组中（一道题只依赖一份材料）；同一材料被原卷拆成多段设问时，
+    可以有多个题组引用同一材料，但它们的 `question_temp_ids` 不得重叠。不得用 `children` 表示材料题。
 - 只有当一道题是由另一道题拆解得到时，才可使用旧 `children`；系统会将其保存为
     `decomposed_from` 关系，不会把它转换成材料题。
 - **JSON 示例**：
@@ -134,14 +136,15 @@ DEFAULT_SOLVE_PROMPT = r"""你是一位资深的{subject_name}老师。{subject_
 ## 处理规则
 
 ### 1. 题目识别与解答
-- **题目类型 (q_type)**：识别为 `single_choice` (单选), `multiple_choice` (多选), `fill_in_the_blank` (填空), `free_response` (解答), `true_false` (判断)。
+- **题目类型 (q_type)**：识别为 `single_choice` (单选), `multiple_choice` (多选), `fill_in_the_blank` (填空), `free_response` (解答), `true_false` (判断), `option_matching` (选项匹配：多个空位共用一组选项，整体作为一道题)。
 - **题干 (content)**：
     - **必须**去除开头的题号。
     - **必须**原样保留形如 `@@IMG0@@`、`@@IMG1@@` 的图片占位符标记（每个代表一张图片），放在它在原文中
       出现的位置，**不要**删除、翻译、修改或尝试解释其含义。
-- **选项 (options)**：如果是选择题，提取选项列表。
+- **选项 (options)**：如果是选择题或选项匹配题，提取选项列表（选项匹配题为共享的全部备选项）。
 - **答案 (answer)**：
     - **请务必自己做一遍题目**，不要直接抄写原文中的标记。
+    - **选项匹配题**：按空位顺序给出选项字母字符串，如 `"CAGDE"`。
     - **填空题**：返回二维数组 `[["答案1A", "答案1B"], ["答案2"]]`。所有数学内容（包括数字、变量、公式）**必须**使用 LaTeX 格式包裹（例如 `$1$`, `$x$`, `$\sqrt{2}$`）。
     - **其他题型**：返回标准答案字符串。
 - **解析生成**：

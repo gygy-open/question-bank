@@ -71,15 +71,14 @@ class PaperImportStimulus(BaseModel):
 
 
 class PaperImportQuestionGroup(BaseModel):
+    """原文中的一组材料题:写库时转为成员题目的 stimulus_id/position,不落独立实体。"""
+
     model_config = ConfigDict(extra="forbid")
 
     temp_id: str = Field(min_length=1)
     stimulus_temp_id: str = Field(min_length=1)
     question_temp_ids: List[str] = Field(min_length=1)
     metadata: Dict[str, Any] = Field(default_factory=dict)
-    status: Optional[QuestionStatus] = None
-    visibility: Optional[QuestionVisibility] = None
-    source: Optional[str] = None
 
 
 class PaperImportPreviewRequest(BaseModel):
@@ -142,7 +141,6 @@ class PaperImportCommitResponse(BaseModel):
     composition_title: Optional[str] = None
     temp_id_map: Dict[str, int] = Field(default_factory=dict)
     stimulus_temp_id_map: Dict[str, int] = Field(default_factory=dict)
-    question_group_temp_id_map: Dict[str, int] = Field(default_factory=dict)
     reused_existing: bool = False
 
 

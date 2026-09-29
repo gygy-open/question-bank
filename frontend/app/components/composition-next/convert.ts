@@ -87,8 +87,6 @@ function questionGroupRowToPm(node: EditorNode): RichNode {
     type: 'questionGroup',
     attrs: {
       [UID_ATTR]: node.id,
-      questionGroupId: node.questionGroupId,
-      questionGroupRevision: node.questionGroupRevision,
       stimulusId: node.stimulusId,
       stimulusRevision: node.stimulusRevision,
       stimulus: node.content,
@@ -216,8 +214,6 @@ export function pmDocToEditorDocument(pmDoc: RichDocNode): EditorDocument {
       case 'questionGroup': {
         const node = makeNode('question_group')
         if (typeof uid === 'string') node.id = uid
-        node.questionGroupId = (block.attrs?.questionGroupId as number | null) ?? null
-        node.questionGroupRevision = (block.attrs?.questionGroupRevision as number | null) ?? null
         node.stimulusId = (block.attrs?.stimulusId as number | null) ?? null
         node.stimulusRevision = (block.attrs?.stimulusRevision as number | null) ?? null
         node.content = (block.attrs?.stimulus as RichDocNode | null) ?? null

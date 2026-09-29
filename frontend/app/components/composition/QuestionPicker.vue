@@ -50,6 +50,7 @@ const qTypeOptions = [
   { label: '判断题', value: 'true_false' },
   { label: '填空题', value: 'fill_in_the_blank' },
   { label: '解答题', value: 'free_response' },
+  { label: '选项匹配', value: 'option_matching' },
 ]
 const difficultyOptions = [
   { label: '全部难度', value: '0' },
@@ -171,7 +172,7 @@ watch(
 )
 
 function isChoiceType(qType: string) {
-  return qType === 'single_choice' || qType === 'multiple_choice'
+  return qType === 'single_choice' || qType === 'multiple_choice' || qType === 'option_matching'
 }
 
 function toggleSelect(q: Question) {

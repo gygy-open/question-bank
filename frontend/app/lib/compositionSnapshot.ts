@@ -13,6 +13,7 @@ import type {
   SnapshotQuestionNode,
 } from '@/types/composition'
 import { ANSWER_FIELD_KEYS } from '@/types/composition'
+import { slotNumbersOf } from '@/lib/compositionDocument'
 
 /** 带 module 子节点的树节点（仅 question_details 携带非空 children）。 */
 export type SnapshotTreeNode = SnapshotNode & { children: SnapshotNode[] }
@@ -109,6 +110,25 @@ export function resolvedQuestionScore(node: SnapshotQuestionNode, snapshot: Comp
   if (!snapshot.scoring_enabled) return null
   const s = node.props?.score
   return typeof s === 'number' ? s : null
+}
+
+/** 选项匹配题的空位题号（题号关闭时为空）。 */
+export function resolvedSlotNumbers(node: SnapshotQuestionNode, snapshot: CompositionSnapshot): Record<string, string> {
+  if (!snapshot.numbering_enabled || node.question.q_type !== 'option_matching') return {}
+  return slotNumbersOf(node.props?.slots)
+}
+
+/** 选项匹配题分值文案，与导出一致：全部空位同分为“每空 N 分”，否则“共 N 分”。 */
+export function resolvedSlotScoreText(node: SnapshotQuestionNode, snapshot: CompositionSnapshot): string | null {
+  if (!snapshot.scoring_enabled || node.question.q_type !== 'option_matching') return null
+  const answer = node.question.answer
+  const slotCount = answer?.kind === 'option_matching' ? answer.slots.length : 0
+  const scores = Object.values(node.props?.slots ?? {})
+    .map((slot) => slot.score)
+    .filter((score): score is number => typeof score === 'number')
+  if (!scores.length) return null
+  if (scores.length === slotCount && new Set(scores).size === 1) return `每空 ${scores[0]} 分`
+  return `共 ${scores.reduce((sum, score) => sum + score, 0)} 分`
 }
 
 /** 题目级 show 覆盖 ?? 定稿时刻冻结的全局默认;旧快照缺失 question_display 视为全局默认全部隐藏。 */
