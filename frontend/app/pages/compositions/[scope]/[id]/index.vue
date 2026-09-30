@@ -154,19 +154,19 @@ const staleQuestionGroups = computed(() => questionGroupStatus.value.filter((sta
 const hasStaleSources = computed(() => hasStaleQuestions.value || staleQuestionGroups.value.length > 0)
 const questionGroupUpdateSummary = computed(() => {
   const statuses = staleQuestionGroups.value
-  const material = statuses.filter((status) =>
+  const stimulus = statuses.filter((status) =>
     !status.stimulus_available || status.stimulus_current_revision !== status.stimulus_pinned_revision)
   const structure = statuses.filter((status) => status.structure_changed)
   const questions = statuses.filter((status) => status.members.some((member) =>
     !member.available || member.current_revision !== member.pinned_revision))
   return {
-    material: material.length,
+    stimulus: stimulus.length,
     structure: structure.length,
     questions: questions.length,
   }
 })
 // 材料下新增了小题但尚未加入稿件：只提示，不算过期；在材料题内“添加小题”手动选用。
-const newMaterialQuestionCount = computed(() =>
+const newStimulusQuestionCount = computed(() =>
   questionGroupStatus.value.reduce((sum, status) => sum + status.new_question_ids.length, 0))
 const numberingEnabled = computed(() => composition.value?.numbering_enabled ?? false)
 const scoringEnabled = computed(() => composition.value?.scoring_enabled ?? false)
@@ -799,20 +799,20 @@ onBeforeRouteLeave(() => {
       </div>
 
       <div
-        v-if="staleQuestionGroups.length || newMaterialQuestionCount"
+        v-if="staleQuestionGroups.length || newStimulusQuestionCount"
         class="flex flex-wrap items-center gap-3 rounded-md border border-amber-400 bg-amber-50 px-4 py-3 text-sm dark:border-amber-700 dark:bg-amber-900/20"
       >
         <AlertTriangle class="h-4 w-4 shrink-0 text-amber-600 dark:text-amber-400" />
         <span class="min-w-0 flex-1">
           <template v-if="staleQuestionGroups.length">
             {{ staleQuestionGroups.length }} 道材料题有来源更新：
-            <template v-if="questionGroupUpdateSummary.material">材料 {{ questionGroupUpdateSummary.material }} 个</template>
-            <template v-if="questionGroupUpdateSummary.structure">{{ questionGroupUpdateSummary.material ? '，' : '' }}小题顺序 {{ questionGroupUpdateSummary.structure }} 个</template>
-            <template v-if="questionGroupUpdateSummary.questions">{{ questionGroupUpdateSummary.material || questionGroupUpdateSummary.structure ? '，' : '' }}小题内容或归属 {{ questionGroupUpdateSummary.questions }} 个</template>。
+            <template v-if="questionGroupUpdateSummary.stimulus">材料 {{ questionGroupUpdateSummary.stimulus }} 个</template>
+            <template v-if="questionGroupUpdateSummary.structure">{{ questionGroupUpdateSummary.stimulus ? '，' : '' }}小题顺序 {{ questionGroupUpdateSummary.structure }} 个</template>
+            <template v-if="questionGroupUpdateSummary.questions">{{ questionGroupUpdateSummary.stimulus || questionGroupUpdateSummary.structure ? '，' : '' }}小题内容或归属 {{ questionGroupUpdateSummary.questions }} 个</template>。
             当前仍显示冻结版本，不会自动刷新。
           </template>
-          <template v-if="newMaterialQuestionCount">
-            题目材料下新增了 {{ newMaterialQuestionCount }} 道未选用的小题，可在对应材料题中“添加小题”。
+          <template v-if="newStimulusQuestionCount">
+            题目材料下新增了 {{ newStimulusQuestionCount }} 道未选用的小题，可在对应材料题中“添加小题”。
           </template>
         </span>
         <Button v-if="staleQuestionGroups.length" size="sm" variant="outline" :disabled="dirty || syncingQuestionGroups" @click="syncQuestionGroups">

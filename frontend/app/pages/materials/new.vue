@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import MaterialForm from '@/components/materials/MaterialForm.vue'
+import StimulusForm from '@/components/stimuli/StimulusForm.vue'
 </script>
 
-<template><MaterialForm /></template>
+<template><StimulusForm /></template>

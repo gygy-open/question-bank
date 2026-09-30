@@ -32,11 +32,11 @@ export function moveMember(
 }
 
 /** 私有材料下不能挂公开小题;返回违反该规则的小题 ID。 */
-export function publicQuestionsUnderPrivateMaterial(
-  materialVisibility: 'public' | 'private',
+export function publicQuestionsUnderPrivateStimulus(
+  stimulusVisibility: 'public' | 'private',
   members: QuestionSummary[],
 ): number[] {
-  if (materialVisibility !== 'private') return []
+  if (stimulusVisibility !== 'private') return []
   return members.filter(member => member.visibility === 'public').map(member => member.id)
 }
 

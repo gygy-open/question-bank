@@ -66,7 +66,7 @@ erDiagram
 
 ### 术语
 
-- 中文界面统一称“题目材料”；代码标识使用 `Stimulus`。
+- 中文界面统一称“题目材料”；前后端代码标识一律使用 `Stimulus` / `stimulus`（复数 `stimuli`），不混用 `material`。用户可见的前端路由保留 `/materials`。
 - `Question` 始终是可作答、可评分的题目；材料题的小题使用现有题型。
 - 题库中没有“题组”实体。稿件中的 `question_group` 节点表示“一篇材料 + 从中选用的小题”，相当于 QTI 的 section/testlet。
 
@@ -203,7 +203,7 @@ erDiagram
 - 模型：`backend/app/models/stimulus.py`、`question.py`、`question_relation.py`、`composition.py`
 - 服务：`backend/app/services/stimulus_service.py`、`question_relation_service.py`、`composition_service.py`、`paper_import_service.py`、`composition_authoring.py`
 - API：`backend/app/api/v1/endpoints/stimuli.py`、`questions.py`
-- 前端：`frontend/app/components/materials/*`、`lib/materialEditor.ts`、`lib/compositionDocument.ts`（材料题节点、按空位编号计分）、`lib/questionModel.ts`、`components/AnswerEditor.vue`、`components/composition-next/nodes/QuestionGroupBlockView.vue`、`QuestionBlockView.vue`、`lib/importReview.ts`
+- 前端：`frontend/app/components/stimuli/*`、`composables/useStimuli.ts`、`lib/stimulusEditor.ts`、`pages/materials/*`（路由）、`lib/compositionDocument.ts`（材料题节点、按空位编号计分）、`lib/questionModel.ts`、`components/AnswerEditor.vue`、`components/composition-next/nodes/QuestionGroupBlockView.vue`、`QuestionBlockView.vue`、`lib/importReview.ts`
 - 测试：`backend/tests/test_stimulus_questions.py`、`test_composition_question_groups.py`、`test_api_composition_question_group_sync.py`、`test_api_paper_import.py`、`test_migrations.py`、`test_option_matching.py`、`test_option_matching_composition.py`
 
 ## 参考

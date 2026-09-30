@@ -5,16 +5,16 @@ import {
   addMember,
   hasEditorSubjectMismatch,
   moveMember,
-  publicQuestionsUnderPrivateMaterial,
+  publicQuestionsUnderPrivateStimulus,
   removeMember,
   sameOrder,
-} from '@/lib/materialEditor'
+} from '@/lib/stimulusEditor'
 
 const question = (id: number, visibility: 'public' | 'private' = 'public'): QuestionSummary =>
   ({ id, visibility } as QuestionSummary)
 const ids = (members: QuestionSummary[]) => members.map(member => member.id)
 
-describe('material sub-question operations', () => {
+describe('stimulus sub-question operations', () => {
   it('adds unique questions in order', () => {
     const members = addMember([], question(2))
     expect(addMember(members, question(2))).toBe(members)
@@ -34,11 +34,11 @@ describe('material sub-question operations', () => {
   })
 })
 
-describe('material visibility compatibility', () => {
-  it('flags public questions under a private material only', () => {
+describe('stimulus visibility compatibility', () => {
+  it('flags public questions under a private stimulus only', () => {
     const members = [question(2), question(5, 'private')]
-    expect(publicQuestionsUnderPrivateMaterial('private', members)).toEqual([2])
-    expect(publicQuestionsUnderPrivateMaterial('public', members)).toEqual([])
+    expect(publicQuestionsUnderPrivateStimulus('private', members)).toEqual([2])
+    expect(publicQuestionsUnderPrivateStimulus('public', members)).toEqual([])
   })
 })
 

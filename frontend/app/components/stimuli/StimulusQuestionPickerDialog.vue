@@ -15,7 +15,7 @@ const props = defineProps<{
   open: boolean
   subjectId: number | null
   selectedIds: number[]
-  materialVisibility: 'public' | 'private'
+  stimulusVisibility: 'public' | 'private'
 }>()
 const emit = defineEmits<{ 'update:open': [value: boolean], select: [questions: Question[]] }>()
 const { $api } = useNuxtApp()
@@ -45,7 +45,7 @@ watch(() => props.open, open => { if (open) { page.value = 1; picked.value = new
 watch(keyword, () => { clearTimeout(debounce); debounce = setTimeout(() => { page.value = 1; load() }, 250) })
 watch([qType, status], () => { page.value = 1; load() })
 watch(page, load)
-const isIncompatible = (question: Question) => props.materialVisibility === 'private' && question.visibility === 'public'
+const isIncompatible = (question: Question) => props.stimulusVisibility === 'private' && question.visibility === 'public'
 const toggle = (question: Question) => {
   if (props.selectedIds.includes(question.id) || isIncompatible(question)) return
   const next = new Map(picked.value)

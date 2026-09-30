@@ -1,8 +1,8 @@
 <script setup lang="ts">
-import MaterialForm from '@/components/materials/MaterialForm.vue'
+import StimulusForm from '@/components/stimuli/StimulusForm.vue'
 
 const route = useRoute()
-const materialId = Number(route.params.id)
+const stimulusId = Number(route.params.id)
 </script>
 
-<template><MaterialForm :material-id="materialId" /></template>
+<template><StimulusForm :stimulus-id="stimulusId" /></template>

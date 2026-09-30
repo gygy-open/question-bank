@@ -3,7 +3,7 @@ import { computed, onActivated, ref, watch } from 'vue'
 import { AlertCircle, ChevronLeft, ChevronRight, Loader2, Plus, RotateCw } from '@lucide/vue'
 import { toast } from 'vue-sonner'
 import PageHeader from '@/components/PageHeader.vue'
-import MaterialListItem from '@/components/materials/MaterialListItem.vue'
+import StimulusRow from '@/components/stimuli/StimulusRow.vue'
 import ClearableInput from '@/components/ClearableInput.vue'
 import ClearableSelect from '@/components/ClearableSelect.vue'
 import { Button } from '@/components/ui/button'
@@ -17,14 +17,14 @@ import type { StimulusListItem, StimulusPage } from '@/types'
 const { currentSubjectId } = useSubjectContext()
 const { can } = usePermissions()
 const canEdit = computed(() => can(Capability.EDIT_QUESTION, currentSubjectId.value))
-const { deleteMaterial, restoreMaterial, getMaterial } = useMaterials()
+const { deleteStimulus, restoreStimulus, getStimulus } = useStimuli()
 
 const pickerOpen = ref(false)
 const pickerQuestionIds = ref<number[]>([])
-const addToComposition = async (material: StimulusListItem) => {
+const addToComposition = async (stimulus: StimulusListItem) => {
   if (!currentSubjectId.value) return
   try {
-    const detail = await getMaterial(currentSubjectId.value, material.id)
+    const detail = await getStimulus(currentSubjectId.value, stimulus.id)
     pickerQuestionIds.value = detail.questions.map(question => question.id)
     pickerOpen.value = pickerQuestionIds.value.length > 0
   } catch (error) {
@@ -53,7 +53,7 @@ const { data, refresh, status, error } = await useAPI<StimulusPage>(endpoint, {
   immediate: false,
   watch: false,
 })
-const materials = computed(() => data.value?.items ?? [])
+const stimuli = computed(() => data.value?.items ?? [])
 const total = computed(() => data.value?.total ?? 0)
 const pages = computed(() => data.value?.pages ?? 0)
 
@@ -88,12 +88,12 @@ const visibilityOptions = [
   { label: '私有', value: 'private' },
 ]
 
-const deleteItem = async (material: StimulusListItem) => {
-  if (!currentSubjectId.value || !confirm(`确定删除题目材料 #${material.id} 吗？`)) return
+const deleteItem = async (stimulus: StimulusListItem) => {
+  if (!currentSubjectId.value || !confirm(`确定删除题目材料 #${stimulus.id} 吗？`)) return
   try {
-    await deleteMaterial(currentSubjectId.value, material.id, material.revision)
+    await deleteStimulus(currentSubjectId.value, stimulus.id, stimulus.revision)
     toast.success('题目材料已移入回收站')
-    if (materials.value.length === 1 && page.value > 1) page.value--
+    if (stimuli.value.length === 1 && page.value > 1) page.value--
     else await refresh()
   } catch (error) {
     if (isRevisionConflict(error)) await refresh()
@@ -101,12 +101,12 @@ const deleteItem = async (material: StimulusListItem) => {
   }
 }
 
-const restoreItem = async (material: StimulusListItem) => {
+const restoreItem = async (stimulus: StimulusListItem) => {
   if (!currentSubjectId.value) return
   try {
-    await restoreMaterial(currentSubjectId.value, material.id, material.revision)
+    await restoreStimulus(currentSubjectId.value, stimulus.id, stimulus.revision)
     toast.success('题目材料已恢复')
-    if (materials.value.length === 1 && page.value > 1) page.value--
+    if (stimuli.value.length === 1 && page.value > 1) page.value--
     else await refresh()
   } catch (error) {
     if (isRevisionConflict(error)) await refresh()
@@ -151,9 +151,9 @@ const restoreItem = async (material: StimulusListItem) => {
       <AlertCircle class="size-6" /><span>题目材料加载失败</span>
       <Button variant="outline" size="sm" @click="load"><RotateCw class="mr-2 size-4" />重试</Button>
     </div>
-    <div v-else-if="materials.length === 0" class="py-16 text-center text-sm text-muted-foreground">{{ view === 'deleted' ? '回收站中暂无题目材料。' : '暂无题目材料。创建后可在其下添加小题。' }}</div>
+    <div v-else-if="stimuli.length === 0" class="py-16 text-center text-sm text-muted-foreground">{{ view === 'deleted' ? '回收站中暂无题目材料。' : '暂无题目材料。创建后可在其下添加小题。' }}</div>
     <section v-else class="border-y">
-      <MaterialListItem v-for="material in materials" :key="material.id" :material="material" :can-edit="canEdit" @delete="deleteItem" @restore="restoreItem" @add-composition="addToComposition" />
+      <StimulusRow v-for="stimulus in stimuli" :key="stimulus.id" :stimulus="stimulus" :can-edit="canEdit" @delete="deleteItem" @restore="restoreItem" @add-composition="addToComposition" />
     </section>
 
     <div v-if="total > 0" class="flex flex-wrap items-center justify-between gap-3 text-sm text-muted-foreground">

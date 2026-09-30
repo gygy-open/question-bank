@@ -4,7 +4,7 @@ import { onBeforeRouteLeave } from 'vue-router'
 import draggable from 'vuedraggable'
 import { AlertTriangle, ArrowDown, ArrowLeft, ArrowUp, FilePlus2, GripVertical, Loader2, Plus, Save, Unlink } from '@lucide/vue'
 import { toast } from 'vue-sonner'
-import MaterialQuestionPickerDialog from '@/components/materials/MaterialQuestionPickerDialog.vue'
+import StimulusQuestionPickerDialog from '@/components/stimuli/StimulusQuestionPickerDialog.vue'
 import QuestionEditDialog from '@/components/QuestionEditDialog.vue'
 import CompositionTargetPicker from '@/components/CompositionTargetPicker.vue'
 import RichContent from '@/components/rich-editor/RichContent.vue'
@@ -22,23 +22,23 @@ import {
   addMember,
   hasEditorSubjectMismatch,
   moveMember,
-  publicQuestionsUnderPrivateMaterial,
+  publicQuestionsUnderPrivateStimulus,
   removeMember,
   sameOrder,
-} from '@/lib/materialEditor'
+} from '@/lib/stimulusEditor'
 import type { Question, QuestionStatus, QuestionSummary, RichDoc, StimulusDetail } from '@/types'
 
-const props = defineProps<{ materialId?: number }>()
+const props = defineProps<{ stimulusId?: number }>()
 const router = useRouter()
 const { currentSubjectId, setSubject } = useSubjectContext()
 const { can } = usePermissions()
-const { createMaterial, getMaterial, updateMaterial, setMaterialQuestions } = useMaterials()
+const { createStimulus, getStimulus, updateStimulus, setStimulusQuestions } = useStimuli()
 const editorSubjectId = ref<number | null>(null)
 // 新建材料后若保存小题失败，重试应更新这份材料而不是再建一份。
 const createdId = ref<number | null>(null)
-const materialId = computed(() => props.materialId ?? createdId.value)
+const stimulusId = computed(() => props.stimulusId ?? createdId.value)
 const canEdit = computed(() => can(Capability.EDIT_QUESTION, editorSubjectId.value))
-const isEdit = computed(() => props.materialId != null)
+const isEdit = computed(() => props.stimulusId != null)
 const subjectMismatch = computed(() => hasEditorSubjectMismatch(editorSubjectId.value, currentSubjectId.value))
 
 const content = ref<RichDoc>(null)
@@ -61,27 +61,27 @@ const compositionPickerOpen = ref(false)
 const membersDirty = computed(() => !sameOrder(members.value, savedMembers.value))
 const dirty = computed(() => metaDirty.value || membersDirty.value)
 const selectedIds = computed(() => members.value.map(member => member.id))
-const incompatibleIds = computed(() => publicQuestionsUnderPrivateMaterial(visibility.value, members.value))
+const incompatibleIds = computed(() => publicQuestionsUnderPrivateStimulus(visibility.value, members.value))
 
-const applyMaterial = (material: StimulusDetail) => {
-  content.value = structuredClone(material.content)
-  status.value = material.status
-  visibility.value = material.visibility
-  source.value = material.source ?? ''
-  revision.value = material.revision
-  members.value = material.questions.slice()
-  savedMembers.value = material.questions.slice()
+const applyStimulus = (stimulus: StimulusDetail) => {
+  content.value = structuredClone(stimulus.content)
+  status.value = stimulus.status
+  visibility.value = stimulus.visibility
+  source.value = stimulus.source ?? ''
+  revision.value = stimulus.revision
+  members.value = stimulus.questions.slice()
+  savedMembers.value = stimulus.questions.slice()
   metaDirty.value = false
   conflict.value = false
   errorMessage.value = ''
 }
 
 const load = async (force = false) => {
-  if (!isEdit.value || !props.materialId || !editorSubjectId.value || (dirty.value && !force)) return
+  if (!isEdit.value || !props.stimulusId || !editorSubjectId.value || (dirty.value && !force)) return
   loading.value = true
   hydrating.value = true
   try {
-    applyMaterial(await getMaterial(editorSubjectId.value, props.materialId))
+    applyStimulus(await getStimulus(editorSubjectId.value, props.stimulusId))
   } catch (error) {
     errorMessage.value = getApiErrorDetail(error, '题目材料加载失败')
   } finally {
@@ -150,17 +150,17 @@ const submit = async () => {
   const payload = { content: content.value, status: status.value, visibility: visibility.value, source: source.value.trim() || null }
   try {
     let currentRevision = revision.value
-    if (materialId.value == null) {
-      const created = await createMaterial(subjectId, payload)
+    if (stimulusId.value == null) {
+      const created = await createStimulus(subjectId, payload)
       createdId.value = created.id
       currentRevision = created.revision
     } else if (metaDirty.value && currentRevision) {
-      currentRevision = (await updateMaterial(subjectId, materialId.value, { ...payload, expected_revision: currentRevision })).revision
+      currentRevision = (await updateStimulus(subjectId, stimulusId.value, { ...payload, expected_revision: currentRevision })).revision
     }
     metaDirty.value = false
     revision.value = currentRevision
-    if (materialId.value != null && currentRevision && membersDirty.value) {
-      const detail = await setMaterialQuestions(subjectId, materialId.value, {
+    if (stimulusId.value != null && currentRevision && membersDirty.value) {
+      const detail = await setStimulusQuestions(subjectId, stimulusId.value, {
         expected_revision: currentRevision,
         question_ids: members.value.map(member => member.id),
       })
@@ -196,7 +196,7 @@ const submit = async () => {
         >
           <FilePlus2 class="mr-2 size-4" />加入稿件
         </Button>
-        <Button :disabled="saving || loading || !canEdit || subjectMismatch || (materialId != null && !dirty)" @click="submit"><Loader2 v-if="saving" class="mr-2 size-4 animate-spin" /><Save v-else class="mr-2 size-4" />保存</Button>
+        <Button :disabled="saving || loading || !canEdit || subjectMismatch || (stimulusId != null && !dirty)" @click="submit"><Loader2 v-if="saving" class="mr-2 size-4 animate-spin" /><Save v-else class="mr-2 size-4" />保存</Button>
       </div>
     </header>
 
@@ -214,7 +214,7 @@ const submit = async () => {
         <div class="grid gap-4 bg-muted/40 p-4 sm:grid-cols-3">
           <div class="space-y-2"><Label>状态</Label><Select v-model="status"><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="draft">草稿</SelectItem><SelectItem value="pending">待审核</SelectItem><SelectItem value="published">已发布</SelectItem><SelectItem value="archived">已归档</SelectItem></SelectContent></Select></div>
           <div class="space-y-2"><Label>可见性</Label><Select v-model="visibility"><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="public">公开</SelectItem><SelectItem value="private">私有</SelectItem></SelectContent></Select></div>
-          <div class="space-y-2"><Label for="material-source">来源</Label><Input id="material-source" v-model="source" placeholder="可选" /></div>
+          <div class="space-y-2"><Label for="stimulus-source">来源</Label><Input id="stimulus-source" v-model="source" placeholder="可选" /></div>
         </div>
         <div class="space-y-2"><Label>题目材料内容</Label><RichEditor v-model="content" /></div>
 
@@ -258,7 +258,7 @@ const submit = async () => {
     </main>
   </div>
 
-  <MaterialQuestionPickerDialog v-model:open="pickerOpen" :subject-id="editorSubjectId" :selected-ids="selectedIds" :material-visibility="visibility" @select="addQuestions" />
+  <StimulusQuestionPickerDialog v-model:open="pickerOpen" :subject-id="editorSubjectId" :selected-ids="selectedIds" :stimulus-visibility="visibility" @select="addQuestions" />
   <QuestionEditDialog v-model:open="createOpen" mode="create" :auto-fill-subject-id="editorSubjectId" @success="addCreatedQuestion" />
   <CompositionTargetPicker v-model:open="compositionPickerOpen" :subject-id="editorSubjectId" :question-ids="savedMembers.map(member => member.id)" />
 </template>

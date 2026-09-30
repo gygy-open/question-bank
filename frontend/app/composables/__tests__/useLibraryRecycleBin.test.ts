@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { useMaterials } from '@/composables/useMaterials'
+import { useStimuli } from '@/composables/useStimuli'
 
 let calls: Array<{ url: string, opts: any }>
 const $api = vi.fn((url: string, opts: any) => {
@@ -19,7 +19,7 @@ afterEach(() => {
 
 describe('题目材料回收站与小题请求', () => {
   it('删除把 expected_revision 放到 query', async () => {
-    await useMaterials().deleteMaterial(3, 7, 2)
+    await useStimuli().deleteStimulus(3, 7, 2)
 
     expect(calls[0]).toEqual({
       url: '/subjects/3/stimuli/7',
@@ -28,7 +28,7 @@ describe('题目材料回收站与小题请求', () => {
   })
 
   it('恢复命中 restore 路径并发送 expected_revision body', async () => {
-    await useMaterials().restoreMaterial(3, 7, 3)
+    await useStimuli().restoreStimulus(3, 7, 3)
 
     expect(calls[0]).toEqual({
       url: '/subjects/3/stimuli/7/restore',
@@ -37,7 +37,7 @@ describe('题目材料回收站与小题请求', () => {
   })
 
   it('整体设置小题走材料的 questions 子资源', async () => {
-    await useMaterials().setMaterialQuestions(3, 7, { expected_revision: 4, question_ids: [9, 2] })
+    await useStimuli().setStimulusQuestions(3, 7, { expected_revision: 4, question_ids: [9, 2] })
 
     expect(calls[0]).toEqual({
       url: '/subjects/3/stimuli/7/questions',

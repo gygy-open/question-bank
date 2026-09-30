@@ -523,13 +523,13 @@ def parse_structured(text: str) -> ExtractionResult:
     block_temp_id: Optional[str] = None
     block_number: Optional[str] = None
     pending_text: List[str] = []
-    material_lines: Optional[List[str]] = None
-    material_temp_id: Optional[str] = None
-    material_label: Optional[str] = None
-    latest_material_temp_id: Optional[str] = None
-    material_ids_by_label: Dict[str, str] = {}
+    stimulus_lines: Optional[List[str]] = None
+    stimulus_temp_id: Optional[str] = None
+    stimulus_label: Optional[str] = None
+    latest_stimulus_temp_id: Optional[str] = None
+    stimulus_ids_by_label: Dict[str, str] = {}
     current_group: Optional[dict] = None
-    material_marker_kind = "_stimulus_declaration"
+    stimulus_marker_kind = "_stimulus_declaration"
 
     def flush_text() -> None:
         markdown = "\n".join(pending_text).strip()
@@ -557,26 +557,26 @@ def parse_structured(text: str) -> ExtractionResult:
         block_temp_id = None
         block_number = None
 
-    def finish_material() -> None:
-        nonlocal material_lines, material_temp_id, material_label
-        nonlocal latest_material_temp_id
-        if material_lines is None or material_temp_id is None:
+    def finish_stimulus() -> None:
+        nonlocal stimulus_lines, stimulus_temp_id, stimulus_label
+        nonlocal latest_stimulus_temp_id
+        if stimulus_lines is None or stimulus_temp_id is None:
             return
-        markdown = "\n".join(material_lines).strip()
+        markdown = "\n".join(stimulus_lines).strip()
         if markdown:
             stimuli.append(
                 {
-                    "temp_id": material_temp_id,
+                    "temp_id": stimulus_temp_id,
                     "markdown": markdown,
-                    "metadata": {"label": material_label} if material_label else {},
+                    "metadata": {"label": stimulus_label} if stimulus_label else {},
                 }
             )
-        latest_material_temp_id = material_temp_id
-        if material_label:
-            material_ids_by_label[material_label] = material_temp_id
-        material_lines = None
-        material_temp_id = None
-        material_label = None
+        latest_stimulus_temp_id = stimulus_temp_id
+        if stimulus_label:
+            stimulus_ids_by_label[stimulus_label] = stimulus_temp_id
+        stimulus_lines = None
+        stimulus_temp_id = None
+        stimulus_label = None
 
     def finish_group(*, warn_unclosed: bool = False) -> None:
         nonlocal current_group
@@ -597,7 +597,7 @@ def parse_structured(text: str) -> ExtractionResult:
         stripped_line = _strip_blockquote_prefix(raw_line)
         parts = (
             [stripped_line]
-            if material_lines is not None
+            if stimulus_lines is not None
             else [part for part in _INLINE_ANALYSIS_TAG_RE.split(stripped_line) if part]
         )
         for line in parts:
@@ -608,29 +608,29 @@ def parse_structured(text: str) -> ExtractionResult:
                 if (
                     kind == "question_group"
                     and not label
-                    and material_lines is not None
-                    and material_label
+                    and stimulus_lines is not None
+                    and stimulus_label
                 ):
-                    material_lines.insert(0, material_label)
-                    material_label = None
-                finish_material()
+                    stimulus_lines.insert(0, stimulus_label)
+                    stimulus_label = None
+                finish_stimulus()
                 if kind == "stimulus":
                     finish_group()
                     flush_text()
-                    material_label = label or None
-                    existing_id = material_ids_by_label.get(label) if label else None
-                    material_temp_id = existing_id or str(uuid.uuid4())
-                    material_lines = []
+                    stimulus_label = label or None
+                    existing_id = stimulus_ids_by_label.get(label) if label else None
+                    stimulus_temp_id = existing_id or str(uuid.uuid4())
+                    stimulus_lines = []
                     outline.append(
-                        {"kind": material_marker_kind, "temp_id": material_temp_id}
+                        {"kind": stimulus_marker_kind, "temp_id": stimulus_temp_id}
                     )
                 elif kind == "question_group":
                     finish_group()
                     flush_text()
                     stimulus_ref = (
-                        material_ids_by_label.get(label)
+                        stimulus_ids_by_label.get(label)
                         if label
-                        else latest_material_temp_id
+                        else latest_stimulus_temp_id
                     )
                     group_temp_id = str(uuid.uuid4())
                     current_group = {
@@ -652,14 +652,14 @@ def parse_structured(text: str) -> ExtractionResult:
                 continue
 
             tag = _match_tag(line)
-            if material_lines is not None:
+            if stimulus_lines is not None:
                 section = _match_section_tag(line)
                 if not (tag and tag[0] == "content") and not (
                     section and section[0] == "answer_section"
                 ):
-                    material_lines.append(line)
+                    stimulus_lines.append(line)
                     continue
-                finish_material()
+                finish_stimulus()
 
             if tag and tag[0] == "content":
                 flush_block()
@@ -707,7 +707,7 @@ def parse_structured(text: str) -> ExtractionResult:
             break
 
     flush_block()
-    finish_material()
+    finish_stimulus()
     finish_group(warn_unclosed=True)
     flush_text()
 
@@ -717,7 +717,7 @@ def parse_structured(text: str) -> ExtractionResult:
     stimulus_by_id = {str(item["temp_id"]): item for item in stimuli}
     resolved_outline: List[PaperOutlineItem] = []
     for item in outline:
-        if item.get("kind") != material_marker_kind:
+        if item.get("kind") != stimulus_marker_kind:
             resolved_outline.append(item)
             continue
         stimulus_ref = str(item.get("temp_id") or "")
