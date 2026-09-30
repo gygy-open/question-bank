@@ -17,7 +17,8 @@ import RichEditorToolbar from './RichEditorToolbar.vue'
 import RichEditorBubbleMenu from './RichEditorBubbleMenu.vue'
 import RichEditorMathPopover from './RichEditorMathPopover.vue'
 import RichEditorBlankPopover from './RichEditorBlankPopover.vue'
-import { useImageUpload } from './useImageUpload'
+import { useImageUpload, type UploadedImageAttrs } from './useImageUpload'
+import MediaPickerDialog from '@/components/media/MediaPickerDialog.vue'
 import { getSchemaExtensions } from './schemaExtensions'
 import { ResetFormatOnEnter } from './resetFormatExtension'
 import { createMathNodeView, requestMathAutofocus } from './mathFieldExtensions'
@@ -39,24 +40,19 @@ const props = withDefaults(
 )
 
 const { uploadImage } = useImageUpload()
-const fileInputRef = ref<HTMLInputElement | null>(null)
+const imagePickerOpen = ref(false)
+
+function insertImage(attrs: UploadedImageAttrs) {
+    editor.value?.chain().focus().insertContent({ type: 'image', attrs }).run()
+}
 
 async function insertImageFile(file: File) {
     const attrs = await uploadImage(file)
-    if (attrs) editor.value?.chain().focus().insertContent({ type: 'image', attrs }).run()
+    if (attrs) insertImage(attrs)
 }
 
 function triggerImagePicker() {
-    fileInputRef.value?.click()
-}
-
-function onFileChange(event: Event) {
-    const target = event.target as HTMLInputElement
-    const file = target.files?.[0]
-    if (file) {
-        insertImageFile(file)
-    }
-    target.value = ''
+    imagePickerOpen.value = true
 }
 
 /**
@@ -352,13 +348,7 @@ watch(model, (value) => {
             @close="closeBlankEditor"
         />
 
-        <input
-            ref="fileInputRef"
-            type="file"
-            accept="image/*"
-            class="hidden"
-            @change="onFileChange"
-        />
+        <MediaPickerDialog v-model:open="imagePickerOpen" @select="insertImage" />
     </div>
 </template>
 

@@ -1,6 +1,6 @@
 # 媒体资产设计
 
-> 状态：决策已确认（见“决策”）；P0、P1 已实施，P2a 起待实施
+> 状态：决策已确认（见“决策”）；P0、P1、P2a 已实施，P3 起待实施
 > 更新日期：2026-09-30
 > 关联：[文科材料题设计](./humanities-question-groups.md)（听力材料题、机考将建立在本设计之上）
 
@@ -370,7 +370,7 @@ erDiagram
 | --- | --- |
 | P0 安全修复 | 上表 8 项；与重构解耦，优先执行（已完成） |
 | P1 资产模型 | 存储布局与唯一路径模块（objects/derived/cache/tmp）、原子写入；`media_assets`、`media_service.ingest`、上传与签名下发接口；编辑器写 `assetId`；所有导入入口改走统一入口，工作文件进 `tmp/jobs/` 并在任务结束后删除（已完成：导入图片在 markdown 中以 `/api/v1/media/{id}/content` 出现、转换时补 `assetId`；同步导入以签名 `source_ref` 关联源文件；批量任务记录 `subject_id`；头像与对话附图走 `/media/me`，对话附图按所有者校验；`/upload/image` 已移除） |
-| P2a 引用与选择器 | `media_references`；编辑器“插入媒体”选择器（上传 / 媒体库 / 最近使用）；源文件鉴权下载 |
+| P2a 引用与选择器 | `media_references`；编辑器“插入媒体”选择器（上传 / 媒体库 / 最近使用）；源文件鉴权下载（已完成：引用方为题目 / 材料 / 稿件（节点内容按稿件合并）/ 定稿版本；写入引用不存在或跨学科的资产返回 422；`GET /subjects/{sid}/media`、`GET /media/{id}/references`） |
 | P2b 媒体库页面 | 网格/列表浏览、搜索筛选、详情抽屉与“被引用于”、删除未使用；之后加替换、批量操作、元数据编辑。应在 P3 迁移后上线 |
 | P3 迁移与回收 | 旧文件搬进 `objects/`、回填 `assetId`、`legacy_paths` 对照表；孤儿回收任务；删除旧目录 |
 | P4 音频 | `kind=audio`、转码 worker、播放组件；之后进入听力材料题 |

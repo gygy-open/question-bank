@@ -12,6 +12,27 @@ export interface MediaAsset {
 
 export type UserMediaPurpose = 'avatar' | 'chat'
 
+export interface MediaAssetListItem extends MediaAsset {
+    usage_count: number
+    created_at: string
+    byte_size: number
+}
+
+export interface MediaAssetPage {
+    items: MediaAssetListItem[]
+    total: number
+    page: number
+    size: number
+}
+
+export interface MediaListQuery {
+    q?: string
+    used?: boolean
+    sort?: 'newest' | 'oldest' | 'name' | 'size'
+    page?: number
+    size?: number
+}
+
 /** 编辑器插图归属的学科；由稿件/材料/题目等宿主提供，未提供时回退当前工作学科。 */
 const MEDIA_SUBJECT_KEY: InjectionKey<Ref<number | null>> = Symbol('media-subject')
 
@@ -43,5 +64,9 @@ export function useMedia() {
         return await $api<MediaAsset>('/media/me', { method: 'POST', query: { purpose }, body: toForm(file) })
     }
 
-    return { uploadContentImage, uploadUserMedia }
+    async function listSubjectMedia(subjectId: number, query: MediaListQuery = {}): Promise<MediaAssetPage> {
+        return await $api<MediaAssetPage>(`/subjects/${subjectId}/media`, { query: { kind: 'image', ...query } })
+    }
+
+    return { uploadContentImage, uploadUserMedia, listSubjectMedia }
 }

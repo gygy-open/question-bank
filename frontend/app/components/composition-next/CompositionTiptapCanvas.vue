@@ -23,7 +23,8 @@ import RichEditorMathPopover from '@/components/rich-editor/RichEditorMathPopove
 import RichEditorBlankPopover from '@/components/rich-editor/RichEditorBlankPopover.vue'
 import QuestionPicker from '@/components/composition/QuestionPicker.vue'
 import CompositionPicker from '@/components/composition/CompositionPicker.vue'
-import { useImageUpload } from '@/components/rich-editor/useImageUpload'
+import { useImageUpload, type UploadedImageAttrs } from '@/components/rich-editor/useImageUpload'
+import MediaPickerDialog from '@/components/media/MediaPickerDialog.vue'
 import { provideMediaSubject } from '@/composables/useMedia'
 import { ResetFormatOnEnter } from '@/components/rich-editor/resetFormatExtension'
 import { createMathNodeView, requestMathAutofocus } from '@/components/rich-editor/mathFieldExtensions'
@@ -87,22 +88,19 @@ const staleNodeIds = computed(() =>
 
 provideMediaSubject(() => props.subjectId)
 const { uploadImage } = useImageUpload()
-const fileInputRef = ref<HTMLInputElement | null>(null)
+const imagePickerOpen = ref(false)
+
+function insertImage(attrs: UploadedImageAttrs) {
+  editor.value?.chain().focus().insertContent({ type: 'image', attrs }).run()
+}
 
 async function insertImageFile(file: File) {
   const attrs = await uploadImage(file)
-  if (attrs) editor.value?.chain().focus().insertContent({ type: 'image', attrs }).run()
+  if (attrs) insertImage(attrs)
 }
 
 function triggerImagePicker() {
-  fileInputRef.value?.click()
-}
-
-function onFileChange(event: Event) {
-  const target = event.target as HTMLInputElement
-  const file = target.files?.[0]
-  if (file) insertImageFile(file)
-  target.value = ''
+  imagePickerOpen.value = true
 }
 
 // 含 Word 公式（OMML/MathML）的粘贴：转换器异步加载，先锁定插入区间再按区间插入。
@@ -549,7 +547,7 @@ watch(
       @close="closeBlankEditor"
     />
 
-    <input ref="fileInputRef" type="file" accept="image/*" class="hidden" @change="onFileChange" />
+    <MediaPickerDialog v-model:open="imagePickerOpen" @select="insertImage" />
 
     <QuestionPicker
       v-model:open="questionPickerOpen"

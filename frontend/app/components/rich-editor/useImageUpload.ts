@@ -1,5 +1,6 @@
 import { toast } from 'vue-sonner'
 import { useMedia, useMediaSubject } from '@/composables/useMedia'
+import { rememberRecentMedia } from '@/lib/recentMedia'
 
 export interface UploadedImageAttrs {
     src: string
@@ -19,6 +20,7 @@ export function useImageUpload() {
         }
         try {
             const asset = await uploadContentImage(subjectId, file)
+            rememberRecentMedia(subjectId, { id: asset.id, url: asset.url, name: asset.original_filename })
             return { src: asset.url, assetId: asset.id }
         } catch (error: any) {
             // 403 已由 api 插件统一提示。
