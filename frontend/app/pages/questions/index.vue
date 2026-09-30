@@ -13,7 +13,8 @@ import QuestionBasketPanel from '~/components/QuestionBasketPanel.vue'
 import TagFilter from '~/components/TagFilter.vue'
 import { useQuestionBasket } from '~/composables/useQuestionBasket'
 import { richDocToPlainText } from '~/components/rich-editor/richDoc'
-import { Loader2, Plus, X, Trash2, ShoppingBasket, FileText, ListTree, Edit, SlidersHorizontal, ChevronsUpDown, ChevronLeft, ChevronRight } from '@lucide/vue'
+import { Loader2, Plus, X, Trash2, ShoppingBasket, FileText, ListTree, Edit, SlidersHorizontal, ChevronsUpDown, ChevronLeft, ChevronRight, ChevronDown, Layers3 } from '@lucide/vue'
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { Label } from '@/components/ui/label'
 import { Badge } from '@/components/ui/badge'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
@@ -538,16 +539,37 @@ const viewStructure = (question: Question) => {
   <!-- Header -->
   <PageHeader title="题库">
     <template #actions>
-      <Button v-if="canEditCurrentSubject" size="sm" @click="createQuestion">
-        <Plus class="mr-2 h-4 w-4" />
-        创建题目
-      </Button>
+      <DropdownMenu v-if="canEditCurrentSubject">
+        <DropdownMenuTrigger as-child>
+          <Button size="sm">
+            <Plus class="mr-2 h-4 w-4" />
+            创建题目
+            <ChevronDown class="ml-1 h-4 w-4" />
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end" class="w-64">
+          <DropdownMenuItem class="items-start" @click="createQuestion">
+            <FileText class="mt-0.5 mr-2 h-4 w-4" />
+            <div>
+              <div class="font-medium">单题</div>
+              <div class="text-xs text-muted-foreground">一道可独立作答的题</div>
+            </div>
+          </DropdownMenuItem>
+          <DropdownMenuItem class="items-start" @click="router.push('/materials/new')">
+            <Layers3 class="mt-0.5 mr-2 h-4 w-4" />
+            <div>
+              <div class="font-medium">材料题</div>
+              <div class="text-xs text-muted-foreground">一段材料 + 多道小题，如阅读理解</div>
+            </div>
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
     </template>
   </PageHeader>
   <QuestionBankNav />
   <div class="flex flex-1 flex-col">
     <div class="@container/main flex flex-1 flex-col px-4 space-y-6 py-6">
-      <p class="text-sm text-muted-foreground">可独立作答和评分的基本单元；材料题的小题依赖题目材料，加入稿件时会带上材料。</p>
+      <p class="text-sm text-muted-foreground">题库中的全部题目，包括单题和材料题的小题。小题加入稿件时会带上所属材料。</p>
       
       <div v-if="filters.import_task_id" class="bg-primary/10 text-primary px-4 py-3 rounded-md flex items-center justify-between">
           <span class="text-sm font-medium">正在查看最新导入的题目任务</span>
@@ -653,7 +675,7 @@ const viewStructure = (question: Question) => {
                       @update:model-value="filters.membership = ($event || 'all') as typeof filters.membership"
                     >
                       <ToggleGroupItem value="all">全部</ToggleGroupItem>
-                      <ToggleGroupItem value="independent">独立题</ToggleGroupItem>
+                      <ToggleGroupItem value="independent">单题</ToggleGroupItem>
                       <ToggleGroupItem value="grouped">材料题小题</ToggleGroupItem>
                     </ToggleGroup>
                   </div>

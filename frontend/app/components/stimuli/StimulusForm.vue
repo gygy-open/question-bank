@@ -2,7 +2,7 @@
 import { computed, nextTick, onActivated, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { onBeforeRouteLeave } from 'vue-router'
 import draggable from 'vuedraggable'
-import { AlertTriangle, ArrowDown, ArrowLeft, ArrowUp, FilePlus2, GripVertical, Loader2, Plus, Save, Unlink } from '@lucide/vue'
+import { AlertTriangle, ArrowDown, ArrowLeft, ArrowUp, ChevronDown, Ellipsis, FilePlus2, GripVertical, ListPlus, Loader2, Plus, Save, Unlink } from '@lucide/vue'
 import { toast } from 'vue-sonner'
 import StimulusQuestionPickerDialog from '@/components/stimuli/StimulusQuestionPickerDialog.vue'
 import QuestionEditDialog from '@/components/QuestionEditDialog.vue'
@@ -13,6 +13,8 @@ import { isEmptyRichDoc } from '@/components/rich-editor/richDoc'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
@@ -62,6 +64,12 @@ const membersDirty = computed(() => !sameOrder(members.value, savedMembers.value
 const dirty = computed(() => metaDirty.value || membersDirty.value)
 const selectedIds = computed(() => members.value.map(member => member.id))
 const incompatibleIds = computed(() => publicQuestionsUnderPrivateStimulus(visibility.value, members.value))
+const settingsOpen = ref(false)
+// 冲突提示要求改可见性时，把设置区展开到用户眼前。
+watch(incompatibleIds, (ids) => { if (ids.length) settingsOpen.value = true })
+const STATUS_LABELS: Record<QuestionStatus, string> = { draft: '草稿', pending: '待审核', published: '已发布', archived: '已归档' }
+const settingsSummary = computed(() =>
+  [STATUS_LABELS[status.value], visibility.value === 'private' ? '私有' : '公开', source.value.trim()].filter(Boolean).join(' · '))
 
 const applyStimulus = (stimulus: StimulusDetail) => {
   content.value = structuredClone(stimulus.content)
@@ -83,7 +91,7 @@ const load = async (force = false) => {
   try {
     applyStimulus(await getStimulus(editorSubjectId.value, props.stimulusId))
   } catch (error) {
-    errorMessage.value = getApiErrorDetail(error, '题目材料加载失败')
+    errorMessage.value = getApiErrorDetail(error, '材料题加载失败')
   } finally {
     loading.value = false
     await nextTick()
@@ -113,7 +121,7 @@ const beforeUnloadHandler = (event: BeforeUnloadEvent) => {
 }
 onMounted(() => window.addEventListener('beforeunload', beforeUnloadHandler))
 onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnloadHandler))
-onBeforeRouteLeave(() => !dirty.value || window.confirm('题目材料有未保存的修改，确定要离开吗？'))
+onBeforeRouteLeave(() => !dirty.value || window.confirm('材料题有未保存的修改，确定要离开吗？'))
 
 const addQuestions = (questions: QuestionSummary[]) => {
   members.value = questions.reduce((current, question) => addMember(current, question), members.value)
@@ -128,10 +136,10 @@ const moveQuestion = (from: number, to: number) => { members.value = moveMember(
 const validationMessage = (): string => {
   if (!editorSubjectId.value) return '请先选择学科'
   if (subjectMismatch.value) return '请先切回草稿所属学科'
-  if (!canEdit.value) return '你没有编辑该学科题目材料的权限'
-  if (isEmptyRichDoc(content.value)) return '请填写题目材料内容'
+  if (!canEdit.value) return '你没有编辑该学科材料题的权限'
+  if (isEmptyRichDoc(content.value)) return '请填写材料内容'
   if (incompatibleIds.value.length) {
-    return `私有题目材料下不能挂公开题目（${incompatibleIds.value.map(id => `#${id}`).join('、')}）。请移出这些小题，或把题目材料改为公开。`
+    return `私有材料题下不能包含公开小题（${incompatibleIds.value.map(id => `#${id}`).join('、')}）。请移出这些小题，或在“设置”中把材料题改为公开。`
   }
   return ''
 }
@@ -168,11 +176,11 @@ const submit = async () => {
       savedMembers.value = detail.questions.slice()
       members.value = detail.questions.slice()
     }
-    toast.success(isEdit.value ? '题目材料已保存' : '题目材料已创建')
+    toast.success(isEdit.value ? '材料题已保存' : '材料题已创建')
     if (!isEdit.value && createdId.value != null) await router.push(`/materials/${createdId.value}/edit`)
   } catch (error) {
     if (isRevisionConflict(error)) conflict.value = true
-    else errorMessage.value = getApiErrorDetail(error, '保存题目材料失败')
+    else errorMessage.value = getApiErrorDetail(error, '保存材料题失败')
   } finally {
     saving.value = false
   }
@@ -183,8 +191,8 @@ const submit = async () => {
   <div class="flex flex-1 flex-col">
     <header class="flex min-h-14 items-center justify-between gap-3 border-b px-4">
       <div class="flex items-center gap-2">
-        <Button variant="ghost" size="icon" title="返回题目材料列表" aria-label="返回题目材料列表" @click="router.push('/materials')"><ArrowLeft class="size-4" /></Button>
-        <h1 class="text-base font-semibold">{{ isEdit ? '编辑题目材料' : '创建题目材料' }}</h1>
+        <Button variant="ghost" size="icon" title="返回材料题列表" aria-label="返回材料题列表" @click="router.push('/materials')"><ArrowLeft class="size-4" /></Button>
+        <h1 class="text-base font-semibold">{{ isEdit ? '编辑材料题' : '新建材料题' }}</h1>
       </div>
       <div class="flex items-center gap-2">
         <Button
@@ -201,32 +209,38 @@ const submit = async () => {
     </header>
 
     <main class="mx-auto flex w-full max-w-5xl flex-1 flex-col gap-5 px-4 py-6">
-      <Alert v-if="!currentSubjectId || !canEdit" variant="destructive"><AlertTriangle class="size-4" /><AlertTitle>无法编辑</AlertTitle><AlertDescription>{{ !currentSubjectId ? '请先选择学科。' : '你没有编辑该学科题目材料的权限。' }}</AlertDescription></Alert>
-      <Alert v-if="subjectMismatch"><AlertTriangle class="size-4" /><AlertTitle>当前学科已切换</AlertTitle><AlertDescription class="space-y-3"><p>本地草稿仍属于学科 #{{ editorSubjectId }}，未被重新加载或覆盖。请切回原学科后继续保存，或返回列表放弃草稿。</p><div class="flex flex-wrap gap-2"><Button size="sm" variant="outline" @click="restoreSubject">切回原学科</Button><Button size="sm" variant="ghost" @click="router.push('/materials')">返回题目材料列表</Button></div></AlertDescription></Alert>
+      <Alert v-if="!currentSubjectId || !canEdit" variant="destructive"><AlertTriangle class="size-4" /><AlertTitle>无法编辑</AlertTitle><AlertDescription>{{ !currentSubjectId ? '请先选择学科。' : '你没有编辑该学科材料题的权限。' }}</AlertDescription></Alert>
+      <Alert v-if="subjectMismatch"><AlertTriangle class="size-4" /><AlertTitle>当前学科已切换</AlertTitle><AlertDescription class="space-y-3"><p>本地草稿仍属于学科 #{{ editorSubjectId }}，未被重新加载或覆盖。请切回原学科后继续保存，或返回列表放弃草稿。</p><div class="flex flex-wrap gap-2"><Button size="sm" variant="outline" @click="restoreSubject">切回原学科</Button><Button size="sm" variant="ghost" @click="router.push('/materials')">返回材料题列表</Button></div></AlertDescription></Alert>
       <Alert v-if="conflict" variant="destructive">
-        <AlertTriangle class="size-4" /><AlertTitle>题目材料已被其他人修改</AlertTitle>
+        <AlertTriangle class="size-4" /><AlertTitle>材料题已被其他人修改</AlertTitle>
         <AlertDescription class="space-y-3"><p>你的本地内容与小题顺序仍然保留。可以加载服务器最新版本，或继续编辑本地草稿后再决定。</p><div class="flex flex-wrap gap-2"><Button size="sm" variant="destructive" @click="load(true)">加载最新并放弃本地</Button><Button size="sm" variant="outline" @click="conflict = false">继续编辑本地</Button></div></AlertDescription>
       </Alert>
-      <Alert v-if="incompatibleIds.length" variant="destructive"><AlertTriangle class="size-4" /><AlertTitle>私有题目材料下有公开小题</AlertTitle><AlertDescription>{{ validationMessage() }}</AlertDescription></Alert>
+      <Alert v-if="incompatibleIds.length" variant="destructive"><AlertTriangle class="size-4" /><AlertTitle>私有材料题下有公开小题</AlertTitle><AlertDescription>{{ validationMessage() }}</AlertDescription></Alert>
       <Alert v-if="errorMessage" variant="destructive"><AlertTriangle class="size-4" /><AlertTitle>操作失败</AlertTitle><AlertDescription>{{ errorMessage }}</AlertDescription></Alert>
       <div v-if="loading" class="flex justify-center py-20"><Loader2 class="size-7 animate-spin text-muted-foreground" /></div>
       <template v-else>
-        <div class="grid gap-4 bg-muted/40 p-4 sm:grid-cols-3">
-          <div class="space-y-2"><Label>状态</Label><Select v-model="status"><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="draft">草稿</SelectItem><SelectItem value="pending">待审核</SelectItem><SelectItem value="published">已发布</SelectItem><SelectItem value="archived">已归档</SelectItem></SelectContent></Select></div>
-          <div class="space-y-2"><Label>可见性</Label><Select v-model="visibility"><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="public">公开</SelectItem><SelectItem value="private">私有</SelectItem></SelectContent></Select></div>
-          <div class="space-y-2"><Label for="stimulus-source">来源</Label><Input id="stimulus-source" v-model="source" placeholder="可选" /></div>
+        <div class="space-y-2">
+          <Label>材料</Label>
+          <p class="text-xs text-muted-foreground">文章、图表或背景内容，小题围绕它作答。可以先只写材料，稍后再出题。</p>
+          <RichEditor v-model="content" />
         </div>
-        <div class="space-y-2"><Label>题目材料内容</Label><RichEditor v-model="content" /></div>
 
         <section class="space-y-3">
           <div class="flex flex-wrap items-center justify-between gap-2">
             <div>
               <h2 class="text-sm font-semibold">小题（{{ members.length }}）</h2>
-              <p class="text-xs text-muted-foreground">小题依赖本材料作答，按此顺序出现在稿件中；移出材料后题目保留为独立题。</p>
+              <p class="text-xs text-muted-foreground">按此顺序出现在稿件中；移出后保留为单题。</p>
             </div>
             <div class="flex gap-2">
-              <Button variant="outline" size="sm" :disabled="!canEdit" @click="createOpen = true"><Plus class="mr-2 size-4" />新建小题</Button>
-              <Button size="sm" :disabled="!canEdit" @click="pickerOpen = true"><Plus class="mr-2 size-4" />添加已有题目</Button>
+              <Button size="sm" :disabled="!canEdit" @click="createOpen = true"><Plus class="mr-2 size-4" />新建小题</Button>
+              <DropdownMenu>
+                <DropdownMenuTrigger as-child>
+                  <Button variant="outline" size="icon" class="size-8" :disabled="!canEdit" title="更多" aria-label="更多"><Ellipsis class="size-4" /></Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem @click="pickerOpen = true"><ListPlus class="mr-2 size-4" />从题库添加已有单题…</DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
             </div>
           </div>
           <draggable v-model="members" item-key="id" handle=".drag-handle" class="divide-y border-y">
@@ -238,22 +252,39 @@ const submit = async () => {
                   <div class="mb-1 flex flex-wrap gap-2">
                     <Badge variant="outline">#{{ member.id }}</Badge>
                     <Badge variant="secondary">{{ questionTypeLabel(member.q_type) }}</Badge>
-                    <Badge variant="outline">{{ member.status }}</Badge>
+                    <Badge variant="outline">{{ STATUS_LABELS[member.status] ?? member.status }}</Badge>
                     <Badge v-if="member.visibility === 'private'" variant="outline">私有</Badge>
-                    <Badge v-if="incompatibleIds.includes(member.id)" variant="destructive">公开题不能挂私有材料</Badge>
+                    <Badge v-if="incompatibleIds.includes(member.id)" variant="destructive">公开小题不能放在私有材料题下</Badge>
                   </div>
                   <RichContent :content="member.content" class="line-clamp-3 text-sm" />
                 </div>
                 <div class="flex shrink-0">
                   <Button variant="ghost" size="icon" :disabled="index === 0" title="上移" aria-label="上移" @click="moveQuestion(index, index - 1)"><ArrowUp class="size-4" /></Button>
                   <Button variant="ghost" size="icon" :disabled="index === members.length - 1" title="下移" aria-label="下移" @click="moveQuestion(index, index + 1)"><ArrowDown class="size-4" /></Button>
-                  <Button variant="ghost" size="icon" title="移出材料（保留为独立题）" aria-label="移出材料" @click="detachQuestion(member.id)"><Unlink class="size-4" /></Button>
+                  <Button variant="ghost" size="icon" title="移出（保留为单题）" aria-label="移出（保留为单题）" @click="detachQuestion(member.id)"><Unlink class="size-4" /></Button>
                 </div>
               </article>
             </template>
           </draggable>
-          <p v-if="members.length === 0" class="border border-dashed py-12 text-center text-sm text-muted-foreground">尚无小题。可以新建小题，或把已有的独立题添加到本材料下。</p>
+          <p v-if="members.length === 0" class="border border-dashed py-12 text-center text-sm text-muted-foreground">还没有小题。点击“新建小题”开始出题；也可以先保存材料，稍后再出题。</p>
         </section>
+
+        <Collapsible v-model:open="settingsOpen" class="border-t pt-4">
+          <CollapsibleTrigger as-child>
+            <button type="button" class="flex w-full items-center gap-2 text-left text-sm">
+              <ChevronDown class="size-4 shrink-0 text-muted-foreground transition-transform" :class="settingsOpen ? '' : '-rotate-90'" />
+              <span class="font-semibold">设置</span>
+              <span class="truncate text-xs text-muted-foreground">{{ settingsSummary }}</span>
+            </button>
+          </CollapsibleTrigger>
+          <CollapsibleContent>
+            <div class="mt-3 grid gap-4 bg-muted/40 p-4 sm:grid-cols-3">
+              <div class="space-y-2"><Label>状态</Label><Select v-model="status"><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="draft">草稿</SelectItem><SelectItem value="pending">待审核</SelectItem><SelectItem value="published">已发布</SelectItem><SelectItem value="archived">已归档</SelectItem></SelectContent></Select></div>
+              <div class="space-y-2"><Label>可见性</Label><Select v-model="visibility"><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="public">公开</SelectItem><SelectItem value="private">私有</SelectItem></SelectContent></Select></div>
+              <div class="space-y-2"><Label for="stimulus-source">来源</Label><Input id="stimulus-source" v-model="source" placeholder="可选" /></div>
+            </div>
+          </CollapsibleContent>
+        </Collapsible>
       </template>
     </main>
   </div>

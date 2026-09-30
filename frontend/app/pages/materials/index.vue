@@ -28,7 +28,7 @@ const addToComposition = async (stimulus: StimulusListItem) => {
     pickerQuestionIds.value = detail.questions.map(question => question.id)
     pickerOpen.value = pickerQuestionIds.value.length > 0
   } catch (error) {
-    toast.error(getApiErrorDetail(error, '加载题目材料失败'))
+    toast.error(getApiErrorDetail(error, '加载材料题失败'))
   }
 }
 
@@ -89,15 +89,15 @@ const visibilityOptions = [
 ]
 
 const deleteItem = async (stimulus: StimulusListItem) => {
-  if (!currentSubjectId.value || !confirm(`确定删除题目材料 #${stimulus.id} 吗？`)) return
+  if (!currentSubjectId.value || !confirm(`确定删除材料题 #${stimulus.id} 吗？`)) return
   try {
     await deleteStimulus(currentSubjectId.value, stimulus.id, stimulus.revision)
-    toast.success('题目材料已移入回收站')
+    toast.success('材料题已移入回收站')
     if (stimuli.value.length === 1 && page.value > 1) page.value--
     else await refresh()
   } catch (error) {
     if (isRevisionConflict(error)) await refresh()
-    toast.error(getApiErrorDetail(error, '删除题目材料失败'))
+    toast.error(getApiErrorDetail(error, '删除材料题失败'))
   }
 }
 
@@ -105,12 +105,12 @@ const restoreItem = async (stimulus: StimulusListItem) => {
   if (!currentSubjectId.value) return
   try {
     await restoreStimulus(currentSubjectId.value, stimulus.id, stimulus.revision)
-    toast.success('题目材料已恢复')
+    toast.success('材料题已恢复')
     if (stimuli.value.length === 1 && page.value > 1) page.value--
     else await refresh()
   } catch (error) {
     if (isRevisionConflict(error)) await refresh()
-    toast.error(getApiErrorDetail(error, '恢复题目材料失败'))
+    toast.error(getApiErrorDetail(error, '恢复材料题失败'))
   }
 }
 </script>
@@ -119,21 +119,21 @@ const restoreItem = async (stimulus: StimulusListItem) => {
   <PageHeader title="题库">
     <template #actions>
       <Button v-if="canEdit" as-child size="sm">
-        <NuxtLink to="/materials/new"><Plus class="mr-2 size-4" />创建题目材料</NuxtLink>
+        <NuxtLink to="/materials/new"><Plus class="mr-2 size-4" />新建材料题</NuxtLink>
       </Button>
     </template>
   </PageHeader>
   <QuestionBankNav />
 
   <main class="flex flex-1 flex-col gap-5 px-4 py-6">
-    <p class="text-sm text-muted-foreground">供一道或多道小题共同依赖的文章、图表或背景内容；本身不可作答。小题在编辑题目材料时维护，加入稿件时会带上材料。</p>
+    <p class="text-sm text-muted-foreground">一段文章、图表或背景材料加上围绕它的若干小题，如阅读理解、完形填空、材料分析。加入稿件时材料与小题一起出现。</p>
     <Tabs v-model="view">
       <TabsList><TabsTrigger value="active">当前</TabsTrigger><TabsTrigger value="deleted">回收站</TabsTrigger></TabsList>
     </Tabs>
     <div class="grid gap-3 bg-muted/40 p-4 sm:grid-cols-3">
       <div class="space-y-2">
         <Label class="text-xs">关键词</Label>
-        <ClearableInput v-model="keyword" placeholder="搜索题目材料内容或来源" />
+        <ClearableInput v-model="keyword" placeholder="搜索材料内容或来源" />
       </div>
       <div class="space-y-2">
         <Label class="text-xs">状态</Label>
@@ -148,16 +148,16 @@ const restoreItem = async (stimulus: StimulusListItem) => {
     <div v-if="!currentSubjectId" class="py-16 text-center text-sm text-muted-foreground">请先选择学科</div>
     <div v-else-if="status === 'pending'" class="flex justify-center py-16"><Loader2 class="size-7 animate-spin text-muted-foreground" /></div>
     <div v-else-if="error" class="flex flex-col items-center gap-3 py-16 text-sm text-muted-foreground">
-      <AlertCircle class="size-6" /><span>题目材料加载失败</span>
+      <AlertCircle class="size-6" /><span>材料题加载失败</span>
       <Button variant="outline" size="sm" @click="load"><RotateCw class="mr-2 size-4" />重试</Button>
     </div>
-    <div v-else-if="stimuli.length === 0" class="py-16 text-center text-sm text-muted-foreground">{{ view === 'deleted' ? '回收站中暂无题目材料。' : '暂无题目材料。创建后可在其下添加小题。' }}</div>
+    <div v-else-if="stimuli.length === 0" class="py-16 text-center text-sm text-muted-foreground">{{ view === 'deleted' ? '回收站中暂无材料题。' : '暂无材料题。' }}</div>
     <section v-else class="border-y">
       <StimulusRow v-for="stimulus in stimuli" :key="stimulus.id" :stimulus="stimulus" :can-edit="canEdit" @delete="deleteItem" @restore="restoreItem" @add-composition="addToComposition" />
     </section>
 
     <div v-if="total > 0" class="flex flex-wrap items-center justify-between gap-3 text-sm text-muted-foreground">
-      <span>共 {{ total }} 条题目材料</span>
+      <span>共 {{ total }} 道材料题</span>
       <div class="flex items-center gap-2">
         <Button variant="outline" size="icon" :disabled="page <= 1" title="上一页" aria-label="上一页" @click="page--"><ChevronLeft class="size-4" /></Button>
         <span>第 {{ page }} / {{ pages }} 页</span>

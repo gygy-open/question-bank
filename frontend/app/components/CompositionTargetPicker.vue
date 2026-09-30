@@ -130,7 +130,7 @@ const createAndAdd = async () => {
       <DialogHeader>
         <DialogTitle>选择稿件</DialogTitle>
         <DialogDescription>
-          {{ `将 ${(questionIds ?? []).length} 道题加入稿件（依赖同一题目材料的小题会合成材料题）` }}
+          {{ `将 ${(questionIds ?? []).length} 道题加入稿件（同一材料题的小题会合并呈现）` }}
         </DialogDescription>
       </DialogHeader>
 

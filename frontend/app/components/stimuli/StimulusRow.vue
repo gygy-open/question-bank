@@ -38,8 +38,9 @@ const statusLabel: Record<string, string> = {
           </Badge>
           <span v-if="stimulus.source" class="truncate text-xs text-muted-foreground">{{ stimulus.source }}</span>
         </div>
-        <RichContent :content="stimulus.content" empty-text="（空题目材料）" class="line-clamp-4 text-sm" />
-        <div class="flex items-center gap-1.5 text-xs text-muted-foreground">
+        <RichContent :content="stimulus.content" empty-text="（空材料）" class="line-clamp-4 text-sm" />
+        <Badge v-if="stimulus.question_count === 0" variant="outline" class="border-amber-500/50 text-amber-700 dark:text-amber-400">待出题</Badge>
+        <div v-else class="flex items-center gap-1.5 text-xs text-muted-foreground">
           <Layers3 class="size-3.5" />
           {{ stimulus.question_count }} 道小题
         </div>
@@ -56,14 +57,14 @@ const statusLabel: Record<string, string> = {
           <FilePlus2 class="size-4" />
         </Button>
         <template v-if="canEdit">
-          <Button v-if="isDeleted" variant="ghost" size="icon" title="恢复题目材料" aria-label="恢复题目材料" @click="$emit('restore', stimulus)">
+          <Button v-if="isDeleted" variant="ghost" size="icon" title="恢复材料题" aria-label="恢复材料题" @click="$emit('restore', stimulus)">
             <ArchiveRestore class="size-4" />
           </Button>
           <template v-else>
-            <Button as-child variant="ghost" size="icon" title="编辑题目材料" aria-label="编辑题目材料">
+            <Button as-child variant="ghost" size="icon" title="编辑材料题" aria-label="编辑材料题">
               <NuxtLink :to="`/materials/${stimulus.id}/edit`"><FilePenLine class="size-4" /></NuxtLink>
             </Button>
-            <Button variant="ghost" size="icon" class="text-destructive" title="删除题目材料" aria-label="删除题目材料" @click="$emit('delete', stimulus)">
+            <Button variant="ghost" size="icon" class="text-destructive" title="删除材料题" aria-label="删除材料题" @click="$emit('delete', stimulus)">
               <Trash2 class="size-4" />
             </Button>
           </template>

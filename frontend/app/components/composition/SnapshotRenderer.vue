@@ -148,7 +148,7 @@ function groupChildSnapshot(node: SnapshotTreeNode): CompositionSnapshot {
       <section v-else-if="node.node_type === 'question_group'" class="border-y bg-muted/20 px-4 py-4">
         <div class="mb-3 flex items-center gap-2">
           <Files class="h-4 w-4 text-muted-foreground" />
-          <span class="text-sm font-medium">材料题 · 题目材料 #{{ node.stimulus_id }}</span>
+          <span class="text-sm font-medium">材料题 #{{ node.stimulus_id }}</span>
           <Badge variant="secondary" class="text-[11px]">材料 v{{ node.stimulus_revision }}</Badge>
         </div>
         <div class="mb-5 border-l-2 border-primary/30 pl-4">

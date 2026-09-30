@@ -3,7 +3,7 @@ const route = useRoute()
 
 const items = [
   { label: '题目', to: '/questions' },
-  { label: '题目材料', to: '/materials' },
+  { label: '材料题', to: '/materials' },
 ]
 
 const isActive = (to: string) => route.path === to || route.path.startsWith(`${to}/`)

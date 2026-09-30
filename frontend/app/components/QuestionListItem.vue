@@ -263,7 +263,7 @@ const sourceFileUrl = computed(() => {
 
               <Badge v-if="(item as DbQuestion).stimulus_id != null" as-child variant="secondary">
                 <NuxtLink :to="`/materials/${(item as DbQuestion).stimulus_id}/edit`">
-                  材料题 · 题目材料 #{{ (item as DbQuestion).stimulus_id }}
+                  材料题 #{{ (item as DbQuestion).stimulus_id }}
                 </NuxtLink>
               </Badge>
 

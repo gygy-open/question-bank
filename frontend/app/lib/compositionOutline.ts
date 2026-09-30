@@ -52,7 +52,7 @@ export function describeNode(node: EditorNode): string {
     case 'question_details':
       return `参考答案模块（${detailPropsOf(node).scope === 'all' ? '全稿' : '模块之前'}）`
     case 'question_group':
-      return `材料题（题目材料 #${node.stimulusId ?? '?'}）`
+      return `材料题 #${node.stimulusId ?? '?'}`
     case 'answer_space': {
       const props = answerSpacePropsOf(node)
       return `作答空间（${props.lines} 行${props.style === 'lined' ? '横线' : '空白'}）`

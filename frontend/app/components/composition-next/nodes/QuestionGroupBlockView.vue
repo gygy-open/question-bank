@@ -182,11 +182,11 @@ function patchAnswerSpace(index: number, patch: { lines?: number; style?: 'blank
   >
     <div class="mb-3 flex items-center gap-2">
       <Files class="size-4 text-muted-foreground" />
-      <span class="text-sm font-medium">材料题 · 题目材料 #{{ node.attrs.stimulusId }}</span>
+      <span class="text-sm font-medium">材料题 #{{ node.attrs.stimulusId }}</span>
       <Badge v-if="node.attrs.stimulusRevision != null" variant="secondary" class="text-[11px]">材料 v{{ node.attrs.stimulusRevision }}</Badge>
       <DropdownMenu @update:open="loadCandidates">
         <DropdownMenuTrigger as-child>
-          <Button class="ml-auto h-7 text-xs" variant="ghost" size="sm" title="从题目材料添加小题">
+          <Button class="ml-auto h-7 text-xs" variant="ghost" size="sm" title="从材料题添加小题">
             <ListPlus class="mr-1 size-3.5" />添加小题
           </Button>
         </DropdownMenuTrigger>

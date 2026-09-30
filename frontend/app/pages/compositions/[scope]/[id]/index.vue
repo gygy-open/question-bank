@@ -812,7 +812,7 @@ onBeforeRouteLeave(() => {
             当前仍显示冻结版本，不会自动刷新。
           </template>
           <template v-if="newStimulusQuestionCount">
-            题目材料下新增了 {{ newStimulusQuestionCount }} 道未选用的小题，可在对应材料题中“添加小题”。
+            材料题下新增了 {{ newStimulusQuestionCount }} 道未选用的小题，可在对应材料题中“添加小题”。
           </template>
         </span>
         <Button v-if="staleQuestionGroups.length" size="sm" variant="outline" :disabled="dirty || syncingQuestionGroups" @click="syncQuestionGroups">
