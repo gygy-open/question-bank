@@ -2,10 +2,11 @@
 
 from __future__ import annotations
 
-from typing import Protocol
+from typing import Optional, Protocol
 
 from app.schemas.export import OutputFormat
 from app.services.exporting.composition_contracts import CompositionExportDoc
+from app.services.exporting.images import ImageResolver
 from app.services.exporting.renderers.composition_docx import CompositionDocxRenderer
 from app.services.exporting.renderers.composition_latex import CompositionLatexRenderer
 
@@ -24,8 +25,10 @@ _RENDERERS = {
 }
 
 
-def composition_renderer_for(fmt: OutputFormat) -> CompositionRenderer:
+def composition_renderer_for(
+    fmt: OutputFormat, images: Optional[ImageResolver] = None
+) -> CompositionRenderer:
     try:
-        return _RENDERERS[fmt]()
+        return _RENDERERS[fmt](images)
     except KeyError as exc:
         raise ValueError(f"Unsupported export format: {fmt}") from exc

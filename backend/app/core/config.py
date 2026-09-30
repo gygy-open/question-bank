@@ -115,6 +115,16 @@ class Settings(BaseSettings):
         """Root directory served at ``/static`` (contains ``media/``)."""
         return self.DATA_DIR / "static"
 
+    @property
+    def STORAGE_DIR(self) -> Path:
+        """内容寻址的持久文件区(objects/ 与 derived/),见 docs/development/media-assets.md。"""
+        return self.DATA_DIR / "storage"
+
+    @property
+    def TMP_DIR(self) -> Path:
+        """可随时清空的临时区;须与 STORAGE_DIR 同一文件系统,以便原子 rename。"""
+        return self.DATA_DIR / "tmp"
+
 settings = Settings()
 
 

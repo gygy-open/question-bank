@@ -44,6 +44,8 @@ from app.schemas.export import OutputFormat
 from app.services import composition_service
 from app.services.exporting.composition_assemble import CompositionAssembler, CompositionExportError
 from app.services.exporting.composition_registry import composition_renderer_for
+from app.services.exporting.images import ImageResolver
+from app.services import media_service
 
 router = APIRouter()
 
@@ -623,7 +625,12 @@ async def export_composition_version(
     if payload.title:
         export_doc.title = payload.title
 
-    file_path = composition_renderer_for(payload.format).render(export_doc)
+    images = ImageResolver(
+        await media_service.load_content_images(
+            db, media_service.collect_asset_ids(version.snapshot), subject_id=subject_id
+        )
+    )
+    file_path = composition_renderer_for(payload.format, images).render(export_doc)
     suffix = "-latex.zip" if payload.format == OutputFormat.LATEX else f".{payload.format.value}"
     filename = f"{export_doc.title}-v{version_no}{suffix}"
 

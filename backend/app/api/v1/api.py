@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends
 from app.api import deps
-from app.api.v1.endpoints import subjects, knowledge_points, tags, tag_categories, questions, upload, login, users, system_settings, ai_config, chat, tools, activity_logs, import_tasks, prompts, setup, system, subject_prompts, subject_answer_space, compositions, paper_imports, stimuli
+from app.api.v1.endpoints import subjects, knowledge_points, tags, tag_categories, questions, upload, login, users, system_settings, ai_config, chat, tools, activity_logs, import_tasks, prompts, setup, system, subject_prompts, subject_answer_space, compositions, paper_imports, stimuli, media
 
 api_router = APIRouter()
 api_router.include_router(setup.router, prefix="/setup", tags=["setup"])
@@ -11,6 +11,8 @@ api_router.include_router(subjects.router, prefix="/subjects", tags=["subjects"]
 api_router.include_router(subject_prompts.router, prefix="/subjects", tags=["subject-prompts"])
 api_router.include_router(subject_answer_space.router, prefix="/subjects", tags=["subject-answer-space"])
 api_router.include_router(stimuli.router, prefix="/subjects", tags=["stimuli"])
+api_router.include_router(media.subject_router, prefix="/subjects", tags=["media"])
+api_router.include_router(media.router, prefix="/media", tags=["media"])
 api_router.include_router(compositions.router, prefix="/subjects", tags=["compositions"])
 api_router.include_router(paper_imports.router, prefix="/subjects", tags=["paper-imports"])
 api_router.include_router(knowledge_points.router, prefix="/knowledge-points", tags=["knowledge-points"])

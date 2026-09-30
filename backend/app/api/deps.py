@@ -1,6 +1,7 @@
 from typing import Generator, Annotated, AsyncGenerator
+from urllib.parse import unquote
 
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends, HTTPException, Request, status
 from fastapi.security import OAuth2PasswordBearer
 from jose import jwt, JWTError
 from pydantic import ValidationError
@@ -26,7 +27,7 @@ async def get_db() -> AsyncGenerator[AsyncSession, None]:
 SessionDep = Annotated[AsyncSession, Depends(get_db)]
 TokenDep = Annotated[str, Depends(reusable_oauth2)]
 
-async def get_current_user(session: SessionDep, token: TokenDep) -> User:
+async def _user_from_token(session: AsyncSession, token: str) -> User:
     try:
         payload = jwt.decode(
             token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM]
@@ -45,7 +46,33 @@ async def get_current_user(session: SessionDep, token: TokenDep) -> User:
         raise HTTPException(status_code=404, detail="User not found")
     return user
 
+
+async def get_current_user(session: SessionDep, token: TokenDep) -> User:
+    return await _user_from_token(session, token)
+
 CurrentUser = Annotated[User, Depends(get_current_user)]
+
+
+async def get_current_active_user_header_or_cookie(
+    request: Request, session: SessionDep
+) -> User:
+    """媒体下发专用:<img>/<audio> 无法带 Authorization 头,同源请求会自动携带 token cookie。"""
+    token = None
+    authorization = request.headers.get("Authorization", "")
+    if authorization.lower().startswith("bearer "):
+        token = authorization[7:].strip()
+    if not token:
+        token = unquote(request.cookies.get("token") or "").strip('"')
+    if not token:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Not authenticated",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    user = await _user_from_token(session, token)
+    if not user.is_active:
+        raise HTTPException(status_code=400, detail="Inactive user")
+    return user
 
 def get_current_active_user(current_user: CurrentUser) -> User:
     if not current_user.is_active:

@@ -14,7 +14,7 @@ from app.services.question_content import parse_json_field
 
 __all__ = ["rich_doc_to_latex", "rich_inline_to_latex", "latex_escape"]
 
-ImagePathFn = Optional[Callable[[str], Optional[str]]]
+ImagePathFn = Optional[Callable[[dict[str, Any]], Optional[str]]]
 
 _BLANK_WIDTH_MIN_EM = 2
 _BLANK_WIDTH_MAX_EM = 30
@@ -173,8 +173,7 @@ def _apply_marks(text: str, marks: list[Any]) -> str:
 
 def _image(node: dict[str, Any], image_path: ImagePathFn) -> str:
     attrs = node.get("attrs") or {}
-    src = str(attrs.get("src", ""))
-    resolved = image_path(src) if (image_path and src) else None
+    resolved = image_path(attrs) if (image_path and (attrs.get("src") or attrs.get("assetId"))) else None
     if not resolved:
         # 图片无法解析时退化为 alt 文本,不静默丢弃。
         alt = str(attrs.get("alt", "") or "")

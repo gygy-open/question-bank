@@ -229,12 +229,13 @@ class DocxRichRenderer:
         if align in _ALIGN:
             paragraph.alignment = _ALIGN[align]
         src = str(attrs.get("src", ""))
-        path = self.images.resolve(src)
-        if path is None:
+        resolved = self.images.resolve_image(attrs)
+        if resolved is None:
             alt = str(attrs.get("alt", "") or "")
             if alt:
                 paragraph.add_run(alt)
             return
+        path = resolved.path
         width = attrs.get("width")
         kwargs = {}
         if isinstance(width, (int, float)) and not isinstance(width, bool) and math.isfinite(float(width)) and width > 0:

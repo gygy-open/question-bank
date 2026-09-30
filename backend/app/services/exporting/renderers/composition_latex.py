@@ -57,8 +57,8 @@ def _format_score(score: float) -> str:
 class CompositionLatexRenderer:
     ext = "zip"
 
-    def __init__(self) -> None:
-        self.images = ImageResolver()
+    def __init__(self, images: Optional[ImageResolver] = None) -> None:
+        self.images = images or ImageResolver()
 
     def render(self, doc: CompositionExportDoc) -> str:
         with tempfile.TemporaryDirectory() as tmp:
@@ -67,15 +67,19 @@ class CompositionLatexRenderer:
             images_dir.mkdir()
             seen: dict[str, str] = {}
 
-            def image_path(src: str) -> Optional[str]:
-                resolved = self.images.resolve(src)
+            def image_path(attrs: dict) -> Optional[str]:
+                resolved = self.images.resolve_image(attrs)
                 if resolved is None:
                     return None
-                if src not in seen:
-                    dst = images_dir / resolved.name
-                    shutil.copy2(resolved, dst)
-                    seen[src] = f"images/{resolved.name}"
-                return seen[src]
+                if resolved.key not in seen:
+                    name = (
+                        f"{resolved.key}{resolved.suffix}"
+                        if resolved.key.startswith("asset-")
+                        else resolved.path.name
+                    )
+                    shutil.copy2(resolved.path, images_dir / name)
+                    seen[resolved.key] = f"images/{name}"
+                return seen[resolved.key]
 
             tex = self._render_tex(doc, image_path)
             (base / f"{doc.title}.tex").write_text(tex, encoding="utf-8")

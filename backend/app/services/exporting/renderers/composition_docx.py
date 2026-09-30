@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import os
 import tempfile
-from typing import Any
+from typing import Any, Optional
 
 from docx import Document
 from docx.enum.text import WD_ALIGN_PARAGRAPH
@@ -61,8 +61,8 @@ def _set_bottom_border(paragraph: Any) -> None:
 class CompositionDocxRenderer:
     ext = "docx"
 
-    def __init__(self) -> None:
-        self.rich = DocxRichRenderer(ImageResolver())
+    def __init__(self, images: Optional[ImageResolver] = None) -> None:
+        self.rich = DocxRichRenderer(images or ImageResolver())
 
     def render(self, doc: CompositionExportDoc) -> str:
         # doc.title 只用于导出文件名（见 composition_registry/API 层），正文完全按画布节点渲染,

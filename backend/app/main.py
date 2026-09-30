@@ -13,6 +13,7 @@ from app._version import __version__
 from app.api.v1.api import api_router
 from app.capabilities.errors import DomainError, status_for
 from app.core.config import settings, is_configured
+from app.core import storage
 from app.services.embedding import reload_embedding_function
 
 logging.basicConfig(level=settings.LOG_LEVEL)
@@ -22,6 +23,9 @@ logger = logging.getLogger(__name__)
 async def lifespan(app: FastAPI):
     # Startup: only touch the database once the app has been configured.
     # Before first-run setup there is no database to talk to.
+    removed = storage.cleanup_stale_tmp()
+    if removed:
+        logger.info("Removed %d stale temporary entries", removed)
     if is_configured():
         await reload_embedding_function()
     else:

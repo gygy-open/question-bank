@@ -40,6 +40,8 @@ class ImportTask(Base):
 
     # 上传文件内容的 SHA-256;仅用于"完全一致"的重复上传提示,不做近似查重。
     content_sha256 = Column(String(64), nullable=True, index=True)
+    # 源文件在内容寻址存储中的键;有值时 file_path 仅为历史记录。
+    source_sha256 = Column(String(64), nullable=True)
     # 整卷导入提交的幂等键;重放同一请求返回既有结果而非重复建题/建稿。
     idempotency_key = Column(String(64), nullable=True, unique=True)
     composition_state = Column(

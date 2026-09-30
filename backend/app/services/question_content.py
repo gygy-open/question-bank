@@ -94,6 +94,11 @@ def validate_rich_doc(doc: Any) -> Optional[RichDoc]:
             return
         if node.get("type") == "image":
             attrs = node.get("attrs") or {}
+            asset_id = attrs.get("assetId")
+            if asset_id is not None and (
+                not isinstance(asset_id, int) or isinstance(asset_id, bool) or asset_id <= 0
+            ):
+                raise ValueError("image assetId must be a positive integer")
             for name in ("width", "height"):
                 value = attrs.get(name)
                 if value is None:
