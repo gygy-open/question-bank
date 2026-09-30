@@ -52,6 +52,7 @@ from app.schemas.composition import (
     QuestionContentSnapshot,
     QuestionSnapshot,
 )
+from app.services import media_refs
 from app.services.question_content import parse_json_field
 
 SNAPSHOT_SCHEMA_VERSION = 3
@@ -390,6 +391,7 @@ async def duplicate_composition(
         await db.flush()
         db.add_all(_clone(n) for n in children)
         await db.flush()
+        await media_refs.sync_composition_refs(db, new_comp.id, new_comp.subject_id)
 
     await _add_event(
         db,
@@ -1362,6 +1364,7 @@ async def replace_nodes(
     await db.flush()
     db.add_all(child_nodes)
     await db.flush()
+    await media_refs.sync_composition_refs(db, comp.id, comp.subject_id)
 
     # 6) 与业务变更同事务写一条时间线事件。
     resolved_batch_id = batch_id or uuid.uuid4().hex
@@ -1644,6 +1647,8 @@ async def sync_question_nodes(
         actor_id=actor.id,
         payload={"node_ids": list(node_ids), "synced": len(targets)},
     )
+    await db.flush()
+    await media_refs.sync_composition_refs(db, comp.id, comp.subject_id)
 
     await db.commit()
     refreshed = await crud_composition.composition.list_nodes(db, composition_id=comp.id)
@@ -1900,6 +1905,7 @@ async def sync_question_group_nodes(
 
     db.add_all(new_children)
     await db.flush()
+    await media_refs.sync_composition_refs(db, comp.id, comp.subject_id)
     await _add_event(
         db,
         composition_id=comp.id,
@@ -2073,6 +2079,14 @@ async def finalize_version(
             finalized_by=actor.id,
         )
         db.add(version)
+        try:
+            await db.flush()
+        except IntegrityError:
+            await db.rollback()
+            if attempt == 0:
+                continue
+            raise _conflict("Version number conflict")
+        await media_refs.sync_version_refs(db, version.id, snapshot)
         await _add_event(
             db,
             composition_id=comp_id,

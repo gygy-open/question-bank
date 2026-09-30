@@ -31,7 +31,7 @@ from app.models.import_task import (
 from app.models.question import Question, QuestionStatus, QuestionType, QuestionVisibility
 from app.models.question_relation import QuestionRelation, QuestionRelationType
 from app.models.stimulus import Stimulus
-from app.services import composition_service
+from app.services import composition_service, media_refs
 from app.services.answer_space import resolve_answer_space_props_or_fallback
 from app.services.composition_authoring import AuthoringError, build_nodes
 from app.services.importing.contracts import (
@@ -713,6 +713,7 @@ async def commit_paper_import(
         )
         db.add(stimulus)
         await db.flush()
+        await media_refs.sync_stimulus_refs(db, stimulus.id, stimulus_in.content, subject_id)
         stimulus_ref = str(raw["temp_id"])
         stimulus_temp_id_map[stimulus_ref] = stimulus.id
 

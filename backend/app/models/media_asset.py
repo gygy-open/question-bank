@@ -1,7 +1,7 @@
 import enum
 from datetime import datetime
 
-from sqlalchemy import BigInteger, Column, DateTime, Float, ForeignKey, Integer, String
+from sqlalchemy import BigInteger, Column, DateTime, Float, ForeignKey, Index, Integer, String, UniqueConstraint
 
 from .base import Base
 
@@ -49,3 +49,27 @@ class MediaAsset(Base):
         DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow
     )
     deleted_at = Column(DateTime, nullable=True, index=True)
+
+
+class MediaOwnerType(str, enum.Enum):
+    QUESTION = "question"
+    STIMULUS = "stimulus"
+    # 稿件工作区的全部节点合并为一个引用方;节点会被整批删建,按节点记不稳定。
+    COMPOSITION = "composition"
+    COMPOSITION_VERSION = "composition_version"
+
+
+class MediaReference(Base):
+    """资产被哪些内容引用;随内容写入同步维护,供"被引用于"与回收判断。"""
+
+    __tablename__ = "media_references"
+    __table_args__ = (
+        UniqueConstraint("asset_id", "owner_type", "owner_id", name="uq_media_references_asset_owner"),
+        Index("ix_media_references_owner", "owner_type", "owner_id"),
+    )
+
+    id = Column(Integer, primary_key=True)
+    asset_id = Column(Integer, ForeignKey("media_assets.id"), nullable=False, index=True)
+    owner_type = Column(String(32), nullable=False)
+    owner_id = Column(Integer, nullable=False)
+    created_at = Column(DateTime, nullable=False, default=datetime.utcnow)

@@ -10,6 +10,7 @@ from app.crud.crud_question import is_question_visible, question as crud_questio
 from app.models.question import Question, QuestionVisibility
 from app.models.stimulus import Stimulus
 from app.models.user import User
+from app.services import media_refs
 from app.schemas.question import QuestionSummary
 from app.schemas.stimulus import (
     StimulusBundleCreate,
@@ -113,10 +114,10 @@ async def create_stimulus(
         updated_by=actor.id,
     )
     db.add(stimulus)
+    await db.flush()
+    await media_refs.sync_stimulus_refs(db, stimulus.id, content, subject_id)
     if commit:
         await db.commit()
-    else:
-        await db.flush()
     await db.refresh(stimulus)
     return stimulus
 
@@ -181,6 +182,7 @@ async def _write_stimulus(
         if serialized != stimulus.content:
             values["content"] = serialized
             content_revision = Stimulus.content_revision + 1
+            await media_refs.sync_stimulus_refs(db, stimulus.id, content, stimulus.subject_id)
     if status_value is not None:
         values["status"] = status_value
     if visibility is not None:

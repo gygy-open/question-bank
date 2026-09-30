@@ -9,6 +9,7 @@ from app.models.tag import Tag
 from app.schemas.question import QuestionCreate, QuestionUpdate
 from app.crud.crud_knowledge_point import knowledge_point as knowledge_point_crud
 from app.services.activity_logger import log_activity
+from app.services import media_refs
 from app.services.question_content import (
     normalize_options,
     parse_json_field,
@@ -409,10 +410,10 @@ class CRUDQuestion(CRUDBase[Question, QuestionCreate, QuestionUpdate]):
             db_obj.knowledge_points = list(kps)
             
         db.add(db_obj)
+        await db.flush()
+        await media_refs.sync_question_refs(db, db_obj)
         if commit:
             await db.commit()
-        else:
-            await db.flush()
         await db.refresh(db_obj)
         
         # Re-fetch with relationships loaded to avoid MissingGreenlet error
@@ -558,10 +559,10 @@ class CRUDQuestion(CRUDBase[Question, QuestionCreate, QuestionUpdate]):
             db_obj.knowledge_points = list(kps)
             
         db.add(db_obj)
+        await db.flush()
+        await media_refs.sync_question_refs(db, db_obj)
         if commit:
             await db.commit()
-        else:
-            await db.flush()
         await db.refresh(db_obj)
         
         # Re-fetch with relationships loaded

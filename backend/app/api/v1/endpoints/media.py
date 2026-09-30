@@ -1,4 +1,4 @@
-from typing import Any, Literal
+from typing import Any, Literal, Optional
 
 from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile, status
 from fastapi.responses import FileResponse
@@ -9,8 +9,8 @@ from app.core import storage
 from app.core.permissions import Permission
 from app.crud.crud_subject import subject as crud_subject
 from app.models.media_asset import MediaPurpose
-from app.schemas.media import MediaAssetRead
-from app.services import media_service
+from app.schemas.media import MediaAssetPage, MediaAssetRead, MediaReferences
+from app.services import media_library, media_service
 
 router = APIRouter()
 subject_router = APIRouter()
@@ -47,6 +47,26 @@ async def upload_subject_media(
     return asset
 
 
+@subject_router.get("/{subject_id}/media", response_model=MediaAssetPage)
+async def list_subject_media(
+    subject_id: int,
+    db: deps.SessionDep,
+    kind: Optional[Literal["image", "audio"]] = None,
+    used: Optional[bool] = None,
+    q: Optional[str] = Query(None, max_length=100),
+    uploader_id: Optional[int] = None,
+    sort: media_library.MediaSort = "newest",
+    page: int = Query(1, ge=1),
+    size: int = Query(30, ge=1, le=100),
+    current_user: models.User = Depends(deps.get_current_active_user),
+) -> Any:
+    deps.require(current_user, Permission.VIEW_QUESTION, subject_id=subject_id)
+    return await media_library.list_subject_media(
+        db, subject_id, kind=kind, used=used, q=q, uploader_id=uploader_id,
+        sort=sort, page=page, size=size,
+    )
+
+
 @router.post("/me", response_model=MediaAssetRead, status_code=status.HTTP_201_CREATED)
 async def upload_personal_media(
     db: deps.SessionDep,
@@ -72,6 +92,16 @@ async def read_media(
     current_user: models.User = Depends(deps.get_current_active_user_header_or_cookie),
 ) -> Any:
     return await media_service.get_readable(db, asset_id, current_user)
+
+
+@router.get("/{asset_id}/references", response_model=MediaReferences)
+async def read_media_references(
+    asset_id: int,
+    db: deps.SessionDep,
+    current_user: models.User = Depends(deps.get_current_active_user),
+) -> Any:
+    await media_service.get_readable(db, asset_id, current_user)
+    return await media_library.describe_references(db, asset_id, current_user)
 
 
 @router.get("/{asset_id}/content")
