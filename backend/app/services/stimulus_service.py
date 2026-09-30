@@ -6,12 +6,17 @@ from sqlalchemy import func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.capabilities.errors import Conflict, NotFound, Unprocessable
-from app.crud.crud_question import is_question_visible
+from app.crud.crud_question import is_question_visible, question as crud_question
 from app.models.question import Question, QuestionVisibility
 from app.models.stimulus import Stimulus
 from app.models.user import User
 from app.schemas.question import QuestionSummary
-from app.schemas.stimulus import StimulusDetail, StimulusRead
+from app.schemas.stimulus import (
+    StimulusBundleCreate,
+    StimulusBundleUpdate,
+    StimulusDetail,
+    StimulusRead,
+)
 
 
 def _is_private_hidden(resource: Stimulus, actor: User) -> bool:
@@ -95,6 +100,7 @@ async def create_stimulus(
     actor: User,
     source: Optional[str] = None,
     metadata: Optional[dict] = None,
+    commit: bool = True,
 ) -> Stimulus:
     stimulus = Stimulus(
         subject_id=subject_id,
@@ -107,12 +113,56 @@ async def create_stimulus(
         updated_by=actor.id,
     )
     db.add(stimulus)
-    await db.commit()
+    if commit:
+        await db.commit()
+    else:
+        await db.flush()
     await db.refresh(stimulus)
     return stimulus
 
 
 async def update_stimulus(
+    db: AsyncSession,
+    *,
+    stimulus: Stimulus,
+    expected_revision: int,
+    actor: User,
+    content: Optional[dict] = None,
+    status_value: Optional[str] = None,
+    visibility: Optional[str] = None,
+    source: Optional[str] = None,
+    metadata: Optional[dict] = None,
+) -> Stimulus:
+    if visibility == QuestionVisibility.PRIVATE.value:
+        await _ensure_no_public_members(db, stimulus.id)
+    updated = await _write_stimulus(
+        db,
+        stimulus=stimulus,
+        expected_revision=expected_revision,
+        actor=actor,
+        content=content,
+        status_value=status_value,
+        visibility=visibility,
+        source=source,
+        metadata=metadata,
+    )
+    await db.commit()
+    return await get_stimulus(db, updated.id, actor)
+
+
+async def _ensure_no_public_members(db: AsyncSession, stimulus_id: int) -> None:
+    public_question = await db.scalar(
+        select(Question.id).where(
+            Question.stimulus_id == stimulus_id,
+            Question.deleted_at.is_(None),
+            Question.visibility == QuestionVisibility.PUBLIC.value,
+        ).limit(1)
+    )
+    if public_question is not None:
+        raise Unprocessable("材料下有公开小题，不能设为私有")
+
+
+async def _write_stimulus(
     db: AsyncSession,
     *,
     stimulus: Stimulus,
@@ -134,16 +184,6 @@ async def update_stimulus(
     if status_value is not None:
         values["status"] = status_value
     if visibility is not None:
-        if visibility == QuestionVisibility.PRIVATE.value:
-            public_question = await db.scalar(
-                select(Question.id).where(
-                    Question.stimulus_id == stimulus.id,
-                    Question.deleted_at.is_(None),
-                    Question.visibility == QuestionVisibility.PUBLIC.value,
-                ).limit(1)
-            )
-            if public_question is not None:
-                raise Unprocessable("材料下有公开小题，不能设为私有")
         values["visibility"] = visibility
     if source is not None:
         values["source"] = source
@@ -160,7 +200,7 @@ async def update_stimulus(
     )
     if result.rowcount == 0:
         raise Conflict("Stimulus revision mismatch")
-    await db.commit()
+    await db.flush()
     return await get_stimulus(db, stimulus.id, actor)
 
 
@@ -245,6 +285,16 @@ async def set_stimulus_questions(
     actor: User,
 ) -> StimulusDetail:
     locked = await _lock_active_stimulus(db, stimulus.id, expected_revision)
+    await _apply_membership(db, locked, question_ids, actor)
+    locked.revision = locked.revision + 1
+    locked.updated_by = actor.id
+    await db.commit()
+    return await to_detail(db, await get_stimulus(db, locked.id, actor), actor)
+
+
+async def _apply_membership(
+    db: AsyncSession, locked: Stimulus, question_ids: List[int], actor: User
+) -> None:
     requested: List[Question] = []
     if question_ids:
         rows = await db.scalars(
@@ -274,7 +324,86 @@ async def set_stimulus_questions(
         question.stimulus_id = None
         question.stimulus_position = None
     await assign_positions(db, locked.id, [*requested, *hidden])
-    locked.revision = locked.revision + 1
-    locked.updated_by = actor.id
-    await db.commit()
-    return await to_detail(db, await get_stimulus(db, locked.id, actor), actor)
+
+
+async def save_bundle(
+    db: AsyncSession,
+    *,
+    subject_id: int,
+    payload: StimulusBundleCreate,
+    actor: User,
+    stimulus: Optional[Stimulus] = None,
+) -> StimulusDetail:
+    """在同一事务内保存材料、新建/更新小题并确定小题顺序;任一步失败整体回滚。"""
+    if payload.content is None:
+        raise Unprocessable("请填写材料内容")
+    try:
+        if stimulus is None:
+            target = await create_stimulus(
+                db,
+                subject_id=subject_id,
+                content=payload.content,
+                status_value=payload.status.value,
+                visibility=payload.visibility.value,
+                actor=actor,
+                source=payload.source,
+                metadata=payload.metadata,
+                commit=False,
+            )
+        else:
+            assert isinstance(payload, StimulusBundleUpdate)
+            await _lock_active_stimulus(db, stimulus.id, payload.expected_revision)
+            # 先写材料,小题更新时的公开/私有校验即按材料的新可见性进行。
+            target = await _write_stimulus(
+                db,
+                stimulus=stimulus,
+                expected_revision=payload.expected_revision,
+                actor=actor,
+                content=payload.content,
+                status_value=payload.status.value,
+                visibility=payload.visibility.value,
+                source=payload.source,
+                metadata=payload.metadata,
+            )
+
+        ordered_ids: List[int] = []
+        for item in payload.questions:
+            if item.id is None:
+                assert item.create is not None
+                question_in = item.create.model_copy(deep=True)
+                question_in.subject_id = subject_id
+                created = await crud_question.create_with_tags(
+                    db, obj_in=question_in, user_id=actor.id, commit=False
+                )
+                ordered_ids.append(created.id)
+                continue
+            if item.update is not None:
+                existing = await db.get(Question, item.id)
+                if (
+                    existing is None
+                    or existing.deleted_at is not None
+                    or not is_question_visible(existing, actor)
+                ):
+                    raise NotFound("Question not found")
+                if existing.subject_id != subject_id or (
+                    "subject_id" in item.update.model_fields_set
+                    and item.update.subject_id != subject_id
+                ):
+                    raise Unprocessable("材料与小题必须属于同一学科")
+                await crud_question.update_with_tags(
+                    db, db_obj=existing, obj_in=item.update, user_id=actor.id, commit=False
+                )
+            ordered_ids.append(item.id)
+
+        locked = await _lock_active_stimulus(db, target.id, target.revision)
+        await _apply_membership(db, locked, ordered_ids, actor)
+        if locked.visibility == QuestionVisibility.PRIVATE.value:
+            await _ensure_no_public_members(db, locked.id)
+        await db.commit()
+    except ValueError as exc:
+        await db.rollback()
+        raise Unprocessable(str(exc)) from exc
+    except Exception:
+        await db.rollback()
+        raise
+    return await to_detail(db, await get_stimulus(db, target.id, actor), actor)

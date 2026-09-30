@@ -1,11 +1,11 @@
 <script setup lang="ts">
-import { computed, nextTick, onActivated, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { onBeforeRouteLeave } from 'vue-router'
 import draggable from 'vuedraggable'
-import { AlertTriangle, ArrowDown, ArrowLeft, ArrowUp, ChevronDown, Ellipsis, FilePlus2, GripVertical, ListPlus, Loader2, Plus, Save, Unlink } from '@lucide/vue'
+import { AlertTriangle, ArrowDown, ArrowLeft, ArrowUp, ChevronDown, ChevronUp, Ellipsis, FilePlus2, GripVertical, ListPlus, Loader2, Pencil, Plus, Save, Trash2, Unlink } from '@lucide/vue'
 import { toast } from 'vue-sonner'
 import StimulusQuestionPickerDialog from '@/components/stimuli/StimulusQuestionPickerDialog.vue'
-import QuestionEditDialog from '@/components/QuestionEditDialog.vue'
+import QuestionDraftEditor from '@/components/QuestionDraftEditor.vue'
 import CompositionTargetPicker from '@/components/CompositionTargetPicker.vue'
 import RichContent from '@/components/rich-editor/RichContent.vue'
 import RichEditor from '@/components/rich-editor/RichEditor.vue'
@@ -21,24 +21,30 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { questionTypeLabel } from '@/lib/answerFormat'
 import { getApiErrorDetail, isRevisionConflict } from '@/lib/apiErrors'
 import {
-  addMember,
+  type BundleMeta,
+  type MemberEntry,
+  addExisting,
+  buildBundleQuestions,
+  bundleSnapshot,
+  effectiveMeta,
+  entryFromQuestion,
   hasEditorSubjectMismatch,
+  isBodyDirty,
   moveMember,
-  publicQuestionsUnderPrivateStimulus,
-  removeMember,
-  sameOrder,
+  newEntry,
+  publicMembersUnderPrivate,
+  validateMembers,
 } from '@/lib/stimulusEditor'
 import type { Question, QuestionStatus, QuestionSummary, RichDoc, StimulusDetail } from '@/types'
 
 const props = defineProps<{ stimulusId?: number }>()
 const router = useRouter()
+const route = useRoute()
+const { $api } = useNuxtApp()
 const { currentSubjectId, setSubject } = useSubjectContext()
 const { can } = usePermissions()
-const { createStimulus, getStimulus, updateStimulus, setStimulusQuestions } = useStimuli()
+const { getStimulus, createStimulusBundle, updateStimulusBundle } = useStimuli()
 const editorSubjectId = ref<number | null>(null)
-// 新建材料后若保存小题失败，重试应更新这份材料而不是再建一份。
-const createdId = ref<number | null>(null)
-const stimulusId = computed(() => props.stimulusId ?? createdId.value)
 const canEdit = computed(() => can(Capability.EDIT_QUESTION, editorSubjectId.value))
 const isEdit = computed(() => props.stimulusId != null)
 const subjectMismatch = computed(() => hasEditorSubjectMismatch(editorSubjectId.value, currentSubjectId.value))
@@ -48,28 +54,47 @@ const status = ref<QuestionStatus>('draft')
 const visibility = ref<'public' | 'private'>('public')
 const source = ref('')
 const revision = ref<number | null>(null)
-const members = ref<QuestionSummary[]>([])
-const savedMembers = ref<QuestionSummary[]>([])
+const entries = ref<MemberEntry[]>([])
+const expanded = ref(new Set<string>())
+const saved = ref({
+  status: 'draft' as QuestionStatus,
+  visibility: 'public' as 'public' | 'private',
+  snapshot: '',
+  questionIds: [] as number[],
+})
 const loading = ref(false)
 const saving = ref(false)
-const metaDirty = ref(false)
-const hydrating = ref(false)
 const conflict = ref(false)
 const errorMessage = ref('')
 const pickerOpen = ref(false)
-const createOpen = ref(false)
 const compositionPickerOpen = ref(false)
 
-const membersDirty = computed(() => !sameOrder(members.value, savedMembers.value))
-const dirty = computed(() => metaDirty.value || membersDirty.value)
-const selectedIds = computed(() => members.value.map(member => member.id))
-const incompatibleIds = computed(() => publicQuestionsUnderPrivateStimulus(visibility.value, members.value))
+const snapshot = computed(() => bundleSnapshot(
+  { content: content.value, status: status.value, visibility: visibility.value, source: source.value },
+  entries.value,
+))
+const dirty = computed(() => snapshot.value !== saved.value.snapshot)
+saved.value.snapshot = snapshot.value
+const meta = computed<BundleMeta>(() => ({
+  status: status.value,
+  visibility: visibility.value,
+  syncMembers: status.value !== saved.value.status || visibility.value !== saved.value.visibility,
+}))
+const selectedIds = computed(() => entries.value.flatMap(entry => (entry.id == null ? [] : [entry.id])))
+const incompatible = computed(() => publicMembersUnderPrivate(entries.value, meta.value))
+const incompatibleMessage = computed(() => incompatible.value.length
+  ? `私有材料题下不能包含公开小题（第 ${incompatible.value.join('、')} 小题）。请移出这些小题，或在“设置”中把材料题改为公开。`
+  : '')
 const settingsOpen = ref(false)
 // 冲突提示要求改可见性时，把设置区展开到用户眼前。
-watch(incompatibleIds, (ids) => { if (ids.length) settingsOpen.value = true })
+watch(incompatible, (items) => { if (items.length) settingsOpen.value = true })
 const STATUS_LABELS: Record<QuestionStatus, string> = { draft: '草稿', pending: '待审核', published: '已发布', archived: '已归档' }
 const settingsSummary = computed(() =>
   [STATUS_LABELS[status.value], visibility.value === 'private' ? '私有' : '公开', source.value.trim()].filter(Boolean).join(' · '))
+
+const resetBaseline = (questionIds: number[]) => {
+  saved.value = { status: status.value, visibility: visibility.value, snapshot: snapshot.value, questionIds }
+}
 
 const applyStimulus = (stimulus: StimulusDetail) => {
   content.value = structuredClone(stimulus.content)
@@ -77,37 +102,79 @@ const applyStimulus = (stimulus: StimulusDetail) => {
   visibility.value = stimulus.visibility
   source.value = stimulus.source ?? ''
   revision.value = stimulus.revision
-  members.value = stimulus.questions.slice()
-  savedMembers.value = stimulus.questions.slice()
-  metaDirty.value = false
+  entries.value = stimulus.questions.map(entryFromQuestion)
+  expanded.value = new Set()
+  resetBaseline(stimulus.questions.map(question => question.id))
   conflict.value = false
   errorMessage.value = ''
+}
+
+// 从单题“加入材料题”进入：取出 URL 中的题目后立即移除参数，避免刷新重复加入。
+const takeQueryQuestion = async (key: 'from_question' | 'add_question'): Promise<Question | null> => {
+  const questionId = Number(route.query[key])
+  if (!Number.isInteger(questionId) || questionId <= 0) return null
+  await router.replace({ query: { ...route.query, [key]: undefined } })
+  try {
+    const question = await $api<Question>(`/questions/${questionId}`)
+    if (question.stimulus_id != null && question.stimulus_id !== props.stimulusId) {
+      errorMessage.value = `题目 #${question.id} 已属于材料题 #${question.stimulus_id}，需先从原材料题移出。`
+      return null
+    }
+    return question
+  } catch (error) {
+    errorMessage.value = getApiErrorDetail(error, '题目加载失败')
+    return null
+  }
+}
+
+// 新建材料题：该题作为第 1 小题，材料题沿用它的状态与可见性。
+const prefillFromQuestion = async () => {
+  if (isEdit.value || !route.query.from_question) return
+  loading.value = true
+  try {
+    const question = await takeQueryQuestion('from_question')
+    if (!question) return
+    status.value = question.status
+    visibility.value = question.visibility
+    entries.value = [entryFromQuestion(question as unknown as QuestionSummary)]
+    resetBaseline([])
+  } finally {
+    loading.value = false
+  }
+}
+
+// 已有材料题：追加到末尾，保持未保存状态让用户确认位置后再保存。
+const appendRequestedQuestion = async () => {
+  if (!route.query.add_question) return
+  const question = await takeQueryQuestion('add_question')
+  if (!question || selectedIds.value.includes(question.id)) return
+  entries.value = addExisting(entries.value, [question as unknown as QuestionSummary])
+  toast.info(`已把题目 #${question.id} 加到末尾，保存后生效`)
+  await nextTick()
+  document.getElementById(`member-q-${question.id}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' })
 }
 
 const load = async (force = false) => {
   if (!isEdit.value || !props.stimulusId || !editorSubjectId.value || (dirty.value && !force)) return
   loading.value = true
-  hydrating.value = true
   try {
     applyStimulus(await getStimulus(editorSubjectId.value, props.stimulusId))
   } catch (error) {
     errorMessage.value = getApiErrorDetail(error, '材料题加载失败')
+    return
   } finally {
     loading.value = false
-    await nextTick()
-    metaDirty.value = false
-    hydrating.value = false
   }
+  await appendRequestedQuestion()
 }
 
-watch([content, status, visibility, source], () => { if (!hydrating.value) metaDirty.value = true }, { deep: true })
 watch(currentSubjectId, (subjectId) => {
   if (editorSubjectId.value === null && subjectId !== null) {
     editorSubjectId.value = subjectId
     void load()
   }
 }, { immediate: true })
-onActivated(() => load(false))
+onMounted(() => { void prefillFromQuestion() })
 
 const restoreSubject = async () => {
   if (editorSubjectId.value !== null) await setSubject(editorSubjectId.value)
@@ -123,28 +190,39 @@ onMounted(() => window.addEventListener('beforeunload', beforeUnloadHandler))
 onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnloadHandler))
 onBeforeRouteLeave(() => !dirty.value || window.confirm('材料题有未保存的修改，确定要离开吗？'))
 
+const toggleExpanded = (key: string) => {
+  const next = new Set(expanded.value)
+  if (!next.delete(key)) next.add(key)
+  expanded.value = next
+}
+const addNewQuestion = async () => {
+  const entry = newEntry({ status: status.value, visibility: visibility.value })
+  entries.value = [...entries.value, entry]
+  expanded.value = new Set([...expanded.value, entry.key])
+  await nextTick()
+  document.getElementById(`member-${entry.key}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+}
 const addQuestions = (questions: QuestionSummary[]) => {
-  members.value = questions.reduce((current, question) => addMember(current, question), members.value)
+  entries.value = addExisting(entries.value, questions)
 }
-const addCreatedQuestion = (question: Question) => {
-  addQuestions([question as unknown as QuestionSummary])
-  createOpen.value = false
+const removeEntry = (entry: MemberEntry) => {
+  const edited = entry.id == null ? !isEmptyRichDoc(entry.draft.content) : isBodyDirty(entry)
+  const message = entry.id == null ? '删除这道未保存的小题？' : '这道小题的未保存修改将丢失，确定移出吗？'
+  if (edited && !window.confirm(message)) return
+  entries.value = entries.value.filter(item => item.key !== entry.key)
 }
-const detachQuestion = (questionId: number) => { members.value = removeMember(members.value, questionId) }
-const moveQuestion = (from: number, to: number) => { members.value = moveMember(members.value, from, to) }
+const moveQuestion = (from: number, to: number) => { entries.value = moveMember(entries.value, from, to) }
 
 const validationMessage = (): string => {
   if (!editorSubjectId.value) return '请先选择学科'
   if (subjectMismatch.value) return '请先切回草稿所属学科'
   if (!canEdit.value) return '你没有编辑该学科材料题的权限'
   if (isEmptyRichDoc(content.value)) return '请填写材料内容'
-  if (incompatibleIds.value.length) {
-    return `私有材料题下不能包含公开小题（${incompatibleIds.value.map(id => `#${id}`).join('、')}）。请移出这些小题，或在“设置”中把材料题改为公开。`
-  }
-  return ''
+  if (incompatibleMessage.value) return incompatibleMessage.value
+  return validateMembers(entries.value, meta.value) ?? ''
 }
 
-// 正文/元数据与小题成员走两条接口；共用同一乐观锁，先存正文再用新 revision 存成员。
+// 材料、新建/修改的小题与顺序一次性整体保存，任一失败服务端整体回滚。
 const submit = async () => {
   const invalid = validationMessage()
   if (invalid) {
@@ -155,29 +233,20 @@ const submit = async () => {
   saving.value = true
   conflict.value = false
   errorMessage.value = ''
-  const payload = { content: content.value, status: status.value, visibility: visibility.value, source: source.value.trim() || null }
+  const payload = {
+    content: content.value,
+    status: status.value,
+    visibility: visibility.value,
+    source: source.value.trim(),
+    questions: buildBundleQuestions(entries.value, meta.value),
+  }
   try {
-    let currentRevision = revision.value
-    if (stimulusId.value == null) {
-      const created = await createStimulus(subjectId, payload)
-      createdId.value = created.id
-      currentRevision = created.revision
-    } else if (metaDirty.value && currentRevision) {
-      currentRevision = (await updateStimulus(subjectId, stimulusId.value, { ...payload, expected_revision: currentRevision })).revision
-    }
-    metaDirty.value = false
-    revision.value = currentRevision
-    if (stimulusId.value != null && currentRevision && membersDirty.value) {
-      const detail = await setStimulusQuestions(subjectId, stimulusId.value, {
-        expected_revision: currentRevision,
-        question_ids: members.value.map(member => member.id),
-      })
-      revision.value = detail.revision
-      savedMembers.value = detail.questions.slice()
-      members.value = detail.questions.slice()
-    }
+    const detail = props.stimulusId == null
+      ? await createStimulusBundle(subjectId, payload)
+      : await updateStimulusBundle(subjectId, props.stimulusId, { ...payload, expected_revision: revision.value! })
+    applyStimulus(detail)
     toast.success(isEdit.value ? '材料题已保存' : '材料题已创建')
-    if (!isEdit.value && createdId.value != null) await router.push(`/materials/${createdId.value}/edit`)
+    if (!isEdit.value) await router.replace(`/materials/${detail.id}/edit`)
   } catch (error) {
     if (isRevisionConflict(error)) conflict.value = true
     else errorMessage.value = getApiErrorDetail(error, '保存材料题失败')
@@ -198,13 +267,13 @@ const submit = async () => {
         <Button
           v-if="isEdit"
           variant="outline"
-          :disabled="dirty || savedMembers.length === 0"
+          :disabled="dirty || saved.questionIds.length === 0"
           :title="dirty ? '请先保存修改' : '把材料和全部小题作为一道材料题加入稿件'"
           @click="compositionPickerOpen = true"
         >
           <FilePlus2 class="mr-2 size-4" />加入稿件
         </Button>
-        <Button :disabled="saving || loading || !canEdit || subjectMismatch || (stimulusId != null && !dirty)" @click="submit"><Loader2 v-if="saving" class="mr-2 size-4 animate-spin" /><Save v-else class="mr-2 size-4" />保存</Button>
+        <Button :disabled="saving || loading || !canEdit || subjectMismatch || (isEdit && !dirty)" @click="submit"><Loader2 v-if="saving" class="mr-2 size-4 animate-spin" /><Save v-else class="mr-2 size-4" />保存</Button>
       </div>
     </header>
 
@@ -215,7 +284,7 @@ const submit = async () => {
         <AlertTriangle class="size-4" /><AlertTitle>材料题已被其他人修改</AlertTitle>
         <AlertDescription class="space-y-3"><p>你的本地内容与小题顺序仍然保留。可以加载服务器最新版本，或继续编辑本地草稿后再决定。</p><div class="flex flex-wrap gap-2"><Button size="sm" variant="destructive" @click="load(true)">加载最新并放弃本地</Button><Button size="sm" variant="outline" @click="conflict = false">继续编辑本地</Button></div></AlertDescription>
       </Alert>
-      <Alert v-if="incompatibleIds.length" variant="destructive"><AlertTriangle class="size-4" /><AlertTitle>私有材料题下有公开小题</AlertTitle><AlertDescription>{{ validationMessage() }}</AlertDescription></Alert>
+      <Alert v-if="incompatible.length" variant="destructive"><AlertTriangle class="size-4" /><AlertTitle>私有材料题下有公开小题</AlertTitle><AlertDescription>{{ incompatibleMessage }}</AlertDescription></Alert>
       <Alert v-if="errorMessage" variant="destructive"><AlertTriangle class="size-4" /><AlertTitle>操作失败</AlertTitle><AlertDescription>{{ errorMessage }}</AlertDescription></Alert>
       <div v-if="loading" class="flex justify-center py-20"><Loader2 class="size-7 animate-spin text-muted-foreground" /></div>
       <template v-else>
@@ -228,11 +297,11 @@ const submit = async () => {
         <section class="space-y-3">
           <div class="flex flex-wrap items-center justify-between gap-2">
             <div>
-              <h2 class="text-sm font-semibold">小题（{{ members.length }}）</h2>
-              <p class="text-xs text-muted-foreground">按此顺序出现在稿件中；移出后保留为单题。</p>
+              <h2 class="text-sm font-semibold">小题（{{ entries.length }}）</h2>
+              <p class="text-xs text-muted-foreground">按此顺序出现在稿件中；移出后保留为单题。小题与材料一起保存。</p>
             </div>
             <div class="flex gap-2">
-              <Button size="sm" :disabled="!canEdit" @click="createOpen = true"><Plus class="mr-2 size-4" />新建小题</Button>
+              <Button size="sm" :disabled="!canEdit" @click="addNewQuestion"><Plus class="mr-2 size-4" />新建小题</Button>
               <DropdownMenu>
                 <DropdownMenuTrigger as-child>
                   <Button variant="outline" size="icon" class="size-8" :disabled="!canEdit" title="更多" aria-label="更多"><Ellipsis class="size-4" /></Button>
@@ -243,30 +312,47 @@ const submit = async () => {
               </DropdownMenu>
             </div>
           </div>
-          <draggable v-model="members" item-key="id" handle=".drag-handle" class="divide-y border-y">
-            <template #item="{ element: member, index }">
-              <article class="flex items-start gap-2 py-3">
-                <button type="button" class="drag-handle mt-1 cursor-grab text-muted-foreground" title="拖动排序" aria-label="拖动排序"><GripVertical class="size-4" /></button>
-                <span class="mt-1 w-6 text-center text-xs text-muted-foreground">{{ index + 1 }}</span>
-                <div class="min-w-0 flex-1">
-                  <div class="mb-1 flex flex-wrap gap-2">
-                    <Badge variant="outline">#{{ member.id }}</Badge>
-                    <Badge variant="secondary">{{ questionTypeLabel(member.q_type) }}</Badge>
-                    <Badge variant="outline">{{ STATUS_LABELS[member.status] ?? member.status }}</Badge>
-                    <Badge v-if="member.visibility === 'private'" variant="outline">私有</Badge>
-                    <Badge v-if="incompatibleIds.includes(member.id)" variant="destructive">公开小题不能放在私有材料题下</Badge>
+          <draggable v-model="entries" item-key="key" handle=".drag-handle" class="divide-y border-y">
+            <template #item="{ element: entry, index }">
+              <article :id="`member-${entry.key}`" class="scroll-mt-20 py-3">
+                <div class="flex items-start gap-2">
+                  <button type="button" class="drag-handle mt-1 cursor-grab text-muted-foreground" title="拖动排序" aria-label="拖动排序"><GripVertical class="size-4" /></button>
+                  <span class="mt-1 w-6 text-center text-xs text-muted-foreground">{{ index + 1 }}</span>
+                  <div class="min-w-0 flex-1">
+                    <div class="mb-1 flex flex-wrap gap-2">
+                      <Badge v-if="entry.id == null" variant="default">新</Badge>
+                      <Badge v-else variant="outline">#{{ entry.id }}</Badge>
+                      <Badge variant="secondary">{{ questionTypeLabel(entry.draft.q_type) }}</Badge>
+                      <Badge variant="outline">{{ STATUS_LABELS[effectiveMeta(entry, meta).status] }}</Badge>
+                      <Badge v-if="effectiveMeta(entry, meta).visibility === 'private'" variant="outline">私有</Badge>
+                      <Badge v-if="entry.id != null && isBodyDirty(entry)" variant="outline" class="border-amber-500/50 text-amber-700 dark:text-amber-400">已修改</Badge>
+                      <Badge v-if="incompatible.includes(index + 1)" variant="destructive">公开小题不能放在私有材料题下</Badge>
+                    </div>
+                    <button v-if="!expanded.has(entry.key)" type="button" class="block w-full text-left" @click="toggleExpanded(entry.key)">
+                      <RichContent :content="entry.draft.content" empty-text="（未填写题干）" class="line-clamp-3 text-sm" />
+                    </button>
                   </div>
-                  <RichContent :content="member.content" class="line-clamp-3 text-sm" />
+                  <div class="flex shrink-0">
+                    <Button variant="ghost" size="icon" :title="expanded.has(entry.key) ? '收起' : '编辑'" :aria-label="expanded.has(entry.key) ? '收起' : '编辑'" @click="toggleExpanded(entry.key)">
+                      <ChevronUp v-if="expanded.has(entry.key)" class="size-4" /><Pencil v-else class="size-4" />
+                    </Button>
+                    <Button variant="ghost" size="icon" :disabled="index === 0" title="上移" aria-label="上移" @click="moveQuestion(index, index - 1)"><ArrowUp class="size-4" /></Button>
+                    <Button variant="ghost" size="icon" :disabled="index === entries.length - 1" title="下移" aria-label="下移" @click="moveQuestion(index, index + 1)"><ArrowDown class="size-4" /></Button>
+                    <Button v-if="entry.id == null" variant="ghost" size="icon" class="text-destructive" title="删除此小题" aria-label="删除此小题" @click="removeEntry(entry)"><Trash2 class="size-4" /></Button>
+                    <Button v-else variant="ghost" size="icon" title="移出（保留为单题）" aria-label="移出（保留为单题）" @click="removeEntry(entry)"><Unlink class="size-4" /></Button>
+                  </div>
                 </div>
-                <div class="flex shrink-0">
-                  <Button variant="ghost" size="icon" :disabled="index === 0" title="上移" aria-label="上移" @click="moveQuestion(index, index - 1)"><ArrowUp class="size-4" /></Button>
-                  <Button variant="ghost" size="icon" :disabled="index === members.length - 1" title="下移" aria-label="下移" @click="moveQuestion(index, index + 1)"><ArrowDown class="size-4" /></Button>
-                  <Button variant="ghost" size="icon" title="移出（保留为单题）" aria-label="移出（保留为单题）" @click="detachQuestion(member.id)"><Unlink class="size-4" /></Button>
+                <div v-if="expanded.has(entry.key)" class="mt-3 ml-8 border-l-2 pl-4">
+                  <QuestionDraftEditor :model-value="entry.draft" />
+                  <div class="mt-4 flex justify-end">
+                    <Button variant="outline" size="sm" @click="toggleExpanded(entry.key)"><ChevronUp class="mr-2 size-4" />收起</Button>
+                  </div>
                 </div>
               </article>
             </template>
           </draggable>
-          <p v-if="members.length === 0" class="border border-dashed py-12 text-center text-sm text-muted-foreground">还没有小题。点击“新建小题”开始出题；也可以先保存材料，稍后再出题。</p>
+          <p v-if="entries.length === 0" class="border border-dashed py-12 text-center text-sm text-muted-foreground">还没有小题。点击“新建小题”开始出题；也可以先保存材料，稍后再出题。</p>
+          <Button v-if="entries.length > 0" variant="outline" class="w-full border-dashed" :disabled="!canEdit" @click="addNewQuestion"><Plus class="mr-2 size-4" />新建小题</Button>
         </section>
 
         <Collapsible v-model:open="settingsOpen" class="border-t pt-4">
@@ -290,6 +376,5 @@ const submit = async () => {
   </div>
 
   <StimulusQuestionPickerDialog v-model:open="pickerOpen" :subject-id="editorSubjectId" :selected-ids="selectedIds" :stimulus-visibility="visibility" @select="addQuestions" />
-  <QuestionEditDialog v-model:open="createOpen" mode="create" :auto-fill-subject-id="editorSubjectId" @success="addCreatedQuestion" />
-  <CompositionTargetPicker v-model:open="compositionPickerOpen" :subject-id="editorSubjectId" :question-ids="savedMembers.map(member => member.id)" />
+  <CompositionTargetPicker v-model:open="compositionPickerOpen" :subject-id="editorSubjectId" :question-ids="saved.questionIds" />
 </template>

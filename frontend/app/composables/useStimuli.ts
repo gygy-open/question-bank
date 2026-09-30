@@ -1,5 +1,7 @@
 import type {
   Stimulus,
+  StimulusBundleRequest,
+  StimulusBundleUpdateRequest,
   StimulusCreateRequest,
   StimulusDetail,
   StimulusPage,
@@ -32,6 +34,18 @@ export function useStimuli() {
       method: 'PUT', body: payload,
     })
 
+  const createStimulusBundle = (subjectId: number, payload: StimulusBundleRequest) =>
+    $api<StimulusDetail>(`${basePath(subjectId)}/bundle`, { method: 'POST', body: payload })
+
+  const updateStimulusBundle = (
+    subjectId: number,
+    stimulusId: number,
+    payload: StimulusBundleUpdateRequest,
+  ) =>
+    $api<StimulusDetail>(`${basePath(subjectId)}/${stimulusId}/bundle`, {
+      method: 'PUT', body: payload,
+    })
+
   const deleteStimulus = (subjectId: number, stimulusId: number, expectedRevision: number) =>
     $api<void>(`${basePath(subjectId)}/${stimulusId}`, {
       method: 'DELETE', query: { expected_revision: expectedRevision },
@@ -48,6 +62,8 @@ export function useStimuli() {
     createStimulus,
     updateStimulus,
     setStimulusQuestions,
+    createStimulusBundle,
+    updateStimulusBundle,
     deleteStimulus,
     restoreStimulus,
   }

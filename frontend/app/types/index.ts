@@ -343,6 +343,15 @@ export interface StimulusUpdateRequest extends StimulusCreateRequest {
   expected_revision: number
 }
 
+/** 材料题整体保存:无 id 的小题按 create 新建,有 id 的保留并可附带 update;顺序即小题顺序。 */
+export interface StimulusBundleRequest extends StimulusCreateRequest {
+  questions: Array<{ create: Record<string, unknown> } | { id: number, update?: Record<string, unknown> }>
+}
+
+export interface StimulusBundleUpdateRequest extends StimulusBundleRequest {
+  expected_revision: number
+}
+
 export interface QuestionSummary {
   id: number
   content: RichDoc

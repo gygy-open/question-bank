@@ -2,10 +2,10 @@ from datetime import datetime
 import json
 from typing import Any, Dict, List, Optional
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from app.models.question import QuestionStatus, QuestionVisibility
-from app.schemas.question import QuestionSummary, RichDoc
+from app.schemas.question import QuestionCreate, QuestionSummary, QuestionUpdate, RichDoc
 
 
 class StimulusCreate(BaseModel):
@@ -43,6 +43,49 @@ class StimulusQuestionsUpdate(BaseModel):
         if len(value) != len(set(value)):
             raise ValueError("question_ids 不可重复")
         return value
+
+
+class StimulusBundleQuestion(BaseModel):
+    """整体保存中的一道小题:无 id 时按 create 新建;有 id 时保留该题,可附带 update。"""
+
+    model_config = ConfigDict(extra="forbid")
+
+    id: Optional[int] = None
+    create: Optional[QuestionCreate] = None
+    update: Optional[QuestionUpdate] = None
+
+    @model_validator(mode="after")
+    def _shape(self) -> "StimulusBundleQuestion":
+        if self.id is None and (self.create is None or self.update is not None):
+            raise ValueError("新小题必须且只能提供 create")
+        if self.id is not None and self.create is not None:
+            raise ValueError("已有小题不能提供 create")
+        return self
+
+
+class StimulusBundleCreate(BaseModel):
+    """材料与有序小题在同一事务内保存;未列出的现有小题解除与材料的关联。"""
+
+    model_config = ConfigDict(extra="forbid")
+
+    content: RichDoc
+    status: QuestionStatus = QuestionStatus.DRAFT
+    visibility: QuestionVisibility = QuestionVisibility.PUBLIC
+    source: Optional[str] = None
+    metadata: Optional[Dict[str, Any]] = None
+    questions: List[StimulusBundleQuestion] = Field(default_factory=list)
+
+    @field_validator("questions")
+    @classmethod
+    def _unique_ids(cls, value: List[StimulusBundleQuestion]) -> List[StimulusBundleQuestion]:
+        ids = [item.id for item in value if item.id is not None]
+        if len(ids) != len(set(ids)):
+            raise ValueError("小题不可重复")
+        return value
+
+
+class StimulusBundleUpdate(StimulusBundleCreate):
+    expected_revision: int = Field(ge=1)
 
 
 class StimulusRead(BaseModel):

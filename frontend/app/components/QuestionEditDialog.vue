@@ -7,7 +7,6 @@ import type {
   TagPage,
   Subject,
   QuestionType,
-  OptionSpec,
 } from '@/types'
 import {
   Dialog,
@@ -17,7 +16,7 @@ import {
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
 import { Input } from '@/components/ui/input'
-import { Plus, Trash2, Save, Loader2, Check, ChevronsUpDown, X } from '@lucide/vue'
+import { Save, Loader2, Check, ChevronsUpDown, X, Layers3 } from '@lucide/vue'
 import {
   Select,
   SelectContent,
@@ -42,22 +41,18 @@ import { Badge } from '@/components/ui/badge'
 import { cn } from '@/lib/utils'
 import { toast } from 'vue-sonner'
 import KnowledgePointSelector from './KnowledgePointSelector.vue'
-import AnswerEditor from './AnswerEditor.vue'
+import QuestionDraftEditor from './QuestionDraftEditor.vue'
+import StimulusTargetPickerDialog from './stimuli/StimulusTargetPickerDialog.vue'
 import AnswerDisplay from './AnswerDisplay.vue'
-import RichEditor from './rich-editor/RichEditor.vue'
 import RichContent from './rich-editor/RichContent.vue'
 import {
   type QuestionDraft,
   type ImportDraft,
   buildQuestionPayload,
   cloneImportDraft,
-  createDefaultOptions,
   createEmptyDraft,
   dbQuestionToDraft,
-  generateOptionId,
   hasOptionPool,
-  nextOptionLabel,
-  pruneAnswerOptionRef,
   validateQuestionDraft,
 } from '@/lib/questionModel'
 
@@ -130,19 +125,7 @@ const availableKnowledgePoints = computed(() => {
 })
 
 // --- shared field accessors (draft is the single edit state for all modes) ---
-const qType = computed<QuestionType>({
-  get: () => draft.value?.q_type ?? 'single_choice',
-  set: (v) => {
-    if (draft.value) switchDraftType(draft.value, v)
-  },
-})
-
-const difficulty = computed<number>({
-  get: () => draft.value?.difficulty ?? 3,
-  set: (v) => {
-    if (draft.value) draft.value.difficulty = v
-  },
-})
+const qType = computed<QuestionType>(() => draft.value?.q_type ?? 'single_choice')
 
 const knowledgePointIds = computed<number[]>({
   get: () => draft.value?.knowledge_point_ids ?? [],
@@ -150,17 +133,6 @@ const knowledgePointIds = computed<number[]>({
     if (draft.value) draft.value.knowledge_point_ids = v
   },
 })
-
-// --- db draft type switching: reinit options + answer for the new variant ---
-function switchDraftType(d: QuestionDraft, newType: QuestionType) {
-  const oldType = d.q_type
-  if (oldType === newType) return
-  d.q_type = newType
-  if (hasOptionPool(newType) && d.options.length === 0) {
-    d.options = createDefaultOptions()
-  }
-  d.answer = null
-}
 
 const initState = () => {
   openTagSelect.value = false
@@ -193,24 +165,25 @@ watch(() => props.question, initState, { immediate: true })
 watch(() => props.open, (isOpen) => { if (isOpen) initState() })
 watch(() => props.mode, initState)
 
+const initialDraft = ref('')
+watch(() => props.question, () => { initialDraft.value = JSON.stringify(draft.value) }, { immediate: true })
+watch(() => props.open, (isOpen) => { if (isOpen) initialDraft.value = JSON.stringify(draft.value) })
+
 const title = computed(() => (props.mode === 'edit' ? '编辑题目' : '新增题目'))
 
-// --- db draft option handlers (v2 OptionSpec with stable ids) ---
-const draftAddOption = () => {
-  if (!draft.value) return
-  const opt: OptionSpec = {
-    id: generateOptionId(),
-    label: nextOptionLabel(draft.value.options.length),
-    content: null,
-  }
-  draft.value.options.push(opt)
-}
-const draftRemoveOption = (index: number) => {
-  if (!draft.value) return
-  const [removed] = draft.value.options.splice(index, 1)
-  // 重排 label（A/B/C…）并清理 answer 对被删选项的引用。
-  draft.value.options.forEach((o, i) => { o.label = nextOptionLabel(i) })
-  if (removed) draft.value.answer = pruneAnswerOptionRef(draft.value.answer, removed.id)
+const canConvertToStimulus = computed(() => {
+  const question = props.question as Partial<Question> | null | undefined
+  return props.mode === 'edit' && typeof question?.id === 'number' && question.stimulus_id == null
+})
+const stimulusPickerOpen = ref(false)
+const joinStimulus = async (stimulusId: number | null) => {
+  if (draft.value && JSON.stringify(draft.value) !== initialDraft.value
+    && !window.confirm('本题有未保存的修改，继续将丢弃这些修改。确定继续吗？')) return
+  const questionId = String((props.question as Partial<Question>).id)
+  emit('update:open', false)
+  await navigateTo(stimulusId == null
+    ? { path: '/materials/new', query: { from_question: questionId } }
+    : { path: `/materials/${stimulusId}/edit`, query: { add_question: questionId } })
 }
 
 // --- save flows ---
@@ -285,6 +258,16 @@ const toggleTag = (tagId: number) => {
         <div class="sticky top-0 z-50 flex items-center justify-between border-b border-border/50 px-6 py-4 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80 lg:static lg:bg-background">
           <DialogTitle class="text-lg">{{ isImportMode ? '编辑导入题目' : title }}</DialogTitle>
           <div class="flex items-center gap-2">
+            <Button
+              v-if="canConvertToStimulus"
+              variant="outline"
+              size="sm"
+              title="把本题加入已有材料题，或新建一道材料题"
+              @click="stimulusPickerOpen = true"
+            >
+              <Layers3 class="mr-2 h-4 w-4" />
+              加入材料题
+            </Button>
             <Button v-if="!isImportMode" size="sm" @click="handlePublish" :disabled="isSubmitting">
               <Loader2 v-if="isSubmitting" class="mr-2 h-4 w-4 animate-spin" />
               <Save v-else class="mr-2 h-4 w-4" />
@@ -305,57 +288,30 @@ const toggleTag = (tagId: number) => {
             <section class="border-b border-border/50 bg-background px-6 py-6 lg:border-b-0 lg:border-r lg:h-full lg:overflow-y-auto">
               <div class="mx-auto max-w-3xl space-y-6">
 
-                <!-- Type & Difficulty (+ db-only status/parent) -->
-                <div class="grid grid-cols-2 gap-4">
-                  <div class="space-y-2">
-                    <Label>题目类型</Label>
-                    <Select v-model="qType">
-                      <SelectTrigger><SelectValue /></SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="single_choice">单选题</SelectItem>
-                        <SelectItem value="multiple_choice">多选题</SelectItem>
-                        <SelectItem value="true_false">判断题</SelectItem>
-                        <SelectItem value="fill_in_the_blank">填空题</SelectItem>
-                        <SelectItem value="free_response">解答题</SelectItem>
-                        <SelectItem value="option_matching">选项匹配</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div v-if="!isImportMode && draft" class="space-y-2">
-                    <Label>状态</Label>
-                    <Select v-model="draft.status">
-                      <SelectTrigger><SelectValue /></SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="draft">草稿</SelectItem>
-                        <SelectItem value="pending">待审核</SelectItem>
-                        <SelectItem value="published">已发布</SelectItem>
-                        <SelectItem value="archived">已归档</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div class="space-y-2">
-                    <Label>难度</Label>
-                    <Select v-model.number="difficulty">
-                      <SelectTrigger><SelectValue /></SelectTrigger>
-                      <SelectContent>
-                        <SelectItem :value="1">难度 1</SelectItem>
-                        <SelectItem :value="2">难度 2</SelectItem>
-                        <SelectItem :value="3">难度 3</SelectItem>
-                        <SelectItem :value="4">难度 4</SelectItem>
-                        <SelectItem :value="5">难度 5</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
-
+                <QuestionDraftEditor v-if="draft" :model-value="draft">
+                  <template v-if="!isImportMode" #meta>
+                    <div class="space-y-2">
+                      <Label>状态</Label>
+                      <Select v-model="draft.status">
+                        <SelectTrigger><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="draft">草稿</SelectItem>
+                          <SelectItem value="pending">待审核</SelectItem>
+                          <SelectItem value="published">已发布</SelectItem>
+                          <SelectItem value="archived">已归档</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </template>
+                  <template #fields>
                 <!-- Source (db only) -->
-                <div v-if="!isImportMode && draft" class="space-y-2">
+                <div v-if="!isImportMode" class="space-y-2">
                   <Label>来源</Label>
                   <Input v-model="draft.source" placeholder="输入题目来源" />
                 </div>
 
                 <!-- Visibility (db only) -->
-                <div v-if="!isImportMode && draft" class="space-y-2">
+                <div v-if="!isImportMode" class="space-y-2">
                   <Label>可见性</Label>
                   <Select v-model="draft.visibility">
                     <SelectTrigger><SelectValue /></SelectTrigger>
@@ -378,7 +334,7 @@ const toggleTag = (tagId: number) => {
                 </div>
 
                 <!-- Tags (db only) -->
-                <div v-if="!isImportMode && draft" class="space-y-2">
+                <div v-if="!isImportMode" class="space-y-2">
                   <Label>标签</Label>
                   <div class="flex flex-wrap gap-2 mb-2" v-if="selectedTags.length > 0">
                     <Badge
@@ -439,52 +395,8 @@ const toggleTag = (tagId: number) => {
                     </PopoverContent>
                   </Popover>
                 </div>
-
-                <!-- ================= v2 editors (all modes) ================= -->
-                <template v-if="draft">
-                  <div class="space-y-2">
-                    <Label>题干</Label>
-                    <RichEditor v-model="draft.content" :allow-blank="qType === 'fill_in_the_blank' || qType === 'option_matching'" />
-                  </div>
-
-                  <div v-if="hasOptionPool(qType)" class="space-y-2">
-                    <Label>{{ qType === 'option_matching' ? '选项池（各空位共用）' : '选项' }}</Label>
-                    <div class="grid grid-cols-1 gap-4">
-                      <div v-for="(opt, optIndex) in draft.options" :key="opt.id" class="flex gap-2 items-start">
-                        <div class="w-8 h-9 flex items-center justify-center bg-muted rounded font-medium shrink-0 mt-0.5">{{ opt.label }}</div>
-                        <div class="flex-1">
-                          <RichEditor v-model="opt.content" placeholder="输入选项内容…" />
-                        </div>
-                        <Button variant="ghost" size="icon" class="h-8 w-8 mt-0.5" @click="draftRemoveOption(optIndex)">
-                          <Trash2 class="h-3 w-3" />
-                        </Button>
-                      </div>
-                      <Button variant="outline" class="w-full border-dashed" @click="draftAddOption">
-                        <Plus class="h-4 w-4 mr-2" /> 添加选项
-                      </Button>
-                    </div>
-                  </div>
-
-                  <AnswerEditor
-                    v-model="draft.answer"
-                    :q-type="draft.q_type"
-                    :options="draft.options"
-                    :stem="draft.content"
-                  />
-
-                  <div class="space-y-2">
-                    <Label>分析</Label>
-                    <RichEditor v-model="draft.thinking" />
-                  </div>
-                  <div class="space-y-2">
-                    <Label>解析</Label>
-                    <RichEditor v-model="draft.analysis" />
-                  </div>
-                  <div class="space-y-2">
-                    <Label>总结</Label>
-                    <RichEditor v-model="draft.summary" />
-                  </div>
-                </template>
+                  </template>
+                </QuestionDraftEditor>
               </div>
             </section>
 
@@ -543,4 +455,11 @@ const toggleTag = (tagId: number) => {
       </div>
     </DialogScrollContent>
   </Dialog>
+  <StimulusTargetPickerDialog
+    v-if="canConvertToStimulus"
+    v-model:open="stimulusPickerOpen"
+    :subject-id="(question as Partial<Question>).subject_id"
+    :question-visibility="(question as Partial<Question>).visibility ?? 'public'"
+    @select="joinStimulus"
+  />
 </template>

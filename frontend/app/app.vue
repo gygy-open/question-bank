@@ -6,7 +6,7 @@ import { Toaster } from '~/components/ui/sonner'
   <div>
     <NuxtRouteAnnouncer />
     <NuxtLayout>
-      <NuxtPage keepalive />
+      <NuxtPage />
     </NuxtLayout>
     <Toaster />
   </div>

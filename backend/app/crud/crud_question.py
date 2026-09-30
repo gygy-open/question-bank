@@ -441,7 +441,8 @@ class CRUDQuestion(CRUDBase[Question, QuestionCreate, QuestionUpdate]):
         *,
         db_obj: Question,
         obj_in: Union[QuestionUpdate, Dict[str, Any]],
-        user_id: Optional[int] = None
+        user_id: Optional[int] = None,
+        commit: bool = True,
     ) -> Question:
         if isinstance(obj_in, dict):
             update_data = obj_in
@@ -557,7 +558,10 @@ class CRUDQuestion(CRUDBase[Question, QuestionCreate, QuestionUpdate]):
             db_obj.knowledge_points = list(kps)
             
         db.add(db_obj)
-        await db.commit()
+        if commit:
+            await db.commit()
+        else:
+            await db.flush()
         await db.refresh(db_obj)
         
         # Re-fetch with relationships loaded

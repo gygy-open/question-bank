@@ -66,7 +66,7 @@ erDiagram
 
 ### 术语
 
-- 中文界面统一称“题目材料”；前后端代码标识一律使用 `Stimulus` / `stimulus`（复数 `stimuli`），不混用 `material`。用户可见的前端路由保留 `/materials`。
+- 中文界面把材料与小题的整体称“材料题”，其中的正文称“材料”；前后端代码标识一律使用 `Stimulus` / `stimulus`（复数 `stimuli`），不混用 `material`。用户可见的前端路由保留 `/materials`（URL 属于界面层，跟随界面语言而非代码命名）。
 - `Question` 始终是可作答、可评分的题目；材料题的小题使用现有题型。
 - 题库中没有“题组”实体。稿件中的 `question_group` 节点表示“一篇材料 + 从中选用的小题”，相当于 QTI 的 section/testlet。
 
@@ -94,13 +94,18 @@ erDiagram
 | `GET` | `/subjects/{sid}/stimuli/{id}` | 材料详情，含按顺序排列的可见小题 |
 | `PUT` | `/subjects/{sid}/stimuli/{id}` | 更新材料（`expected_revision`） |
 | `PUT` | `/subjects/{sid}/stimuli/{id}/questions` | 整体设置有序小题（`expected_revision` + `question_ids`） |
+| `POST` | `/subjects/{sid}/stimuli/bundle` | 材料题整体创建：材料 + 新建/已有小题 + 顺序，单事务 |
+| `PUT` | `/subjects/{sid}/stimuli/{id}/bundle` | 材料题整体保存（`expected_revision`），单事务 |
 | `DELETE` | `/subjects/{sid}/stimuli/{id}?expected_revision=` | 软删除无活动小题的材料 |
 | `POST` | `/subjects/{sid}/stimuli/{id}/restore` | 恢复材料 |
 | `GET` | `/questions?has_stimulus=&stimulus_id=` | 按材料归属筛选题目 |
 | `GET/POST/DELETE` | `/questions/{id}/relations…` | 派生关系 |
 | `POST` | `/questions/{id}/derived-questions` | 原子创建派生题及关系 |
 
-材料小题只有一条写路径：`PUT …/stimuli/{id}/questions`。
+材料小题的写路径是 `PUT …/stimuli/{id}/questions` 与 bundle 接口，二者共用同一套成员规则。
+
+- bundle 的 `questions` 按顺序列出小题：`{create}` 新建（学科强制为材料学科）；`{id}` 保留已有题，可附带 `{update}` 修改题目内容。任一步失败整体回滚。
+- 材料编辑器就地编辑小题时只提交题目内容字段，不覆盖知识点和标签；材料的状态/可见性被修改时，前端把它写给全部小题。
 
 - 列表中的题目挂到该材料并按列表顺序重排；未列出的现有小题解除关联，成为独立题。
 - 题目已属于其他材料、跨学科、已删除或不可见时拒绝，整次不产生部分修改。

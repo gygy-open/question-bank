@@ -10,6 +10,8 @@ from app.crud.crud_stimulus import stimulus as crud_stimulus
 from app.crud.crud_subject import subject as crud_subject
 from app.schemas.stimulus import (
     RestoreRequest,
+    StimulusBundleCreate,
+    StimulusBundleUpdate,
     StimulusCreate,
     StimulusDetail,
     StimulusListItem,
@@ -60,6 +62,40 @@ async def create_stimulus(
         actor=current_user,
         source=payload.source,
         metadata=payload.metadata,
+    )
+
+
+@router.post(
+    "/{subject_id}/stimuli/bundle",
+    response_model=StimulusDetail,
+    status_code=status.HTTP_201_CREATED,
+)
+async def create_stimulus_bundle(
+    subject_id: int,
+    payload: StimulusBundleCreate,
+    db: deps.SessionDep,
+    current_user: models.User = Depends(deps.get_current_active_user),
+) -> Any:
+    await _require_subject(db, subject_id)
+    deps.require(current_user, Permission.EDIT_QUESTION, subject_id=subject_id)
+    return await stimulus_service.save_bundle(
+        db, subject_id=subject_id, payload=payload, actor=current_user
+    )
+
+
+@router.put("/{subject_id}/stimuli/{stimulus_id}/bundle", response_model=StimulusDetail)
+async def update_stimulus_bundle(
+    subject_id: int,
+    stimulus_id: int,
+    payload: StimulusBundleUpdate,
+    db: deps.SessionDep,
+    current_user: models.User = Depends(deps.get_current_active_user),
+) -> Any:
+    await _require_subject(db, subject_id)
+    deps.require(current_user, Permission.EDIT_QUESTION, subject_id=subject_id)
+    stimulus = await _scoped_stimulus(db, subject_id, stimulus_id, current_user)
+    return await stimulus_service.save_bundle(
+        db, subject_id=subject_id, payload=payload, actor=current_user, stimulus=stimulus
     )
 
 

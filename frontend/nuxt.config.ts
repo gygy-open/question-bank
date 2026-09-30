@@ -18,6 +18,8 @@ export default defineNuxtConfig({
   },
 
   app: {
+    // 页面默认缓存；单页可用 definePageMeta({ keepalive: false }) 退出。
+    keepalive: true,
     head: {
       title: `${appName} - ${appSlogan}`, // default fallback title
       htmlAttrs: {
