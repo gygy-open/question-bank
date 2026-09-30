@@ -45,10 +45,21 @@ def exists(sha256: str) -> bool:
     return object_path(sha256).is_file()
 
 
+def iter_objects() -> Iterator[tuple[str, Path]]:
+    root = _objects_root()
+    if not root.is_dir():
+        return
+    for path in root.glob("*/*/*"):
+        if path.is_file() and _SHA256_RE.match(path.name):
+            yield path.name, path
+
+
 def _publish(tmp: Path, sha256: str) -> Path:
     target = object_path(sha256)
     if target.is_file():
         tmp.unlink(missing_ok=True)
+        # 复用已有对象也刷新 mtime:GC 按 mtime 判定宽限期,避免误删刚被重新引用、尚未提交的对象。
+        os.utime(target)
         return target
     target.parent.mkdir(parents=True, exist_ok=True)
     os.replace(tmp, target)

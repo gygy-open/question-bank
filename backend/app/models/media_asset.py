@@ -73,3 +73,16 @@ class MediaReference(Base):
     owner_type = Column(String(32), nullable=False)
     owner_id = Column(Integer, nullable=False)
     created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+
+
+class LegacyMediaPath(Base):
+    """旧 /static/media URL → 内容寻址对象;迁移后旧目录可删,历史引用(含定稿快照)仍可解析。"""
+
+    __tablename__ = "legacy_media_paths"
+
+    id = Column(Integer, primary_key=True)
+    # URL 解码后的完整路径,如 /static/media/images/a b.png。
+    old_path = Column(String(512), nullable=False, unique=True)
+    sha256 = Column(String(64), nullable=False, index=True)
+    mime = Column(String(100), nullable=False)
+    created_at = Column(DateTime, nullable=False, default=datetime.utcnow)

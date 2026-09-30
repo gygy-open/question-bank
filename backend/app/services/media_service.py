@@ -9,7 +9,8 @@ import asyncio
 import io
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Iterable, Optional
+from typing import Any, Iterable, Iterator, Optional
+from urllib.parse import unquote
 
 from PIL import Image, UnidentifiedImageError
 from sqlalchemy import select
@@ -18,8 +19,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.capabilities.errors import Forbidden, NotFound, Unprocessable
 from app.core import permissions, storage
 from app.core.config import settings
+from app.core.file_paths import resolve_within
 from app.core.permissions import Permission
-from app.models.media_asset import MediaAsset, MediaKind, MediaPurpose, MediaStatus
+from app.models.media_asset import LegacyMediaPath, MediaAsset, MediaKind, MediaPurpose, MediaStatus
 from app.models.user import User
 
 MAX_IMAGE_BYTES = 10 * 1024 * 1024
@@ -38,6 +40,7 @@ _EXTENSION_BY_MIME = {
     "image/emf": ".emf",
     "image/wmf": ".wmf",
 }
+_MIME_BY_EXTENSION = {ext: mime for mime, ext in _EXTENSION_BY_MIME.items()} | {".jpeg": "image/jpeg", ".tiff": "image/tiff"}
 
 
 @dataclass(frozen=True)
@@ -193,21 +196,73 @@ async def get_owned_chat_asset(db: AsyncSession, asset_id: int, user: User) -> M
     return asset
 
 
-def collect_asset_ids(value: Any) -> set[int]:
-    """在任意嵌套的 RichDoc / 快照 JSON 中收集图片节点引用的资产 id。"""
-    found: set[int] = set()
+def iter_image_attrs(value: Any) -> Iterator[dict]:
+    """遍历任意嵌套 RichDoc / 快照 JSON 中的图片节点 attrs(可就地修改)。"""
     stack: list[Any] = [value]
     while stack:
         node = stack.pop()
         if isinstance(node, dict):
-            if node.get("type") == "image":
-                asset_id = (node.get("attrs") or {}).get("assetId")
-                if isinstance(asset_id, int) and not isinstance(asset_id, bool) and asset_id > 0:
-                    found.add(asset_id)
+            if node.get("type") == "image" and isinstance(node.get("attrs"), dict):
+                yield node["attrs"]
             stack.extend(node.values())
         elif isinstance(node, list):
             stack.extend(node)
+
+
+def collect_asset_ids(value: Any) -> set[int]:
+    """在任意嵌套 RichDoc / 快照 JSON 中收集图片节点引用的资产 id。"""
+    found: set[int] = set()
+    for attrs in iter_image_attrs(value):
+        asset_id = attrs.get("assetId")
+        if isinstance(asset_id, int) and not isinstance(asset_id, bool) and asset_id > 0:
+            found.add(asset_id)
     return found
+
+
+LEGACY_MEDIA_PREFIX = "/static/media/"
+
+
+def normalize_legacy_path(src: Any) -> Optional[str]:
+    """旧媒体 URL 规整为映射表键(去掉 query/fragment、URL 解码);不是旧媒体 URL 返回 None。"""
+    if not isinstance(src, str) or not src.startswith(LEGACY_MEDIA_PREFIX):
+        return None
+    path = unquote(src.split("#", 1)[0].split("?", 1)[0])
+    return path if len(path) > len(LEGACY_MEDIA_PREFIX) else None
+
+
+def collect_legacy_paths(value: Any) -> set[str]:
+    found: set[str] = set()
+    for attrs in iter_image_attrs(value):
+        path = normalize_legacy_path(attrs.get("src"))
+        if path:
+            found.add(path)
+    return found
+
+
+def legacy_media_file(path: str) -> Optional[Path]:
+    """旧媒体目录中的原文件(迁移前/清理前);路径必须仍在媒体目录内。"""
+    real = resolve_within(settings.MEDIA_DIR, settings.MEDIA_DIR / path[len(LEGACY_MEDIA_PREFIX):])
+    return real if real is not None and real.is_file() else None
+
+
+async def resolve_legacy_images(db: AsyncSession, paths: Iterable[str]) -> dict[str, StoredImage]:
+    """旧 URL → 本机文件:优先迁移映射(对象存储),其次旧目录原文件;都找不到的不返回。"""
+    wanted = sorted({p for p in (normalize_legacy_path(p) for p in paths) if p})
+    if not wanted:
+        return {}
+    rows = await db.scalars(select(LegacyMediaPath).where(LegacyMediaPath.old_path.in_(wanted)))
+    resolved = {
+        row.old_path: StoredImage(path=storage.object_path(row.sha256), mime=row.mime)
+        for row in rows.all()
+        if storage.exists(row.sha256)
+    }
+    for path in wanted:
+        if path in resolved:
+            continue
+        real = legacy_media_file(path)
+        if real is not None:
+            resolved[path] = StoredImage(path=real, mime=_MIME_BY_EXTENSION.get(real.suffix.lower(), "application/octet-stream"))
+    return resolved
 
 
 @dataclass(frozen=True)

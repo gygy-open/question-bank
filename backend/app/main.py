@@ -10,6 +10,7 @@ from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
 from app._version import __version__
+from app.api import legacy_media
 from app.api.v1.api import api_router
 from app.capabilities.errors import DomainError, status_for
 from app.core.config import settings, is_configured
@@ -62,6 +63,8 @@ async def require_setup(request: Request, call_next):
 settings.MEDIA_DIR.mkdir(parents=True, exist_ok=True)
 settings.UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 
+# 旧媒体 URL 需鉴权,路由先于 /static 挂载注册。
+app.include_router(legacy_media.router)
 # Mount static files (absolute paths so serving is independent of the CWD,
 # which matters for a packaged desktop build).
 app.mount("/static", StaticFiles(directory=settings.STATIC_DIR), name="static")

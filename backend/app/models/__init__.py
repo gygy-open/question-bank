@@ -10,7 +10,7 @@ from .stimulus import Stimulus
 from .question_relation import QuestionRelation
 from .question_relation_audit import LegacyQuestionParentAudit
 from .import_task import ImportTask
-from .media_asset import MediaAsset, MediaReference
+from .media_asset import LegacyMediaPath, MediaAsset, MediaReference
 from .activity_log import ActivityLog
 from .system_setting import SystemSetting
 from .subject_prompt import SubjectPrompt

@@ -628,7 +628,10 @@ async def export_composition_version(
     images = ImageResolver(
         await media_service.load_content_images(
             db, media_service.collect_asset_ids(version.snapshot), subject_id=subject_id
-        )
+        ),
+        legacy=await media_service.resolve_legacy_images(
+            db, media_service.collect_legacy_paths(version.snapshot)
+        ),
     )
     file_path = composition_renderer_for(payload.format, images).render(export_doc)
     suffix = "-latex.zip" if payload.format == OutputFormat.LATEX else f".{payload.format.value}"

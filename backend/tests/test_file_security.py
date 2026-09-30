@@ -109,14 +109,14 @@ def test_export_image_resolver_stays_inside_media_dir(data_dirs):
     assert resolver.resolve("/static/media/ok.png") == (data_dirs["media"] / "ok.png").resolve()
 
 
-async def test_chat_image_reader_rejects_paths_outside_media(data_dirs):
+async def test_chat_image_reader_rejects_paths_outside_media(data_dirs, db_session):
     from app.api.v1.endpoints.chat import get_image_base64
 
     (data_dirs["root"] / "secret.png").write_bytes(_png_bytes())
     (data_dirs["media"] / "ok.png").write_bytes(_png_bytes())
-    assert await get_image_base64(str(data_dirs["root"] / "secret.png")) is None
-    assert await get_image_base64("/static/media/../../secret.png") is None
-    encoded = await get_image_base64("/static/media/ok.png")
+    assert await get_image_base64(db_session, str(data_dirs["root"] / "secret.png")) is None
+    assert await get_image_base64(db_session, "/static/media/../../secret.png") is None
+    encoded = await get_image_base64(db_session, "/static/media/ok.png")
     assert encoded is not None and encoded.startswith("data:image/png;base64,")
 
 

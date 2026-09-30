@@ -23,14 +23,12 @@ from fastapi.responses import StreamingResponse
 import logging
 import asyncio
 import base64
-import aiofiles
+from pathlib import Path
 from typing import List, Dict, Any, Optional
 
 from app.models.user import User
 from app.capabilities.errors import DomainError
 from app.core import storage
-from app.core.config import settings
-from app.core.file_paths import resolve_within
 from app.services import media_service
 
 logger = logging.getLogger(__name__)
@@ -39,47 +37,39 @@ router = APIRouter()
 # 只有最近这么多个 run 的工具结果保留完整内容,更早的截断,防止历史无限膨胀。
 _FULL_TOOL_RESULT_RUNS = 2
 
-_MEDIA_URL_PREFIX = "/static/media/"
-_IMAGE_MIME_BY_SUFFIX = {".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".gif": "image/gif", ".webp": "image/webp"}
-
-
-async def get_image_base64(file_path: str) -> Optional[str]:
-    # 路径来自客户端:只接受媒体 URL,且解析结果必须仍在媒体目录内。
-    if not isinstance(file_path, str) or not file_path.startswith(_MEDIA_URL_PREFIX):
-        logger.warning("Ignoring chat image outside media dir: %r", file_path)
-        return None
-    real_path = resolve_within(settings.MEDIA_DIR, settings.MEDIA_DIR / file_path[len(_MEDIA_URL_PREFIX):])
-    mime_type = _IMAGE_MIME_BY_SUFFIX.get(real_path.suffix.lower()) if real_path else None
-    if real_path is None or mime_type is None or not real_path.is_file():
-        logger.warning("Ignoring invalid chat image path: %r", file_path)
+async def _data_url(path: Path, mime: str, ref: Any) -> Optional[str]:
+    if not media_service.is_displayable(mime):
         return None
     try:
-        async with aiofiles.open(real_path, "rb") as f:
-            data = await f.read()
+        data = await asyncio.to_thread(path.read_bytes)
     except OSError as e:
-        logger.error(f"Error reading image file {file_path}: {e}")
+        logger.error("Error reading chat image %r: %s", ref, e)
         return None
-    return f"data:{mime_type};base64,{base64.b64encode(data).decode('utf-8')}"
+    return f"data:{mime};base64,{base64.b64encode(data).decode('utf-8')}"
+
+
+async def get_image_base64(db: AsyncSession, ref: Any) -> Optional[str]:
+    """旧对话附图(/static/media URL):经迁移映射或旧媒体目录解析,路径越界一律忽略。"""
+    stored = (await media_service.resolve_legacy_images(db, [ref])).get(
+        media_service.normalize_legacy_path(ref) or ""
+    )
+    if stored is None:
+        logger.warning("Ignoring invalid chat image path: %r", ref)
+        return None
+    return await _data_url(stored.path, stored.mime, ref)
 
 
 async def load_chat_image(db: AsyncSession, ref: Any, owner: User) -> Optional[str]:
-    """对话附图 → data URL。资产引用只接受会话主人自己上传的对话图片;旧数据走媒体目录路径。"""
+    """对话附图 → data URL。资产引用只接受会话主人自己上传的对话图片;旧数据走旧 URL 解析。"""
     asset_id = media_service.asset_id_from_url(ref)
     if asset_id is None:
-        return await get_image_base64(ref)
+        return await get_image_base64(db, ref)
     try:
         asset = await media_service.get_owned_chat_asset(db, asset_id, owner)
     except DomainError:
         logger.warning("Ignoring chat image not owned by user %s: %r", owner.id, ref)
         return None
-    if not media_service.is_displayable(asset.mime):
-        return None
-    try:
-        data = await asyncio.to_thread(storage.read_bytes, asset.sha256)
-    except OSError as e:
-        logger.error("Error reading chat image asset %s: %s", asset.id, e)
-        return None
-    return f"data:{asset.mime};base64,{base64.b64encode(data).decode('utf-8')}"
+    return await _data_url(storage.object_path(asset.sha256), asset.mime, ref)
 
 async def generate_session_title(session_id: str, messages: List[Dict], provider, config):
     # 背景任务:请求级 db 在 yield 依赖 teardown 后就关了,这里必须自建会话。

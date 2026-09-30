@@ -12,7 +12,7 @@ from typing import Any, Mapping, Optional
 
 from app.core.config import settings
 from app.core.file_paths import resolve_within
-from app.services.media_service import StoredImage
+from app.services.media_service import StoredImage, normalize_legacy_path
 
 logger = logging.getLogger(__name__)
 
@@ -30,8 +30,14 @@ class ResolvedImage:
 class ImageResolver:
     """把 RichDoc image 节点解析为本机可读文件:优先 assetId(需预取),其次旧 /static/media src。"""
 
-    def __init__(self, assets: Optional[Mapping[int, StoredImage]] = None) -> None:
+    def __init__(
+        self,
+        assets: Optional[Mapping[int, StoredImage]] = None,
+        legacy: Optional[Mapping[str, StoredImage]] = None,
+    ) -> None:
         self.assets = dict(assets or {})
+        # 旧 /static/media URL(规整后)→ 文件,由 media_service.resolve_legacy_images 预取。
+        self.legacy = dict(legacy or {})
 
     def resolve_image(self, attrs: Mapping[str, Any]) -> Optional[ResolvedImage]:
         asset_id = attrs.get("assetId")
@@ -39,6 +45,10 @@ class ImageResolver:
         if stored is not None:
             return ResolvedImage(path=stored.path, key=f"asset-{asset_id}", suffix=stored.extension)
         src = str(attrs.get("src") or "")
+        legacy_key = normalize_legacy_path(src)
+        stored = self.legacy.get(legacy_key) if legacy_key else None
+        if stored is not None:
+            return ResolvedImage(path=stored.path, key=legacy_key, suffix=stored.extension or stored.path.suffix)
         path = self.resolve(src)
         if path is None:
             return None

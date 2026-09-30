@@ -13,7 +13,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.capabilities.errors import Unprocessable
 from app.models.composition import CompositionNode
 from app.models.media_asset import MediaAsset, MediaOwnerType, MediaPurpose, MediaReference
-from app.services.media_service import collect_asset_ids
+# 模块引用而非 from-import:media_service → capabilities → crud_question → 本模块成环。
+from app.services import media_service
 
 
 def _parse(value: Any) -> Any:
@@ -28,7 +29,7 @@ def _parse(value: Any) -> Any:
 def asset_ids_in(values: Iterable[Any]) -> set[int]:
     found: set[int] = set()
     for value in values:
-        found |= collect_asset_ids(_parse(value))
+        found |= media_service.collect_asset_ids(_parse(value))
     return found
 
 
@@ -56,9 +57,10 @@ async def sync_refs(
     *,
     subject_id: Optional[int],
     validate: bool = True,
+    extra_asset_ids: Iterable[int] = (),
 ) -> None:
     """把引用方的引用集合同步为 values 中出现的资产;validate 时要求均为本学科内容资产。"""
-    wanted = asset_ids_in(values)
+    wanted = asset_ids_in(values) | set(extra_asset_ids)
     if validate and wanted:
         await _check_assets(db, wanted, subject_id)
     existing = set(
