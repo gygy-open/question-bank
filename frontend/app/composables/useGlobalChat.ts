@@ -326,6 +326,7 @@ const handlePromptSelect = (content: string) => {
 const sendMessage = async () => {
     const nuxtApp = useNuxtApp()
     const { $api } = nuxtApp
+    const { uploadUserMedia } = useMedia()
     if ((!input.value.trim() && selectedFiles.value.length === 0) || !selectedModelId.value || loading.value) return
 
     const userMessageContent = input.value.trim()
@@ -360,10 +361,8 @@ const sendMessage = async () => {
         // 2. Upload images.
         const uploadedImagePaths: string[] = []
         for (const file of userFiles) {
-            const formData = new FormData()
-            formData.append('file', file)
-            const res = await $api<{ url: string }>('/upload/image', { method: 'POST', body: formData })
-            uploadedImagePaths.push(res.url)
+            const asset = await uploadUserMedia('chat', file)
+            uploadedImagePaths.push(asset.url)
         }
 
         // 3. Stream response.

@@ -21,13 +21,17 @@ from app.services.prompts import CHAT_SYSTEM_PROMPT, render_scene_context
 from app.models.subject import Subject
 from fastapi.responses import StreamingResponse
 import logging
+import asyncio
 import base64
 import aiofiles
 from typing import List, Dict, Any, Optional
 
 from app.models.user import User
+from app.capabilities.errors import DomainError
+from app.core import storage
 from app.core.config import settings
 from app.core.file_paths import resolve_within
+from app.services import media_service
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -56,6 +60,26 @@ async def get_image_base64(file_path: str) -> Optional[str]:
         logger.error(f"Error reading image file {file_path}: {e}")
         return None
     return f"data:{mime_type};base64,{base64.b64encode(data).decode('utf-8')}"
+
+
+async def load_chat_image(db: AsyncSession, ref: Any, owner: User) -> Optional[str]:
+    """对话附图 → data URL。资产引用只接受会话主人自己上传的对话图片;旧数据走媒体目录路径。"""
+    asset_id = media_service.asset_id_from_url(ref)
+    if asset_id is None:
+        return await get_image_base64(ref)
+    try:
+        asset = await media_service.get_owned_chat_asset(db, asset_id, owner)
+    except DomainError:
+        logger.warning("Ignoring chat image not owned by user %s: %r", owner.id, ref)
+        return None
+    if not media_service.is_displayable(asset.mime):
+        return None
+    try:
+        data = await asyncio.to_thread(storage.read_bytes, asset.sha256)
+    except OSError as e:
+        logger.error("Error reading chat image asset %s: %s", asset.id, e)
+        return None
+    return f"data:{asset.mime};base64,{base64.b64encode(data).decode('utf-8')}"
 
 async def generate_session_title(session_id: str, messages: List[Dict], provider, config):
     # 背景任务:请求级 db 在 yield 依赖 teardown 后就关了,这里必须自建会话。
@@ -88,6 +112,7 @@ async def build_provider_messages(
     db: AsyncSession,
     *,
     session_id: str,
+    owner: User,
     subject: Optional[Subject],
     scene: Optional[str] = None,
     scene_context: Optional[Dict[str, Any]] = None,
@@ -128,8 +153,8 @@ async def build_provider_messages(
             message_dict["tool_calls"] = msg.tool_calls
         if msg.images:
             images_b64 = []
-            for img_path in msg.images:
-                b64 = await get_image_base64(img_path)
+            for img_ref in msg.images:
+                b64 = await load_chat_image(db, img_ref, owner)
                 if b64:
                     images_b64.append(b64)
             if images_b64:
@@ -165,6 +190,7 @@ async def chat_generator(session_id: str, new_user_message: ChatMessageCreate, m
     ai_messages = await build_provider_messages(
         db,
         session_id=session_id,
+        owner=current_user,
         subject=subject,
         scene=scene,
         scene_context=scene_context,

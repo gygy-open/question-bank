@@ -203,6 +203,24 @@ async def test_chat_media_is_private_and_avatar_is_shared(client, people):
     assert (await client.get(avatar_url, headers=_auth(people["outsider"]))).status_code == 200
 
 
+async def test_chat_image_refs_only_resolve_for_owner(client, db_session, people):
+    from app.api.v1.endpoints.chat import load_chat_image
+
+    chat = await client.post(
+        f"{API}/media/me?purpose=chat",
+        files={"file": ("c.png", _image_bytes(color="blue"), "image/png")},
+        headers=_auth(people["viewer"]),
+    )
+    content = await _upload(client, people)
+    chat_url, content_url = chat.json()["url"], content.json()["url"]
+
+    encoded = await load_chat_image(db_session, chat_url, people["viewer"])
+    assert encoded is not None and encoded.startswith("data:image/png;base64,")
+    assert await load_chat_image(db_session, chat_url, people["outsider"]) is None
+    assert await load_chat_image(db_session, content_url, people["editor"]) is None
+    assert await load_chat_image(db_session, "/api/v1/media/0/content", people["viewer"]) is None
+
+
 async def test_rich_doc_rejects_invalid_asset_id():
     from app.services.question_content import validate_rich_doc
 

@@ -92,6 +92,17 @@ def content_url(asset_id: int) -> str:
     return f"{settings.API_V1_STR}/media/{asset_id}/content"
 
 
+def asset_id_from_url(url: Any) -> Optional[int]:
+    """content_url() 的逆运算;不是资产内容 URL 时返回 None。"""
+    if not isinstance(url, str):
+        return None
+    prefix, suffix = f"{settings.API_V1_STR}/media/", "/content"
+    if not (url.startswith(prefix) and url.endswith(suffix)):
+        return None
+    raw = url[len(prefix):-len(suffix)]
+    return int(raw) if raw.isdigit() and not raw.startswith("0") else None
+
+
 def _scope_filter(purpose: MediaPurpose, subject_id: Optional[int], owner_user_id: Optional[int]):
     if purpose == MediaPurpose.CONTENT:
         return MediaAsset.subject_id == subject_id

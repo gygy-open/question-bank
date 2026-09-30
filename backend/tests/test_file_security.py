@@ -75,45 +75,26 @@ async def _task_with_question(db_session, people, file_path: str) -> tuple[Impor
 
 async def test_upload_requires_login(client, data_dirs):
     response = await client.post(
-        f"{API}/upload/image", files={"file": ("a.png", _png_bytes(), "image/png")}
+        f"{API}/upload/docx", files={"file": ("a.docx", b"x", "application/octet-stream")}
     )
     assert response.status_code == 401
 
 
-async def test_upload_image_sniffs_content_and_picks_extension(client, data_dirs, people):
+async def test_media_upload_rejects_svg_and_oversized(client, data_dirs, people, monkeypatch):
+    from app.services import media_service
+
+    url = f"{API}/subjects/{people['subject'].id}/media"
     headers = _auth(people["owner"])
-    disguised = await client.post(
-        f"{API}/upload/image",
-        files={"file": ("x.html", b"<script>alert(1)</script>", "image/png")},
-        headers=headers,
-    )
-    assert disguised.status_code == 400
     svg = await client.post(
-        f"{API}/upload/image",
+        url,
         files={"file": ("x.svg", b"<svg xmlns='http://www.w3.org/2000/svg'/>", "image/svg+xml")},
         headers=headers,
     )
-    assert svg.status_code == 400
+    assert svg.status_code == 422
 
-    ok = await client.post(
-        f"{API}/upload/image",
-        files={"file": ("evil.html", _png_bytes(), "image/png")},
-        headers=headers,
-    )
-    assert ok.status_code == 200, ok.text
-    url = ok.json()["url"]
-    assert url.startswith("/static/media/images/") and url.endswith(".png")
-    assert (data_dirs["media"] / "images" / url.rsplit("/", 1)[1]).is_file()
-
-
-async def test_upload_image_rejects_oversized(client, data_dirs, people, monkeypatch):
-    from app.api.v1.endpoints import upload
-
-    monkeypatch.setattr(upload, "_MAX_IMAGE_BYTES", 16)
+    monkeypatch.setattr(media_service, "MAX_IMAGE_BYTES", 16)
     response = await client.post(
-        f"{API}/upload/image",
-        files={"file": ("a.png", _png_bytes(), "image/png")},
-        headers=_auth(people["owner"]),
+        url, files={"file": ("a.png", _png_bytes(), "image/png")}, headers=headers
     )
     assert response.status_code == 413
 

@@ -14,6 +14,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Loader2, Upload } from '@lucide/vue'
+import { useMedia } from '@/composables/useMedia'
 
 const props = defineProps<{
   open: boolean
@@ -25,6 +26,7 @@ const emit = defineEmits<{
 
 const { user, fetchUser } = useAuth()
 const { $api } = useNuxtApp()
+const { uploadUserMedia } = useMedia()
 
 const isLoading = ref(false)
 const isUploading = ref(false)
@@ -54,15 +56,8 @@ const handleFileSelect = async (event: Event) => {
 
   isUploading.value = true
   try {
-    const uploadFormData = new FormData()
-    uploadFormData.append('file', file)
-
-    const res = await $api<{ url: string }>('/upload/image', {
-      method: 'POST',
-      body: uploadFormData,
-    })
-
-    formData.avatar_url = res.url
+    const asset = await uploadUserMedia('avatar', file)
+    formData.avatar_url = asset.url
     toast.success('头像上传成功')
   } catch (error: any) {
     const detail = error.data?.detail || '上传失败'

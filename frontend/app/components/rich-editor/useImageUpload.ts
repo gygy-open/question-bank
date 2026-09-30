@@ -1,14 +1,29 @@
-export function useImageUpload() {
-    const { $api } = useNuxtApp()
+import { toast } from 'vue-sonner'
+import { useMedia, useMediaSubject } from '@/composables/useMedia'
 
-    async function uploadImage(file: File): Promise<string> {
-        const formData = new FormData()
-        formData.append('file', file)
+export interface UploadedImageAttrs {
+    src: string
+    assetId: number
+}
+
+/** 上传题目内容图片到学科媒体库；学科取宿主提供的媒体学科（见 provideMediaSubject）。 */
+export function useImageUpload() {
+    const mediaSubject = useMediaSubject()
+    const { uploadContentImage } = useMedia()
+
+    async function uploadImage(file: File): Promise<UploadedImageAttrs | null> {
+        const subjectId = mediaSubject.value
+        if (!subjectId) {
+            toast.error('请先选择学科再插入图片')
+            return null
+        }
         try {
-            const data = await $api<{ url: string }>('/upload/image', { method: 'POST', body: formData })
-            return data.url
-        } catch (error) {
-            throw new Error('图片上传失败', { cause: error })
+            const asset = await uploadContentImage(subjectId, file)
+            return { src: asset.url, assetId: asset.id }
+        } catch (error: any) {
+            // 403 已由 api 插件统一提示。
+            if (error?.response?.status !== 403) toast.error(error?.data?.detail || '图片上传失败')
+            return null
         }
     }
 

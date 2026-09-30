@@ -52,6 +52,15 @@ export const ResizableImage = Image.extend({
     addAttributes() {
         return {
             ...this.parent?.(),
+            assetId: {
+                default: null,
+                parseHTML: (el: HTMLElement) => {
+                    const id = Number(el.getAttribute('data-asset-id'))
+                    return Number.isInteger(id) && id > 0 ? id : null
+                },
+                renderHTML: (attrs: { assetId?: number | null }) =>
+                    attrs.assetId ? { 'data-asset-id': String(attrs.assetId) } : {},
+            },
             align: {
                 default: null,
                 parseHTML: (el: HTMLElement) => el.getAttribute('data-align'),

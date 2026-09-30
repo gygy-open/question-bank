@@ -7,6 +7,7 @@ import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import AnswerEditor from '@/components/AnswerEditor.vue'
 import RichEditor from '@/components/rich-editor/RichEditor.vue'
+import { provideMediaSubject } from '@/composables/useMedia'
 import {
   type QuestionDraft,
   createDefaultOptions,
@@ -17,6 +18,7 @@ import {
 } from '@/lib/questionModel'
 
 const draft = defineModel<QuestionDraft>({ required: true })
+provideMediaSubject(() => draft.value.subject_id)
 
 const qType = computed<QuestionType>({
   get: () => draft.value.q_type,

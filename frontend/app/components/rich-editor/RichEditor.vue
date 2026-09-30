@@ -42,12 +42,8 @@ const { uploadImage } = useImageUpload()
 const fileInputRef = ref<HTMLInputElement | null>(null)
 
 async function insertImageFile(file: File) {
-    try {
-        const url = await uploadImage(file)
-        editor.value?.chain().focus().setImage({ src: url }).run()
-    } catch (error) {
-        console.error(error)
-    }
+    const attrs = await uploadImage(file)
+    if (attrs) editor.value?.chain().focus().insertContent({ type: 'image', attrs }).run()
 }
 
 function triggerImagePicker() {

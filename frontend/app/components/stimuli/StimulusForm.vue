@@ -10,6 +10,7 @@ import CompositionTargetPicker from '@/components/CompositionTargetPicker.vue'
 import RichContent from '@/components/rich-editor/RichContent.vue'
 import RichEditor from '@/components/rich-editor/RichEditor.vue'
 import { isEmptyRichDoc } from '@/components/rich-editor/richDoc'
+import { provideMediaSubject } from '@/composables/useMedia'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -45,6 +46,7 @@ const { currentSubjectId, setSubject } = useSubjectContext()
 const { can } = usePermissions()
 const { getStimulus, createStimulusBundle, updateStimulusBundle } = useStimuli()
 const editorSubjectId = ref<number | null>(null)
+provideMediaSubject(() => editorSubjectId.value)
 const canEdit = computed(() => can(Capability.EDIT_QUESTION, editorSubjectId.value))
 const isEdit = computed(() => props.stimulusId != null)
 const subjectMismatch = computed(() => hasEditorSubjectMismatch(editorSubjectId.value, currentSubjectId.value))

@@ -104,3 +104,20 @@ describe('image align 渲染与回读', () => {
         expect(doc.content?.[0]?.attrs).toMatchObject({ align: 'right' })
     })
 })
+
+describe('image assetId 渲染与回读', () => {
+    it('assetId 经 data-asset-id 往返', () => {
+        const html = generateHTML(
+            { type: 'doc', content: [{ type: 'image', attrs: { src: '/api/v1/media/7/content', assetId: 7 } }] },
+            getSchemaExtensions(),
+        )
+        expect(html).toContain('data-asset-id="7"')
+        const doc = generateJSON(html, getSchemaExtensions())
+        expect(doc.content?.[0]?.attrs).toMatchObject({ assetId: 7, src: '/api/v1/media/7/content' })
+    })
+
+    it('非法 data-asset-id 回读为 null', () => {
+        const doc = generateJSON('<img src="/x.png" data-asset-id="abc">', getSchemaExtensions())
+        expect(doc.content?.[0]?.attrs?.assetId).toBeNull()
+    })
+})

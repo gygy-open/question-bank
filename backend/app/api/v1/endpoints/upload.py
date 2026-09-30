@@ -1,13 +1,10 @@
 import asyncio
 import hashlib
-import io
 import logging
-import uuid
 import zipfile
 from typing import Optional
 
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
-from PIL import Image, UnidentifiedImageError
 from pydantic import BaseModel
 from sqlalchemy import select
 
@@ -15,7 +12,6 @@ from app import models
 from app.api import deps
 from app.capabilities.errors import DomainError
 from app.core import storage
-from app.core.config import settings
 from app.core.permissions import Permission
 from app.crud.crud_subject import subject as crud_subject
 from app.models.composition import Composition
@@ -258,35 +254,3 @@ async def upload_image_recognition(
             subject_id,
         )
         raise HTTPException(status_code=500, detail=str(e)) from e
-
-_IMAGE_EXTENSION_BY_FORMAT = {"PNG": ".png", "JPEG": ".jpg", "GIF": ".gif", "WEBP": ".webp"}
-_MAX_IMAGE_BYTES = 10 * 1024 * 1024
-
-
-def _detect_image_extension(data: bytes) -> str:
-    """按文件内容识别图片格式;只放行浏览器可安全显示的位图,扩展名由识别结果决定。"""
-    try:
-        with Image.open(io.BytesIO(data)) as img:
-            fmt = img.format
-            img.verify()
-    except (UnidentifiedImageError, OSError, SyntaxError, ValueError) as exc:
-        raise HTTPException(status_code=400, detail="Only PNG, JPEG, GIF or WebP images are supported") from exc
-    ext = _IMAGE_EXTENSION_BY_FORMAT.get(fmt or "")
-    if ext is None:
-        raise HTTPException(status_code=400, detail="Only PNG, JPEG, GIF or WebP images are supported")
-    return ext
-
-
-@router.post("/image")
-async def upload_image(file: UploadFile = File(...)):
-    data = await file.read(_MAX_IMAGE_BYTES + 1)
-    if len(data) > _MAX_IMAGE_BYTES:
-        raise HTTPException(status_code=413, detail="Image is too large (max 10 MB)")
-    ext = _detect_image_extension(data)
-
-    images_dir = settings.MEDIA_DIR / "images"
-    images_dir.mkdir(parents=True, exist_ok=True)
-    filename = f"{uuid.uuid4()}{ext}"
-    await asyncio.to_thread((images_dir / filename).write_bytes, data)
-
-    return {"url": f"/static/media/images/{filename}"}

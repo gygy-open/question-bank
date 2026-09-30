@@ -24,6 +24,7 @@ import RichEditorBlankPopover from '@/components/rich-editor/RichEditorBlankPopo
 import QuestionPicker from '@/components/composition/QuestionPicker.vue'
 import CompositionPicker from '@/components/composition/CompositionPicker.vue'
 import { useImageUpload } from '@/components/rich-editor/useImageUpload'
+import { provideMediaSubject } from '@/composables/useMedia'
 import { ResetFormatOnEnter } from '@/components/rich-editor/resetFormatExtension'
 import { createMathNodeView, requestMathAutofocus } from '@/components/rich-editor/mathFieldExtensions'
 import { createBlankNodeView } from '@/components/rich-editor/blankNodeView'
@@ -84,16 +85,13 @@ const staleNodeIds = computed(() =>
   collectStaleQuestionNodeIds(model.value, props.questionStatus ?? new Map()),
 )
 
+provideMediaSubject(() => props.subjectId)
 const { uploadImage } = useImageUpload()
 const fileInputRef = ref<HTMLInputElement | null>(null)
 
 async function insertImageFile(file: File) {
-  try {
-    const url = await uploadImage(file)
-    editor.value?.chain().focus().setImage({ src: url }).run()
-  } catch (error) {
-    console.error(error)
-  }
+  const attrs = await uploadImage(file)
+  if (attrs) editor.value?.chain().focus().insertContent({ type: 'image', attrs }).run()
 }
 
 function triggerImagePicker() {
