@@ -26,6 +26,8 @@ import aiofiles
 from typing import List, Dict, Any, Optional
 
 from app.models.user import User
+from app.core.config import settings
+from app.core.file_paths import resolve_within
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -33,46 +35,27 @@ router = APIRouter()
 # 只有最近这么多个 run 的工具结果保留完整内容,更早的截断,防止历史无限膨胀。
 _FULL_TOOL_RESULT_RUNS = 2
 
-async def get_image_base64(file_path: str) -> str:
+_MEDIA_URL_PREFIX = "/static/media/"
+_IMAGE_MIME_BY_SUFFIX = {".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".gif": "image/gif", ".webp": "image/webp"}
+
+
+async def get_image_base64(file_path: str) -> Optional[str]:
+    # 路径来自客户端:只接受媒体 URL,且解析结果必须仍在媒体目录内。
+    if not isinstance(file_path, str) or not file_path.startswith(_MEDIA_URL_PREFIX):
+        logger.warning("Ignoring chat image outside media dir: %r", file_path)
+        return None
+    real_path = resolve_within(settings.MEDIA_DIR, settings.MEDIA_DIR / file_path[len(_MEDIA_URL_PREFIX):])
+    mime_type = _IMAGE_MIME_BY_SUFFIX.get(real_path.suffix.lower()) if real_path else None
+    if real_path is None or mime_type is None or not real_path.is_file():
+        logger.warning("Ignoring invalid chat image path: %r", file_path)
+        return None
     try:
-        # Handle relative paths (assuming they are relative to static/media or uploads)
-        # But user requirement says "store file path".
-        # If it starts with /, it's absolute or relative to root?
-        # Usually uploads return absolute path or relative to project root.
-        # Let's assume the path stored is usable.
-        # If it's a URL path like /static/media/..., we need to map it to file system.
-        
-        real_path = file_path
-        if file_path.startswith("/static/media/"):
-            real_path = f"static/media/{file_path.replace('/static/media/', '')}"
-        elif file_path.startswith("/uploads/"): # If we have an uploads dir served
-             real_path = f"uploads/{file_path.replace('/uploads/', '')}"
-        
-        # If it's just a filename or relative path, we might need to adjust.
-        # For now, assume the upload endpoint returns a path we can use or map.
-        
         async with aiofiles.open(real_path, "rb") as f:
             data = await f.read()
-            # Detect mime type? For now assume png or jpeg based on extension or just send bytes
-            # The provider expects base64 string.
-            # We should probably prepend the data URI scheme if the provider expects it?
-            # Gemini provider code:
-            # if "," in img_b64: header, data = img_b64.split(",", 1) ...
-            # else: data = img_b64; mime_type = "image/png"
-            
-            b64_data = base64.b64encode(data).decode("utf-8")
-            
-            # Try to guess mime type from extension
-            mime_type = "image/png"
-            if real_path.lower().endswith(".jpg") or real_path.lower().endswith(".jpeg"):
-                mime_type = "image/jpeg"
-            elif real_path.lower().endswith(".webp"):
-                mime_type = "image/webp"
-                
-            return f"data:{mime_type};base64,{b64_data}"
-    except Exception as e:
+    except OSError as e:
         logger.error(f"Error reading image file {file_path}: {e}")
         return None
+    return f"data:{mime_type};base64,{base64.b64encode(data).decode('utf-8')}"
 
 async def generate_session_title(session_id: str, messages: List[Dict], provider, config):
     # 背景任务:请求级 db 在 yield 依赖 teardown 后就关了,这里必须自建会话。

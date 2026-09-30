@@ -21,6 +21,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app import schemas
+from app.core.file_paths import sanitize_client_source_path
 from app.models.composition import ScopeType
 from app.models.import_task import (
     CompositionImportState,
@@ -651,7 +652,7 @@ async def commit_paper_import(
             user_id=actor.id,
             description=filename or f"整卷导入 {len(plans)} 道题目",
             source="paper_import",
-            file_path=file_path or "virtual",
+            file_path=sanitize_client_source_path(file_path),
             original_filename=filename or "paper_import.json",
             file_type="json",
             status=ImportTaskStatus.COMPLETED,

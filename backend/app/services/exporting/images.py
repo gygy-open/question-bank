@@ -10,6 +10,7 @@ from pathlib import Path
 from typing import Optional
 
 from app.core.config import settings
+from app.core.file_paths import resolve_within
 
 logger = logging.getLogger(__name__)
 
@@ -22,12 +23,10 @@ class ImageResolver:
     def resolve(self, src: str) -> Optional[Path]:
         if not src or not src.startswith(_MEDIA_PREFIX):
             return None
-        rel = src[len(_MEDIA_PREFIX):]
-        try:
-            abs_path = (settings.MEDIA_DIR / rel).resolve()
-        except Exception as exc:
-            logger.warning("Failed to resolve image path %s: %s", src, exc)
+        abs_path = resolve_within(settings.MEDIA_DIR, settings.MEDIA_DIR / src[len(_MEDIA_PREFIX):])
+        if abs_path is None:
+            logger.warning("Rejected image path outside media dir: %s", src)
             return None
-        if abs_path.exists():
+        if abs_path.is_file():
             return abs_path
         return None

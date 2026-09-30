@@ -1,11 +1,11 @@
 import asyncio
 import hashlib
+import io
 import logging
-import shutil
 import uuid
-from pathlib import Path
 
 from fastapi import APIRouter, File, HTTPException, UploadFile
+from PIL import Image, UnidentifiedImageError
 from pydantic import BaseModel
 from sqlalchemy import select
 
@@ -227,25 +227,34 @@ async def upload_image_recognition(
         )
         raise HTTPException(status_code=500, detail=str(e)) from e
 
+_IMAGE_EXTENSION_BY_FORMAT = {"PNG": ".png", "JPEG": ".jpg", "GIF": ".gif", "WEBP": ".webp"}
+_MAX_IMAGE_BYTES = 10 * 1024 * 1024
+
+
+def _detect_image_extension(data: bytes) -> str:
+    """按文件内容识别图片格式;只放行浏览器可安全显示的位图,扩展名由识别结果决定。"""
+    try:
+        with Image.open(io.BytesIO(data)) as img:
+            fmt = img.format
+            img.verify()
+    except (UnidentifiedImageError, OSError, SyntaxError, ValueError) as exc:
+        raise HTTPException(status_code=400, detail="Only PNG, JPEG, GIF or WebP images are supported") from exc
+    ext = _IMAGE_EXTENSION_BY_FORMAT.get(fmt or "")
+    if ext is None:
+        raise HTTPException(status_code=400, detail="Only PNG, JPEG, GIF or WebP images are supported")
+    return ext
+
+
 @router.post("/image")
 async def upload_image(file: UploadFile = File(...)):
-    if not file.content_type.startswith('image/'):
-        raise HTTPException(status_code=400, detail="Only image files are supported")
-    
-    # Create images directory if it doesn't exist
+    data = await file.read(_MAX_IMAGE_BYTES + 1)
+    if len(data) > _MAX_IMAGE_BYTES:
+        raise HTTPException(status_code=413, detail="Image is too large (max 10 MB)")
+    ext = _detect_image_extension(data)
+
     images_dir = settings.MEDIA_DIR / "images"
     images_dir.mkdir(parents=True, exist_ok=True)
-    
-    # Generate unique filename
-    ext = Path(file.filename).suffix
     filename = f"{uuid.uuid4()}{ext}"
-    file_path = images_dir / filename
-    
-    # Save file
-    def save_image_file():
-        with open(file_path, "wb") as buffer:
-            shutil.copyfileobj(file.file, buffer)
-            
-    await asyncio.to_thread(save_image_file)
-        
+    await asyncio.to_thread((images_dir / filename).write_bytes, data)
+
     return {"url": f"/static/media/images/{filename}"}

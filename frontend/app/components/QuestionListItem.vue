@@ -213,12 +213,9 @@ const statusAccentClass = computed(() => {
   }
 })
 
-const sourceFileUrl = computed(() => {
-  const item = props.item as DbQuestion
-  if (item.import_task?.file_path) {
-    return `/${item.import_task.file_path}`
-  }
-  return null
+const sourcePreviewQuery = computed(() => {
+  const task = (props.item as DbQuestion).import_task
+  return task?.has_source ? { task: String(task.id), name: task.original_filename } : null
 })
 </script>
 
@@ -322,14 +319,14 @@ const sourceFileUrl = computed(() => {
 
             <!-- Low-frequency reference action: kept before the overflow menu, after the higher-frequency edit/review/basket/compose actions -->
             <Button
-              v-if="sourceFileUrl"
+              v-if="sourcePreviewQuery"
               as-child
               variant="ghost"
               size="icon"
               class="h-8 w-8 text-muted-foreground"
               title="查看源文件"
             >
-              <NuxtLink :to="{ path: '/preview', query: { url: sourceFileUrl } }" target="_blank">
+              <NuxtLink :to="{ path: '/preview', query: sourcePreviewQuery }" target="_blank">
                 <FileText class="h-4 w-4" />
               </NuxtLink>
             </Button>

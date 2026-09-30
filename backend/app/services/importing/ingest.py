@@ -42,7 +42,7 @@ _ARCHIVE_MAX_TOTAL_BYTES = 200 * 1024 * 1024
 _ARCHIVE_MAX_FILE_BYTES = 50 * 1024 * 1024
 
 _IMAGE_EXTENSIONS = {
-    ".png", ".jpg", ".jpeg", ".gif", ".webp", ".bmp", ".svg", ".tif", ".tiff",
+    ".png", ".jpg", ".jpeg", ".gif", ".webp", ".bmp", ".tif", ".tiff",
 }
 
 # markdown 图片语法 ![alt](URL "可选标题"):分三段捕获,只重写中间的 URL 段。

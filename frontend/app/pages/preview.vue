@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted, watch } from 'vue'
+import { ref, onMounted, onBeforeUnmount, watch, nextTick } from 'vue'
 import { useRoute } from 'vue-router'
 import { renderAsync } from 'docx-preview'
 import MarkdownPreview from '@/components/MarkdownPreview.vue'
@@ -11,45 +11,43 @@ definePageMeta({
 })
 
 const route = useRoute()
-const fileUrl = ref('')
+const { $api } = useNuxtApp()
+const fileName = ref('')
+const downloadUrl = ref('')
 const fileType = ref<'docx' | 'md' | 'unknown'>('unknown')
 const loading = ref(true)
 const error = ref('')
 const docxContainer = ref<HTMLElement | null>(null)
 const mdContent = ref('')
 
+const releaseDownloadUrl = () => {
+  if (downloadUrl.value) URL.revokeObjectURL(downloadUrl.value)
+  downloadUrl.value = ''
+}
+
 const loadFile = async () => {
-  const url = route.query.url as string
-  if (!url) {
-    error.value = '未提供文件 URL'
+  const taskId = Number(route.query.task)
+  fileName.value = String(route.query.name || '源文件')
+  if (!Number.isInteger(taskId) || taskId <= 0) {
+    error.value = '未指定导入任务'
     loading.value = false
     return
   }
 
-  fileUrl.value = url
   loading.value = true
   error.value = ''
   mdContent.value = ''
+  releaseDownloadUrl()
 
-  // Determine type from extension
-  const lowerUrl = url.toLowerCase()
-  if (lowerUrl.endsWith('.docx')) {
-    fileType.value = 'docx'
-  } else if (lowerUrl.endsWith('.md')) {
-    fileType.value = 'md'
-  } else {
-    fileType.value = 'unknown'
-    error.value = '不支持的文件格式'
-    loading.value = false
-    return
-  }
+  const lowerName = fileName.value.toLowerCase()
+  fileType.value = lowerName.endsWith('.docx') ? 'docx' : lowerName.endsWith('.md') ? 'md' : 'unknown'
 
   try {
-    const res = await fetch(url)
-    if (!res.ok) throw new Error(`Failed to load file: ${res.statusText}`)
+    const blob = await $api<Blob>(`/imports/${taskId}/source`, { responseType: 'blob' })
+    downloadUrl.value = URL.createObjectURL(blob)
 
     if (fileType.value === 'docx') {
-      const blob = await res.blob()
+      await nextTick()
       if (docxContainer.value) {
         await renderAsync(blob, docxContainer.value, docxContainer.value, {
           className: 'docx-viewer',
@@ -67,11 +65,11 @@ const loadFile = async () => {
         })
       }
     } else if (fileType.value === 'md') {
-      mdContent.value = await res.text()
+      mdContent.value = await blob.text()
     }
   } catch (e: any) {
     console.error(e)
-    error.value = e.message || '加载文件失败'
+    error.value = e?.statusCode === 404 ? '源文件不存在或无权查看' : (e?.message || '加载文件失败')
   } finally {
     loading.value = false
   }
@@ -80,8 +78,9 @@ const loadFile = async () => {
 onMounted(() => {
   loadFile()
 })
+onBeforeUnmount(releaseDownloadUrl)
 
-watch(() => route.query.url, () => {
+watch(() => route.query.task, () => {
   loadFile()
 })
 </script>
@@ -91,13 +90,13 @@ watch(() => route.query.url, () => {
     <!-- Header -->
     <header class="bg-white border-b px-6 py-3 flex items-center justify-between sticky top-0 z-10 shadow-sm">
       <div class="flex items-center gap-2">
-        <h1 class="font-medium text-lg truncate max-w-md" :title="fileUrl">
-          文件预览: {{ fileUrl.split('/').pop() }}
+        <h1 class="font-medium text-lg truncate max-w-md" :title="fileName">
+          文件预览: {{ fileName }}
         </h1>
       </div>
       <div class="flex items-center gap-2">
-        <Button variant="outline" size="sm" as-child>
-          <a :href="fileUrl" download>下载文件</a>
+        <Button v-if="downloadUrl" variant="outline" size="sm" as-child>
+          <a :href="downloadUrl" :download="fileName">下载文件</a>
         </Button>
       </div>
     </header>
@@ -127,6 +126,11 @@ watch(() => route.query.url, () => {
         <!-- Markdown Viewer -->
         <div v-if="!loading && !error && fileType === 'md'" class="prose max-w-none">
           <MarkdownPreview :content="mdContent" />
+        </div>
+
+        <div v-if="!loading && !error && fileType === 'unknown'" class="flex flex-col items-center justify-center h-64 text-muted-foreground">
+          <FileWarning class="h-10 w-10 mb-2" />
+          <p>该格式不支持在线预览，请下载后查看。</p>
         </div>
       </div>
     </main>

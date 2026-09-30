@@ -1,13 +1,20 @@
 from typing import Any, List, Optional
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Query
+from fastapi.responses import FileResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, update, func
 from sqlalchemy.orm import selectinload
 from app import models, schemas
 from app.api import deps
+from app.core import permissions
 from app.core.config import settings
+from app.core.file_paths import import_source_file
+from app.core.permissions import Permission
+from app.crud.crud_question import is_question_visible
 from app.models.import_task import ImportTask, ImportTaskStatus
+from app.models.question import Question
 from app.services.importing.ingest import extract_archive_and_rewrite
+import logging
 import shutil
 import uuid
 import zipfile
@@ -18,6 +25,7 @@ import math
 import json
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
 
 @router.get("/queue-status", response_model=dict)
 async def get_queue_status(
@@ -400,14 +408,58 @@ async def delete_import_task(
         raise HTTPException(status_code=403, detail="Not enough permissions")
         
     # Delete file if exists
-    try:
-        file_path = Path(task.file_path)
-        if file_path.exists() and file_path.is_file():
-            file_path.unlink()
-    except Exception as e:
-        print(f"Error deleting file: {e}")
+    source = import_source_file(task.file_path)
+    if source is not None:
+        try:
+            source.unlink()
+        except OSError as e:
+            logger.warning("Error deleting import source %s: %s", source, e)
         
     await db.delete(task)
     await db.commit()
     
     return {"message": "Task deleted"}
+
+
+_SOURCE_MEDIA_TYPES = {
+    ".docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    ".md": "text/markdown; charset=utf-8",
+    ".zip": "application/zip",
+}
+
+
+async def _can_view_import_source(db, task: ImportTask, user: models.User) -> bool:
+    if user.is_superuser or task.user_id == user.id:
+        return True
+    # 能看到该任务导入的任一道题,即可对照原卷。
+    rows = await db.scalars(
+        select(Question)
+        .where(Question.import_task_id == task.id, Question.deleted_at.is_(None))
+        .limit(500)
+    )
+    return any(
+        is_question_visible(question, user)
+        and permissions.can(user, Permission.VIEW_QUESTION, subject_id=question.subject_id)
+        for question in rows.all()
+    )
+
+
+@router.get("/{task_id}/source")
+async def download_import_source(
+    *,
+    db: deps.SessionDep,
+    task_id: int,
+    current_user: models.User = Depends(deps.get_current_active_user),
+) -> FileResponse:
+    task = await db.get(ImportTask, task_id)
+    if task is None or not await _can_view_import_source(db, task, current_user):
+        raise HTTPException(status_code=404, detail="Task not found")
+    source = import_source_file(task.file_path)
+    if source is None:
+        raise HTTPException(status_code=404, detail="Source file not available")
+    return FileResponse(
+        source,
+        media_type=_SOURCE_MEDIA_TYPES.get(source.suffix.lower(), "application/octet-stream"),
+        filename=Path(task.original_filename or source.name).name,
+        headers={"X-Content-Type-Options": "nosniff"},
+    )

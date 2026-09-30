@@ -225,7 +225,7 @@ export interface ImportTask {
   id: number
   description?: string
   source: string
-  file_path: string
+  has_source: boolean
   original_filename: string
   file_type: string
   mode: string

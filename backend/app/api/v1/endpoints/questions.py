@@ -6,6 +6,7 @@ from app import capabilities
 from app.capabilities import questions as question_caps
 from app.crud.crud_question import is_question_visible
 from app.models.question import QuestionType, QuestionStatus
+from app.core.file_paths import sanitize_client_source_path
 from app.models.import_task import ImportTask, ImportTaskStatus
 from app.services.importing.contracts import ImportDefaults
 from app.services.importing.normalize import question_importer
@@ -148,7 +149,7 @@ async def create_questions_batch_legacy(
         user_id=current_user.id,
         description=batch_in.filename or f"Batch import of {len(batch_in.questions)} questions",
         source="smart_import",
-        file_path=batch_in.file_path or "virtual",
+        file_path=sanitize_client_source_path(batch_in.file_path),
         original_filename=batch_in.filename or "smart_import.json",
         file_type="json",
         status=ImportTaskStatus.COMPLETED,

@@ -19,6 +19,7 @@ from app import crud, models, schemas
 from app.core import permissions
 from app.core.permissions import Permission
 from app.crud.crud_question import is_question_visible, release_stimulus_slot
+from app.core.file_paths import sanitize_client_source_path
 from app.models.import_task import ImportTask, ImportTaskStatus
 from app.models.question import Question, QuestionStatus
 from app.models.question_relation import QuestionRelation, QuestionRelationType
@@ -204,7 +205,7 @@ class BatchCreateQuestions(Capability[schemas.QuestionBatchCreate, List[Question
             user_id=ctx.actor.id,
             description=description,
             source="smart_import",
-            file_path=inp.file_path or "virtual",
+            file_path=sanitize_client_source_path(inp.file_path),
             original_filename=inp.filename or "smart_import.json",
             file_type="json",
             status=ImportTaskStatus.COMPLETED,

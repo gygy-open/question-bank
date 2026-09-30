@@ -61,7 +61,7 @@ settings.UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 # Mount static files (absolute paths so serving is independent of the CWD,
 # which matters for a packaged desktop build).
 app.mount("/static", StaticFiles(directory=settings.STATIC_DIR), name="static")
-app.mount("/uploads", StaticFiles(directory=settings.UPLOAD_DIR), name="uploads")
+# 导入源文件是私有数据,不再静态挂载;经 GET /api/v1/imports/{id}/source 鉴权下载。
 
 app.include_router(api_router, prefix="/api/v1")
 
