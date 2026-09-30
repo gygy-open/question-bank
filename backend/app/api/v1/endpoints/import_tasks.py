@@ -6,17 +6,15 @@ from sqlalchemy import select, update, func
 from sqlalchemy.orm import selectinload
 from app import models, schemas
 from app.api import deps
-from app.core import permissions
-from app.core.config import settings
-from app.core.file_paths import import_source_file
+from app.core import permissions, storage
+from app.core.file_paths import VIRTUAL_SOURCE, import_source_file, task_source_file
 from app.core.permissions import Permission
 from app.crud.crud_question import is_question_visible
 from app.models.import_task import ImportTask, ImportTaskStatus
 from app.models.question import Question
-from app.services.importing.ingest import extract_archive_and_rewrite
+from app.services.importing.ingest import extract_markdown_archive
+from app.services.importing.media import ImportImageSink
 import logging
-import shutil
-import uuid
 import zipfile
 from pathlib import Path
 import asyncio
@@ -155,51 +153,50 @@ async def create_import_tasks(
     if not files:
         raise HTTPException(status_code=400, detail="No files provided")
 
+    # 学科在创建时确定:抽取出的图片与题目都归属它,不受之后切换学科影响。
+    subject_id = current_user.last_active_subject_id
+    if subject_id is None:
+        raise HTTPException(status_code=400, detail="请先选择所属学科")
+    deps.require(current_user, Permission.EDIT_QUESTION, subject_id=subject_id)
+    sink = ImportImageSink(db, subject_id=subject_id, actor_id=current_user.id)
+
     created_tasks = []
-    
-    # Use a unique directory for this upload session
-    upload_session_id = str(uuid.uuid4())
-    upload_dir = settings.UPLOAD_DIR / upload_session_id
-    upload_dir.mkdir(parents=True, exist_ok=True)
-    
+
+    def _new_task(source_sha256: str, original_filename: str, file_type: str) -> ImportTask:
+        task = ImportTask(
+            user_id=current_user.id,
+            subject_id=subject_id,
+            file_path=VIRTUAL_SOURCE,
+            source_sha256=source_sha256,
+            original_filename=original_filename,
+            file_type=file_type,
+            status=ImportTaskStatus.PENDING,
+            source="batch_upload",
+            description=f"Import {original_filename}",
+            mode=mode,
+        )
+        db.add(task)
+        created_tasks.append(task)
+        return task
+
     for file in files:
         # Determine file type
         ext = Path(file.filename).suffix.lower()
 
-        # A .zip is a markdown archive: extract + rewrite local image paths, then fan out into one
-        # markdown task per contained .md (all sharing one /static/media/{media_id}/ directory).
+        # A .zip is a markdown archive: images become subject assets, then fan out into one
+        # markdown task per contained .md (each stored as its own rewritten source object).
         if ext == '.zip':
-            zip_path = upload_dir / file.filename
             content = await file.read()
-            await asyncio.to_thread(zip_path.write_bytes, content)
-
-            archive_media_id = str(uuid.uuid4())
+            zip_sha = await asyncio.to_thread(storage.put_bytes, content)
             try:
-                parts = await asyncio.to_thread(
-                    extract_archive_and_rewrite, zip_path, media_id=archive_media_id
-                )
+                parts = await extract_markdown_archive(storage.object_path(zip_sha), store=sink.store)
             except (ValueError, zipfile.BadZipFile):
                 continue
 
             archive_stem = Path(file.filename).stem
             for md_name, rewritten in parts:
-                md_path = upload_dir / archive_media_id / md_name
-                md_path.parent.mkdir(parents=True, exist_ok=True)
-                await asyncio.to_thread(md_path.write_text, rewritten, encoding="utf-8")
-
-                original_filename = f"{archive_stem}/{md_name}"
-                task = ImportTask(
-                    user_id=current_user.id,
-                    file_path=str(md_path),
-                    original_filename=original_filename,
-                    file_type='markdown',
-                    status=ImportTaskStatus.PENDING,
-                    source="batch_upload",
-                    description=f"Import {original_filename}",
-                    mode=mode
-                )
-                db.add(task)
-                created_tasks.append(task)
+                md_sha = await asyncio.to_thread(storage.put_bytes, rewritten.encode("utf-8"))
+                _new_task(md_sha, f"{archive_stem}/{md_name}", 'markdown')
             continue
 
         if ext == '.docx':
@@ -208,27 +205,10 @@ async def create_import_tasks(
             file_type = 'markdown'
         else:
             continue 
-            
-        # Save file
-        file_path = upload_dir / file.filename
-        
-        # We need to read and write async or in thread
+
         content = await file.read()
-        await asyncio.to_thread(file_path.write_bytes, content)
-        
-        # Create task record
-        task = ImportTask(
-            user_id=current_user.id,
-            file_path=str(file_path),
-            original_filename=file.filename,
-            file_type=file_type,
-            status=ImportTaskStatus.PENDING,
-            source="batch_upload",
-            description=f"Import {file.filename}",
-            mode=mode
-        )
-        db.add(task)
-        created_tasks.append(task)
+        sha256 = await asyncio.to_thread(storage.put_bytes, content)
+        _new_task(sha256, file.filename, file_type)
     
     if not created_tasks:
          raise HTTPException(status_code=400, detail="No valid files found (supported: .docx, .md, .zip)")
@@ -454,12 +434,13 @@ async def download_import_source(
     task = await db.get(ImportTask, task_id)
     if task is None or not await _can_view_import_source(db, task, current_user):
         raise HTTPException(status_code=404, detail="Task not found")
-    source = import_source_file(task.file_path)
+    source = task_source_file(task.file_path, task.source_sha256)
     if source is None:
         raise HTTPException(status_code=404, detail="Source file not available")
+    filename = Path(task.original_filename or source.name).name
     return FileResponse(
         source,
-        media_type=_SOURCE_MEDIA_TYPES.get(source.suffix.lower(), "application/octet-stream"),
-        filename=Path(task.original_filename or source.name).name,
+        media_type=_SOURCE_MEDIA_TYPES.get(Path(filename).suffix.lower(), "application/octet-stream"),
+        filename=filename,
         headers={"X-Content-Type-Options": "nosniff"},
     )

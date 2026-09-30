@@ -82,7 +82,8 @@ const stimuli = ref<ImportStimulus[]>([])
 const questionGroups = ref<ImportQuestionGroup[]>([])
 const editingItemId = ref<string | null>(null)
 const importedTaskId = ref<number | null>(null)
-const uploadedFilePath = ref<string | null>(null)
+// 服务端签发的源文件凭据,提交时回传以关联原文件。
+const sourceRef = ref<string | null>(null)
 
 // --- 整卷结构与稿件选项 ---
 const paper = ref<PaperExtraction | null>(null)
@@ -306,7 +307,7 @@ const acceptExtraction = (data: any) => {
     paper.value = data.paper ?? null
     contentSha256.value = data.content_sha256 ?? null
     duplicateOf.value = data.duplicate_of ?? null
-    if (data.file_path) uploadedFilePath.value = data.file_path
+    sourceRef.value = data.source_ref ?? null
     compositionTitle.value = (paper.value?.suggested_title || file.value?.name || '').replace(/\.[^.]+$/, '')
     step.value = 'review'
 }
@@ -510,7 +511,7 @@ const handleImport = async (proceedWithPartial = false) => {
             proceed_with_partial: proceedWithPartial,
             status: globalSettings.value.status,
             filename: file.value?.name ?? null,
-            file_path: uploadedFilePath.value,
+            source_ref: sourceRef.value,
             content_sha256: contentSha256.value,
             idempotency_key: idempotencyKey.value,
         }
@@ -603,7 +604,7 @@ const reset = () => {
     markdownContent.value = ''
     pastedImage.value = null
     fileTextPreview.value = null
-    uploadedFilePath.value = null
+    sourceRef.value = null
     importList.value = []
     stimuli.value = []
     questionGroups.value = []

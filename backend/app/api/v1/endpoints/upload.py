@@ -3,21 +3,47 @@ import hashlib
 import io
 import logging
 import uuid
+import zipfile
+from typing import Optional
 
-from fastapi import APIRouter, File, HTTPException, UploadFile
+from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 from PIL import Image, UnidentifiedImageError
 from pydantic import BaseModel
 from sqlalchemy import select
 
+from app import models
 from app.api import deps
+from app.capabilities.errors import DomainError
+from app.core import storage
 from app.core.config import settings
+from app.core.permissions import Permission
+from app.crud.crud_subject import subject as crud_subject
 from app.models.composition import Composition
 from app.models.import_task import ImportTask
 from app.services.doc_processor import doc_processor
+from app.services.importing.media import sign_source_ref
 from app.services.importing.review import extracted_stimuli_to_review, extracted_to_v2_review
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
+
+
+async def _check_import_subject(db, user: models.User, subject_id: Optional[int]) -> None:
+    """文档内图片会入库为该学科的资产,因此需要该学科的编辑权限。"""
+    if subject_id is None:
+        return
+    if await crud_subject.get(db, id=subject_id) is None:
+        raise HTTPException(status_code=404, detail="Subject not found")
+    deps.require(user, Permission.EDIT_QUESTION, subject_id=subject_id)
+
+
+async def _store_source(content: bytes) -> str:
+    return await asyncio.to_thread(storage.put_bytes, content)
+
+
+def _attach_source_ref(result: dict, sha256: str, user: models.User) -> None:
+    """源文件已存入对象存储;前端提交时回传该凭据,服务端验签后关联到导入任务。"""
+    result["source_ref"] = sign_source_ref(sha256, user.id)
 
 
 def _as_review(result: dict, subject_id: int | None) -> dict:
@@ -70,28 +96,33 @@ async def upload_docx(
     mode: str = "extract",
     method: str = "ai",
     subject_id: int = None,
+    current_user: models.User = Depends(deps.get_current_active_user),
 ):
     """Upload and process a DOCX file."""
     if not file.filename.endswith('.docx'):
         raise HTTPException(status_code=400, detail="Only .docx files are supported")
-    
-    # Create upload directory
-    upload_session_id = str(uuid.uuid4())
-    upload_dir = settings.UPLOAD_DIR / upload_session_id
-    upload_dir.mkdir(parents=True, exist_ok=True)
-    
-    file_path = upload_dir / file.filename
-    
-    # Save file
+    await _check_import_subject(db, current_user, subject_id)
+
     content = await file.read()
-    await asyncio.to_thread(file_path.write_bytes, content)
-    
+    sha256 = await _store_source(content)
+
     try:
-        result = await doc_processor.process_docx(file_path, db=db, mode=mode, method=method, subject_id=subject_id)
+        result = await doc_processor.process_docx(
+            storage.object_path(sha256),
+            db=db,
+            mode=mode,
+            method=method,
+            subject_id=subject_id,
+            actor_id=current_user.id,
+            filename=file.filename,
+        )
         _as_review(result, subject_id)
-        result["file_path"] = str(file_path)
+        _attach_source_ref(result, sha256, current_user)
         await _attach_duplicate_hint(result, db, content)
+        await db.commit()
         return result
+    except DomainError:
+        raise
     except Exception as e:
         logger.exception(
             "Failed to process DOCX: filename=%s mode=%s method=%s subject_id=%s",
@@ -109,6 +140,7 @@ async def upload_markdown(
     mode: str = "extract",
     method: str = "ai",
     subject_id: int = None,
+    current_user: models.User = Depends(deps.get_current_active_user),
 ):
     """Process markdown content from file upload."""
     if not file:
@@ -116,24 +148,16 @@ async def upload_markdown(
     
     if not file.filename.endswith('.md'):
         raise HTTPException(status_code=400, detail="Only .md files are supported")
-    
-    # Create upload directory
-    upload_session_id = str(uuid.uuid4())
-    upload_dir = settings.UPLOAD_DIR / upload_session_id
-    upload_dir.mkdir(parents=True, exist_ok=True)
-    
-    file_path = upload_dir / file.filename
-    
-    # Save file
+    await _check_import_subject(db, current_user, subject_id)
+
     markdown_content_bytes = await file.read()
-    await asyncio.to_thread(file_path.write_bytes, markdown_content_bytes)
-    
+    sha256 = await _store_source(markdown_content_bytes)
     markdown_content = markdown_content_bytes.decode('utf-8')
     
     try:
         result = await doc_processor.process_markdown(markdown_content, db=db, filename=file.filename, mode=mode, method=method, subject_id=subject_id)
         _as_review(result, subject_id)
-        result["file_path"] = str(file_path)
+        _attach_source_ref(result, sha256, current_user)
         await _attach_duplicate_hint(result, db, markdown_content_bytes)
         return result
     except Exception as e:
@@ -173,25 +197,33 @@ async def upload_markdown_archive(
     mode: str = "extract",
     method: str = "ai",
     subject_id: int = None,
+    current_user: models.User = Depends(deps.get_current_active_user),
 ):
     """Process a zip archive containing markdown file(s) plus their local images."""
     if not file.filename.endswith('.zip'):
         raise HTTPException(status_code=400, detail="Only .zip archives are supported")
-
-    upload_session_id = str(uuid.uuid4())
-    upload_dir = settings.UPLOAD_DIR / upload_session_id
-    upload_dir.mkdir(parents=True, exist_ok=True)
-    file_path = upload_dir / file.filename
+    await _check_import_subject(db, current_user, subject_id)
 
     content = await file.read()
-    await asyncio.to_thread(file_path.write_bytes, content)
+    sha256 = await _store_source(content)
 
     try:
-        result = await doc_processor.process_markdown_archive(file_path, db=db, mode=mode, method=method, subject_id=subject_id)
+        result = await doc_processor.process_markdown_archive(
+            storage.object_path(sha256),
+            db=db,
+            mode=mode,
+            method=method,
+            subject_id=subject_id,
+            actor_id=current_user.id,
+            filename=file.filename,
+        )
         _as_review(result, subject_id)
-        result["file_path"] = str(file_path)
+        _attach_source_ref(result, sha256, current_user)
+        await db.commit()
         return result
-    except ValueError as e:
+    except DomainError:
+        raise
+    except (ValueError, zipfile.BadZipFile) as e:
         raise HTTPException(status_code=400, detail=str(e)) from e
     except Exception as e:
         logger.exception(

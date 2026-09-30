@@ -120,7 +120,8 @@ class PaperImportCommitRequest(BaseModel):
     proceed_with_partial: bool = False
     status: QuestionStatus = QuestionStatus.PENDING
     filename: Optional[str] = None
-    file_path: Optional[str] = None
+    # 同步上传接口返回的源文件凭据(签名),用于把原文件关联到本次导入任务。
+    source_ref: Optional[str] = None
     content_sha256: Optional[str] = None
     idempotency_key: Optional[str] = None
 

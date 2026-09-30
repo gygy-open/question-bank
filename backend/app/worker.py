@@ -11,6 +11,7 @@ sys.path.append(str(Path(__file__).parent.parent))
 
 from app.db.session import SessionLocal
 from app.core.config import get_db_url, is_configured
+from app.core.file_paths import task_source_file
 from app.models.import_task import ImportTask, ImportTaskStatus
 from app.models.user import User
 from app.services.doc_processor import doc_processor
@@ -36,30 +37,36 @@ async def process_task(db: AsyncSession, task: ImportTask):
         logger.info(f"Task {task.id} status updated to PROCESSING")
         
         # Process file
-        file_path = Path(task.file_path)
-        if not file_path.exists():
-            raise FileNotFoundError(f"File not found: {file_path}")
+        file_path = task_source_file(task.file_path, task.source_sha256)
+        if file_path is None:
+            raise FileNotFoundError(f"Source file not found for task {task.id}")
 
         # Resolve subject up-front so knowledge-point retrieval can be subject-scoped.
-        subject_id = None
+        # Tasks created after subject_id existed carry it; older ones fall back to the
+        # user's active subject.
+        subject_id = task.subject_id
         user = None
         if task.user_id:
             user_stmt = select(User).where(User.id == task.user_id)
             user_result = await db.execute(user_stmt)
             user = user_result.scalar_one_or_none()
-            if user:
+            if user and subject_id is None:
                 subject_id = user.last_active_subject_id
 
         result = None
+        actor_id = user.id if user else None
         if task.file_type == 'docx':
-            import uuid
-            proc_task_id = str(uuid.uuid4())
-            result = await doc_processor.process_docx(file_path, db=db, task_id=proc_task_id, mode=task.mode or "extract", subject_id=subject_id)
+            result = await doc_processor.process_docx(
+                file_path,
+                db=db,
+                mode=task.mode or "extract",
+                subject_id=subject_id,
+                actor_id=actor_id,
+                filename=task.original_filename,
+            )
         elif task.file_type == 'markdown':
             content = file_path.read_text(encoding='utf-8')
-            import uuid
-            proc_task_id = str(uuid.uuid4())
-            result = await doc_processor.process_markdown(content, db=db, filename=task.original_filename, task_id=proc_task_id, mode=task.mode or "extract", subject_id=subject_id)
+            result = await doc_processor.process_markdown(content, db=db, filename=task.original_filename, mode=task.mode or "extract", subject_id=subject_id)
             
         if result and user and subject_id:
             report = await commit_extracted_paper_import(

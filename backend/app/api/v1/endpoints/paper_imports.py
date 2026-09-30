@@ -81,7 +81,7 @@ async def commit_paper_import(
             proceed_with_partial=payload.proceed_with_partial,
             status=payload.status,
             filename=payload.filename,
-            file_path=payload.file_path,
+            source_ref=payload.source_ref,
             content_sha256=payload.content_sha256,
             idempotency_key=payload.idempotency_key,
         ),

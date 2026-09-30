@@ -1,7 +1,8 @@
 """摄取阶段:把各种源(docx / markdown / image)归一为 CanonicalDoc。
 
-CanonicalDoc 是抽取阶段唯一认识的输入:文本源产出 markdown,图像源产出 image_data +
-公开 URL。媒体路径重写(pandoc → /static/media/...)在此一次做完,下游不再感知物理路径。
+CanonicalDoc 是抽取阶段唯一认识的输入:文本源产出 markdown,图像源产出 image_data。
+文档内的本地图片在此交给 ImageStore 入库并改写为资产 URL,中间文件只落在临时 job 目录,
+下游不再感知物理路径。
 """
 from __future__ import annotations
 
@@ -13,12 +14,15 @@ import uuid
 import zipfile
 from dataclasses import dataclass
 from pathlib import Path
-from typing import BinaryIO, Optional
-from urllib.parse import quote, unquote, urlsplit
+from typing import Awaitable, BinaryIO, Callable, Optional
+from urllib.parse import unquote, urlsplit
 
 import pypandoc
 
-from app.core.config import settings
+from app.core import storage
+
+# (图片字节, 原文件名) -> 替换后的 URL;返回 None 表示该图片保持原引用。
+ImageStore = Callable[[bytes, str], Awaitable[Optional[str]]]
 
 
 @dataclass
@@ -27,7 +31,6 @@ class CanonicalDoc:
     markdown: str = ""                       # 文本源内容;图像源为空
     filename: Optional[str] = None           # 传给 AI 抽取的文件名上下文
     image_data: Optional[bytes] = None       # 视觉抽取用
-    image_url: Optional[str] = None          # 图像源的公开访问 URL
 
 
 def _ensure_task_id(task_id: Optional[str]) -> str:
@@ -42,7 +45,7 @@ _ARCHIVE_MAX_TOTAL_BYTES = 200 * 1024 * 1024
 _ARCHIVE_MAX_FILE_BYTES = 50 * 1024 * 1024
 
 _IMAGE_EXTENSIONS = {
-    ".png", ".jpg", ".jpeg", ".gif", ".webp", ".bmp", ".tif", ".tiff",
+    ".png", ".jpg", ".jpeg", ".gif", ".webp", ".bmp", ".tif", ".tiff", ".emf", ".wmf",
 }
 
 # markdown 图片语法 ![alt](URL "可选标题"):分三段捕获,只重写中间的 URL 段。
@@ -75,106 +78,105 @@ def _safe_extract_zip(zip_path: Path, dest: Path) -> None:
                 shutil.copyfileobj(src, out)
 
 
-def _rewrite_markdown_images(
-    markdown: str, *, md_dir: Path, extract_root: Path, media_dir: Path, media_id: str
-) -> str:
-    """把 markdown 里指向压缩包内本地图片的引用拷到媒体目录并改写成 /static/media 路径。
+def _local_image_resolver(base_dir: Path, root: Path) -> Callable[[str], Optional[Path]]:
+    """把 markdown 图片 URL 解析成 root 内的本地图片文件;解析不到返回 None。
 
-    仅处理能在包内解析到的本地图片;URL(http/https/data 等)、绝对路径、解析不到或逃逸出
-    解压根的引用一律原样保留(坏链但保文字)。媒体按其在包内的相对路径落地,天然去重防撞名。
+    URL(http/https/data 等)、绝对路径、逃逸出 root、不存在或非图片扩展名的引用一律不处理
+    (原样保留,坏链但保文字)。
     """
-    extract_root = extract_root.resolve()
+    root = root.resolve()
 
-    def _sub(match: re.Match[str]) -> str:
-        raw_url = match.group(2)
-        # 带 scheme(http/https/data/...)或以 / 开头的绝对路径:不动。
+    def resolve(raw_url: str) -> Optional[Path]:
         if urlsplit(raw_url).scheme or raw_url.startswith("/"):
-            return match.group(0)
-
+            return None
         rel = unquote(raw_url.split("#", 1)[0].split("?", 1)[0])
         if not rel:
-            return match.group(0)
-
-        src = (md_dir / rel).resolve()
-        # 逃逸出解压根、不存在、非图片扩展名:不动。
-        if extract_root not in src.parents:
-            return match.group(0)
+            return None
+        src = (base_dir / rel).resolve()
+        if root not in src.parents:
+            return None
         if not src.is_file() or src.suffix.lower() not in _IMAGE_EXTENSIONS:
+            return None
+        return src
+
+    return resolve
+
+
+async def _rewrite_local_images(
+    markdown: str, *, resolve: Callable[[str], Optional[Path]], store: ImageStore
+) -> str:
+    """把能解析到的本地图片交给 store 入库,并把引用改写成 store 返回的 URL。"""
+    replacements: dict[str, str] = {}
+    for raw_url in dict.fromkeys(m.group(2) for m in _MD_IMAGE_RE.finditer(markdown)):
+        src = resolve(raw_url)
+        if src is None:
+            continue
+        data = await asyncio.to_thread(src.read_bytes)
+        new_url = await store(data, src.name)
+        if new_url:
+            replacements[raw_url] = new_url
+    if not replacements:
+        return markdown
+
+    def _sub(match: re.Match[str]) -> str:
+        new_url = replacements.get(match.group(2))
+        if new_url is None:
             return match.group(0)
-
-        rel_to_root = src.relative_to(extract_root)
-        target = media_dir / rel_to_root
-        if not target.exists():
-            target.parent.mkdir(parents=True, exist_ok=True)
-            shutil.copy2(src, target)
-
-        new_url = f"/static/media/{media_id}/{quote(rel_to_root.as_posix())}"
         return f"{match.group(1)}{new_url}{match.group(3)}"
 
     return _MD_IMAGE_RE.sub(_sub, markdown)
 
 
-def extract_archive_and_rewrite(zip_path: Path, *, media_id: str) -> list[tuple[str, str]]:
-    """解压 markdown 归档,落地被引用的本地图片,返回 [(包内 md 相对路径, 重写后 markdown)]。
+async def extract_markdown_archive(zip_path: Path, *, store: ImageStore) -> list[tuple[str, str]]:
+    """解压 markdown 归档,把被引用的本地图片交给 store,返回 [(包内 md 相对路径, 重写后 markdown)]。
 
-    所有 md 共用同一个 media_id(同一 /static/media/{media_id}/ 目录),因此跨 md 引用同一张图
-    会落到同一目标、天然去重。无 md 文件时抛 ValueError。**不做 AI 抽取**,同步/批量入口共用。
+    解压只落在临时 job 目录,返回前即清理。无 md 文件时抛 ValueError。**不做 AI 抽取**,
+    同步/批量入口共用。
     """
-    extract_root = settings.UPLOAD_DIR / media_id / "archive"
-    media_dir = settings.MEDIA_DIR / media_id
-    if extract_root.exists():
-        shutil.rmtree(extract_root)
-    extract_root.mkdir(parents=True, exist_ok=True)
-    media_dir.mkdir(parents=True, exist_ok=True)
+    with storage.job_dir() as extract_root:
+        await asyncio.to_thread(_safe_extract_zip, zip_path, extract_root)
 
-    _safe_extract_zip(zip_path, extract_root)
-
-    md_paths = sorted(
-        (p for p in extract_root.rglob("*") if p.is_file() and p.suffix.lower() == ".md"),
-        key=lambda p: p.relative_to(extract_root).as_posix(),
-    )
-    if not md_paths:
-        raise ValueError("压缩包内未找到 .md 文件")
-
-    results: list[tuple[str, str]] = []
-    for md_path in md_paths:
-        content = md_path.read_text(encoding="utf-8")
-        rewritten = _rewrite_markdown_images(
-            content,
-            md_dir=md_path.parent,
-            extract_root=extract_root,
-            media_dir=media_dir,
-            media_id=media_id,
+        md_paths = sorted(
+            (p for p in extract_root.rglob("*") if p.is_file() and p.suffix.lower() == ".md"),
+            key=lambda p: p.relative_to(extract_root).as_posix(),
         )
-        results.append((md_path.relative_to(extract_root).as_posix(), rewritten))
-    return results
+        if not md_paths:
+            raise ValueError("压缩包内未找到 .md 文件")
+
+        results: list[tuple[str, str]] = []
+        for md_path in md_paths:
+            content = await asyncio.to_thread(md_path.read_text, encoding="utf-8")
+            rewritten = await _rewrite_local_images(
+                content,
+                resolve=_local_image_resolver(md_path.parent, extract_root),
+                store=store,
+            )
+            results.append((md_path.relative_to(extract_root).as_posix(), rewritten))
+        return results
 
 
 class MarkdownArchiveIngestor:
     async def ingest(
-        self, zip_path: Path, *, task_id: Optional[str] = None
+        self,
+        zip_path: Path,
+        *,
+        store: ImageStore,
+        task_id: Optional[str] = None,
+        filename: Optional[str] = None,
     ) -> CanonicalDoc:
-        """同步/单条导入用:解压归档、重写图片路径,把包内所有 md 按路径序拼成一个文档。"""
-        media_id = _ensure_task_id(task_id)
-        parts = await asyncio.to_thread(
-            extract_archive_and_rewrite, zip_path, media_id=media_id
-        )
+        """同步/单条导入用:解压归档、图片入库,把包内所有 md 按路径序拼成一个文档。"""
+        parts = await extract_markdown_archive(zip_path, store=store)
         markdown = "\n\n".join(md for _, md in parts)
-        return CanonicalDoc(task_id=media_id, markdown=markdown, filename=zip_path.name)
+        return CanonicalDoc(
+            task_id=_ensure_task_id(task_id), markdown=markdown, filename=filename or zip_path.name
+        )
 
 
 class MarkdownIngestor:
     async def ingest(
         self, content: str, *, task_id: Optional[str] = None, filename: Optional[str] = None
     ) -> CanonicalDoc:
-        task_id = _ensure_task_id(task_id)
-
-        task_dir = settings.UPLOAD_DIR / task_id
-        task_dir.mkdir(parents=True, exist_ok=True)
-        output_path = task_dir / "content.md"
-        await asyncio.to_thread(output_path.write_text, content, encoding="utf-8")
-
-        return CanonicalDoc(task_id=task_id, markdown=content, filename=filename)
+        return CanonicalDoc(task_id=_ensure_task_id(task_id), markdown=content, filename=filename)
 
 
 # pandoc 转换 Word 公式时，把非 ASCII 希腊字母原样塞进 \text{}；KaTeX 的 text 模式
@@ -202,75 +204,44 @@ def _fix_text_wrapped_greek(content: str) -> str:
 
 
 class DocxIngestor:
-    async def ingest(self, file_path: Path, *, task_id: Optional[str] = None) -> CanonicalDoc:
-        task_id = _ensure_task_id(task_id)
+    async def ingest(
+        self,
+        file_path: Path,
+        *,
+        store: ImageStore,
+        task_id: Optional[str] = None,
+        filename: Optional[str] = None,
+    ) -> CanonicalDoc:
+        """file_path 可以是无扩展名的存储对象,因此显式指定输入格式为 docx。"""
+        with storage.job_dir() as job:
+            try:
+                content = await asyncio.to_thread(
+                    pypandoc.convert_file,
+                    glob.escape(str(file_path.resolve())),
+                    # 只保留 pipe 表格(禁用 grid/multiline/simple):下游 markdown-it 仅解析 pipe 表格。
+                    "markdown-grid_tables-multiline_tables-simple_tables",
+                    format="docx",
+                    # 在 job 目录内以相对路径抽取媒体,引用形如 media/image1.png,避免路径含空格被转义。
+                    # --wrap=none:避免 pandoc 把表格行硬换行,破坏 pipe 表格结构。
+                    extra_args=["--extract-media=.", "--mathml", "--wrap=none"],
+                    cworkdir=str(job),
+                )
+            except Exception as e:
+                raise RuntimeError(f"Pandoc conversion failed: {e}") from e
 
-        task_dir = settings.UPLOAD_DIR / task_id
-        media_dir = settings.MEDIA_DIR / task_id
-        task_dir.mkdir(parents=True, exist_ok=True)
-        media_dir.mkdir(parents=True, exist_ok=True)
-        output_path = task_dir / "content.md"
-
-        try:
-            await asyncio.to_thread(
-                pypandoc.convert_file,
-                glob.escape(str(file_path.resolve())),
-                # 只保留 pipe 表格(禁用 grid/multiline/simple):下游 markdown-it 仅解析 pipe 表格。
-                "markdown-grid_tables-multiline_tables-simple_tables",
-                outputfile=str(output_path),
-                # --wrap=none:避免 pandoc 把表格行硬换行,破坏 pipe 表格结构。
-                extra_args=[f"--extract-media={str(task_dir)}", "--mathml", "--wrap=none"],
+            content = await _rewrite_local_images(
+                content, resolve=_local_image_resolver(job, job), store=store
             )
-        except Exception as e:
-            raise RuntimeError(f"Pandoc conversion failed: {e}") from e
 
-        if not output_path.exists():
-            raise RuntimeError("Conversion output file not found")
-
-        content = await asyncio.to_thread(output_path.read_text, encoding="utf-8")
-
-        def handle_media_and_update_content(content_str: str) -> str:
-            generated_media_folder = task_dir / "media"
-            if generated_media_folder.exists():
-                for item in generated_media_folder.iterdir():
-                    if item.is_file():
-                        shutil.move(str(item), str(media_dir / item.name))
-
-                shutil.rmtree(str(generated_media_folder))
-
-                pandoc_media_prefix = f"{str(task_dir)}/media/"
-                public_media_url = f"/static/media/{task_id}/"
-                content_str = content_str.replace(pandoc_media_prefix, public_media_url)
-
-            content_str = _fix_text_wrapped_greek(content_str)
-            output_path.write_text(content_str, encoding="utf-8")
-            return content_str
-
-        content = await asyncio.to_thread(handle_media_and_update_content, content)
-
-        return CanonicalDoc(task_id=task_id, markdown=content, filename=file_path.name)
+        return CanonicalDoc(
+            task_id=_ensure_task_id(task_id),
+            markdown=_fix_text_wrapped_greek(content),
+            filename=filename or file_path.name,
+        )
 
 
 class ImageIngestor:
     async def ingest(self, image_file: BinaryIO, *, task_id: Optional[str] = None) -> CanonicalDoc:
-        task_id = _ensure_task_id(task_id)
-
-        media_dir = settings.MEDIA_DIR / task_id
-        media_dir.mkdir(parents=True, exist_ok=True)
-
-        image_filename = "uploaded_image.png"
-        image_path = media_dir / image_filename
-
+        """识别用图片只送给视觉模型,不落盘。"""
         image_data = await asyncio.to_thread(image_file.read)
-
-        def save_image():
-            with open(image_path, "wb") as f:
-                f.write(image_data)
-
-        await asyncio.to_thread(save_image)
-
-        return CanonicalDoc(
-            task_id=task_id,
-            image_data=image_data,
-            image_url=f"/static/media/{task_id}/{image_filename}",
-        )
+        return CanonicalDoc(task_id=_ensure_task_id(task_id), image_data=image_data)

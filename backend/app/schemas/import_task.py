@@ -1,7 +1,7 @@
 from pydantic import BaseModel, Field, computed_field
 from typing import Optional
 from datetime import datetime
-from app.core.file_paths import import_source_file
+from app.core.file_paths import task_source_file
 from app.models.import_task import ImportTaskStatus
 
 class ImportTaskBase(BaseModel):
@@ -28,11 +28,12 @@ class ImportTask(ImportTaskBase):
     result_summary: Optional[str] = None
     # 服务器路径不外露;只告诉前端能否"查看源文件"。
     file_path: Optional[str] = Field(default=None, exclude=True)
+    source_sha256: Optional[str] = Field(default=None, exclude=True)
 
     @computed_field
     @property
     def has_source(self) -> bool:
-        return import_source_file(self.file_path) is not None
+        return task_source_file(self.file_path, self.source_sha256) is not None
 
     class Config:
         from_attributes = True

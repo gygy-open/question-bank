@@ -21,7 +21,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app import schemas
-from app.core.file_paths import sanitize_client_source_path
+from app.core.file_paths import VIRTUAL_SOURCE
 from app.models.composition import ScopeType
 from app.models.import_task import (
     CompositionImportState,
@@ -572,7 +572,7 @@ async def commit_paper_import(
     proceed_with_partial: bool = False,
     default_status: QuestionStatus = QuestionStatus.PENDING,
     filename: Optional[str] = None,
-    file_path: Optional[str] = None,
+    source_sha256: Optional[str] = None,
     content_sha256: Optional[str] = None,
     idempotency_key: Optional[str] = None,
     import_task: Optional[ImportTask] = None,
@@ -652,7 +652,8 @@ async def commit_paper_import(
             user_id=actor.id,
             description=filename or f"整卷导入 {len(plans)} 道题目",
             source="paper_import",
-            file_path=sanitize_client_source_path(file_path),
+            file_path=VIRTUAL_SOURCE,
+            source_sha256=source_sha256,
             original_filename=filename or "paper_import.json",
             file_type="json",
             status=ImportTaskStatus.COMPLETED,
@@ -838,7 +839,6 @@ async def commit_extracted_paper_import(
         proceed_with_partial=True,
         default_status=QuestionStatus.PENDING,
         filename=import_task.original_filename,
-        file_path=import_task.file_path,
         import_task=import_task,
     )
 

@@ -26,6 +26,8 @@ class ImportTask(Base):
     
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(Integer, ForeignKey('user.id'), nullable=True)
+    # 批量导入在创建时确定学科;抽取出的图片与题目都归属该学科。
+    subject_id = Column(Integer, ForeignKey('subjects.id'), nullable=True)
     description = Column(String(255), nullable=True)
     source = Column(String(50), default="manual")
     

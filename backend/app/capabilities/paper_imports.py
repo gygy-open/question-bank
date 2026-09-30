@@ -14,6 +14,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy.exc import IntegrityError
 
 from app import crud
+from app.core import storage
 from app.core.permissions import Permission
 from app.models.composition import ScopeType
 from app.models.question import QuestionStatus
@@ -53,7 +54,7 @@ class PaperImportCommitInput(PaperImportScopeInput):
     proceed_with_partial: bool = False
     status: QuestionStatus = QuestionStatus.PENDING
     filename: Optional[str] = None
-    file_path: Optional[str] = None
+    source_ref: Optional[str] = None
     content_sha256: Optional[str] = None
     idempotency_key: Optional[str] = None
 
@@ -115,7 +116,12 @@ class CommitPaperImport(Capability[PaperImportCommitInput, PaperImportCommitResp
         self, ctx: ExecutionContext, inp: PaperImportCommitInput, target: Any
     ) -> PaperImportCommitResponse:
         from app.services import paper_import_service
+        from app.services.importing.media import verify_source_ref
         from app.services.paper_import_service import PaperImportError
+
+        source_sha256 = verify_source_ref(inp.source_ref, ctx.actor.id)
+        if source_sha256 is not None and not storage.exists(source_sha256):
+            source_sha256 = None
 
         try:
             result = await paper_import_service.commit_paper_import(
@@ -135,7 +141,7 @@ class CommitPaperImport(Capability[PaperImportCommitInput, PaperImportCommitResp
                 proceed_with_partial=inp.proceed_with_partial,
                 default_status=inp.status,
                 filename=inp.filename,
-                file_path=inp.file_path,
+                source_sha256=source_sha256,
                 content_sha256=inp.content_sha256,
                 idempotency_key=inp.idempotency_key,
             )

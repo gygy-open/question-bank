@@ -34,6 +34,9 @@ Node = dict[str, Any]
 RichDoc = Optional[dict[str, Any]]
 AnswerSpec = dict[str, Any]
 
+# 导入时入库的图片以 media_service.content_url() 的形式出现在 markdown 里;转成 RichDoc 时补上 assetId。
+_ASSET_CONTENT_URL_RE = re.compile(r"/api/v1/media/([1-9][0-9]*)/content")
+
 _MD_PARSER = (
     MarkdownIt("commonmark", {"html": True})
     .enable("strikethrough")
@@ -305,6 +308,9 @@ def _image(node: SyntaxTreeNode) -> Node:
         c.content for c in node.children if c.type == "text"
     ) or node.content or ""
     image_attrs: dict[str, Any] = {"src": src, "alt": str(alt)}
+    asset_match = _ASSET_CONTENT_URL_RE.fullmatch(src)
+    if asset_match:
+        image_attrs["assetId"] = int(asset_match.group(1))
     title = attrs.get("title")
     if title:
         image_attrs["title"] = str(title)

@@ -4,6 +4,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Optional, Union
 
+from app.core import storage
 from app.core.config import settings
 
 VIRTUAL_SOURCE = "virtual"
@@ -32,6 +33,13 @@ def import_source_file(file_path: Optional[str]) -> Optional[Path]:
         return None
     resolved = resolve_within(settings.UPLOAD_DIR, file_path)
     return resolved if resolved is not None and resolved.is_file() else None
+
+
+def task_source_file(file_path: Optional[str], source_sha256: Optional[str]) -> Optional[Path]:
+    """导入任务的源文件:优先取对象存储,其次是历史 UPLOAD_DIR 路径。"""
+    if source_sha256 and storage.exists(source_sha256):
+        return storage.object_path(source_sha256)
+    return import_source_file(file_path)
 
 
 def sanitize_client_source_path(file_path: Optional[str]) -> str:
