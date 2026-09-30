@@ -9,7 +9,7 @@ from app.core import storage
 from app.core.permissions import Permission
 from app.crud.crud_subject import subject as crud_subject
 from app.models.media_asset import MediaPurpose
-from app.schemas.media import MediaAssetPage, MediaAssetRead, MediaReferences
+from app.schemas.media import MediaAssetPage, MediaAssetRead, MediaAssetUpdate, MediaReferences
 from app.services import media_library, media_service
 
 router = APIRouter()
@@ -94,6 +94,25 @@ async def read_media(
     return await media_service.get_readable(db, asset_id, current_user)
 
 
+@router.patch("/{asset_id}", response_model=MediaAssetRead)
+async def update_media(
+    asset_id: int,
+    payload: MediaAssetUpdate,
+    db: deps.SessionDep,
+    current_user: models.User = Depends(deps.get_current_active_user),
+) -> Any:
+    return await media_library.update_asset(db, asset_id, current_user, payload)
+
+
+@router.delete("/{asset_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_media(
+    asset_id: int,
+    db: deps.SessionDep,
+    current_user: models.User = Depends(deps.get_current_active_user),
+) -> None:
+    await media_library.delete_asset(db, asset_id, current_user)
+
+
 @router.get("/{asset_id}/references", response_model=MediaReferences)
 async def read_media_references(
     asset_id: int,
@@ -108,6 +127,7 @@ async def read_media_references(
 async def read_media_content(
     asset_id: int,
     db: deps.SessionDep,
+    download: bool = False,
     current_user: models.User = Depends(deps.get_current_active_user_header_or_cookie),
 ) -> FileResponse:
     asset = await media_service.get_readable(db, asset_id, current_user)
@@ -119,7 +139,7 @@ async def read_media_content(
         path,
         media_type=asset.mime,
         filename=filename,
-        content_disposition_type="inline",
+        content_disposition_type="attachment" if download else "inline",
         headers={
             "Cache-Control": "private, max-age=31536000, immutable",
             "X-Content-Type-Options": "nosniff",

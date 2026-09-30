@@ -8,6 +8,30 @@ export interface MediaAsset {
     height?: number | null
     displayable: boolean
     original_filename?: string | null
+    alt?: string | null
+    source?: string | null
+    owner_user_id?: number | null
+}
+
+export interface MediaReferenceItem {
+    owner_type: string
+    owner_id: number
+    title: string
+    deleted: boolean
+    composition_id?: number | null
+    scope?: string | null
+    version_no?: number | null
+}
+
+export interface MediaReferences {
+    items: MediaReferenceItem[]
+    hidden_count: number
+}
+
+export interface MediaAssetUpdate {
+    original_filename?: string | null
+    alt?: string | null
+    source?: string | null
 }
 
 export type UserMediaPurpose = 'avatar' | 'chat'
@@ -28,6 +52,7 @@ export interface MediaAssetPage {
 export interface MediaListQuery {
     q?: string
     used?: boolean
+    uploader_id?: number
     sort?: 'newest' | 'oldest' | 'name' | 'size'
     page?: number
     size?: number
@@ -68,5 +93,17 @@ export function useMedia() {
         return await $api<MediaAssetPage>(`/subjects/${subjectId}/media`, { query: { kind: 'image', ...query } })
     }
 
-    return { uploadContentImage, uploadUserMedia, listSubjectMedia }
+    async function updateMedia(id: number, changes: MediaAssetUpdate): Promise<MediaAsset> {
+        return await $api<MediaAsset>(`/media/${id}`, { method: 'PATCH', body: changes })
+    }
+
+    async function deleteMedia(id: number): Promise<void> {
+        await $api(`/media/${id}`, { method: 'DELETE' })
+    }
+
+    async function getMediaReferences(id: number): Promise<MediaReferences> {
+        return await $api<MediaReferences>(`/media/${id}/references`)
+    }
+
+    return { uploadContentImage, uploadUserMedia, listSubjectMedia, updateMedia, deleteMedia, getMediaReferences }
 }

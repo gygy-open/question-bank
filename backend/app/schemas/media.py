@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import List, Optional
 
-from pydantic import BaseModel, ConfigDict, computed_field
+from pydantic import BaseModel, ConfigDict, Field, computed_field
 
 from app.services import media_service
 
@@ -38,6 +38,12 @@ class MediaAssetRead(BaseModel):
 
 class MediaAssetListItem(MediaAssetRead):
     usage_count: int = 0
+
+
+class MediaAssetUpdate(BaseModel):
+    original_filename: Optional[str] = Field(default=None, max_length=255)
+    alt: Optional[str] = Field(default=None, max_length=500)
+    source: Optional[str] = Field(default=None, max_length=255)
 
 
 class MediaAssetPage(BaseModel):

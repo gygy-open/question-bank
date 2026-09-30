@@ -1,11 +1,13 @@
 """媒体库读侧:学科资产列表(含引用计数)与"被引用于"明细。"""
 from __future__ import annotations
 
+from datetime import datetime
 from typing import Literal, Optional
 
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.capabilities.errors import Conflict, Forbidden
 from app.core import permissions
 from app.core.permissions import Permission
 from app.crud.crud_question import is_question_visible
@@ -14,12 +16,53 @@ from app.models.media_asset import MediaAsset, MediaOwnerType, MediaPurpose, Med
 from app.models.question import Question, QuestionVisibility
 from app.models.stimulus import Stimulus
 from app.models.user import User
-from app.schemas.media import MediaAssetListItem, MediaAssetPage, MediaReferenceItem, MediaReferences
+from app.schemas.media import (
+    MediaAssetListItem,
+    MediaAssetPage,
+    MediaAssetUpdate,
+    MediaReferenceItem,
+    MediaReferences,
+)
+from app.services import media_service
 from app.services.question_content import parse_json_field
 
 MediaSort = Literal["newest", "oldest", "name", "size"]
 
 _TITLE_LEN = 60
+
+
+async def _editable_asset(db: AsyncSession, asset_id: int, actor: User) -> MediaAsset:
+    asset = await media_service.get_readable(db, asset_id, actor)
+    if asset.purpose == MediaPurpose.CONTENT.value:
+        allowed = permissions.can(actor, Permission.EDIT_QUESTION, subject_id=asset.subject_id)
+    else:
+        allowed = actor.is_superuser or asset.owner_user_id == actor.id
+    if not allowed:
+        raise Forbidden("没有编辑该图片的权限")
+    return asset
+
+
+async def update_asset(db: AsyncSession, asset_id: int, actor: User, changes: MediaAssetUpdate) -> MediaAsset:
+    asset = await _editable_asset(db, asset_id, actor)
+    for name, value in changes.model_dump(exclude_unset=True).items():
+        # 空字符串视为清空。
+        setattr(asset, name, (value or "").strip() or None)
+    await db.commit()
+    await db.refresh(asset)
+    return asset
+
+
+async def delete_asset(db: AsyncSession, asset_id: int, actor: User) -> None:
+    """软删除未被引用的资产;文件由回收任务在宽限期后清理,期间重新上传同一文件会恢复。"""
+    asset = await _editable_asset(db, asset_id, actor)
+    in_use = await db.scalar(
+        select(func.count(MediaReference.id)).where(MediaReference.asset_id == asset.id)
+    )
+    if in_use:
+        raise Conflict(f"图片仍被 {in_use} 处内容引用，不能删除")
+    if asset.deleted_at is None:
+        asset.deleted_at = datetime.utcnow()
+        await db.commit()
 
 
 async def list_subject_media(

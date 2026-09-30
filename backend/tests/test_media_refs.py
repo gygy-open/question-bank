@@ -218,3 +218,30 @@ async def test_references_hide_what_viewer_cannot_see(client, ctx):
     assert body["hidden_count"] == 1
 
     assert (await client.get(f"{API}/media/{a}/references", headers=_auth(ctx["outsider"]))).status_code == 404
+
+
+async def test_update_and_delete_media(client, ctx):
+    sid = ctx["subject"].id
+    used = await _asset(client, ctx["editor"], sid, "red")
+    unused = await _asset(client, ctx["editor"], sid, "blue")
+    await _create_question(client, ctx["editor"], sid, _doc_with_image(used))
+
+    patched = await client.patch(
+        f"{API}/media/{unused}", json={"original_filename": " 地图.png ", "alt": ""}, headers=_auth(ctx["editor"])
+    )
+    assert patched.status_code == 200, patched.text
+    assert patched.json()["original_filename"] == "地图.png" and patched.json()["alt"] is None
+    assert (await client.patch(f"{API}/media/{unused}", json={"alt": "x"}, headers=_auth(ctx["viewer"]))).status_code == 403
+
+    in_use = await client.delete(f"{API}/media/{used}", headers=_auth(ctx["editor"]))
+    assert in_use.status_code == 409
+    assert (await client.delete(f"{API}/media/{unused}", headers=_auth(ctx["viewer"]))).status_code == 403
+    assert (await client.delete(f"{API}/media/{unused}", headers=_auth(ctx["editor"]))).status_code == 204
+
+    listed = (await client.get(f"{API}/subjects/{sid}/media", headers=_auth(ctx["editor"]))).json()
+    assert [item["id"] for item in listed["items"]] == [used]
+    # 重新上传同一文件会恢复原资产。
+    assert await _asset(client, ctx["editor"], sid, "blue") == unused
+
+    download = await client.get(f"{API}/media/{used}/content?download=true", headers=_auth(ctx["viewer"]))
+    assert download.headers["content-disposition"].startswith("attachment")
