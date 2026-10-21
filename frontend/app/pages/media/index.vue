@@ -1,16 +1,19 @@
 <script setup lang="ts">
 import { computed, onActivated, ref, watch } from 'vue'
-import { AlertCircle, ChevronLeft, ChevronRight, ImageOff, LayoutGrid, List, Loader2, RotateCw, Upload } from '@lucide/vue'
+import { AlertCircle, ChevronLeft, ChevronRight, Download, ImageOff, LayoutGrid, List, Loader2, RotateCw, Tag, Trash2, Upload, X } from '@lucide/vue'
 import { toast } from 'vue-sonner'
 import PageHeader from '@/components/PageHeader.vue'
 import ClearableInput from '@/components/ClearableInput.vue'
 import ClearableSelect from '@/components/ClearableSelect.vue'
 import MediaDetailSheet from '@/components/media/MediaDetailSheet.vue'
 import { Button } from '@/components/ui/button'
+import { Checkbox } from '@/components/ui/checkbox'
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
-import { useMedia, type MediaAssetListItem, type MediaListQuery } from '@/composables/useMedia'
+import { useMedia, useMediaBatch, type MediaAssetListItem, type MediaListQuery } from '@/composables/useMedia'
 import { getApiErrorDetail } from '@/lib/apiErrors'
 import { formatBytes } from '@/lib/mediaLibrary'
 
@@ -20,6 +23,7 @@ const { currentSubjectId } = useSubjectContext()
 const { can } = usePermissions()
 const canEdit = computed(() => can(Capability.EDIT_QUESTION, currentSubjectId.value))
 const { listSubjectMedia, uploadContentImage } = useMedia()
+const { batchDelete, batchUpdateSource, archiveUrl } = useMediaBatch()
 
 const view = ref<'grid' | 'list'>('grid')
 const keyword = ref('')
@@ -36,6 +40,58 @@ const dragOver = ref(false)
 const fileInputRef = ref<HTMLInputElement | null>(null)
 const selected = ref<MediaAssetListItem | null>(null)
 const detailOpen = ref(false)
+// 批量选择只在当前页内有效，翻页或重新加载时清空。
+const checked = ref(new Set<number>())
+const batchBusy = ref(false)
+const sourceDialogOpen = ref(false)
+const batchSource = ref('')
+const allChecked = computed(() => items.value.length > 0 && items.value.every(item => checked.value.has(item.id)))
+
+function toggleChecked(id: number, value: boolean | 'indeterminate') {
+    const next = new Set(checked.value)
+    if (value === true) next.add(id)
+    else next.delete(id)
+    checked.value = next
+}
+
+function toggleAll(value: boolean | 'indeterminate') {
+    checked.value = value === true ? new Set(items.value.map(item => item.id)) : new Set()
+}
+
+async function runBatch(action: () => Promise<{ affected: number; skipped: number }>, verb: string, skipReason: string) {
+    batchBusy.value = true
+    try {
+        const { affected, skipped } = await action()
+        toast.success(skipped ? `已${verb} ${affected} 张，${skipped} 张${skipReason}` : `已${verb} ${affected} 张`)
+        await load()
+    } catch (error) {
+        toast.error(getApiErrorDetail(error, `${verb}失败`))
+    } finally {
+        batchBusy.value = false
+    }
+}
+
+function deleteChecked() {
+    const sid = currentSubjectId.value
+    if (!sid || !confirm(`删除所选 ${checked.value.size} 张图片中未被使用的？仍被引用的会保留。`)) return
+    runBatch(() => batchDelete(sid, [...checked.value]), '删除', '仍被使用已保留')
+}
+
+async function saveBatchSource() {
+    const sid = currentSubjectId.value
+    if (!sid) return
+    sourceDialogOpen.value = false
+    await runBatch(() => batchUpdateSource(sid, [...checked.value], batchSource.value.trim() || null), '更新', '未更新')
+}
+
+function downloadChecked() {
+    const sid = currentSubjectId.value
+    if (!sid) return
+    const link = document.createElement('a')
+    link.href = archiveUrl(sid, [...checked.value])
+    link.download = ''
+    link.click()
+}
 
 const pages = computed(() => Math.max(1, Math.ceil(total.value / PAGE_SIZE)))
 const hasFilters = computed(() => !!keyword.value.trim() || (!!usage.value && usage.value !== '0'))
@@ -67,6 +123,7 @@ async function load() {
         })
         items.value = res.items
         total.value = res.total
+        checked.value = new Set()
     } catch {
         failed.value = true
     } finally {
@@ -108,6 +165,7 @@ function onUpdated(asset: MediaAssetListItem) {
 function onDeleted(id: number) {
     items.value = items.value.filter((item) => item.id !== id)
     total.value = Math.max(0, total.value - 1)
+    toggleChecked(id, false)
     if (items.value.length === 0 && page.value > 1) page.value--
 }
 
@@ -214,29 +272,38 @@ function usageLabel(count: number) {
         </div>
 
         <div v-else-if="view === 'grid'" class="grid grid-cols-2 gap-4 sm:grid-cols-4 lg:grid-cols-6">
-            <button
-                v-for="item in items"
-                :key="item.id"
-                type="button"
-                class="flex flex-col gap-1.5 rounded-md border p-2 text-left transition-colors hover:border-primary focus-visible:outline-2 focus-visible:outline-primary"
-                @click="openDetail(item)"
-            >
-                <div class="flex aspect-square items-center justify-center overflow-hidden rounded bg-muted">
-                    <img v-if="item.displayable" :src="item.url" :alt="item.alt || item.original_filename || ''" loading="lazy" class="max-h-full max-w-full object-contain" />
-                    <ImageOff v-else class="size-6 text-muted-foreground" />
-                </div>
-                <span class="truncate text-sm">{{ item.original_filename || `图片 #${item.id}` }}</span>
-                <span class="flex flex-wrap gap-x-2 text-xs">
-                    <span :class="item.usage_count ? 'text-muted-foreground' : 'text-muted-foreground/60'">{{ usageLabel(item.usage_count) }}</span>
-                    <span v-if="!item.displayable" class="text-amber-600">无法预览</span>
-                    <span v-else-if="!item.alt" class="text-muted-foreground/60">缺 alt</span>
-                </span>
-            </button>
+            <div v-for="item in items" :key="item.id" class="group relative">
+                <button
+                    type="button"
+                    class="flex w-full flex-col gap-1.5 rounded-md border p-2 text-left transition-colors hover:border-primary focus-visible:outline-2 focus-visible:outline-primary"
+                    :class="checked.has(item.id) ? 'border-primary' : ''"
+                    @click="openDetail(item)"
+                >
+                    <div class="flex aspect-square items-center justify-center overflow-hidden rounded bg-muted">
+                        <img v-if="item.displayable" :src="item.url" :alt="item.alt || item.original_filename || ''" loading="lazy" class="max-h-full max-w-full object-contain" />
+                        <ImageOff v-else class="size-6 text-muted-foreground" />
+                    </div>
+                    <span class="truncate text-sm">{{ item.original_filename || `图片 #${item.id}` }}</span>
+                    <span class="flex flex-wrap gap-x-2 text-xs">
+                        <span :class="item.usage_count ? 'text-muted-foreground' : 'text-muted-foreground/60'">{{ usageLabel(item.usage_count) }}</span>
+                        <span v-if="!item.displayable" class="text-amber-600">无法预览</span>
+                        <span v-else-if="!item.alt" class="text-muted-foreground/60">缺 alt</span>
+                    </span>
+                </button>
+                <Checkbox
+                    class="absolute left-3 top-3 bg-background transition-opacity"
+                    :class="checked.size ? 'opacity-100' : 'opacity-0 group-hover:opacity-100 focus-visible:opacity-100'"
+                    :model-value="checked.has(item.id)"
+                    :aria-label="`选择 ${item.original_filename || `图片 #${item.id}`}`"
+                    @update:model-value="(v) => toggleChecked(item.id, v)"
+                />
+            </div>
         </div>
 
         <table v-else class="w-full text-sm">
             <thead class="border-b text-left text-xs text-muted-foreground">
                 <tr>
+                    <th class="w-8 py-2 font-normal"><Checkbox :model-value="allChecked" aria-label="全选本页" @update:model-value="toggleAll" /></th>
                     <th class="w-16 py-2 font-normal">预览</th>
                     <th class="py-2 font-normal">名称</th>
                     <th class="hidden py-2 font-normal sm:table-cell">格式</th>
@@ -248,6 +315,9 @@ function usageLabel(count: number) {
             </thead>
             <tbody>
                 <tr v-for="item in items" :key="item.id" class="cursor-pointer border-b hover:bg-muted/50" tabindex="0" @click="openDetail(item)" @keydown.enter="openDetail(item)">
+                    <td class="py-1.5" @click.stop>
+                        <Checkbox :model-value="checked.has(item.id)" :aria-label="`选择 ${item.original_filename || `图片 #${item.id}`}`" @update:model-value="(v) => toggleChecked(item.id, v)" />
+                    </td>
                     <td class="py-1.5">
                         <div class="flex size-12 items-center justify-center overflow-hidden rounded bg-muted">
                             <img v-if="item.displayable" :src="item.url" :alt="item.alt || item.original_filename || ''" loading="lazy" class="max-h-full max-w-full object-contain" />
@@ -264,6 +334,19 @@ function usageLabel(count: number) {
             </tbody>
         </table>
 
+        <div v-if="checked.size" class="sticky bottom-4 z-10 flex flex-wrap items-center gap-2 rounded-md border bg-background p-2 shadow-md">
+            <span class="px-2 text-sm">已选 {{ checked.size }} 张</span>
+            <Button variant="ghost" size="sm" @click="toggleAll(!allChecked)">{{ allChecked ? '取消全选' : '全选本页' }}</Button>
+            <div class="ml-auto flex flex-wrap gap-2">
+                <Button variant="outline" size="sm" @click="downloadChecked"><Download class="mr-2 size-4" />下载</Button>
+                <template v-if="canEdit">
+                    <Button variant="outline" size="sm" :disabled="batchBusy" @click="batchSource = ''; sourceDialogOpen = true"><Tag class="mr-2 size-4" />设置来源</Button>
+                    <Button variant="outline" size="sm" class="text-destructive" :disabled="batchBusy" @click="deleteChecked"><Trash2 class="mr-2 size-4" />删除未使用</Button>
+                </template>
+                <Button variant="ghost" size="icon" title="清除选择" aria-label="清除选择" @click="toggleAll(false)"><X class="size-4" /></Button>
+            </div>
+        </div>
+
         <div v-if="total > 0" class="flex flex-wrap items-center justify-between gap-3 text-sm text-muted-foreground">
             <span>共 {{ total }} 张图片</span>
             <div class="flex items-center gap-2">
@@ -275,4 +358,20 @@ function usageLabel(count: number) {
     </main>
 
     <MediaDetailSheet v-model:open="detailOpen" :asset="selected" :can-edit="canEdit" @updated="onUpdated" @deleted="onDeleted" @replaced="load" />
+
+    <Dialog v-model:open="sourceDialogOpen">
+        <DialogContent class="sm:max-w-md">
+            <DialogHeader><DialogTitle>设置来源 / 版权</DialogTitle></DialogHeader>
+            <form class="space-y-4" @submit.prevent="saveBatchSource">
+                <div class="space-y-1.5">
+                    <Label for="batch-source">应用到所选 {{ checked.size }} 张图片；留空则清除来源</Label>
+                    <Input id="batch-source" v-model="batchSource" maxlength="255" />
+                </div>
+                <DialogFooter>
+                    <Button type="button" variant="outline" @click="sourceDialogOpen = false">取消</Button>
+                    <Button type="submit">保存</Button>
+                </DialogFooter>
+            </form>
+        </DialogContent>
+    </Dialog>
 </template>

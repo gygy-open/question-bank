@@ -63,6 +63,23 @@ class MediaReplaceResult(BaseModel):
     frozen: int = 0
 
 
+class MediaBatchIds(BaseModel):
+    ids: List[int] = Field(min_length=1, max_length=100)
+
+
+class MediaBatchSourceUpdate(MediaBatchIds):
+    source: Optional[str] = Field(default=None, max_length=255)
+
+
+class MediaBatchResult(BaseModel):
+    affected: int
+    skipped: int = 0
+
+
+class MediaCopyRequest(BaseModel):
+    subject_id: int
+
+
 class MediaAssetPage(BaseModel):
     items: List[MediaAssetListItem]
     total: int

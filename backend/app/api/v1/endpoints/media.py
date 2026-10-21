@@ -1,7 +1,7 @@
-from typing import Any, Literal, Optional
+from typing import Any, Iterator, List, Literal, Optional
 
 from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile, status
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, StreamingResponse
 
 from app import models
 from app.api import deps
@@ -13,6 +13,10 @@ from app.schemas.media import (
     MediaAssetPage,
     MediaAssetRead,
     MediaAssetUpdate,
+    MediaBatchIds,
+    MediaBatchResult,
+    MediaBatchSourceUpdate,
+    MediaCopyRequest,
     MediaReferences,
     MediaReplaceRequest,
     MediaReplaceResult,
@@ -74,6 +78,53 @@ async def list_subject_media(
     )
 
 
+@subject_router.post("/{subject_id}/media/batch-delete", response_model=MediaBatchResult)
+async def batch_delete_subject_media(
+    subject_id: int,
+    payload: MediaBatchIds,
+    db: deps.SessionDep,
+    current_user: models.User = Depends(deps.get_current_active_user),
+) -> Any:
+    deps.require(current_user, Permission.EDIT_QUESTION, subject_id=subject_id)
+    return await media_library.batch_delete(db, subject_id, payload.ids)
+
+
+@subject_router.post("/{subject_id}/media/batch-update", response_model=MediaBatchResult)
+async def batch_update_subject_media(
+    subject_id: int,
+    payload: MediaBatchSourceUpdate,
+    db: deps.SessionDep,
+    current_user: models.User = Depends(deps.get_current_active_user),
+) -> Any:
+    deps.require(current_user, Permission.EDIT_QUESTION, subject_id=subject_id)
+    return await media_library.batch_update_source(db, subject_id, payload.ids, payload.source)
+
+
+@subject_router.get("/{subject_id}/media/archive")
+async def download_subject_media_archive(
+    subject_id: int,
+    db: deps.SessionDep,
+    ids: List[int] = Query(..., min_length=1, max_length=100),
+    current_user: models.User = Depends(deps.get_current_active_user_header_or_cookie),
+) -> StreamingResponse:
+    deps.require(current_user, Permission.VIEW_QUESTION, subject_id=subject_id)
+    spool = await media_library.archive_assets(db, subject_id, ids)
+
+    def chunks() -> Iterator[bytes]:
+        with spool:
+            while chunk := spool.read(1024 * 1024):
+                yield chunk
+
+    return StreamingResponse(
+        chunks(),
+        media_type="application/zip",
+        headers={
+            "Content-Disposition": f'attachment; filename="media-{subject_id}.zip"',
+            "X-Content-Type-Options": "nosniff",
+        },
+    )
+
+
 @router.post("/me", response_model=MediaAssetRead, status_code=status.HTTP_201_CREATED)
 async def upload_personal_media(
     db: deps.SessionDep,
@@ -128,6 +179,18 @@ async def replace_media(
     current_user: models.User = Depends(deps.get_current_active_user),
 ) -> Any:
     return await media_replace.replace_asset(db, asset_id, current_user, payload)
+
+
+@router.post("/{asset_id}/copy", response_model=MediaAssetRead, status_code=status.HTTP_201_CREATED)
+async def copy_media_to_subject(
+    asset_id: int,
+    payload: MediaCopyRequest,
+    db: deps.SessionDep,
+    current_user: models.User = Depends(deps.get_current_active_user),
+) -> Any:
+    if await crud_subject.get(db, id=payload.subject_id) is None:
+        raise HTTPException(status_code=404, detail="Subject not found")
+    return await media_library.copy_to_subject(db, asset_id, payload.subject_id, current_user)
 
 
 @router.get("/{asset_id}/references", response_model=MediaReferences)

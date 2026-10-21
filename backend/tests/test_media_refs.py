@@ -1,6 +1,7 @@
 """媒体引用索引:写路径同步 media_references、跨学科/不存在资产拒绝、列表计数与"被引用于"。"""
 import io
 import uuid
+import zipfile
 
 import pytest
 from PIL import Image
@@ -298,3 +299,48 @@ async def test_replace_rewrites_editable_refs_and_keeps_versions(client, ctx, db
     )
     pinned, current = rows.one()
     assert pinned == current
+
+
+async def test_batch_delete_update_and_archive(client, ctx):
+    sid = ctx["subject"].id
+    h = _auth(ctx["editor"])
+    used = await _asset(client, ctx["editor"], sid, "red")
+    unused = await _asset(client, ctx["editor"], sid, "blue")
+    foreign = await _asset(client, ctx["editor"], ctx["other_subject"].id, "green")
+    await _create_question(client, ctx["editor"], sid, _doc_with_image(used))
+    base = f"{API}/subjects/{sid}/media"
+
+    updated = await client.post(f"{base}/batch-update", json={"ids": [used, unused, foreign], "source": " 课本 "}, headers=h)
+    assert updated.json() == {"affected": 2, "skipped": 1}
+    sources = {i["id"]: i["source"] for i in (await client.get(base, headers=h)).json()["items"]}
+    assert sources == {used: "课本", unused: "课本"}
+    assert (await client.post(f"{base}/batch-update", json={"ids": [used]}, headers=_auth(ctx["viewer"]))).status_code == 403
+
+    archive = await client.get(f"{base}/archive", params=[("ids", used), ("ids", unused), ("ids", foreign)], headers=_auth(ctx["viewer"]))
+    assert archive.status_code == 200, archive.text
+    with zipfile.ZipFile(io.BytesIO(archive.content)) as zf:
+        assert sorted(zf.namelist()) == sorted([f"{used}-red.png", f"{unused}-blue.png"])
+    assert (await client.get(f"{base}/archive", params={"ids": foreign}, headers=h)).status_code == 404
+
+    deleted = await client.post(f"{base}/batch-delete", json={"ids": [used, unused, foreign]}, headers=h)
+    assert deleted.json() == {"affected": 1, "skipped": 2}
+    assert [i["id"] for i in (await client.get(base, headers=h)).json()["items"]] == [used]
+
+
+async def test_copy_to_another_subject_shares_file(client, ctx, db_session, grant_role):
+    sid, other = ctx["subject"].id, ctx["other_subject"].id
+    source = await _asset(client, ctx["editor"], sid, "red")
+    await client.patch(f"{API}/media/{source}", json={"alt": "细胞"}, headers=_auth(ctx["editor"]))
+
+    copied = await client.post(f"{API}/media/{source}/copy", json={"subject_id": other}, headers=_auth(ctx["editor"]))
+    assert copied.status_code == 201, copied.text
+    body = copied.json()
+    assert body["id"] != source and (body["subject_id"], body["alt"]) == (other, "细胞")
+    # 目标学科已有同一文件时复用,不重复建资产。
+    again = await client.post(f"{API}/media/{source}/copy", json={"subject_id": other}, headers=_auth(ctx["editor"]))
+    assert again.json()["id"] == body["id"]
+
+    # viewer 能读源图,但在目标学科没有编辑权。
+    await grant_role(ctx["viewer"], ctx["other_subject"], SubjectRole.VIEWER)
+    denied = await client.post(f"{API}/media/{source}/copy", json={"subject_id": other}, headers=_auth(ctx["viewer"]))
+    assert denied.status_code == 403

@@ -126,3 +126,33 @@ export function useMedia() {
 
     return { uploadContentImage, uploadUserMedia, listSubjectMedia, updateMedia, deleteMedia, getMediaReferences, replaceMedia }
 }
+
+export interface MediaBatchResult {
+    affected: number
+    skipped: number
+}
+
+/** 媒体库批量操作与跨学科复制;均以当前学科为作用域。 */
+export function useMediaBatch() {
+    const { $api } = useNuxtApp()
+
+    async function batchDelete(subjectId: number, ids: number[]): Promise<MediaBatchResult> {
+        return await $api<MediaBatchResult>(`/subjects/${subjectId}/media/batch-delete`, { method: 'POST', body: { ids } })
+    }
+
+    async function batchUpdateSource(subjectId: number, ids: number[], source: string | null): Promise<MediaBatchResult> {
+        return await $api<MediaBatchResult>(`/subjects/${subjectId}/media/batch-update`, { method: 'POST', body: { ids, source } })
+    }
+
+    /** 浏览器直接下载(cookie 鉴权),不经 $api。 */
+    function archiveUrl(subjectId: number, ids: number[]): string {
+        const query = ids.map(id => `ids=${id}`).join('&')
+        return `/api/v1/subjects/${subjectId}/media/archive?${query}`
+    }
+
+    async function copyToSubject(assetId: number, subjectId: number): Promise<MediaAsset> {
+        return await $api<MediaAsset>(`/media/${assetId}/copy`, { method: 'POST', body: { subject_id: subjectId } })
+    }
+
+    return { batchDelete, batchUpdateSource, archiveUrl, copyToSubject }
+}

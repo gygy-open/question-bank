@@ -1,14 +1,15 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
-import { Download, ExternalLink, ImageOff, Loader2, Replace, Trash2 } from '@lucide/vue'
+import { Copy, Download, ExternalLink, ImageOff, Loader2, Replace, Trash2 } from '@lucide/vue'
 import { toast } from 'vue-sonner'
 import MediaPickerDialog from '@/components/media/MediaPickerDialog.vue'
 import MediaReplaceDialog from '@/components/media/MediaReplaceDialog.vue'
 import { Button } from '@/components/ui/button'
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet'
-import { useMedia, type MediaAssetListItem, type MediaReferences } from '@/composables/useMedia'
+import { useMedia, useMediaBatch, type MediaAssetListItem, type MediaReferences } from '@/composables/useMedia'
 import type { UploadedImageAttrs } from '@/components/rich-editor/useImageUpload'
 import { getApiErrorDetail } from '@/lib/apiErrors'
 import { formatBytes, groupMediaReferences, mediaReferenceLink, replaceableReferences } from '@/lib/mediaLibrary'
@@ -44,6 +45,21 @@ function onPicked(attrs: UploadedImageAttrs) {
 function onReplaced() {
     emit('replaced')
     open.value = false
+}
+
+const { subjects } = useSubjectContext()
+const { can } = usePermissions()
+const { copyToSubject } = useMediaBatch()
+const copyTargets = computed(() => subjects.value.filter(s => s.id !== props.asset?.subject_id && can(Capability.EDIT_QUESTION, s.id)))
+
+async function copyTo(subject: { id: number; name: string }) {
+    if (!props.asset) return
+    try {
+        await copyToSubject(props.asset.id, subject.id)
+        toast.success(`已加入「${subject.name}」的媒体库`)
+    } catch (error) {
+        toast.error(getApiErrorDetail(error, '加入失败'))
+    }
 }
 const dirty = computed(() => {
     const a = props.asset
@@ -181,6 +197,15 @@ async function remove() {
                     >
                         <Replace class="mr-2 size-4" />替换
                     </Button>
+                    <DropdownMenu v-if="copyTargets.length">
+                        <DropdownMenuTrigger as-child>
+                            <Button variant="outline" size="sm"><Copy class="mr-2 size-4" />加入其他学科</Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="start">
+                            <DropdownMenuLabel class="text-xs font-normal text-muted-foreground">复制到目标学科的媒体库</DropdownMenuLabel>
+                            <DropdownMenuItem v-for="subject in copyTargets" :key="subject.id" @select="copyTo(subject)">{{ subject.name }}</DropdownMenuItem>
+                        </DropdownMenuContent>
+                    </DropdownMenu>
                     <Button
                         v-if="canEdit"
                         variant="outline"

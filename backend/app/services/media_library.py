@@ -1,14 +1,18 @@
 """媒体库读侧:学科资产列表(含引用计数)与"被引用于"明细。"""
 from __future__ import annotations
 
+import asyncio
+import tempfile
+import zipfile
 from datetime import datetime
+from pathlib import Path
 from typing import Literal, Optional
 
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.capabilities.errors import Conflict, Forbidden
-from app.core import permissions
+from app.capabilities.errors import Conflict, Forbidden, NotFound, Unprocessable
+from app.core import permissions, storage
 from app.core.permissions import Permission
 from app.crud.crud_question import is_question_visible
 from app.models.composition import Composition, CompositionVersion, ScopeType
@@ -20,6 +24,7 @@ from app.schemas.media import (
     MediaAssetListItem,
     MediaAssetPage,
     MediaAssetUpdate,
+    MediaBatchResult,
     MediaReferenceItem,
     MediaReferences,
 )
@@ -63,6 +68,112 @@ async def delete_asset(db: AsyncSession, asset_id: int, actor: User) -> None:
     if asset.deleted_at is None:
         asset.deleted_at = datetime.utcnow()
         await db.commit()
+
+
+async def _subject_assets(db: AsyncSession, subject_id: int, ids: list[int]) -> list[MediaAsset]:
+    """本学科内未删除的内容资产;其他 id 静默忽略(由调用方计入跳过数)。"""
+    if not ids:
+        return []
+    return list(
+        await db.scalars(
+            select(MediaAsset).where(
+                MediaAsset.id.in_(ids),
+                MediaAsset.subject_id == subject_id,
+                MediaAsset.purpose == MediaPurpose.CONTENT.value,
+                MediaAsset.deleted_at.is_(None),
+            )
+        )
+    )
+
+
+async def batch_delete(db: AsyncSession, subject_id: int, ids: list[int]) -> MediaBatchResult:
+    """只删除未被引用的资产,其余跳过。调用方负责学科编辑权限。"""
+    assets = await _subject_assets(db, subject_id, ids)
+    used = set(
+        await db.scalars(
+            select(MediaReference.asset_id).where(
+                MediaReference.asset_id.in_([asset.id for asset in assets])
+            )
+        )
+    )
+    now = datetime.utcnow()
+    deleted = 0
+    for asset in assets:
+        if asset.id not in used:
+            asset.deleted_at = now
+            deleted += 1
+    await db.commit()
+    return MediaBatchResult(affected=deleted, skipped=len(set(ids)) - deleted)
+
+
+async def batch_update_source(
+    db: AsyncSession, subject_id: int, ids: list[int], source: Optional[str]
+) -> MediaBatchResult:
+    assets = await _subject_assets(db, subject_id, ids)
+    value = (source or "").strip() or None
+    for asset in assets:
+        asset.source = value
+    await db.commit()
+    return MediaBatchResult(affected=len(assets), skipped=len(set(ids)) - len(assets))
+
+
+async def archive_assets(db: AsyncSession, subject_id: int, ids: list[int]):
+    """把所选资产打成 zip(仅存储不压缩,图片本身已压缩),返回位于开头的临时文件。"""
+    assets = await _subject_assets(db, subject_id, ids)
+    if not assets:
+        raise NotFound("没有可下载的图片")
+
+    def build():
+        spool = tempfile.SpooledTemporaryFile(max_size=32 * 1024 * 1024)
+        with zipfile.ZipFile(spool, "w", zipfile.ZIP_STORED) as archive:
+            for asset in assets:
+                path = storage.object_path(asset.sha256)
+                if not path.is_file():
+                    continue
+                stem = Path(asset.original_filename or "").stem or "image"
+                archive.write(path, f"{asset.id}-{stem}{media_service.extension_for(asset.mime)}")
+        spool.seek(0)
+        return spool
+
+    return await asyncio.to_thread(build)
+
+
+async def copy_to_subject(db: AsyncSession, asset_id: int, subject_id: int, actor: User) -> MediaAsset:
+    """跨学科「加入本学科」:新建逻辑资产,物理文件共享;目标学科已有同一文件时直接复用。"""
+    source = await media_service.get_readable(db, asset_id, actor)
+    if source.purpose != MediaPurpose.CONTENT.value:
+        raise Unprocessable("只有题目内容图片可以加入学科")
+    if not permissions.can(actor, Permission.EDIT_QUESTION, subject_id=subject_id):
+        raise Forbidden("没有在目标学科添加图片的权限")
+    existing = await db.scalar(
+        select(MediaAsset)
+        .where(
+            MediaAsset.subject_id == subject_id,
+            MediaAsset.purpose == MediaPurpose.CONTENT.value,
+            MediaAsset.sha256 == source.sha256,
+        )
+        .order_by(MediaAsset.id)
+        .limit(1)
+    )
+    if existing is not None:
+        existing.deleted_at = None
+        await db.commit()
+        return existing
+    copy = MediaAsset(
+        subject_id=subject_id,
+        owner_user_id=actor.id,
+        **{
+            name: getattr(source, name)
+            for name in (
+                "purpose", "kind", "sha256", "mime", "byte_size", "width", "height",
+                "duration", "original_filename", "alt", "source", "status",
+            )
+        },
+    )
+    db.add(copy)
+    await db.commit()
+    await db.refresh(copy)
+    return copy
 
 
 async def list_subject_media(
