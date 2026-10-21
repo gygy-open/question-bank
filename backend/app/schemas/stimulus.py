@@ -116,10 +116,12 @@ class StimulusRead(BaseModel):
 
 class StimulusDetail(StimulusRead):
     questions: List[QuestionSummary] = Field(default_factory=list)
+    composition_count: int = 0
 
 
 class StimulusListItem(StimulusRead):
     question_count: int = 0
+    composition_count: int = 0
 
 
 class StimulusPage(BaseModel):

@@ -109,6 +109,7 @@ async def read_stimuli(
     status_value: Optional[str] = Query(None, alias="status"),
     visibility: Optional[str] = None,
     only_deleted: bool = False,
+    has_questions: Optional[bool] = None,
     current_user: models.User = Depends(deps.get_current_active_user),
 ) -> Any:
     await _require_subject(db, subject_id)
@@ -124,12 +125,13 @@ async def read_stimuli(
         status=status_value,
         visibility=visibility,
         only_deleted=only_deleted,
+        has_questions=has_questions,
     )
     items = [
         StimulusListItem.model_validate(stimulus).model_copy(
-            update={"question_count": question_count}
+            update={"question_count": question_count, "composition_count": composition_count}
         )
-        for stimulus, question_count in rows
+        for stimulus, question_count, composition_count in rows
     ]
     return {
         "items": items,

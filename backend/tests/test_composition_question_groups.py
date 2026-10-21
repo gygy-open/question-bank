@@ -1,9 +1,12 @@
 import json
 import uuid
+from datetime import datetime
 
 import pytest
 
 from app.capabilities.errors import Invalid, Unprocessable
+from app.crud.crud_stimulus import stimulus as crud_stimulus
+from app.crud.crud_user import user as crud_user
 from app.models.composition import (
     BODY_SLOT,
     Composition,
@@ -19,6 +22,7 @@ from app.models.subject import Subject
 from app.models.user import User
 from app.schemas.composition import CompositionNodeInput
 from app.services.composition_service import replace_nodes
+from app.services.stimulus_service import to_detail
 
 
 def _uid() -> str:
@@ -260,3 +264,44 @@ async def test_stimulus_bound_question_cannot_be_frozen_as_root_node(db_session)
         ],
     )
     assert revision == 2
+
+
+@pytest.mark.asyncio
+async def test_stimulus_list_counts_visible_compositions_and_filters_empty(db_session):
+    actor, composition, stimulus, questions, _ = await _seed(db_session)
+    bob = User(username="bob", full_name="Bob", hashed_password="x")
+    empty = Stimulus(subject_id=composition.subject_id, content=json.dumps(_rich_doc("空材料")), created_by=actor.id)
+    db_session.add_all([bob, empty])
+    await db_session.flush()
+    personal = Composition(
+        title="bob 的稿", scope_type=ScopeType.PERSONAL, owner_id=bob.id,
+        subject_id=composition.subject_id, created_by=bob.id,
+    )
+    trashed = Composition(
+        title="已删除", scope_type=ScopeType.SHARED, subject_id=composition.subject_id, created_by=actor.id,
+    )
+    db_session.add_all([personal, trashed])
+    await db_session.commit()
+    for comp, who in ((composition, actor), (personal, bob), (trashed, actor)):
+        module_id = _uid()
+        await _replace(db_session, comp, who, [_module(module_id, stimulus.id), _child(module_id, questions[0].id)])
+    trashed.deleted_at = datetime.utcnow()
+    await db_session.commit()
+
+    async def counts(user_id, superuser=False, **filters):
+        rows, _ = await crud_stimulus.get_page(
+            db_session, subject_id=composition.subject_id, viewer_id=user_id,
+            is_superuser=superuser, skip=0, limit=10, **filters,
+        )
+        return {s.id: (q, c) for s, q, c in rows}
+
+    assert (await counts(actor.id))[stimulus.id] == (3, 1)
+    assert (await counts(bob.id))[stimulus.id] == (3, 2)
+    assert (await counts(actor.id, superuser=True))[stimulus.id] == (3, 2)
+    assert set(await counts(actor.id, has_questions=False)) == {empty.id}
+    assert set(await counts(actor.id, has_questions=True)) == {stimulus.id}
+
+    await db_session.refresh(stimulus)
+    viewer = await crud_user.get_with_memberships(db_session, id=bob.id)
+    detail = await to_detail(db_session, stimulus, viewer)
+    assert detail.composition_count == 2

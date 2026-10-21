@@ -37,6 +37,7 @@ const size = ref(10)
 const keyword = ref('')
 const statusFilter = ref('0')
 const visibility = ref('0')
+const usage = ref('0')
 const view = ref<'active' | 'deleted'>('active')
 const query = computed(() => buildLibraryQuery({
   page: page.value,
@@ -44,6 +45,7 @@ const query = computed(() => buildLibraryQuery({
   keyword: keyword.value.trim(),
   status: statusFilter.value,
   visibility: visibility.value,
+  has_questions: usage.value === 'empty' ? false : usage.value === 'filled' ? true : undefined,
   only_deleted: view.value === 'deleted' ? true : undefined,
 }))
 
@@ -67,11 +69,11 @@ watch(currentSubjectId, () => {
   page.value = 1
   load()
 }, { immediate: true })
-watch([page, size, keyword, statusFilter, visibility, view], () => {
-  if (page.value > 1 && (keyword.value || statusFilter.value !== '0' || visibility.value !== '0')) return
+watch([page, size, keyword, statusFilter, visibility, usage, view], () => {
+  if (page.value > 1 && (keyword.value || statusFilter.value !== '0' || visibility.value !== '0' || usage.value !== '0')) return
   load()
 })
-watch([keyword, statusFilter, visibility, size, view], () => {
+watch([keyword, statusFilter, visibility, usage, size, view], () => {
   if (page.value !== 1) page.value = 1
 })
 
@@ -86,6 +88,11 @@ const visibilityOptions = [
   { label: '全部可见性', value: '0' },
   { label: '公开', value: 'public' },
   { label: '私有', value: 'private' },
+]
+const usageOptions = [
+  { label: '全部', value: '0' },
+  { label: '待出题', value: 'empty' },
+  { label: '已有小题', value: 'filled' },
 ]
 
 const deleteItem = async (stimulus: StimulusListItem) => {
@@ -130,7 +137,7 @@ const restoreItem = async (stimulus: StimulusListItem) => {
     <Tabs v-model="view">
       <TabsList><TabsTrigger value="active">当前</TabsTrigger><TabsTrigger value="deleted">回收站</TabsTrigger></TabsList>
     </Tabs>
-    <div class="grid gap-3 bg-muted/40 p-4 sm:grid-cols-3">
+    <div class="grid gap-3 bg-muted/40 p-4 sm:grid-cols-4">
       <div class="space-y-2">
         <Label class="text-xs">关键词</Label>
         <ClearableInput v-model="keyword" placeholder="搜索材料内容或来源" />
@@ -142,6 +149,10 @@ const restoreItem = async (stimulus: StimulusListItem) => {
       <div class="space-y-2">
         <Label class="text-xs">可见性</Label>
         <ClearableSelect v-model="visibility" :options="visibilityOptions" />
+      </div>
+      <div class="space-y-2">
+        <Label class="text-xs">出题情况</Label>
+        <ClearableSelect v-model="usage" :options="usageOptions" />
       </div>
     </div>
 

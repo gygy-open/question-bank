@@ -7,6 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.capabilities.errors import Conflict, NotFound, Unprocessable
 from app.crud.crud_question import is_question_visible, question as crud_question
+from app.crud.crud_stimulus import composition_usage_count
 from app.models.question import Question, QuestionVisibility
 from app.models.stimulus import Stimulus
 from app.models.user import User
@@ -68,9 +69,13 @@ async def list_stimulus_questions(
 
 async def to_detail(db: AsyncSession, stimulus: Stimulus, actor: User) -> StimulusDetail:
     questions = await list_stimulus_questions(db, stimulus.id, actor)
+    composition_count = await db.scalar(
+        composition_usage_count(stimulus.id, viewer_id=actor.id, is_superuser=actor.is_superuser)
+    )
     return StimulusDetail(
         **StimulusRead.model_validate(stimulus).model_dump(),
         questions=[QuestionSummary.model_validate(question) for question in questions],
+        composition_count=int(composition_count or 0),
     )
 
 

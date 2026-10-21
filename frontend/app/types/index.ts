@@ -310,6 +310,7 @@ export interface StimulusListItem {
   updated_at: string
   deleted_at: string | null
   question_count: number
+  composition_count: number
 }
 
 export interface StimulusPage {
@@ -325,6 +326,7 @@ export type Stimulus = Omit<StimulusListItem, 'question_count'>
 /** GET 材料详情:附带按 stimulus_position 排列、当前用户可见的小题。 */
 export interface StimulusDetail extends Stimulus {
   questions: QuestionSummary[]
+  composition_count?: number
 }
 
 export interface StimulusQuestionsUpdateRequest {

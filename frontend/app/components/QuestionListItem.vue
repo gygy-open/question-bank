@@ -259,7 +259,7 @@ const sourcePreviewQuery = computed(() => {
               </Badge>
 
               <Badge v-if="(item as DbQuestion).stimulus_id != null" as-child variant="secondary">
-                <NuxtLink :to="`/materials/${(item as DbQuestion).stimulus_id}/edit`">
+                <NuxtLink :to="`/materials/${(item as DbQuestion).stimulus_id}/edit?focus=${(item as DbQuestion).id}`">
                   材料题 #{{ (item as DbQuestion).stimulus_id }}
                 </NuxtLink>
               </Badge>

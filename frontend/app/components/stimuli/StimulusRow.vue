@@ -1,9 +1,11 @@
 <script setup lang="ts">
-import { ArchiveRestore, FilePenLine, FilePlus2, Layers3, Lock, Trash2 } from '@lucide/vue'
+import { ArchiveRestore, ChevronDown, ChevronRight, FilePenLine, FilePlus2, Layers3, Loader2, Lock, Trash2 } from '@lucide/vue'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import RichContent from '@/components/rich-editor/RichContent.vue'
-import type { StimulusListItem } from '@/types'
+import { questionTypeLabel } from '@/lib/answerFormat'
+import { getApiErrorDetail } from '@/lib/apiErrors'
+import type { QuestionSummary, StimulusListItem } from '@/types'
 
 const props = defineProps<{
   stimulus: StimulusListItem
@@ -17,6 +19,28 @@ defineEmits<{
 }>()
 
 const isDeleted = computed(() => props.stimulus.deleted_at !== null)
+const { getStimulus } = useStimuli()
+
+const expanded = ref(false)
+const questions = ref<QuestionSummary[] | null>(null)
+const loadingQuestions = ref(false)
+const loadError = ref('')
+
+// 展开时才加载小题;列表刷新(revision 变化)后重新取。
+watch(() => props.stimulus.revision, () => { questions.value = null })
+const toggleQuestions = async () => {
+  expanded.value = !expanded.value
+  if (!expanded.value || questions.value || loadingQuestions.value) return
+  loadingQuestions.value = true
+  loadError.value = ''
+  try {
+    questions.value = (await getStimulus(props.stimulus.subject_id, props.stimulus.id)).questions
+  } catch (error) {
+    loadError.value = getApiErrorDetail(error, '小题加载失败')
+  } finally {
+    loadingQuestions.value = false
+  }
+}
 
 const statusLabel: Record<string, string> = {
   draft: '草稿',
@@ -40,10 +64,29 @@ const statusLabel: Record<string, string> = {
         </div>
         <RichContent :content="stimulus.content" empty-text="（空材料）" class="line-clamp-4 text-sm" />
         <Badge v-if="stimulus.question_count === 0" variant="outline" class="border-amber-500/50 text-amber-700 dark:text-amber-400">待出题</Badge>
-        <div v-else class="flex items-center gap-1.5 text-xs text-muted-foreground">
-          <Layers3 class="size-3.5" />
-          {{ stimulus.question_count }} 道小题
-        </div>
+        <template v-else>
+          <button
+            type="button"
+            class="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground"
+            :aria-expanded="expanded"
+            @click="toggleQuestions"
+          >
+            <component :is="expanded ? ChevronDown : ChevronRight" class="size-3.5" />
+            <Layers3 class="size-3.5" />
+            {{ stimulus.question_count }} 道小题<template v-if="stimulus.composition_count"> · 被 {{ stimulus.composition_count }} 份稿件使用</template>
+          </button>
+          <div v-if="expanded" class="ml-5 border-l pl-3">
+            <div v-if="loadingQuestions" class="py-2"><Loader2 class="size-4 animate-spin text-muted-foreground" /></div>
+            <p v-else-if="loadError" class="py-2 text-xs text-destructive">{{ loadError }}</p>
+            <ol v-else class="space-y-2">
+              <li v-for="(question, index) in questions" :key="question.id" class="flex items-start gap-2 text-sm">
+                <span class="shrink-0 text-xs text-muted-foreground">{{ index + 1 }}.</span>
+                <RichContent :content="question.content" empty-text="（空题干）" class="line-clamp-2 min-w-0 flex-1" />
+                <span class="shrink-0 text-xs text-muted-foreground">{{ questionTypeLabel(question.q_type) }}</span>
+              </li>
+            </ol>
+          </div>
+        </template>
       </div>
       <div class="flex shrink-0 items-center gap-1">
         <Button

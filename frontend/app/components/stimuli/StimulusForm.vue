@@ -98,12 +98,29 @@ const resetBaseline = (questionIds: number[]) => {
   saved.value = { status: status.value, visibility: visibility.value, snapshot: snapshot.value, questionIds }
 }
 
+const compositionCount = ref(0)
+const savedContent = ref('')
+// 与后端过期判断一致:材料或已有小题内容变化、小题移出;新增小题与状态变化不算。
+const staleForCompositions = computed(() =>
+  JSON.stringify(content.value) !== savedContent.value
+  || entries.value.some(entry => entry.id != null && isBodyDirty(entry))
+  || saved.value.questionIds.some(id => !selectedIds.value.includes(id)))
+const impactHint = computed(() => {
+  if (!isEdit.value || !dirty.value) return ''
+  const parts: string[] = []
+  if (meta.value.syncMembers && saved.value.questionIds.length) parts.push(`状态和可见性会同步到 ${saved.value.questionIds.length} 道小题`)
+  if (compositionCount.value && staleForCompositions.value) parts.push(`${compositionCount.value} 份稿件会提示同步更新`)
+  return parts.length ? `保存后${parts.join('，')}。` : ''
+})
+
 const applyStimulus = (stimulus: StimulusDetail) => {
   content.value = structuredClone(stimulus.content)
   status.value = stimulus.status
   visibility.value = stimulus.visibility
   source.value = stimulus.source ?? ''
   revision.value = stimulus.revision
+  compositionCount.value = stimulus.composition_count ?? 0
+  savedContent.value = JSON.stringify(stimulus.content)
   entries.value = stimulus.questions.map(entryFromQuestion)
   expanded.value = new Set()
   resetBaseline(stimulus.questions.map(question => question.id))
@@ -168,6 +185,17 @@ const load = async (force = false) => {
     loading.value = false
   }
   await appendRequestedQuestion()
+  await focusRequestedQuestion()
+}
+
+// 从题库「材料题 #id」进入时展开并定位到该小题。
+const focusRequestedQuestion = async () => {
+  const questionId = Number(route.query.focus)
+  const entry = entries.value.find(item => item.id === questionId)
+  if (!entry) return
+  expanded.value = new Set([...expanded.value, entry.key])
+  await nextTick()
+  document.getElementById(`member-${entry.key}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
 }
 
 watch(currentSubjectId, (subjectId) => {
@@ -288,6 +316,7 @@ const submit = async () => {
       </Alert>
       <Alert v-if="incompatible.length" variant="destructive"><AlertTriangle class="size-4" /><AlertTitle>私有材料题下有公开小题</AlertTitle><AlertDescription>{{ incompatibleMessage }}</AlertDescription></Alert>
       <Alert v-if="errorMessage" variant="destructive"><AlertTriangle class="size-4" /><AlertTitle>操作失败</AlertTitle><AlertDescription>{{ errorMessage }}</AlertDescription></Alert>
+      <p v-if="impactHint" class="text-sm text-muted-foreground" role="status">{{ impactHint }}</p>
       <div v-if="loading" class="flex justify-center py-20"><Loader2 class="size-7 animate-spin text-muted-foreground" /></div>
       <template v-else>
         <div class="space-y-2">
