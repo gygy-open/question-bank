@@ -46,6 +46,10 @@ export function richDocToPlainText(doc: RichDoc | null | undefined): string {
             parts.push('____')
             return
         }
+        if (node.type === 'audio') {
+            parts.push(' [音频] ')
+            return
+        }
         if (node.type === 'inlineMath' || node.type === 'blockMath') {
             const latex = node.attrs?.latex
             if (typeof latex === 'string' && latex) parts.push(latex)

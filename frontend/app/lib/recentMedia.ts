@@ -1,8 +1,10 @@
-/** 编辑器"最近使用"的图片：按学科存在 localStorage，只存展示所需的最少字段。 */
+/** 编辑器"最近使用"的媒体：按学科存在 localStorage，只存展示所需的最少字段。 */
 export interface RecentMediaEntry {
     id: number
     url: string
     name?: string | null
+    /** 缺省为图片（早期记录没有该字段）。 */
+    kind?: 'image' | 'audio'
 }
 
 export const RECENT_MEDIA_LIMIT = 24

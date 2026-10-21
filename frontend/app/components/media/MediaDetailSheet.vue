@@ -12,7 +12,7 @@ import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '
 import { useMedia, useMediaBatch, type MediaAssetListItem, type MediaReferences } from '@/composables/useMedia'
 import type { UploadedImageAttrs } from '@/components/rich-editor/useImageUpload'
 import { getApiErrorDetail } from '@/lib/apiErrors'
-import { formatBytes, groupMediaReferences, mediaReferenceLink, replaceableReferences } from '@/lib/mediaLibrary'
+import { formatBytes, groupMediaReferences, mediaDimension, mediaFormat, mediaName, mediaReferenceLink, replaceableReferences } from '@/lib/mediaLibrary'
 
 const open = defineModel<boolean>('open', { required: true })
 const props = defineProps<{ asset: MediaAssetListItem | null; canEdit: boolean }>()
@@ -35,7 +35,7 @@ const replacement = ref<UploadedImageAttrs | null>(null)
 
 function onPicked(attrs: UploadedImageAttrs) {
     if (attrs.assetId === props.asset?.id) {
-        toast.info('请选择另一张图片')
+        toast.info('请选择另一个文件')
         return
     }
     replacement.value = attrs
@@ -101,7 +101,7 @@ async function save() {
 
 async function remove() {
     const a = props.asset
-    if (!a || deleting.value || !confirm(`确定删除「${a.original_filename || `图片 #${a.id}`}」吗？`)) return
+    if (!a || deleting.value || !confirm(`确定删除「${mediaName(a)}」吗？`)) return
     deleting.value = true
     try {
         await deleteMedia(a.id)
@@ -120,12 +120,13 @@ async function remove() {
     <Sheet v-model:open="open">
         <SheetContent side="right" class="w-full overflow-y-auto sm:max-w-md">
             <SheetHeader>
-                <SheetTitle class="truncate">{{ asset?.original_filename || (asset ? `图片 #${asset.id}` : '') }}</SheetTitle>
+                <SheetTitle class="truncate">{{ asset ? mediaName(asset) : '' }}</SheetTitle>
                 <SheetDescription>修改名称、替代文本与来源只影响资料信息，不改变文件本身。</SheetDescription>
             </SheetHeader>
 
             <div v-if="asset" class="space-y-6 px-4 pb-6">
-                <div class="flex min-h-40 items-center justify-center overflow-hidden rounded-md border bg-muted">
+                <audio v-if="asset.kind === 'audio'" :src="asset.url" controls preload="metadata" class="w-full" />
+                <div v-else class="flex min-h-40 items-center justify-center overflow-hidden rounded-md border bg-muted">
                     <img v-if="asset.displayable" :src="asset.url" :alt="asset.alt || asset.original_filename || ''" class="max-h-72 max-w-full object-contain" />
                     <div v-else class="flex flex-col items-center gap-2 py-10 text-sm text-muted-foreground">
                         <ImageOff class="size-6" />
@@ -134,9 +135,9 @@ async function remove() {
                 </div>
 
                 <dl class="grid grid-cols-[5rem_1fr] gap-y-1 text-sm">
-                    <dt class="text-muted-foreground">格式</dt><dd>{{ asset.mime }}</dd>
-                    <template v-if="asset.width && asset.height">
-                        <dt class="text-muted-foreground">尺寸</dt><dd>{{ asset.width }} × {{ asset.height }}</dd>
+                    <dt class="text-muted-foreground">格式</dt><dd>{{ mediaFormat(asset.mime) }}</dd>
+                    <template v-if="mediaDimension(asset) !== '—'">
+                        <dt class="text-muted-foreground">{{ asset.kind === 'audio' ? '时长' : '尺寸' }}</dt><dd>{{ mediaDimension(asset) }}</dd>
                     </template>
                     <dt class="text-muted-foreground">大小</dt><dd>{{ formatBytes(asset.byte_size) }}</dd>
                     <dt class="text-muted-foreground">上传时间</dt><dd>{{ new Date(asset.created_at).toLocaleString() }}</dd>
@@ -218,12 +219,12 @@ async function remove() {
                         <Trash2 class="mr-2 size-4" />删除
                     </Button>
                 </div>
-                <p v-if="canEdit && referenceCount > 0" class="text-xs text-muted-foreground">仍被内容引用的图片不能删除；可以先替换成其他图片。已冻结的定稿版本会一直保留其引用。</p>
+                <p v-if="canEdit && referenceCount > 0" class="text-xs text-muted-foreground">仍被内容引用的文件不能删除；可以先替换成其他文件。已冻结的定稿版本会一直保留其引用。</p>
             </div>
         </SheetContent>
     </Sheet>
     <template v-if="asset && canEdit">
-        <MediaPickerDialog v-model:open="pickerOpen" @select="onPicked" />
+        <MediaPickerDialog v-model:open="pickerOpen" :kind="asset.kind" @select="onPicked" />
         <MediaReplaceDialog v-model:open="replaceOpen" :asset="asset" :replacement="replacement" :references="references" @replaced="onReplaced" />
     </template>
 </template>

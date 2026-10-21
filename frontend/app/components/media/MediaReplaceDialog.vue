@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
-import { ArrowRight, Loader2 } from '@lucide/vue'
+import { ArrowRight, Loader2, Music } from '@lucide/vue'
 import { toast } from 'vue-sonner'
 import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
@@ -8,12 +8,12 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
 import { useMedia, type MediaAssetListItem, type MediaReferences, type MediaReplaceResult } from '@/composables/useMedia'
 import { getApiErrorDetail } from '@/lib/apiErrors'
-import { MEDIA_OWNER_LABELS, referenceKey, replaceableReferences, replaceSummary } from '@/lib/mediaLibrary'
+import { MEDIA_OWNER_LABELS, mediaName, referenceKey, replaceableReferences, replaceSummary } from '@/lib/mediaLibrary'
 
 const open = defineModel<boolean>('open', { required: true })
 const props = defineProps<{
     asset: MediaAssetListItem
-    replacement: { assetId: number; src: string } | null
+    replacement: { assetId: number; src: string; title?: string | null } | null
     references: MediaReferences | null
 }>()
 const emit = defineEmits<{ replaced: [result: MediaReplaceResult] }>()
@@ -24,6 +24,7 @@ const chosen = ref(new Set<string>())
 const submitting = ref(false)
 
 const candidates = computed(() => replaceableReferences(props.references?.items ?? []))
+const noun = computed(() => (props.asset.kind === 'audio' ? '音频' : '图片'))
 const frozenCount = computed(() => (props.references?.items ?? []).filter(item => item.owner_type === 'composition_version').length)
 const canSubmit = computed(() => !!props.replacement && !submitting.value && (scope.value === 'all' ? candidates.value.length > 0 : chosen.value.size > 0))
 
@@ -65,17 +66,19 @@ async function submit() {
     <Dialog v-model:open="open">
         <DialogContent class="sm:max-w-lg">
             <DialogHeader>
-                <DialogTitle>替换图片</DialogTitle>
-                <DialogDescription>把所选内容里的这张图换成新图片。原图仍保留在媒体库中。</DialogDescription>
+                <DialogTitle>替换{{ noun }}</DialogTitle>
+                <DialogDescription>把所选内容里的这个{{ noun }}换成新的。原文件仍保留在媒体库中。</DialogDescription>
             </DialogHeader>
 
             <div class="flex items-center justify-center gap-3">
-                <div class="flex size-28 items-center justify-center overflow-hidden rounded border bg-muted">
-                    <img v-if="asset.displayable" :src="asset.url" alt="原图" class="max-h-full max-w-full object-contain" />
+                <div class="flex size-28 items-center justify-center overflow-hidden rounded border bg-muted" :title="mediaName(asset)">
+                    <Music v-if="asset.kind === 'audio'" class="size-8 text-muted-foreground" />
+                    <img v-else-if="asset.displayable" :src="asset.url" alt="原图" class="max-h-full max-w-full object-contain" />
                 </div>
                 <ArrowRight class="size-5 shrink-0 text-muted-foreground" />
-                <div class="flex size-28 items-center justify-center overflow-hidden rounded border bg-muted">
-                    <img v-if="replacement" :src="replacement.src" alt="新图片" class="max-h-full max-w-full object-contain" />
+                <div class="flex size-28 items-center justify-center overflow-hidden rounded border bg-muted" :title="replacement?.title ?? ''">
+                    <Music v-if="asset.kind === 'audio'" class="size-8 text-muted-foreground" />
+                    <img v-else-if="replacement" :src="replacement.src" alt="新图片" class="max-h-full max-w-full object-contain" />
                 </div>
             </div>
 
@@ -100,7 +103,7 @@ async function submit() {
             </ul>
 
             <ul class="space-y-1 text-xs text-muted-foreground">
-                <li v-if="frozenCount">{{ frozenCount }} 个已定稿版本不受影响，仍显示原图。</li>
+                <li v-if="frozenCount">{{ frozenCount }} 个已定稿版本不受影响，仍使用原文件。</li>
                 <li v-if="references?.hidden_count">另有 {{ references.hidden_count }} 处你无权查看的内容不会被替换。</li>
                 <li>正在编辑这些内容的人保存时会提示内容已被修改。</li>
             </ul>

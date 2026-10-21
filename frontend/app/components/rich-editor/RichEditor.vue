@@ -18,6 +18,7 @@ import RichEditorBubbleMenu from './RichEditorBubbleMenu.vue'
 import RichEditorMathPopover from './RichEditorMathPopover.vue'
 import RichEditorBlankPopover from './RichEditorBlankPopover.vue'
 import { useImageUpload, type UploadedImageAttrs } from './useImageUpload'
+import type { MediaPickResult } from '@/composables/useMedia'
 import MediaPickerDialog from '@/components/media/MediaPickerDialog.vue'
 import { getSchemaExtensions } from './schemaExtensions'
 import { ResetFormatOnEnter } from './resetFormatExtension'
@@ -53,6 +54,11 @@ async function insertImageFile(file: File) {
 
 function triggerImagePicker() {
     imagePickerOpen.value = true
+}
+
+const audioPickerOpen = ref(false)
+function insertAudio(attrs: MediaPickResult) {
+    editor.value?.chain().focus().insertContent({ type: 'audio', attrs }).run()
 }
 
 /**
@@ -233,6 +239,7 @@ const editor = useEditor({
         }),
         SlashCommand.configure({
             onImageSelect: triggerImagePicker,
+            onAudioSelect: () => { audioPickerOpen.value = true },
             onInsertMath: openInsertMath,
         }),
     ],
@@ -303,7 +310,7 @@ watch(model, (value) => {
 
 <template>
     <div class="rich-editor overflow-hidden rounded-md border border-border bg-background">
-        <RichEditorToolbar v-if="editor" :editor="editor" :allow-blank="allowBlank" @image="triggerImagePicker" @math="openInsertMath" @blank="insertBlank" @table="insertTable" />
+        <RichEditorToolbar v-if="editor" :editor="editor" :allow-blank="allowBlank" allow-audio @image="triggerImagePicker" @audio="audioPickerOpen = true" @math="openInsertMath" @blank="insertBlank" @table="insertTable" />
 
         <div class="relative">
             <DragHandle v-if="editor" :editor="editor" class="rich-editor__drag-handle" :on-node-change="onHandleNodeChange">
@@ -349,6 +356,7 @@ watch(model, (value) => {
         />
 
         <MediaPickerDialog v-model:open="imagePickerOpen" @select="insertImage" />
+        <MediaPickerDialog v-model:open="audioPickerOpen" kind="audio" @select="insertAudio" />
     </div>
 </template>
 

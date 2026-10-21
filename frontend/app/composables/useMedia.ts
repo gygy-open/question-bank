@@ -1,11 +1,23 @@
 import { computed, inject, provide, type InjectionKey, type Ref } from 'vue'
 
+export type MediaKind = 'image' | 'audio'
+
+/** 媒体选择器的结果，即插入编辑器节点的 attrs。 */
+export interface MediaPickResult {
+    src: string
+    assetId: number
+    /** 仅音频带文件名，作为播放器标题。 */
+    title?: string | null
+}
+
 export interface MediaAsset {
     id: number
     url: string
+    kind: MediaKind
     mime: string
     width?: number | null
     height?: number | null
+    duration?: number | null
     displayable: boolean
     original_filename?: string | null
     alt?: string | null
@@ -61,6 +73,8 @@ export interface MediaAssetPage {
 }
 
 export interface MediaListQuery {
+    /** 不传则图片与音频都返回。 */
+    kind?: MediaKind
     q?: string
     used?: boolean
     uploader_id?: number
@@ -101,7 +115,7 @@ export function useMedia() {
     }
 
     async function listSubjectMedia(subjectId: number, query: MediaListQuery = {}): Promise<MediaAssetPage> {
-        return await $api<MediaAssetPage>(`/subjects/${subjectId}/media`, { query: { kind: 'image', ...query } })
+        return await $api<MediaAssetPage>(`/subjects/${subjectId}/media`, { query: { ...query } })
     }
 
     async function updateMedia(id: number, changes: MediaAssetUpdate): Promise<MediaAsset> {

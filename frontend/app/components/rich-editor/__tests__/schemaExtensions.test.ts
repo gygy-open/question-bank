@@ -36,6 +36,19 @@ describe('getSchemaExtensions schema 契约', () => {
         expect(html).toContain('<img')
         expect(html).toContain('https://example.com/diagram.png')
     })
+
+    it('audio 节点渲染为播放器并可往返解析', () => {
+        const doc: RichDoc = {
+            type: 'doc',
+            content: [{ type: 'audio', attrs: { assetId: 9, src: '/api/v1/media/9/content', title: '听力' } }],
+        }
+        const audioHtml = generateHTML(doc, getSchemaExtensions())
+        expect(audioHtml).toContain('<audio')
+        expect(audioHtml).toContain('data-asset-id="9"')
+        expect(audioHtml).toContain('controls')
+        const parsed = generateJSON(audioHtml, getSchemaExtensions())
+        expect(parsed.content[0]).toMatchObject({ type: 'audio', attrs: { assetId: 9, src: '/api/v1/media/9/content', title: '听力' } })
+    })
 })
 describe('blank widthEm 渲染与规整', () => {
     function blankHtml(widthEm: unknown): string {

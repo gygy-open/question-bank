@@ -13,6 +13,7 @@ from typing import Any, Iterable, Iterator, Optional
 from urllib.parse import unquote
 
 from PIL import Image, UnidentifiedImageError
+from mutagen import File as MutagenFile, MutagenError
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -25,8 +26,11 @@ from app.models.media_asset import LegacyMediaPath, MediaAsset, MediaKind, Media
 from app.models.user import User
 
 MAX_IMAGE_BYTES = 10 * 1024 * 1024
+MAX_AUDIO_BYTES = 100 * 1024 * 1024
 
 WEB_IMAGE_MIMES = frozenset({"image/png", "image/jpeg", "image/gif", "image/webp"})
+# 不转码:只收浏览器可直接播放的格式。
+WEB_AUDIO_MIMES = frozenset({"audio/mpeg", "audio/mp4", "audio/ogg", "audio/wav"})
 _PIL_WEB_FORMATS = {"PNG": "image/png", "JPEG": "image/jpeg", "GIF": "image/gif", "WEBP": "image/webp"}
 # 仅导入来源可入库:浏览器无法显示,保留原件以便日后转换。
 _PIL_LEGACY_FORMATS = {"TIFF": "image/tiff", "BMP": "image/bmp"}
@@ -39,6 +43,10 @@ _EXTENSION_BY_MIME = {
     "image/bmp": ".bmp",
     "image/emf": ".emf",
     "image/wmf": ".wmf",
+    "audio/mpeg": ".mp3",
+    "audio/mp4": ".m4a",
+    "audio/ogg": ".ogg",
+    "audio/wav": ".wav",
 }
 _MIME_BY_EXTENSION = {ext: mime for mime, ext in _EXTENSION_BY_MIME.items()} | {".jpeg": "image/jpeg", ".tiff": "image/tiff"}
 
@@ -49,6 +57,33 @@ class SniffResult:
     mime: str
     width: Optional[int] = None
     height: Optional[int] = None
+    duration: Optional[float] = None
+
+
+_MP4_AUDIO_BRANDS = (b"M4A ", b"M4B ", b"mp42", b"mp41", b"isom", b"iso2")
+
+
+def _sniff_audio_mime(data: bytes) -> Optional[str]:
+    if data[:3] == b"ID3" or (len(data) > 1 and data[0] == 0xFF and data[1] & 0xE0 == 0xE0):
+        return "audio/mpeg"
+    if data[4:8] == b"ftyp" and data[8:12] in _MP4_AUDIO_BRANDS:
+        return "audio/mp4"
+    if data[:4] == b"OggS":
+        return "audio/ogg"
+    if data[:4] == b"RIFF" and data[8:12] == b"WAVE":
+        return "audio/wav"
+    return None
+
+
+def _sniff_audio(data: bytes, mime: str) -> SniffResult:
+    try:
+        parsed = MutagenFile(io.BytesIO(data))
+    except (MutagenError, ValueError, OSError) as exc:
+        raise Unprocessable("无法识别的音频文件") from exc
+    length = getattr(getattr(parsed, "info", None), "length", None)
+    if not length or length <= 0:
+        raise Unprocessable("无法识别的音频文件")
+    return SniffResult(kind=MediaKind.AUDIO.value, mime=mime, duration=round(float(length), 3))
 
 
 def _sniff_metafile(data: bytes) -> Optional[str]:
@@ -61,8 +96,13 @@ def _sniff_metafile(data: bytes) -> Optional[str]:
     return None
 
 
-def sniff(data: bytes, *, allow_legacy_formats: bool = False) -> SniffResult:
+def sniff(data: bytes, *, allow_legacy_formats: bool = False, allow_audio: bool = False) -> SniffResult:
     """按文件内容识别媒体类型;不在白名单内一律拒绝。"""
+    audio_mime = _sniff_audio_mime(data)
+    if audio_mime is not None:
+        if not allow_audio:
+            raise Unprocessable("这里只能上传图片")
+        return _sniff_audio(data, audio_mime)
     metafile = _sniff_metafile(data)
     if metafile is not None:
         if not allow_legacy_formats:
@@ -84,7 +124,8 @@ def sniff(data: bytes, *, allow_legacy_formats: bool = False) -> SniffResult:
 
 
 def is_displayable(mime: str) -> bool:
-    return mime in WEB_IMAGE_MIMES
+    """浏览器能否直接显示(图片)或播放(音频)。"""
+    return mime in WEB_IMAGE_MIMES or mime in WEB_AUDIO_MIMES
 
 
 def extension_for(mime: str) -> str:
@@ -121,19 +162,24 @@ async def ingest(
     subject_id: Optional[int] = None,
     filename: Optional[str] = None,
     allow_legacy_formats: bool = False,
-    max_bytes: int = MAX_IMAGE_BYTES,
+    allow_audio: bool = False,
+    max_bytes: Optional[int] = None,
 ) -> MediaAsset:
-    """识别、去重并登记一个资产;只 flush,由调用方决定何时提交。"""
+    """识别、去重并登记一个资产;只 flush,由调用方决定何时提交。max_bytes 为图片上限。"""
+    max_bytes = max_bytes or MAX_IMAGE_BYTES
     if purpose == MediaPurpose.CONTENT and subject_id is None:
         raise Unprocessable("题目内容图片必须归属学科")
     if purpose != MediaPurpose.CONTENT and actor_id is None:
         raise Unprocessable("个人媒体必须归属用户")
-    if len(data) > max_bytes:
-        raise Unprocessable(f"文件过大（上限 {max_bytes // (1024 * 1024)} MB）")
+    limit = max(max_bytes, MAX_AUDIO_BYTES) if allow_audio else max_bytes
+    if len(data) > limit:
+        raise Unprocessable(f"文件过大（上限 {limit // (1024 * 1024)} MB）")
     if not data:
         raise Unprocessable("文件为空")
 
-    info = sniff(data, allow_legacy_formats=allow_legacy_formats)
+    info = sniff(data, allow_legacy_formats=allow_legacy_formats, allow_audio=allow_audio)
+    if info.kind == MediaKind.IMAGE.value and len(data) > max_bytes:
+        raise Unprocessable(f"图片过大（上限 {max_bytes // (1024 * 1024)} MB）")
     sha256 = await asyncio.to_thread(storage.put_bytes, data)
 
     owner_scope = None if purpose == MediaPurpose.CONTENT else actor_id
@@ -163,6 +209,7 @@ async def ingest(
         byte_size=len(data),
         width=info.width,
         height=info.height,
+        duration=info.duration,
         original_filename=(Path(filename).name[:255] if filename else None),
         status=MediaStatus.READY.value,
     )
@@ -198,11 +245,16 @@ async def get_owned_chat_asset(db: AsyncSession, asset_id: int, user: User) -> M
 
 def iter_image_attrs(value: Any) -> Iterator[dict]:
     """遍历任意嵌套 RichDoc / 快照 JSON 中的图片节点 attrs(可就地修改)。"""
+    return iter_media_attrs(value, types=("image",))
+
+
+def iter_media_attrs(value: Any, types: tuple[str, ...] = ("image", "audio")) -> Iterator[dict]:
+    """遍历任意嵌套 RichDoc / 快照 JSON 中引用媒体的节点 attrs(可就地修改)。"""
     stack: list[Any] = [value]
     while stack:
         node = stack.pop()
         if isinstance(node, dict):
-            if node.get("type") == "image" and isinstance(node.get("attrs"), dict):
+            if node.get("type") in types and isinstance(node.get("attrs"), dict):
                 yield node["attrs"]
             stack.extend(node.values())
         elif isinstance(node, list):
@@ -210,9 +262,9 @@ def iter_image_attrs(value: Any) -> Iterator[dict]:
 
 
 def collect_asset_ids(value: Any) -> set[int]:
-    """在任意嵌套 RichDoc / 快照 JSON 中收集图片节点引用的资产 id。"""
+    """在任意嵌套 RichDoc / 快照 JSON 中收集图片与音频节点引用的资产 id。"""
     found: set[int] = set()
-    for attrs in iter_image_attrs(value):
+    for attrs in iter_media_attrs(value):
         asset_id = attrs.get("assetId")
         if isinstance(asset_id, int) and not isinstance(asset_id, bool) and asset_id > 0:
             found.add(asset_id)

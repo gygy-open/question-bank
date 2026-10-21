@@ -27,10 +27,10 @@ router = APIRouter()
 subject_router = APIRouter()
 
 
-async def _read_upload(file: UploadFile) -> bytes:
-    data = await file.read(media_service.MAX_IMAGE_BYTES + 1)
-    if len(data) > media_service.MAX_IMAGE_BYTES:
-        raise HTTPException(status_code=413, detail="文件过大（上限 10 MB）")
+async def _read_upload(file: UploadFile, limit: int = media_service.MAX_IMAGE_BYTES) -> bytes:
+    data = await file.read(limit + 1)
+    if len(data) > limit:
+        raise HTTPException(status_code=413, detail=f"文件过大（上限 {limit // (1024 * 1024)} MB）")
     return data
 
 
@@ -48,11 +48,12 @@ async def upload_subject_media(
     deps.require(current_user, Permission.EDIT_QUESTION, subject_id=subject_id)
     asset = await media_service.ingest(
         db,
-        await _read_upload(file),
+        await _read_upload(file, media_service.MAX_AUDIO_BYTES),
         purpose=MediaPurpose.CONTENT,
         subject_id=subject_id,
         actor_id=current_user.id,
         filename=file.filename,
+        allow_audio=True,
     )
     await db.commit()
     return asset

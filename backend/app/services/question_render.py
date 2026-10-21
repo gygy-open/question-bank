@@ -16,7 +16,7 @@ from __future__ import annotations
 import math
 from typing import Any, Optional
 
-from app.services.question_content import parse_json_field
+from app.services.question_content import audio_placeholder, parse_json_field
 from app.services.question_content_converter import rich_doc_to_plain_text
 
 __all__ = [
@@ -90,6 +90,9 @@ def _block_to_md(node: dict[str, Any]) -> str:
 
     if t == "image":
         return _image_md(node)
+
+    if t == "audio":
+        return audio_placeholder(node)
 
     if t == "table":
         return _table_to_md(node)

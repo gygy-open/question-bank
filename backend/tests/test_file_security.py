@@ -96,6 +96,12 @@ async def test_media_upload_rejects_svg_and_oversized(client, data_dirs, people,
     response = await client.post(
         url, files={"file": ("a.png", _png_bytes(), "image/png")}, headers=headers
     )
+    assert response.status_code == 422
+
+    monkeypatch.setattr(media_service, "MAX_AUDIO_BYTES", 16)
+    response = await client.post(
+        url, files={"file": ("a.png", _png_bytes(), "image/png")}, headers=headers
+    )
     assert response.status_code == 413
 
 

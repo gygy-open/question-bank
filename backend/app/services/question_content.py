@@ -64,6 +64,12 @@ def to_db_json(obj: Any) -> Optional[str]:
     return json.dumps(obj, ensure_ascii=False)
 
 
+def audio_placeholder(node: Dict[str, Any]) -> str:
+    """音频节点在纸面/纯文本导出中的占位文字。"""
+    title = str((node.get("attrs") or {}).get("title") or "").strip()
+    return f"[音频：{title}]" if title else "[音频]"
+
+
 def serialize_write_fields(data: Dict[str, Any]) -> Dict[str, Any]:
     """把写入 payload 中的富文本 / answer 字段集中序列化为 JSON 字符串。
 
@@ -116,6 +122,11 @@ def validate_rich_doc(doc: Any) -> Optional[RichDoc]:
             align = attrs.get("align")
             if align is not None and align not in ("left", "center", "right"):
                 raise ValueError("image align must be one of left/center/right")
+        if node.get("type") == "audio":
+            # 音频只能来自媒体库,必须带资产 id。
+            asset_id = (node.get("attrs") or {}).get("assetId")
+            if not isinstance(asset_id, int) or isinstance(asset_id, bool) or asset_id <= 0:
+                raise ValueError("audio assetId must be a positive integer")
         if node.get("type") == "blank":
             # widthEm 可选;缺省由渲染侧按默认宽度处理。给定时必须是 2..30 的有限数字。
             value = (node.get("attrs") or {}).get("widthEm")

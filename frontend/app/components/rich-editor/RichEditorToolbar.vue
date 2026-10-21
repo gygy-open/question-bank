@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import type { Editor } from '@tiptap/vue-3'
-import { ImageIcon, List, ListOrdered, Undo2, Redo2, Sigma, SquareSigma, SquareDashed } from '@lucide/vue'
+import { ImageIcon, List, ListOrdered, Music, Undo2, Redo2, Sigma, SquareSigma, SquareDashed } from '@lucide/vue'
 import { Button } from '@/components/ui/button'
 import {
     Tooltip,
@@ -14,9 +14,10 @@ import RichEditorAlignMenu from './RichEditorAlignMenu.vue'
 import RichEditorHeadingMenu from './RichEditorHeadingMenu.vue'
 import RichEditorTableMenu from './RichEditorTableMenu.vue'
 
-const props = defineProps<{ editor: Editor; allowBlank?: boolean; allowHeading?: boolean }>()
+const props = defineProps<{ editor: Editor; allowBlank?: boolean; allowHeading?: boolean; allowAudio?: boolean }>()
 const emit = defineEmits<{
     image: []
+    audio: []
     math: [boolean]
     blank: []
     table: [{ rows: number; cols: number; withHeaderRow: boolean }]
@@ -47,6 +48,9 @@ const insertItems = computed<ToolbarItem[]>(() => {
         { label: '块公式', icon: SquareSigma, action: () => emit('math', true) },
         { label: '图片', icon: ImageIcon, action: () => emit('image') },
     ]
+    if (props.allowAudio) {
+        items.push({ label: '音频', icon: Music, action: () => emit('audio') })
+    }
     if (props.allowBlank) {
         items.push({ label: '插入填空', icon: SquareDashed, action: () => emit('blank') })
     }

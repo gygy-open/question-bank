@@ -20,7 +20,7 @@ export function useImageUpload() {
         }
         try {
             const asset = await uploadContentImage(subjectId, file)
-            rememberRecentMedia(subjectId, { id: asset.id, url: asset.url, name: asset.original_filename })
+            rememberRecentMedia(subjectId, { id: asset.id, url: asset.url, name: asset.original_filename, kind: 'image' })
             return { src: asset.url, assetId: asset.id }
         } catch (error: any) {
             // 403 已由 api 插件统一提示。

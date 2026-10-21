@@ -1,4 +1,20 @@
-import type { MediaReferenceItem, MediaReplaceResult, MediaReplaceTarget } from '@/composables/useMedia'
+import type { MediaAsset, MediaReferenceItem, MediaReplaceResult, MediaReplaceTarget } from '@/composables/useMedia'
+
+const FORMAT_LABELS: Record<string, string> = { 'audio/mpeg': 'MP3', 'audio/mp4': 'M4A' }
+
+export function mediaName(asset: Pick<MediaAsset, 'id' | 'kind' | 'original_filename'>): string {
+    return asset.original_filename || `${asset.kind === 'audio' ? '音频' : '图片'} #${asset.id}`
+}
+
+export function mediaFormat(mime: string): string {
+    return FORMAT_LABELS[mime] ?? (mime.split('/')[1] ?? mime).toUpperCase()
+}
+
+/** 图片为宽×高，音频为时长。 */
+export function mediaDimension(asset: Pick<MediaAsset, 'kind' | 'width' | 'height' | 'duration'>): string {
+    if (asset.kind === 'audio') return formatDuration(asset.duration) || '—'
+    return asset.width && asset.height ? `${asset.width}×${asset.height}` : '—'
+}
 
 export const MEDIA_OWNER_LABELS: Record<string, string> = {
     question: '题目',
@@ -38,6 +54,16 @@ export function formatBytes(bytes: number): string {
     if (bytes < 1024) return `${bytes} B`
     if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
     return `${(bytes / 1024 / 1024).toFixed(1)} MB`
+}
+
+/** 音频时长 m:ss（超过一小时为 h:mm:ss）。 */
+export function formatDuration(seconds: number | null | undefined): string {
+    if (seconds == null || !Number.isFinite(seconds) || seconds < 0) return ''
+    const total = Math.round(seconds)
+    const h = Math.floor(total / 3600)
+    const m = Math.floor((total % 3600) / 60)
+    const s = String(total % 60).padStart(2, '0')
+    return h ? `${h}:${String(m).padStart(2, '0')}:${s}` : `${m}:${s}`
 }
 
 /** 可被替换的引用：定稿版本永不改动。 */

@@ -1,5 +1,6 @@
 import io
 import json
+import wave
 
 import pytest
 from PIL import Image
@@ -244,3 +245,70 @@ async def test_export_resolver_prefers_asset_ids(db_session, people):
     resolved = ImageResolver(images).resolve_image({"assetId": asset.id})
     assert resolved is not None and resolved.suffix == ".png" and resolved.path.is_file()
     assert ImageResolver(images).resolve_image({"assetId": 999}) is None
+
+
+# --- audio -----------------------------------------------------------------
+
+def _wav_bytes(seconds: float = 1.0, rate: int = 8000) -> bytes:
+    buf = io.BytesIO()
+    with wave.open(buf, "wb") as out:
+        out.setnchannels(1)
+        out.setsampwidth(2)
+        out.setframerate(rate)
+        out.writeframes(b"\x00\x00" * int(seconds * rate))
+    return buf.getvalue()
+
+
+def test_sniff_audio_only_where_allowed():
+    info = media_service.sniff(_wav_bytes(1.5), allow_audio=True)
+    assert (info.kind, info.mime, info.duration) == ("audio", "audio/wav", 1.5)
+    assert media_service.is_displayable("audio/wav")
+    with pytest.raises(Unprocessable):
+        media_service.sniff(_wav_bytes())
+    with pytest.raises(Unprocessable):
+        media_service.sniff(b"RIFF\x00\x00\x00\x00WAVEgarbage", allow_audio=True)
+
+
+async def test_audio_upload_play_and_reference(client, people):
+    h = _auth(people["editor"])
+    sid = people["subject"].id
+    created = await client.post(
+        f"{API}/subjects/{sid}/media", files={"file": ("听力.wav", _wav_bytes(2), "audio/wav")}, headers=h
+    )
+    assert created.status_code == 201, created.text
+    audio = created.json()
+    assert (audio["kind"], audio["duration"], audio["displayable"]) == ("audio", 2.0, True)
+
+    ranged = await client.get(f"{API}/media/{audio['id']}/content", headers={**h, "Range": "bytes=0-9"})
+    assert ranged.status_code == 206 and len(ranged.content) == 10
+
+    personal = await client.post(
+        f"{API}/media/me?purpose=chat", files={"file": ("a.wav", _wav_bytes(), "audio/wav")}, headers=h
+    )
+    assert personal.status_code == 422
+
+    node = {"type": "audio", "attrs": {"assetId": audio["id"], "src": audio["url"], "title": "听力.wav"}}
+    doc = {"type": "doc", "content": [node]}
+    question = await client.post(
+        f"{API}/questions", json={"content": doc, "q_type": "free_response", "subject_id": sid}, headers=h
+    )
+    assert question.status_code == 200, question.text
+    refs = (await client.get(f"{API}/media/{audio['id']}/references", headers=h)).json()
+    assert [item["owner_id"] for item in refs["items"]] == [question.json()["id"]]
+
+    no_asset = {"type": "doc", "content": [{"type": "audio", "attrs": {"src": "/x.mp3"}}]}
+    rejected = await client.post(
+        f"{API}/questions", json={"content": no_asset, "q_type": "free_response", "subject_id": sid}, headers=h
+    )
+    assert rejected.status_code == 422
+
+    image = (await _upload(client, people)).json()
+    mismatch = await client.post(f"{API}/media/{audio['id']}/replace", json={"new_asset_id": image["id"]}, headers=h)
+    assert mismatch.status_code == 422
+
+
+def test_exporters_render_audio_placeholder():
+    from app.services.question_render import _block_to_md
+
+    node = {"type": "audio", "attrs": {"assetId": 1, "title": "第一节"}}
+    assert _block_to_md(node) == "[音频：第一节]"

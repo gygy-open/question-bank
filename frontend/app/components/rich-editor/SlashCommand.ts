@@ -9,6 +9,7 @@ import {
     List,
     ListOrdered,
     ImageIcon,
+    Music,
     Sigma,
     SquareSigma,
 } from '@lucide/vue'
@@ -17,6 +18,8 @@ import SlashCommandList from './SlashCommandList.vue'
 export interface SlashCommandOptions {
     /** Called when the "image" item is picked, so the host can open a file picker. */
     onImageSelect?: () => void
+    /** Called when the "audio" item is picked, so the host can open the media picker. */
+    onAudioSelect?: () => void
     /** Called when a math item is picked, so the host can open the math dialog. */
     onInsertMath?: (isBlock: boolean) => void
 }
@@ -61,6 +64,15 @@ const ITEMS: SlashCommandItem[] = [
         command: ({ editor, range, options }) => {
             editor.chain().focus().deleteRange(range).run()
             options.onImageSelect?.()
+        },
+    },
+    {
+        title: '音频',
+        icon: Music,
+        aliases: ['audio', 'sound', 'mp3', 'yinpin', 'tingli'],
+        command: ({ editor, range, options }) => {
+            editor.chain().focus().deleteRange(range).run()
+            options.onAudioSelect?.()
         },
     },
     {
@@ -137,6 +149,7 @@ export const SlashCommand = Extension.create<SlashCommandOptions>({
     addOptions() {
         return {
             onImageSelect: undefined,
+            onAudioSelect: undefined,
         }
     },
 

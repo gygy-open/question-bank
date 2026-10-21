@@ -19,6 +19,7 @@ from docx.shared import Emu, Inches
 
 from app.services.exporting.images import ImageResolver
 from app.services.exporting.richdoc.omml import latex_to_omml
+from app.services.question_content import audio_placeholder
 
 logger = logging.getLogger(__name__)
 
@@ -83,6 +84,10 @@ class DocxRichRenderer:
         if t == "image":
             p = parent.add_paragraph()
             self._add_image(p, node)
+            return
+
+        if t == "audio":
+            parent.add_paragraph().add_run(audio_placeholder(node))
             return
 
         if t == "table":

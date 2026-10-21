@@ -38,7 +38,7 @@ def _swap(value: Any, old_id: int, new_id: int) -> tuple[Any, bool]:
     else:
         data = copy.deepcopy(value)
     changed = False
-    for attrs in media_service.iter_image_attrs(data):
+    for attrs in media_service.iter_media_attrs(data):
         if attrs.get("assetId") == old_id:
             attrs["assetId"] = new_id
             attrs["src"] = media_service.content_url(new_id)
@@ -75,7 +75,7 @@ async def replace_asset(
 ) -> MediaReplaceResult:
     old = await media_library._editable_asset(db, asset_id, actor)
     if old.purpose != MediaPurpose.CONTENT.value:
-        raise Unprocessable("只有题目内容图片可以替换")
+        raise Unprocessable("只有题目内容媒体可以替换")
     new: Optional[MediaAsset] = await db.get(MediaAsset, request.new_asset_id)
     if (
         new is None
@@ -84,7 +84,9 @@ async def replace_asset(
         or new.purpose != MediaPurpose.CONTENT.value
         or new.subject_id != old.subject_id
     ):
-        raise Unprocessable("新图片必须是本学科媒体库中的另一张图片")
+        raise Unprocessable("新文件必须是本学科媒体库中的另一个文件")
+    if new.kind != old.kind:
+        raise Unprocessable("只能用同类型的文件替换(图片换图片、音频换音频)")
 
     refs = (
         await db.execute(

@@ -10,7 +10,7 @@ import math
 import re
 from typing import Any, Callable, Optional
 
-from app.services.question_content import parse_json_field
+from app.services.question_content import audio_placeholder, parse_json_field
 
 __all__ = ["rich_doc_to_latex", "rich_inline_to_latex", "latex_escape"]
 
@@ -89,6 +89,9 @@ def _block(node: dict[str, Any], image_path: ImagePathFn) -> str:
 
     if t == "image":
         return _image_block(node, image_path)
+
+    if t == "audio":
+        return latex_escape(audio_placeholder(node))
 
     if t == "table":
         return _table(node, image_path)

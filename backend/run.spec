@@ -45,6 +45,7 @@ for pkg in [
     "pystray",
     "PIL",
     "latex2mathml",
+    "mutagen",
 ]:
     try:
         d, b, h = collect_all(pkg)

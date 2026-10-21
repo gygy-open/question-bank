@@ -189,6 +189,43 @@ export const Blank = Node.create({
     },
 })
 
+/** 媒体库音频：块级原子节点，渲染为原生播放器；assetId 必填，由后端登记引用。 */
+export const Audio = Node.create({
+    name: 'audio',
+    group: 'block',
+    atom: true,
+    draggable: true,
+
+    addAttributes() {
+        return {
+            // 渲染时由 assetId 推导地址，不信任文档里存的 src。
+            src: {
+                default: null,
+                renderHTML: (attrs: { assetId?: number | null }) =>
+                    attrs.assetId ? { src: `/api/v1/media/${attrs.assetId}/content` } : {},
+            },
+            assetId: {
+                default: null,
+                parseHTML: (el: HTMLElement) => {
+                    const id = Number(el.getAttribute('data-asset-id'))
+                    return Number.isInteger(id) && id > 0 ? id : null
+                },
+                renderHTML: (attrs: { assetId?: number | null }) =>
+                    attrs.assetId ? { 'data-asset-id': String(attrs.assetId) } : {},
+            },
+            title: { default: null },
+        }
+    },
+
+    parseHTML() {
+        return [{ tag: 'audio[data-asset-id]' }]
+    },
+
+    renderHTML({ HTMLAttributes }) {
+        return ['audio', mergeAttributes(HTMLAttributes, { controls: 'true', preload: 'metadata', class: 'rich-audio' })]
+    },
+})
+
 /** 决定 schema 的扩展集合，编辑与只读渲染必须保持一致，否则内容会跑版或丢失。 */
 export function getSchemaExtensions(options: SchemaExtensionOptions = {}) {
     const inlineMath = options.mathNodeView
@@ -226,6 +263,7 @@ export function getSchemaExtensions(options: SchemaExtensionOptions = {}) {
                 }
                 : false,
         }),
+        Audio,
         Table.configure({ resizable: true, lastColumnResizable: true }),
         TableRow,
         TableHeader,
