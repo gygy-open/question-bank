@@ -9,7 +9,6 @@ from app.models.tag import Tag
 from app.schemas.question import QuestionCreate, QuestionUpdate
 from app.crud.crud_knowledge_point import knowledge_point as knowledge_point_crud
 from app.services.activity_logger import log_activity
-from app.services import media_refs
 from app.services.question_content import (
     normalize_options,
     parse_json_field,
@@ -23,6 +22,13 @@ from app.models.import_task import ImportTask
 from app.models.activity_log import ActivityLog
 from app.models.question_relation import QuestionRelation
 from app.models.stimulus import Stimulus
+
+
+async def _sync_media_refs(db: AsyncSession, question: Question) -> None:
+    # 延迟导入:media_refs → app.capabilities → 本模块,模块级导入会成环。
+    from app.services import media_refs
+
+    await media_refs.sync_question_refs(db, question)
 
 
 async def release_stimulus_slot(db: AsyncSession, question: Question) -> None:
@@ -411,7 +417,7 @@ class CRUDQuestion(CRUDBase[Question, QuestionCreate, QuestionUpdate]):
             
         db.add(db_obj)
         await db.flush()
-        await media_refs.sync_question_refs(db, db_obj)
+        await _sync_media_refs(db, db_obj)
         if commit:
             await db.commit()
         await db.refresh(db_obj)
@@ -560,7 +566,7 @@ class CRUDQuestion(CRUDBase[Question, QuestionCreate, QuestionUpdate]):
             
         db.add(db_obj)
         await db.flush()
-        await media_refs.sync_question_refs(db, db_obj)
+        await _sync_media_refs(db, db_obj)
         if commit:
             await db.commit()
         await db.refresh(db_obj)
