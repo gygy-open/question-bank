@@ -12,8 +12,11 @@ from __future__ import annotations
 import socket
 import threading
 
-HOSTNAME = "questionbank.local."
-_SERVICE_NAME = "questionbank._http._tcp.local."
+from app.channel import MDNS_HOST
+
+# 测试版用独立主机名,与正式版同时开启局域网共享时互不抢占。
+HOSTNAME = f"{MDNS_HOST}.local."
+_SERVICE_NAME = f"{MDNS_HOST}._http._tcp.local."
 _SERVICE_TYPE = "_http._tcp.local."
 
 _lock = threading.Lock()

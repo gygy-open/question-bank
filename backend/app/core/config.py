@@ -43,17 +43,14 @@ def _load_or_create_secret_key(data_dir: Path) -> str:
 def _default_data_dir() -> Path:
     """Directory for runtime-writable data (config.json, sqlite db, uploads).
 
-    - Frozen (PyInstaller desktop build): OS per-user data directory.
+    - Frozen (PyInstaller desktop build): OS per-user data directory
+      (pre-release builds use a separate one, see ``app.channel``).
     - Development / server: the ``backend/`` project directory.
     """
     if getattr(sys, "frozen", False):
-        if sys.platform == "win32":
-            base = Path(os.getenv("APPDATA", str(Path.home())))
-        elif sys.platform == "darwin":
-            base = Path.home() / "Library" / "Application Support"
-        else:
-            base = Path(os.getenv("XDG_DATA_HOME", str(Path.home() / ".local" / "share")))
-        return base / "QuestionBank"
+        from app.channel import desktop_data_dir
+
+        return desktop_data_dir()
     # config.py -> app/core/config.py, parents[2] == backend/
     return Path(__file__).resolve().parents[2]
 

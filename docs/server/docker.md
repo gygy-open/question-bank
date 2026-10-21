@@ -104,6 +104,29 @@ docker compose up -d
 
 默认使用 `latest` 标签（对应 `main` 分支最新构建）。如需锁定到具体版本，在 `.env` 中设置 `IMAGE_TAG`（如 `1.2.0`），再执行 `docker compose pull && docker compose up -d`。可用标签见 [容器包页面](https://github.com/gygy-open/question-bank/pkgs/container/question-bank-backend)。
 
+### 试用测试版（与正式版并存）
+
+测试版会把数据升级到新格式且不可回退，请不要直接把正式部署的 `IMAGE_TAG` 改成测试版。另建一套独立部署，数据复制过去即可：
+
+1. 新建目录（如 `question-bank-alpha`），复制 `docker-compose.yml`、`.env`（及 `docker-compose.override.yml`，如有）。
+2. 在新目录的 `.env` 中设置：
+   ```bash
+   COMPOSE_PROJECT_NAME=question-bank-alpha   # 独立的容器与数据卷
+   IMAGE_TAG=1.5.0-alpha.1                    # 测试版标签
+   HTTP_PORT=8080                             # 与正式版同时运行
+   ```
+3. 把正式版数据复制到新数据卷（复制期间先停止正式版，保证 MySQL 数据一致）：
+   ```bash
+   (cd 正式版目录 && docker compose stop)
+   for v in mysql_data app_data chromadb_data; do
+     docker run --rm -v question-bank_$v:/from -v question-bank-alpha_$v:/to alpine cp -a /from/. /to/
+   done
+   (cd 正式版目录 && docker compose start)
+   ```
+4. 在新目录执行 `docker compose up -d`，访问 `http://服务器:8080`。测试版只会升级这份副本。
+
+不再需要时，在新目录执行 `docker compose down -v` 即可删除测试版及其数据卷，正式版不受影响。
+
 更多见 [运维](/server/operations) 与 [数据库与迁移](/server/database)。
 
 ## 数据持久化

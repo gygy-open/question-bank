@@ -93,11 +93,14 @@ jobs:
         shell: pwsh
         run: |
           $ver = "${{ steps.ver.outputs.version }}"
+          # Pre-release (hyphenated) versions build the side-by-side preview installer.
+          $preview = $ver.Contains('-')
+          $exe = if ($preview) { "question-bank-preview.exe" } else { "question-bank.exe" }
 
           # Stage everything the installer bundles into Program Files.
           $payload = "installer_payload"
           New-Item -ItemType Directory -Force -Path $payload | Out-Null
-          Copy-Item backend/dist/question-bank.exe "$payload/question-bank.exe"
+          Copy-Item backend/dist/question-bank.exe "$payload/$exe"
           Copy-Item backend/deploy/windows/README.txt "$payload/"
 
           # Compile with Inno Setup (preinstalled on GitHub windows runners).
@@ -107,7 +110,9 @@ jobs:
           }
           $out = "installer_out"
           New-Item -ItemType Directory -Force -Path $out | Out-Null
-          & $iscc "/DMyAppVersion=$ver" "/DPayloadDir=$((Resolve-Path $payload).Path)" "/O$((Resolve-Path $out).Path)" backend/deploy/windows/installer.iss
+          $defines = @("/DMyAppVersion=$ver", "/DPayloadDir=$((Resolve-Path $payload).Path)")
+          if ($preview) { $defines += "/DPreview" }
+          & $iscc @defines "/O$((Resolve-Path $out).Path)" backend/deploy/windows/installer.iss
 
           $setup = "$out/QuestionBank-Setup-$ver.exe"
           if (-not (Test-Path $setup)) { throw "Installer not produced: $setup" }

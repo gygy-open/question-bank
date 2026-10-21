@@ -95,7 +95,7 @@ services:
     environment:
       API_BASE_URL: http://backend:8000
     ports:
-      - "80:80"
+      - "${HTTP_PORT:-80}:80"
     depends_on:
       - backend
 

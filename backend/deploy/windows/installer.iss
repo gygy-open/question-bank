@@ -13,6 +13,10 @@
 ; Compiled in CI with:
 ;   iscc /DMyAppVersion=<ver> /DPayloadDir=<staged files> /O<out dir> installer.iss
 ; PayloadDir must contain: question-bank.exe (+ optional README.txt).
+; Pre-release versions add /DPreview and stage question-bank-preview.exe instead:
+; the preview installs side by side with the stable app (own AppId, folder, exe
+; name, autostart entry and port) so installing/uninstalling it never touches the
+; stable install. Its data lives in %APPDATA%\QuestionBank-Preview (see app/channel.py).
 
 #ifndef MyAppVersion
   #define MyAppVersion "0.0.0-dev"
@@ -21,17 +25,29 @@
   #define PayloadDir "."
 #endif
 
-#define MyAppName "QuestionBank"
-#define MyAppExe "question-bank.exe"
-#define MyPort "8000"
+#ifdef Preview
+  #define MyAppId "{{5C1E7B2A-4D3F-4E8B-9A6C-2F7D1B3E5A90}"
+  #define MyAppName "QuestionBank 测试版"
+  #define MyAppDir "QuestionBank Preview"
+  #define MyAppExe "question-bank-preview.exe"
+  #define MyRunKey "QuestionBankPreview"
+  #define MyPort "8001"
+#else
+  #define MyAppId "{{8F3A2B14-9C7E-4D6A-B1F2-3E5C7A9D0B11}"
+  #define MyAppName "QuestionBank"
+  #define MyAppDir "QuestionBank"
+  #define MyAppExe "question-bank.exe"
+  #define MyRunKey "QuestionBank"
+  #define MyPort "8000"
+#endif
 #define MyFwRule "QuestionBank (" + MyPort + ")"
 
 [Setup]
-AppId={{8F3A2B14-9C7E-4D6A-B1F2-3E5C7A9D0B11}
+AppId={#MyAppId}
 AppName={#MyAppName}
 AppVersion={#MyAppVersion}
 AppPublisher=gygy-open
-DefaultDirName={autopf}\QuestionBank
+DefaultDirName={autopf}\{#MyAppDir}
 DefaultGroupName={#MyAppName}
 DisableProgramGroupPage=yes
 UninstallDisplayIcon={app}\{#MyAppExe}
@@ -66,7 +82,7 @@ Name: "{autodesktop}\{#MyAppName}"; Filename: "{app}\{#MyAppExe}"; Tasks: deskto
 
 [Registry]
 ; Login autostart for all users (single-PC server model). Removed on uninstall.
-Root: HKLM; Subkey: "Software\Microsoft\Windows\CurrentVersion\Run"; ValueType: string; ValueName: "QuestionBank"; ValueData: """{app}\{#MyAppExe}"""; Flags: uninsdeletevalue; Tasks: autostart
+Root: HKLM; Subkey: "Software\Microsoft\Windows\CurrentVersion\Run"; ValueType: string; ValueName: "{#MyRunKey}"; ValueData: """{app}\{#MyAppExe}"""; Flags: uninsdeletevalue; Tasks: autostart
 
 [Run]
 ; Launch the tray now (as the signed-in user, not the elevated installer).
