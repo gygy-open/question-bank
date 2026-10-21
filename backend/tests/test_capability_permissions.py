@@ -161,3 +161,46 @@ async def test_batch_confirm_rejects_bad_action(client, ctx):
     )
     assert r.status_code == 400
     assert r.json()["detail"] == "Invalid action. Must be 'approve' or 'reject'."
+
+
+# --------------------------------------------------------------------------- #
+# review / batch_confirm / batch_create —— 曾经只要求登录
+# --------------------------------------------------------------------------- #
+@pytest.mark.parametrize(
+    "actor, expected",
+    [("editor", 200), ("manager", 200), ("admin", 200), ("viewer", 403), ("outsider", 404)],
+)
+async def test_review_permission_matrix(client, ctx, actor, expected):
+    r = await client.post(
+        f"{API}/questions/{ctx['question'].id}/review",
+        json={"action": "approve"},
+        headers=_auth(ctx[actor]),
+    )
+    assert r.status_code == expected
+
+
+async def test_batch_confirm_skips_unauthorized(client, ctx, db_session):
+    other_draft = await _seed_question(db_session, subject=ctx["other"], created_by=ctx["admin"])
+    ids = [ctx["question"].id, other_draft.id]
+
+    approve = await client.post(
+        f"{API}/questions/batch-confirm", json={"question_ids": ids, "action": "approve"}, headers=_auth(ctx["editor"])
+    )
+    assert approve.json()["processed_count"] == 1
+
+    # 驳回=软删除,沿用删除权限:editor 不能驳回他人的题。
+    reject = await client.post(
+        f"{API}/questions/batch-confirm", json={"question_ids": ids, "action": "reject"}, headers=_auth(ctx["viewer"])
+    )
+    assert reject.json()["processed_count"] == 0
+    await db_session.refresh(other_draft)
+    assert other_draft.deleted_at is None
+
+
+async def test_batch_create_requires_edit_permission(client, ctx):
+    body = {"questions": [{"content": _DOC, "q_type": "free_response", "subject_id": ctx["math"].id}]}
+    assert (await client.post(f"{API}/questions/batch", json=body, headers=_auth(ctx["viewer"]))).status_code == 403
+    assert (await client.post(f"{API}/questions/batch", json=body, headers=_auth(ctx["editor"]))).status_code == 200
+
+    cross = {"questions": [{**body["questions"][0], "subject_id": ctx["other"].id}]}
+    assert (await client.post(f"{API}/questions/batch", json=cross, headers=_auth(ctx["editor"]))).status_code == 403

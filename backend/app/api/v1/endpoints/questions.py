@@ -5,6 +5,7 @@ from app.api import deps
 from app import capabilities
 from app.capabilities import questions as question_caps
 from app.crud.crud_question import is_question_visible
+from app.core.permissions import Permission
 from app.models.question import QuestionType, QuestionStatus
 from app.core.file_paths import sanitize_client_source_path
 from app.models.import_task import ImportTask, ImportTaskStatus
@@ -144,6 +145,9 @@ async def create_questions_batch_legacy(
     """
     if not batch_in.questions:
         return schemas.LegacyBatchResult()
+
+    for subject_id in {item.subject_id or current_user.last_active_subject_id for item in batch_in.questions}:
+        deps.require(current_user, Permission.EDIT_QUESTION, subject_id=subject_id)
 
     import_task = ImportTask(
         user_id=current_user.id,

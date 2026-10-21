@@ -3,7 +3,7 @@
 鉴权与组稿写路径保持一致(学科作用域的 EDIT_QUESTION):本能力既建题又建稿,
 两个域在同一学科下要求同一权限,故一次判权即可。
 
-刻意不复用 `question.batch_create`:那条能力是 `Authz.NONE`,且在建题前就 commit 了
+刻意不复用 `question.batch_create`:那条能力在建题前就 commit 了
 ImportTask,无法与建稿收进同一事务。
 """
 from __future__ import annotations

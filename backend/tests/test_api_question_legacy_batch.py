@@ -6,6 +6,7 @@ from app.core.security import create_access_token, get_password_hash
 from app.models.question import Question
 from app.models.question_relation import QuestionRelation
 from app.models.subject import Subject
+from app.models.subject_member import SubjectMember
 from app.models.user import User
 
 
@@ -13,6 +14,7 @@ async def test_legacy_batch_partially_succeeds_without_persisting_unresolved(
     client,
     db_session,
 ):
+    subject = Subject(name="数学", slug="legacy-math")
     user = User(
         username="legacy-importer",
         full_name="Legacy Importer",
@@ -20,10 +22,26 @@ async def test_legacy_batch_partially_succeeds_without_persisting_unresolved(
         is_active=True,
         is_superuser=False,
     )
-    db_session.add(user)
+    db_session.add_all([subject, user])
+    await db_session.flush()
+    user.last_active_subject_id = subject.id
+    db_session.add(SubjectMember(user_id=user.id, subject_id=subject.id, role="editor"))
     await db_session.commit()
     await db_session.refresh(user)
     token = create_access_token(subject=user.id)
+
+    viewer = User(username="legacy-viewer", full_name="V", hashed_password="x", is_active=True)
+    db_session.add(viewer)
+    await db_session.flush()
+    viewer.last_active_subject_id = subject.id
+    db_session.add(SubjectMember(user_id=viewer.id, subject_id=subject.id, role="viewer"))
+    await db_session.commit()
+    denied = await client.post(
+        "/api/v1/questions/batch-legacy",
+        headers={"Authorization": f"Bearer {create_access_token(subject=viewer.id)}"},
+        json={"questions": [{"content": "x", "q_type": "free_response"}]},
+    )
+    assert denied.status_code == 403
 
     response = await client.post(
         "/api/v1/questions/batch-legacy",
@@ -80,6 +98,7 @@ async def test_batch_nested_children_create_relations_without_parent_id(
     db_session.add_all([subject, user])
     await db_session.flush()
     user.last_active_subject_id = subject.id
+    db_session.add(SubjectMember(user_id=user.id, subject_id=subject.id, role="editor"))
     await db_session.commit()
     token = create_access_token(subject=user.id)
 

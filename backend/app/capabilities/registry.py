@@ -13,17 +13,10 @@ from .context import ExecutionContext
 
 _REGISTRY: dict[str, Capability] = {}
 
-# 允许 authz=NONE 的能力白名单 —— 这些能力在迁移前就没有任何鉴权。
-# 本期只做搬迁不改行为,故在此登记为「已知缺口」。
+# 允许 authz=NONE 的能力白名单(已知鉴权缺口),当前为空。
 # test_capability_registry 断言集合完全相等:新增漏权限的能力会失败,
 # 补上门禁后忘了摘白名单也会失败。
-UNGATED_ALLOWLIST: frozenset[str] = frozenset(
-    {
-        "question.batch_create",
-        "question.review",
-        "question.batch_confirm",
-    }
-)
+UNGATED_ALLOWLIST: frozenset[str] = frozenset()
 
 
 def register(cls: type[Capability]) -> type[Capability]:

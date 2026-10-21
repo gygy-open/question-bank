@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted, computed, watch } from 'vue'
+import { ref, onActivated, onDeactivated, onUnmounted, computed, watch } from 'vue'
 import { Upload, FileText, CheckCircle, XCircle, Loader2, Ban, Trash2, RefreshCw, ExternalLink, AlertCircle, RotateCcw, Sparkles } from '@lucide/vue'
 import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
@@ -329,15 +329,15 @@ const stopPolling = () => {
     }
 }
 
-onMounted(() => {
+// 页面被 keepalive 缓存：离开时停止轮询，返回时刷新。
+onActivated(() => {
     fetchQueueStatus()
     fetchTasks()
     startPolling()
 })
 
-onUnmounted(() => {
-    stopPolling()
-})
+onDeactivated(stopPolling)
+onUnmounted(stopPolling)
 
 const statusVariant = (status: string) => {
     switch (status) {

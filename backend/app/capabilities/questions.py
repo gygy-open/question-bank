@@ -4,8 +4,6 @@
 端点直连 CRUD 更直接。`POST /questions/batch-legacy` 是遗留兼容端点,同样不迁。
 
 行为与迁移前的端点逐字一致(含「不可见 → 404 而非 403」、批量操作逐条跳过无权项)。
-`question.batch_create` / `review` / `batch_confirm` 迁移前就没有任何鉴权,
-本期只搬不改,登记在 UNGATED_ALLOWLIST 里。
 """
 from __future__ import annotations
 
@@ -190,9 +188,19 @@ class BatchCreateQuestions(Capability[schemas.QuestionBatchCreate, List[Question
     name = "question.batch_create"
     description = "批量创建题目(智能导入落库),同时登记一条已完成的导入任务。"
     input_model = schemas.QuestionBatchCreate
-    authz = Authz.NONE
+    authz = Authz.CUSTOM
     scope = Scope.SUBJECT
     mutating = True
+
+    async def authorize(self, ctx: ExecutionContext, inp: schemas.QuestionBatchCreate, target: Any) -> None:
+        # 整批写入,任一题目的学科无编辑权就整批拒绝。
+        pending = list(inp.questions)
+        while pending:
+            item = pending.pop()
+            subject_id = item.subject_id or ctx.actor.last_active_subject_id
+            if not permissions.can(ctx.actor, Permission.EDIT_QUESTION, subject_id=subject_id):
+                raise Forbidden("The user doesn't have enough privileges")
+            pending.extend(item.children or [])
 
     async def execute(
         self, ctx: ExecutionContext, inp: schemas.QuestionBatchCreate, target: Any
@@ -288,15 +296,13 @@ class ReviewQuestion(Capability[QuestionReviewInput, Question]):
     name = "question.review"
     description = "审核一道题目:通过则累加审核次数并按学科阈值决定是否发布;驳回则退回草稿。"
     input_model = QuestionReviewInput
-    authz = Authz.NONE
+    authz = Authz.PERMISSION
+    permission = Permission.EDIT_QUESTION
     scope = Scope.SUBJECT
     mutating = True
 
     async def load(self, ctx: ExecutionContext, inp: QuestionReviewInput) -> Question:
-        question = await crud.question.get(db=ctx.db, id=inp.id)
-        if not question:
-            raise NotFound("Question not found")
-        return question
+        return await _load_visible_question(ctx, inp.id)
 
     async def execute(self, ctx: ExecutionContext, inp: QuestionReviewInput, target: Question) -> Question:
         if inp.data.action == "approve":
@@ -452,9 +458,9 @@ class BatchUpdateQuestions(Capability[schemas.QuestionBatchUpdate, dict]):
 @register
 class BatchConfirmQuestions(Capability[schemas.QuestionBatchConfirm, dict]):
     name = "question.batch_confirm"
-    description = "批量确认或驳回草稿题目:确认转待审,驳回则软删除。"
+    description = "批量确认或驳回草稿题目:确认转待审,驳回则软删除;无权条目跳过。"
     input_model = schemas.QuestionBatchConfirm
-    authz = Authz.NONE
+    authz = Authz.CUSTOM
     scope = Scope.SUBJECT
     mutating = True
 
@@ -471,8 +477,14 @@ class BatchConfirmQuestions(Capability[schemas.QuestionBatchConfirm, dict]):
 
         processed_count = 0
         for question in questions:
+            if inp.action == "approve":
+                allowed = is_question_visible(question, ctx.actor) and permissions.can(
+                    ctx.actor, Permission.EDIT_QUESTION, subject_id=question.subject_id
+                )
+            else:
+                allowed = can_delete_question(question, ctx.actor)
             # 只处理草稿，避免误改已入库题目。
-            if question.status == QuestionStatus.DRAFT:
+            if allowed and question.status == QuestionStatus.DRAFT:
                 if inp.action == "approve":
                     question.status = QuestionStatus.PENDING
                 elif inp.action == "reject":
