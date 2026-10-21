@@ -16,5 +16,7 @@ config.json
 static/
 uploads/
 data/
+storage/
+tmp/
 
 .env

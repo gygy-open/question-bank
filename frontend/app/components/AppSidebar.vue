@@ -166,7 +166,7 @@ const navActiveClass = 'border-l-2 border-transparent data-[active=true]:border-
           </div>
 
           <div>
-            <SidebarGroupLabel>知识库</SidebarGroupLabel>
+            <SidebarGroupLabel>学科资源</SidebarGroupLabel>
             <SidebarMenu>
               <SidebarMenuItem>
                 <SidebarMenuButton as-child :is-active="route.path === '/knowledge-points'" :class="navActiveClass">
@@ -189,14 +189,6 @@ const navActiveClass = 'border-l-2 border-transparent data-[active=true]:border-
                   <NuxtLink to="/media">
                     <Images />
                     <span>媒体库</span>
-                  </NuxtLink>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-              <SidebarMenuItem v-if="isAdmin || isManagerSomewhere">
-                <SidebarMenuButton as-child :is-active="route.path === '/subjects'" :class="navActiveClass">
-                  <NuxtLink to="/subjects">
-                    <Library />
-                    <span>学科管理</span>
                   </NuxtLink>
                 </SidebarMenuButton>
               </SidebarMenuItem>
@@ -230,6 +222,14 @@ const navActiveClass = 'border-l-2 border-transparent data-[active=true]:border-
               </SidebarMenuButton>
             </SidebarMenuItem>
           </template>
+          <SidebarMenuItem v-if="isAdmin || isManagerSomewhere">
+            <SidebarMenuButton as-child :is-active="route.path === '/subjects'" :class="navActiveClass">
+              <NuxtLink to="/subjects">
+                <Library />
+                <span>学科管理</span>
+              </NuxtLink>
+            </SidebarMenuButton>
+          </SidebarMenuItem>
           <SidebarMenuItem v-if="isAdmin || isManagerSomewhere">
             <SidebarMenuButton as-child :is-active="route.path === '/settings'" :class="navActiveClass">
               <NuxtLink to="/settings">
