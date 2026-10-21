@@ -137,6 +137,34 @@ def test_composition_latex_renderer_produces_nonempty_zip_with_tex():
         os.remove(path)
 
 
+def test_composition_latex_keeps_extension_for_migrated_legacy_images(tmp_path):
+    # 迁移后旧图片位于对象存储,文件名是无扩展名的 sha256;两份旧导入还可能都叫 image1.png。
+    from app.services.exporting.images import ImageResolver
+    from app.services.media_service import StoredImage
+
+    stored_a, stored_b = tmp_path / ("a" * 64), tmp_path / ("b" * 64)
+    stored_a.write_bytes(b"png-a")
+    stored_b.write_bytes(b"png-b")
+    legacy = {
+        "/static/media/x/image1.png": StoredImage(path=stored_a, mime="image/png"),
+        "/static/media/y/image1.png": StoredImage(path=stored_b, mime="image/png"),
+    }
+    doc = CompositionExportDoc(title="t", nodes=[
+        ExportRichTextNode(content={"type": "doc", "content": [
+            {"type": "image", "attrs": {"src": "/static/media/x/image1.png"}},
+            {"type": "image", "attrs": {"src": "/static/media/y/image1.png"}},
+        ]}),
+    ])
+    path = CompositionLatexRenderer(ImageResolver(legacy=legacy)).render(doc)
+    try:
+        with zipfile.ZipFile(path) as zf:
+            images = sorted(n for n in zf.namelist() if n.startswith("images/") and not n.endswith("/"))
+            assert images == ["images/image-1.png", "images/image-2.png"]
+            assert {zf.read(n) for n in images} == {b"png-a", b"png-b"}
+    finally:
+        os.remove(path)
+
+
 def test_composition_registry_resolves_both_formats():
     assert isinstance(composition_renderer_for(OutputFormat.DOCX), CompositionDocxRenderer)
     assert isinstance(composition_renderer_for(OutputFormat.LATEX), CompositionLatexRenderer)

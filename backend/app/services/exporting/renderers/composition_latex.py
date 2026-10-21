@@ -72,10 +72,11 @@ class CompositionLatexRenderer:
                 if resolved is None:
                     return None
                 if resolved.key not in seen:
+                    # 对象存储文件名是无扩展名的 sha256,旧图片又可能重名;统一编号并保留扩展名。
                     name = (
                         f"{resolved.key}{resolved.suffix}"
                         if resolved.key.startswith("asset-")
-                        else resolved.path.name
+                        else f"image-{len(seen) + 1}{resolved.suffix}"
                     )
                     shutil.copy2(resolved.path, images_dir / name)
                     seen[resolved.key] = f"images/{name}"
