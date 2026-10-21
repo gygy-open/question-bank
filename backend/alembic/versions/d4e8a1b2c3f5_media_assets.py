@@ -57,10 +57,5 @@ def downgrade() -> None:
     with op.batch_alter_table('import_tasks', schema=None) as batch_op:
         batch_op.drop_column('source_sha256')
 
-    with op.batch_alter_table('media_assets', schema=None) as batch_op:
-        batch_op.drop_index(batch_op.f('ix_media_assets_subject_id'))
-        batch_op.drop_index(batch_op.f('ix_media_assets_sha256'))
-        batch_op.drop_index(batch_op.f('ix_media_assets_owner_user_id'))
-        batch_op.drop_index(batch_op.f('ix_media_assets_id'))
-        batch_op.drop_index(batch_op.f('ix_media_assets_deleted_at'))
+    # MySQL 不允许先删 FK 依赖的索引(1553);DROP TABLE 会连同索引和外键一起删除。
     op.drop_table('media_assets')
