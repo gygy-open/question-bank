@@ -411,6 +411,7 @@ export type CompositionEventType =
   | 'nodes_replaced'
   | 'question_nodes_synced'
   | 'finalized'
+  | 'media_replaced'
 
 export interface CompositionEventActor {
   id: number

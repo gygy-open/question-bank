@@ -9,8 +9,15 @@ from app.core import storage
 from app.core.permissions import Permission
 from app.crud.crud_subject import subject as crud_subject
 from app.models.media_asset import MediaPurpose
-from app.schemas.media import MediaAssetPage, MediaAssetRead, MediaAssetUpdate, MediaReferences
-from app.services import media_library, media_service
+from app.schemas.media import (
+    MediaAssetPage,
+    MediaAssetRead,
+    MediaAssetUpdate,
+    MediaReferences,
+    MediaReplaceRequest,
+    MediaReplaceResult,
+)
+from app.services import media_library, media_replace, media_service
 
 router = APIRouter()
 subject_router = APIRouter()
@@ -111,6 +118,16 @@ async def delete_media(
     current_user: models.User = Depends(deps.get_current_active_user),
 ) -> None:
     await media_library.delete_asset(db, asset_id, current_user)
+
+
+@router.post("/{asset_id}/replace", response_model=MediaReplaceResult)
+async def replace_media(
+    asset_id: int,
+    payload: MediaReplaceRequest,
+    db: deps.SessionDep,
+    current_user: models.User = Depends(deps.get_current_active_user),
+) -> Any:
+    return await media_replace.replace_asset(db, asset_id, current_user, payload)
 
 
 @router.get("/{asset_id}/references", response_model=MediaReferences)

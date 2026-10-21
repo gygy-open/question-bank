@@ -9,7 +9,9 @@ from sqlalchemy import select
 from app.core.config import settings
 from app.core.permissions import SubjectRole
 from app.core.security import create_access_token
+from app.models.composition import CompositionNode
 from app.models.media_asset import MediaOwnerType, MediaReference
+from app.models.question import Question
 from app.models.subject import Subject
 from app.models.user import User
 
@@ -245,3 +247,54 @@ async def test_update_and_delete_media(client, ctx):
 
     download = await client.get(f"{API}/media/{used}/content?download=true", headers=_auth(ctx["viewer"]))
     assert download.headers["content-disposition"].startswith("attachment")
+
+
+async def test_replace_rewrites_editable_refs_and_keeps_versions(client, ctx, db_session):
+    sid = ctx["subject"].id
+    h = _auth(ctx["editor"])
+    old = await _asset(client, ctx["editor"], sid, "red")
+    new = await _asset(client, ctx["editor"], sid, "blue")
+    foreign = await _asset(client, ctx["editor"], ctx["other_subject"].id, "green")
+
+    mine = (await _create_question(client, ctx["editor"], sid, _doc_with_image(old))).json()
+    await client.put(f"{API}/questions/{mine['id']}", json={"analysis": _doc_with_image(old, "解析")}, headers=h)
+    hidden = (await _create_question(client, ctx["other"], sid, _doc_with_image(old), visibility="private")).json()
+
+    comp = (await client.post(f"{API}/subjects/{sid}/compositions?scope=shared", json={"title": "稿"}, headers=h)).json()
+    base = f"{API}/subjects/{sid}/compositions/{comp['id']}"
+    node = {"id": str(uuid.uuid4()), "node_kind": "block", "node_type": "question", "question_id": mine["id"]}
+    assert (await client.put(f"{base}/nodes?scope=shared", json={"expected_revision": 1, "nodes": [node]}, headers=h)).status_code == 200
+    version = (await client.post(f"{base}/versions?scope=shared", json={"expected_revision": 2}, headers=h)).json()
+
+    url = f"{API}/media/{old}/replace"
+    assert (await client.post(url, json={"new_asset_id": foreign}, headers=h)).status_code == 422
+    assert (await client.post(url, json={"new_asset_id": new}, headers=_auth(ctx["viewer"]))).status_code == 403
+    hidden_target = {"new_asset_id": new, "targets": [{"owner_type": "question", "owner_id": hidden["id"]}]}
+    assert (await client.post(url, json=hidden_target, headers=h)).status_code == 403
+    unrelated = {"new_asset_id": new, "targets": [{"owner_type": "stimulus", "owner_id": 1}]}
+    assert (await client.post(url, json=unrelated, headers=h)).status_code == 422
+
+    result = await client.post(url, json={"new_asset_id": new}, headers=h)
+    assert result.status_code == 200, result.text
+    body = result.json()
+    assert {(t["owner_type"], t["owner_id"]) for t in body["replaced"]} == {
+        ("question", mine["id"]), ("composition", comp["id"]),
+    }
+    assert (body["skipped"], body["frozen"]) == (1, 1)
+
+    question = (await client.get(f"{API}/questions/{mine['id']}", headers=h)).json()
+    assert question["content"]["content"][1]["attrs"] == {"src": f"/api/v1/media/{new}/content", "assetId": new}
+    assert question["analysis"]["content"][1]["attrs"]["assetId"] == new
+    assert await _refs(db_session, MediaOwnerType.QUESTION, mine["id"]) == {new}
+    assert await _refs(db_session, MediaOwnerType.QUESTION, hidden["id"]) == {old}
+    assert await _refs(db_session, MediaOwnerType.COMPOSITION, comp["id"]) == {new}
+    assert await _refs(db_session, MediaOwnerType.COMPOSITION_VERSION, version["id"]) == {old}
+
+    # 原本已同步的稿件节点跟随新的题目内容版本,不被误报为过期。
+    rows = await db_session.execute(
+        select(CompositionNode.question_revision, Question.content_revision)
+        .join(Question, Question.id == CompositionNode.question_id)
+        .where(CompositionNode.composition_id == comp["id"])
+    )
+    pinned, current = rows.one()
+    assert pinned == current

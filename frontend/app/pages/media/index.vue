@@ -274,5 +274,5 @@ function usageLabel(count: number) {
         </div>
     </main>
 
-    <MediaDetailSheet v-model:open="detailOpen" :asset="selected" :can-edit="canEdit" @updated="onUpdated" @deleted="onDeleted" />
+    <MediaDetailSheet v-model:open="detailOpen" :asset="selected" :can-edit="canEdit" @updated="onUpdated" @deleted="onDeleted" @replaced="load" />
 </template>

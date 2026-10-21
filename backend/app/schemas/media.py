@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import List, Optional
+from typing import List, Literal, Optional
 
 from pydantic import BaseModel, ConfigDict, Field, computed_field
 
@@ -44,6 +44,23 @@ class MediaAssetUpdate(BaseModel):
     original_filename: Optional[str] = Field(default=None, max_length=255)
     alt: Optional[str] = Field(default=None, max_length=500)
     source: Optional[str] = Field(default=None, max_length=255)
+
+
+class MediaReplaceTarget(BaseModel):
+    owner_type: Literal["question", "stimulus", "composition"]
+    owner_id: int
+
+
+class MediaReplaceRequest(BaseModel):
+    new_asset_id: int
+    # 缺省 = 全部可编辑的引用方。
+    targets: Optional[List[MediaReplaceTarget]] = None
+
+
+class MediaReplaceResult(BaseModel):
+    replaced: List[MediaReplaceTarget]
+    skipped: int = 0
+    frozen: int = 0
 
 
 class MediaAssetPage(BaseModel):

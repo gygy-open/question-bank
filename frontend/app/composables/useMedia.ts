@@ -34,6 +34,17 @@ export interface MediaAssetUpdate {
     source?: string | null
 }
 
+export interface MediaReplaceTarget {
+    owner_type: 'question' | 'stimulus' | 'composition'
+    owner_id: number
+}
+
+export interface MediaReplaceResult {
+    replaced: MediaReplaceTarget[]
+    skipped: number
+    frozen: number
+}
+
 export type UserMediaPurpose = 'avatar' | 'chat'
 
 export interface MediaAssetListItem extends MediaAsset {
@@ -105,5 +116,13 @@ export function useMedia() {
         return await $api<MediaReferences>(`/media/${id}/references`)
     }
 
-    return { uploadContentImage, uploadUserMedia, listSubjectMedia, updateMedia, deleteMedia, getMediaReferences }
+    /** targets 缺省时替换全部可编辑的引用。 */
+    async function replaceMedia(id: number, newAssetId: number, targets?: MediaReplaceTarget[]): Promise<MediaReplaceResult> {
+        return await $api<MediaReplaceResult>(`/media/${id}/replace`, {
+            method: 'POST',
+            body: { new_asset_id: newAssetId, targets },
+        })
+    }
+
+    return { uploadContentImage, uploadUserMedia, listSubjectMedia, updateMedia, deleteMedia, getMediaReferences, replaceMedia }
 }

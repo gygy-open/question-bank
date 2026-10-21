@@ -1,18 +1,21 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
-import { Download, ExternalLink, ImageOff, Loader2, Trash2 } from '@lucide/vue'
+import { Download, ExternalLink, ImageOff, Loader2, Replace, Trash2 } from '@lucide/vue'
 import { toast } from 'vue-sonner'
+import MediaPickerDialog from '@/components/media/MediaPickerDialog.vue'
+import MediaReplaceDialog from '@/components/media/MediaReplaceDialog.vue'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet'
 import { useMedia, type MediaAssetListItem, type MediaReferences } from '@/composables/useMedia'
+import type { UploadedImageAttrs } from '@/components/rich-editor/useImageUpload'
 import { getApiErrorDetail } from '@/lib/apiErrors'
-import { formatBytes, groupMediaReferences, mediaReferenceLink } from '@/lib/mediaLibrary'
+import { formatBytes, groupMediaReferences, mediaReferenceLink, replaceableReferences } from '@/lib/mediaLibrary'
 
 const open = defineModel<boolean>('open', { required: true })
 const props = defineProps<{ asset: MediaAssetListItem | null; canEdit: boolean }>()
-const emit = defineEmits<{ updated: [asset: MediaAssetListItem]; deleted: [id: number] }>()
+const emit = defineEmits<{ updated: [asset: MediaAssetListItem]; deleted: [id: number]; replaced: [] }>()
 
 const { updateMedia, deleteMedia, getMediaReferences } = useMedia()
 
@@ -24,6 +27,24 @@ const loadingRefs = ref(false)
 
 const groups = computed(() => groupMediaReferences(references.value?.items ?? []))
 const referenceCount = computed(() => (references.value?.items.length ?? 0) + (references.value?.hidden_count ?? 0))
+const replaceableCount = computed(() => replaceableReferences(references.value?.items ?? []).length)
+const pickerOpen = ref(false)
+const replaceOpen = ref(false)
+const replacement = ref<UploadedImageAttrs | null>(null)
+
+function onPicked(attrs: UploadedImageAttrs) {
+    if (attrs.assetId === props.asset?.id) {
+        toast.info('请选择另一张图片')
+        return
+    }
+    replacement.value = attrs
+    replaceOpen.value = true
+}
+
+function onReplaced() {
+    emit('replaced')
+    open.value = false
+}
 const dirty = computed(() => {
     const a = props.asset
     if (!a) return false
@@ -154,6 +175,16 @@ async function remove() {
                         v-if="canEdit"
                         variant="outline"
                         size="sm"
+                        :disabled="loadingRefs || replaceableCount === 0"
+                        :title="replaceableCount === 0 ? '没有可替换的引用' : ''"
+                        @click="pickerOpen = true"
+                    >
+                        <Replace class="mr-2 size-4" />替换
+                    </Button>
+                    <Button
+                        v-if="canEdit"
+                        variant="outline"
+                        size="sm"
                         class="text-destructive"
                         :disabled="deleting || loadingRefs || referenceCount > 0"
                         :title="referenceCount > 0 ? '仍被内容引用，需先从这些内容中移除后才能删除' : ''"
@@ -162,8 +193,12 @@ async function remove() {
                         <Trash2 class="mr-2 size-4" />删除
                     </Button>
                 </div>
-                <p v-if="canEdit && referenceCount > 0" class="text-xs text-muted-foreground">仍被内容引用的图片不能删除；已冻结的定稿版本会一直保留其引用。</p>
+                <p v-if="canEdit && referenceCount > 0" class="text-xs text-muted-foreground">仍被内容引用的图片不能删除；可以先替换成其他图片。已冻结的定稿版本会一直保留其引用。</p>
             </div>
         </SheetContent>
     </Sheet>
+    <template v-if="asset && canEdit">
+        <MediaPickerDialog v-model:open="pickerOpen" @select="onPicked" />
+        <MediaReplaceDialog v-model:open="replaceOpen" :asset="asset" :replacement="replacement" :references="references" @replaced="onReplaced" />
+    </template>
 </template>

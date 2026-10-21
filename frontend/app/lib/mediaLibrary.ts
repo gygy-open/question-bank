@@ -1,4 +1,4 @@
-import type { MediaReferenceItem } from '@/composables/useMedia'
+import type { MediaReferenceItem, MediaReplaceResult, MediaReplaceTarget } from '@/composables/useMedia'
 
 export const MEDIA_OWNER_LABELS: Record<string, string> = {
     question: '题目',
@@ -38,4 +38,21 @@ export function formatBytes(bytes: number): string {
     if (bytes < 1024) return `${bytes} B`
     if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
     return `${(bytes / 1024 / 1024).toFixed(1)} MB`
+}
+
+/** 可被替换的引用：定稿版本永不改动。 */
+export function replaceableReferences(items: MediaReferenceItem[]): (MediaReferenceItem & MediaReplaceTarget)[] {
+    return items.filter((item): item is MediaReferenceItem & MediaReplaceTarget =>
+        item.owner_type === 'question' || item.owner_type === 'stimulus' || item.owner_type === 'composition')
+}
+
+export function referenceKey(item: { owner_type: string; owner_id: number }): string {
+    return `${item.owner_type}-${item.owner_id}`
+}
+
+export function replaceSummary(result: MediaReplaceResult): string {
+    const parts = [`已替换 ${result.replaced.length} 处引用`]
+    if (result.skipped) parts.push(`${result.skipped} 处无权修改未替换`)
+    if (result.frozen) parts.push(`${result.frozen} 个定稿版本保持原图`)
+    return parts.join('，')
 }

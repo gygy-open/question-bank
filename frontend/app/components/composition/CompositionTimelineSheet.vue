@@ -7,7 +7,7 @@ import {
 import { Button } from '@/components/ui/button'
 import {
   Loader2, Clock, RefreshCw, AlertTriangle,
-  FilePlus, Pencil, FolderInput, Trash2, RotateCcw, Save, CheckCircle2,
+  FilePlus, Pencil, FolderInput, Trash2, RotateCcw, Save, CheckCircle2, Image as ImageIcon,
 } from '@lucide/vue'
 import { useCompositions } from '~/composables/useCompositions'
 import type { CompositionEvent, CompositionEventType, CompositionScope } from '~/types'
@@ -38,6 +38,7 @@ const EVENT_META: Record<CompositionEventType, { label: string; icon: unknown }>
   nodes_replaced: { label: '保存内容', icon: Save },
   question_nodes_synced: { label: '同步题目', icon: RefreshCw },
   finalized: { label: '定稿', icon: CheckCircle2 },
+  media_replaced: { label: '替换图片', icon: ImageIcon },
 }
 
 function metaFor(type: CompositionEventType) {
