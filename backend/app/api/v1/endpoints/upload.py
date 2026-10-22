@@ -5,11 +5,16 @@ import shutil
 import uuid
 from pathlib import Path
 
-from fastapi import APIRouter, File, HTTPException, UploadFile
+from typing import Annotated
+
+from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 from pydantic import BaseModel
 from sqlalchemy import select
 
 from app.api import deps
+from app.models.user import User
+
+ActiveUser = Annotated[User, Depends(deps.get_current_active_user)]
 from app.core.config import settings
 from app.models.composition import Composition
 from app.models.import_task import ImportTask
@@ -65,6 +70,7 @@ class MarkdownContentRequest(BaseModel):
 @router.post("/docx")
 async def upload_docx(
     db: deps.SessionDep,
+    current_user: ActiveUser,
     file: UploadFile = File(...),
     mode: str = "extract",
     method: str = "ai",
@@ -86,7 +92,7 @@ async def upload_docx(
     await asyncio.to_thread(file_path.write_bytes, content)
     
     try:
-        result = await doc_processor.process_docx(file_path, db=db, mode=mode, method=method, subject_id=subject_id)
+        result = await doc_processor.process_docx(file_path, db=db, mode=mode, method=method, subject_id=subject_id, user_id=current_user.id)
         _as_review(result, subject_id)
         result["file_path"] = str(file_path)
         await _attach_duplicate_hint(result, db, content)
@@ -104,6 +110,7 @@ async def upload_docx(
 @router.post("/markdown")
 async def upload_markdown(
     db: deps.SessionDep,
+    current_user: ActiveUser,
     file: UploadFile = File(None),
     mode: str = "extract",
     method: str = "ai",
@@ -130,7 +137,7 @@ async def upload_markdown(
     markdown_content = markdown_content_bytes.decode('utf-8')
     
     try:
-        result = await doc_processor.process_markdown(markdown_content, db=db, filename=file.filename, mode=mode, method=method, subject_id=subject_id)
+        result = await doc_processor.process_markdown(markdown_content, db=db, filename=file.filename, mode=mode, method=method, subject_id=subject_id, user_id=current_user.id)
         _as_review(result, subject_id)
         result["file_path"] = str(file_path)
         await _attach_duplicate_hint(result, db, markdown_content_bytes)
@@ -148,11 +155,12 @@ async def upload_markdown(
 @router.post("/markdown-text")
 async def upload_markdown_text(
     db: deps.SessionDep,
+    current_user: ActiveUser,
     request: MarkdownContentRequest
 ):
     """Process markdown content from text input."""
     try:
-        result = await doc_processor.process_markdown(request.content, db=db, filename=request.filename, mode=request.mode, method=request.method, subject_id=request.subject_id)
+        result = await doc_processor.process_markdown(request.content, db=db, filename=request.filename, mode=request.mode, method=request.method, subject_id=request.subject_id, user_id=current_user.id)
         _as_review(result, request.subject_id)
         return result
     except Exception as e:
@@ -168,6 +176,7 @@ async def upload_markdown_text(
 @router.post("/markdown-archive")
 async def upload_markdown_archive(
     db: deps.SessionDep,
+    current_user: ActiveUser,
     file: UploadFile = File(...),
     mode: str = "extract",
     method: str = "ai",
@@ -186,7 +195,7 @@ async def upload_markdown_archive(
     await asyncio.to_thread(file_path.write_bytes, content)
 
     try:
-        result = await doc_processor.process_markdown_archive(file_path, db=db, mode=mode, method=method, subject_id=subject_id)
+        result = await doc_processor.process_markdown_archive(file_path, db=db, mode=mode, method=method, subject_id=subject_id, user_id=current_user.id)
         _as_review(result, subject_id)
         result["file_path"] = str(file_path)
         return result
@@ -205,6 +214,7 @@ async def upload_markdown_archive(
 @router.post("/image-recognition")
 async def upload_image_recognition(
     db: deps.SessionDep,
+    current_user: ActiveUser,
     file: UploadFile = File(...),
     mode: str = "extract",
     subject_id: int = None,
@@ -214,7 +224,7 @@ async def upload_image_recognition(
         raise HTTPException(status_code=400, detail="Only image files are supported")
     
     try:
-        result = await doc_processor.process_image(file.file, db=db, mode=mode, subject_id=subject_id)
+        result = await doc_processor.process_image(file.file, db=db, mode=mode, subject_id=subject_id, user_id=current_user.id)
         _as_review(result, subject_id)
         return result
     except Exception as e:

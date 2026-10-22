@@ -20,7 +20,7 @@ class DocProcessor:
     def _extractor_for(self, method: str) -> ExtractionStrategy:
         return self._template_extractor if method == "structured" else self._ai_extractor
 
-    async def process_markdown(self, content: str, db: AsyncSession, filename: str = None, task_id: str = None, mode: str = "extract", method: str = "ai", subject_id: Optional[int] = None) -> dict:
+    async def process_markdown(self, content: str, db: AsyncSession, filename: str = None, task_id: str = None, mode: str = "extract", method: str = "ai", subject_id: Optional[int] = None, user_id: Optional[int] = None) -> dict:
         """
         Process markdown content directly and extract questions.
         
@@ -37,7 +37,7 @@ class DocProcessor:
         """
         doc = await self._markdown_ingestor.ingest(content, task_id=task_id, filename=filename)
         extraction = await self._extractor_for(method).extract(
-            doc.markdown, db, filename=doc.filename, mode=mode, subject_id=subject_id
+            doc.markdown, db, filename=doc.filename, mode=mode, subject_id=subject_id, user_id=user_id
         )
         return {
             "task_id": doc.task_id,
@@ -46,7 +46,7 @@ class DocProcessor:
             "paper": extraction.paper,
         }
 
-    async def process_markdown_archive(self, file_path: Path, db: AsyncSession, task_id: str = None, mode: str = "extract", method: str = "ai", subject_id: Optional[int] = None) -> dict:
+    async def process_markdown_archive(self, file_path: Path, db: AsyncSession, task_id: str = None, mode: str = "extract", method: str = "ai", subject_id: Optional[int] = None, user_id: Optional[int] = None) -> dict:
         """Extract a markdown archive (zip with local images) and parse questions.
 
         Local image refs are rewritten to /static/media/{task_id}/... before extraction; multiple
@@ -54,7 +54,7 @@ class DocProcessor:
         """
         doc = await self._markdown_archive_ingestor.ingest(file_path, task_id=task_id)
         extraction = await self._extractor_for(method).extract(
-            doc.markdown, db, filename=doc.filename, mode=mode, subject_id=subject_id
+            doc.markdown, db, filename=doc.filename, mode=mode, subject_id=subject_id, user_id=user_id
         )
         return {
             "task_id": doc.task_id,
@@ -63,7 +63,7 @@ class DocProcessor:
             "paper": extraction.paper,
         }
 
-    async def process_image(self, image_file: BinaryIO, db: AsyncSession, task_id: str = None, mode: str = "extract", subject_id: Optional[int] = None) -> dict:
+    async def process_image(self, image_file: BinaryIO, db: AsyncSession, task_id: str = None, mode: str = "extract", subject_id: Optional[int] = None, user_id: Optional[int] = None) -> dict:
         """
         Process image file and extract questions using Gemini Vision.
         
@@ -78,7 +78,7 @@ class DocProcessor:
         """
         doc = await self._image_ingestor.ingest(image_file, task_id=task_id)
         extraction = await self._ai_extractor.extract(
-            "", db, image_data=doc.image_data, mode=mode, subject_id=subject_id
+            "", db, image_data=doc.image_data, mode=mode, subject_id=subject_id, user_id=user_id
         )
         return {
             "task_id": doc.task_id,
@@ -87,13 +87,13 @@ class DocProcessor:
             "paper": extraction.paper,
         }
 
-    async def process_docx(self, file_path: Path, db: AsyncSession = None, task_id: str = None, mode: str = "extract", method: str = "ai", subject_id: Optional[int] = None) -> dict:
+    async def process_docx(self, file_path: Path, db: AsyncSession = None, task_id: str = None, mode: str = "extract", method: str = "ai", subject_id: Optional[int] = None, user_id: Optional[int] = None) -> dict:
         """
         Convert docx to markdown, extract media, and parse questions using Gemini.
         """
         doc = await self._docx_ingestor.ingest(file_path, task_id=task_id)
         extraction = await self._extractor_for(method).extract(
-            doc.markdown, db, filename=doc.filename, mode=mode, subject_id=subject_id
+            doc.markdown, db, filename=doc.filename, mode=mode, subject_id=subject_id, user_id=user_id
         )
         return {
             "task_id": doc.task_id,

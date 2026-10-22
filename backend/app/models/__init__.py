@@ -10,7 +10,7 @@ from .import_task import ImportTask
 from .activity_log import ActivityLog
 from .system_setting import SystemSetting
 from .subject_prompt import SubjectPrompt
-from .ai_config import AIProvider, AIModel
+from .ai_config import AIProvider, AIModel, UserAIPreference
 from .chat import ChatSession, ChatMessage
 from .agent import AgentRun, AgentStep
 from .prompt import PromptTemplate

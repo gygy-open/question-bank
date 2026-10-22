@@ -7,33 +7,7 @@ from app.models.ai_config import AIProvider, AIModel
 from app.schemas.ai_config import AIProviderCreate, AIProviderUpdate, AIModelCreate, AIModelUpdate
 
 class CRUDAIProvider(CRUDBase[AIProvider, AIProviderCreate, AIProviderUpdate]):
-    async def create_with_models(self, db: AsyncSession, *, obj_in: AIProviderCreate) -> AIProvider:
-        db_obj = AIProvider(
-            name=obj_in.name,
-            interface_type=obj_in.interface_type,
-            base_url=obj_in.base_url,
-            api_key=obj_in.api_key,
-            is_active=obj_in.is_active
-        )
-        db.add(db_obj)
-        await db.flush() # Get ID
-        
-        for model_in in obj_in.models:
-            db_model = AIModel(
-                provider_id=db_obj.id,
-                name=model_in.name,
-                is_vision_capable=model_in.is_vision_capable,
-                is_embedding_model=model_in.is_embedding_model
-            )
-            db.add(db_model)
-        
-        await db.commit()
-        await db.refresh(db_obj)
-        # Re-fetch with models loaded
-        query = select(AIProvider).options(selectinload(AIProvider.models)).where(AIProvider.id == db_obj.id)
-        result = await db.execute(query)
-        return result.scalar_one()
-
+    # 写操作走 app.services.ai_config_service(负责 Key 加密与归属校验)。
     async def get_multi_with_models(self, db: AsyncSession, *, skip: int = 0, limit: int = 100) -> List[AIProvider]:
         query = select(AIProvider).options(selectinload(AIProvider.models)).offset(skip).limit(limit)
         result = await db.execute(query)

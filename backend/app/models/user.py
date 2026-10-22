@@ -47,6 +47,14 @@ class User(Base):
     # Paper
     papers = relationship("Paper", back_populates="owner", cascade="all, delete-orphan")
 
+    # 个人 AI 服务商(删除用户时连同其模型一并删除)
+    ai_providers = relationship(
+        "AIProvider", back_populates="owner", cascade="all, delete-orphan"
+    )
+    ai_preference = relationship(
+        "UserAIPreference", cascade="all, delete-orphan", uselist=False
+    )
+
     # 学科成员关系(承载学科作用域角色)
     subject_memberships = relationship(
         "SubjectMember", back_populates="user", cascade="all, delete-orphan"

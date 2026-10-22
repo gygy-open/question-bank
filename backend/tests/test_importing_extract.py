@@ -74,7 +74,7 @@ async def test_extract_masks_images_before_ai_and_restores_after(monkeypatch, db
         [AIQuestion(q_type="single_choice", content="第一题：见图 @@IMG0@@")]
     )
 
-    async def _stub_resolve_active_provider(db, *, is_vision=False):
+    async def _stub_resolve_active_provider(db, *, is_vision=False, user_id=None):
         return "gemini", {}
 
     monkeypatch.setattr(extract_module, "resolve_active_provider", _stub_resolve_active_provider)
@@ -106,7 +106,7 @@ async def test_extract_strips_hallucinated_placeholder_not_in_map(monkeypatch, d
         ]
     )
 
-    async def _stub_resolve_active_provider(db, *, is_vision=False):
+    async def _stub_resolve_active_provider(db, *, is_vision=False, user_id=None):
         return "gemini", {}
 
     monkeypatch.setattr(extract_module, "resolve_active_provider", _stub_resolve_active_provider)
@@ -137,7 +137,7 @@ async def test_extract_recovers_when_ai_writes_wrong_placeholder_number(monkeypa
         ]
     )
 
-    async def _stub_resolve_active_provider(db, *, is_vision=False):
+    async def _stub_resolve_active_provider(db, *, is_vision=False, user_id=None):
         return "gemini", {}
 
     monkeypatch.setattr(extract_module, "resolve_active_provider", _stub_resolve_active_provider)
@@ -153,7 +153,7 @@ async def test_extract_recovers_when_ai_writes_wrong_placeholder_number(monkeypa
 async def test_extract_without_images_is_a_no_op_for_masking(monkeypatch, db_session):
     stub_provider = _StubProvider([AIQuestion(q_type="single_choice", content="没有图片的题目")])
 
-    async def _stub_resolve_active_provider(db, *, is_vision=False):
+    async def _stub_resolve_active_provider(db, *, is_vision=False, user_id=None):
         return "gemini", {}
 
     monkeypatch.setattr(extract_module, "resolve_active_provider", _stub_resolve_active_provider)

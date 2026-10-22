@@ -5,13 +5,24 @@ import { Textarea } from '@/components/ui/textarea'
 import {
   Select,
   SelectContent,
+  SelectGroup,
   SelectItem,
+  SelectLabel,
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
 import { useGlobalChat } from '@/composables/useGlobalChat'
 
 const chat = useGlobalChat()
+
+const modelGroups = computed(() => {
+  const models = chat.allModels.value
+  const mine = models.filter(m => m.isPersonal)
+  const shared = models.filter(m => !m.isPersonal)
+  return mine.length && shared.length
+    ? [{ label: '我的模型', items: mine }, { label: '全局模型', items: shared }]
+    : [{ label: '', items: models }]
+})
 const fileInputRef = ref<HTMLInputElement | null>(null)
 
 const triggerFileInput = () => fileInputRef.value?.click()
@@ -70,12 +81,18 @@ const onEnter = (e: KeyboardEvent) => {
           <SelectValue placeholder="选择模型" />
         </SelectTrigger>
         <SelectContent>
-          <SelectItem v-for="model in chat.allModels.value" :key="model.id" :value="model.id.toString()">
-            <div class="flex items-center gap-2">
-              <span>{{ model.displayName }}</span>
-              <ImageIcon v-if="model.is_vision_capable" class="h-3 w-3 text-muted-foreground" />
-            </div>
-          </SelectItem>
+          <SelectGroup v-for="group in modelGroups" :key="group.label">
+            <SelectLabel v-if="group.label" class="text-xs">{{ group.label }}</SelectLabel>
+            <SelectItem v-for="model in group.items" :key="model.id" :value="model.id.toString()">
+              <div class="flex items-center gap-2">
+                <span>{{ model.displayName }}</span>
+                <ImageIcon v-if="model.is_vision_capable" class="h-3 w-3 text-muted-foreground" />
+              </div>
+            </SelectItem>
+          </SelectGroup>
+          <div v-if="!chat.allModels.value.length" class="px-2 py-1.5 text-xs text-muted-foreground">
+            暂无可用模型，请在“设置 → 我的 AI 模型”中配置
+          </div>
         </SelectContent>
       </Select>
     </div>

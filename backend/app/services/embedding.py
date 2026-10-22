@@ -10,6 +10,7 @@ from app.db.session import SessionLocal
 from app.crud.crud_system_setting import system_setting
 from app.models.ai_config import AIModel
 from app.core.vector_store import VectorStore
+from app.core.secrets import decrypt_secret
 
 logger = logging.getLogger(__name__)
 
@@ -100,17 +101,17 @@ async def reload_embedding_function():
                 result = await db.execute(stmt)
                 model = result.scalar_one_or_none()
                 
-                if model and model.provider:
+                if model and model.provider and model.provider.owner_id is None:
                     ef = AIProviderEmbeddingFunction(
                         provider_type=model.provider.interface_type,
-                        api_key=model.provider.api_key,
+                        api_key=decrypt_secret(model.provider.api_key),
                         base_url=model.provider.base_url,
                         model_name=model.name
                     )
                     VectorStore.set_embedding_function(ef)
                     logger.info(f"Initialized VectorStore with embedding model: {model.name} ({model.provider.name})")
                 else:
-                    logger.error(f"Embedding model ID {model_id} not found or has no provider. Vector Store unavailable.")
+                    logger.error(f"Embedding model ID {model_id} not found, has no provider, or is not global. Vector Store unavailable.")
                     VectorStore.set_embedding_function(None)
             except ValueError:
                 logger.error(f"Invalid AI_EMBEDDING_MODEL_ID value: {setting.value}")

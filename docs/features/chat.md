@@ -10,7 +10,7 @@ AI 对话提供基于会话的多模型聊天，支持图片输入、Provider / 
 
 ## 多模型
 
-- 支持 OpenAI、Gemini、DeepSeek 及兼容 API（通过 [AI 供应商与模型](/admin/ai-config) 配置）。
+- 支持 OpenAI、Gemini、DeepSeek 及兼容 API（通过 [AI 服务商与模型](/admin/ai-config) 配置；用户可在「设置 → 我的 AI 模型」接入自己的服务商）。
 - 可选择用于对话的**文本模型**；图片输入需要**视觉模型**。
 
 激活模型由系统参数控制：

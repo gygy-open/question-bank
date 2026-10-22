@@ -61,7 +61,7 @@
 
 ## AI 配置为数据库驱动
 
-AI 供应商 / 模型 / Key 存于数据库（`ai_providers`、`ai_models`），而非环境变量，支持热切换。新增供应商需实现 `app/services/ai_provider.py` 中的 `AIProvider` 接口。
+AI 供应商 / 模型 / Key 存于数据库（`ai_providers`、`ai_models`、`user_ai_preferences`），而非环境变量，支持热切换。`ai_providers.owner_id` 为空表示全局服务商，非空表示用户个人服务商；Key 加密存储（`app/core/secrets.py`）。调用方统一经 `app/services/ai_resolver.py` 按「显式指定 → 个人默认 → 全局」解析模型。新增供应商需实现 `app/services/ai_provider.py` 中的 `AIProvider` 接口。
 
 ## 图解
 

@@ -1,11 +1,11 @@
 from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
-from sqlalchemy.orm import selectinload
 from app.api import deps
 from app.schemas.chat import ChatRequest, ChatSession, ChatSessionCreate, ChatSessionUpdate, ChatMessageCreate, ChatMessage, ChatSessionSummary, ChatMessageUpdate, ClientToolResult
 from app.models.chat import ChatMessage as ChatMessageModel
-from app.models.ai_config import AIModel
+from app.capabilities.errors import Invalid
+from app.services.ai_resolver import get_usable_model, resolve_model, supports
 from app.crud.crud_chat import chat_session, chat_message
 from app.db.session import SessionLocal
 from app.services.ai_provider import get_ai_provider
@@ -187,23 +187,16 @@ async def chat_generator(session_id: str, new_user_message: ChatMessageCreate, m
         scene_context=scene_context,
     )
 
-    result = await db.execute(
-        select(AIModel)
-        .options(selectinload(AIModel.provider))
-        .where(AIModel.id == model_id)
-        .with_for_update()
-    )
-    ai_model = result.scalars().first()
-    if not ai_model:
-        yield "Error: Model not found"
+    try:
+        resolved = await resolve_model(
+            db, user_id=current_user.id, purpose="text", model_id=model_id, lock=True
+        )
+    except Invalid as exc:
+        yield sse_pack("message", f"[Error: {exc}]")
+        yield sse_pack("done", {})
         return
-
-    provider_config = {
-        "MODEL_NAME": ai_model.name,
-        "API_KEY": ai_model.provider.api_key,
-    }
-    if ai_model.provider.base_url:
-        provider_config["BASE_URL"] = ai_model.provider.base_url
+    ai_model = resolved.model
+    provider_config = resolved.config
 
     service_provider = get_ai_provider(ai_model.provider.interface_type)
     runner = AgentRunner(service_provider, provider_config)
@@ -360,6 +353,10 @@ async def create_message(
         raise HTTPException(status_code=404, detail="Session not found")
     if session.user_id != current_user.id:
         raise HTTPException(status_code=403, detail="Not authorized")
+
+    model = await get_usable_model(db, user_id=current_user.id, model_id=request.model_id)
+    if model is None or not supports(model, "text"):
+        raise HTTPException(status_code=400, detail="所选模型不存在、已停用、不支持对话或无权使用")
 
     return StreamingResponse(
         chat_generator(session_id, request.message, request.model_id, db, current_user, background_tasks, request.subject_id, request.scene, request.scene_context),

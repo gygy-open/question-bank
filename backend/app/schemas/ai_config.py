@@ -1,5 +1,8 @@
-from pydantic import BaseModel, field_validator
-from typing import Optional, List
+from pydantic import BaseModel, ConfigDict, field_validator
+from typing import Literal, Optional, List
+
+InterfaceType = Literal["openai", "gemini"]
+
 
 class AIModelBase(BaseModel):
     name: str
@@ -23,12 +26,11 @@ class AIModel(AIModelBase):
     id: int
     provider_id: int
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 class AIProviderBase(BaseModel):
     name: str
-    interface_type: str
+    interface_type: InterfaceType
     base_url: Optional[str] = None
     is_active: bool = True
 
@@ -38,14 +40,57 @@ class AIProviderCreate(AIProviderBase):
 
 class AIProviderUpdate(BaseModel):
     name: Optional[str] = None
-    interface_type: Optional[str] = None
+    interface_type: Optional[InterfaceType] = None
     base_url: Optional[str] = None
     api_key: Optional[str] = None
     is_active: Optional[bool] = None
 
 class AIProvider(AIProviderBase):
+    """响应体从不包含 API Key,只告知是否已设置。"""
+
     id: int
+    interface_type: str  # 兼容历史数据,响应不做枚举校验
+    owner_id: Optional[int] = None
+    owner_name: Optional[str] = None
+    is_personal: bool = False
+    api_key_set: bool = False
     models: List[AIModel] = []
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
+
+
+class DiscoverModelsRequest(BaseModel):
+    """新建时传完整凭据;编辑已有服务商时可只传 provider_id,后端用已保存的 Key。"""
+
+    interface_type: Optional[InterfaceType] = None
+    base_url: Optional[str] = None
+    api_key: Optional[str] = None
+    provider_id: Optional[int] = None
+
+
+class DiscoveredModel(AIModelBase):
+    pass
+
+
+class DiscoverModelsResponse(BaseModel):
+    ok: bool
+    message: str
+    models: List[DiscoveredModel] = []
+
+
+class UserAIPreferenceUpdate(BaseModel):
+    text_model_id: Optional[int] = None
+    vision_model_id: Optional[int] = None
+
+
+class EffectiveModel(BaseModel):
+    model_id: Optional[int] = None
+    source: Optional[Literal["personal", "global"]] = None
+    error: Optional[str] = None
+
+
+class UserAIPreference(UserAIPreferenceUpdate):
+    """个人默认 + 实际生效的模型(个人默认不可用时回落到全局)。"""
+
+    effective_text: EffectiveModel = EffectiveModel()
+    effective_vision: EffectiveModel = EffectiveModel()

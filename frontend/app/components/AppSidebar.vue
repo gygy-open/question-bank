@@ -219,11 +219,11 @@ const navActiveClass = 'border-l-2 border-transparent data-[active=true]:border-
               </SidebarMenuButton>
             </SidebarMenuItem>
           </template>
-          <SidebarMenuItem v-if="isAdmin || isManagerSomewhere">
+          <SidebarMenuItem>
             <SidebarMenuButton as-child :is-active="route.path === '/settings'" :class="navActiveClass">
               <NuxtLink to="/settings">
                 <Settings />
-                <span>{{ isAdmin ? '系统设置' : '提示词配置' }}</span>
+                <span>{{ isAdmin ? '系统设置' : '设置' }}</span>
               </NuxtLink>
             </SidebarMenuButton>
           </SidebarMenuItem>
