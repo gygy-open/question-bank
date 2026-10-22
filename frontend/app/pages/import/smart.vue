@@ -324,6 +324,7 @@ const handleUploadDocx = async () => {
         })
 
         acceptExtraction(data)
+        for (const w of data?.warnings ?? []) toast.warning(w)
     } catch (e: any) {
         error.value = e.message
     } finally {

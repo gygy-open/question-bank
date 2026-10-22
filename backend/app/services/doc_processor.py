@@ -100,6 +100,7 @@ class DocProcessor:
             "content": doc.markdown,
             "questions": extraction.questions,
             "paper": extraction.paper,
+            "warnings": doc.warnings,
         }
 
 doc_processor = DocProcessor()

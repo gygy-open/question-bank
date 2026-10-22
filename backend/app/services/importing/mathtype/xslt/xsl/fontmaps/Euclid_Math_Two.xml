@@ -1,0 +1,73 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<symbols>
+  <!--  *
+        * Euclid Math Two: http://www.dessci.com/en/products/mathtype/misc/euclid_math2_plain.gif
+        * -->
+  <!-- SPACE -->
+  <symbol number="0009" entity="&#x0009;" char="&#x0020;"/>
+  <!-- SUBSET OF WITH NOT EQUAL TO -->
+  <symbol number="00D8" entity="&#xea42;" char="&#x228a;"/>
+  <!-- SUPERSET OF WITH NOT EQUAL TO -->
+  <symbol number="00D9" entity="&#xea43;" char="&#x228b;"/>
+  <!-- MATHEMATICAL DOUBLE-STRUCK CAPITAL A -->
+  <symbol number="0041" entity="&#xea41;" char="&#x1d538;"/>
+  <!-- MATHEMATICAL DOUBLE-STRUCK CAPITAL B -->
+  <symbol number="0042" entity="&#xea42;" char="&#x1d539;"/>
+  <!-- MATHEMATICAL DOUBLE-STRUCK CAPITAL C -->
+  <symbol number="0043" entity="&#xea43;" char="&#x2102;"/>
+  <symbol number="F043" entity="" char="&#x2102;"/>
+  <!-- MATHEMATICAL DOUBLE-STRUCK CAPITAL D -->
+  <symbol number="0044" entity="&#xea44;" char="&#x1d53b;"/>
+  <!-- MATHEMATICAL DOUBLE-STRUCK CAPITAL E -->
+  <symbol number="0045" entity="&#xea45;" char="&#x1d53c;"/>
+  <!-- MATHEMATICAL DOUBLE-STRUCK CAPITAL F -->
+  <symbol number="0046" entity="&#xea46;" char="&#x1d53d;"/>
+  <!-- MATHEMATICAL DOUBLE-STRUCK CAPITAL G -->
+  <symbol number="0047" entity="&#xea47;" char="&#x1d53e;"/>
+  <!-- MATHEMATICAL DOUBLE-STRUCK CAPITAL H -->
+  <symbol number="0048" entity="&#xea48;" char="&#x210d;"/>
+  <!-- MATHEMATICAL DOUBLE-STRUCK CAPITAL I -->
+  <symbol number="0049" entity="&#xea49;" char="&#x1d540;"/>
+  <!-- MATHEMATICAL DOUBLE-STRUCK CAPITAL J -->
+  <symbol number="004A" entity="&#xea49;" char="&#x1d541;"/>
+  <!-- MATHEMATICAL DOUBLE-STRUCK CAPITAL K -->
+  <symbol number="004B" entity="&#xea49;" char="&#x1d542;"/>
+  <!-- MATHEMATICAL DOUBLE-STRUCK CAPITAL L -->
+  <symbol number="004C" entity="&#xea49;" char="&#x1d543;"/>
+  <!-- MATHEMATICAL DOUBLE-STRUCK CAPITAL M -->
+  <symbol number="004D" entity="&#xea49;" char="&#x1d544;"/>
+  <!-- MATHEMATICAL DOUBLE-STRUCK CAPITAL N -->
+  <symbol number="004E" entity="&#xea4e;" char="&#x2115;"/>
+  <symbol number="F04E" entity="" char="&#x2115;"/>
+  <!-- MATHEMATICAL DOUBLE-STRUCK CAPITAL O -->
+  <symbol number="004F" entity="&#xea4f;" char="&#x1d546;"/>
+  <!-- MATHEMATICAL DOUBLE-STRUCK CAPITAL P -->
+  <symbol number="0050" entity="&#xea50;" char="&#x2119;"/>
+  <!-- MATHEMATICAL DOUBLE-STRUCK CAPITAL Q -->
+  <symbol number="0051" entity="&#xea51;" char="&#x211a;"/>
+  <symbol number="F051" entity="" char="&#x211a;"/>
+  <!-- MATHEMATICAL DOUBLE-STRUCK CAPITAL R -->
+  <symbol number="0052" entity="&#xea52;" char="&#x211d;"/>
+  <symbol number="F052" entity="" char="&#x211d;"/>
+  <!-- MATHEMATICAL DOUBLE-STRUCK CAPITAL S -->
+  <symbol number="0053" entity="&#xea53;" char="&#x1d54a;"/>
+  <!-- MATHEMATICAL DOUBLE-STRUCK CAPITAL T -->
+  <symbol number="0054" entity="&#xea54;" char="&#x1d54b;"/>
+  <!-- MATHEMATICAL DOUBLE-STRUCK CAPITAL U -->
+  <symbol number="0055" entity="&#xea55;" char="&#x1d54c;"/>
+  <!-- MATHEMATICAL DOUBLE-STRUCK CAPITAL V -->
+  <symbol number="0056" entity="&#xea56;" char="&#x1d54d;"/>
+  <!-- MATHEMATICAL DOUBLE-STRUCK CAPITAL W -->
+  <symbol number="0057" entity="&#xea57;" char="&#x1d54e;"/>
+  <!-- MATHEMATICAL DOUBLE-STRUCK CAPITAL X -->
+  <symbol number="0058" entity="&#xea58;" char="&#x1d54f;"/>
+  <!-- MATHEMATICAL DOUBLE-STRUCK CAPITAL Y -->
+  <symbol number="0059" entity="&#xea59;" char="&#x1d550;"/>
+  <!-- MATHEMATICAL DOUBLE-STRUCK CAPITAL Z -->
+  <symbol number="005A" entity="&#xea5a;" char="&#x2124;"/>
+  <symbol number="F05A" entity="" char="&#x2124;"/>
+  <!-- MATHEMATICAL DOUBLE-STRUCK SMALL K -->
+  <symbol number="006B" entity="&#xea6b;" char="&#x1d55c;"/>
+  <!-- Precedes Or Equal To -->
+  <symbol number="F0B0" entity="" char="&#x227c;"/>
+</symbols>

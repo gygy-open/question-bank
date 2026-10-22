@@ -1,0 +1,679 @@
+<?xml version="1.0" encoding="US-ASCII"?><symbols>
+  <!--  *
+        * Thanks to Alan Wood for providing a comprehensive list with 
+        * Wingdings character set and equivalent Unicode characters
+        * and allowing us to use it here.
+        * 
+        * http://www.alanwood.net/demos/wingdings.html
+        * 
+        * -->
+  <!--SPACE-->
+  <symbol number="F020" entity="&#xf020;" char=" "/>
+  <symbol number="0020" entity="&#x0020;" char=" "/>
+  <!--LOWER LEFT PENCIL-->
+  <symbol number="F021" entity="&#xf021;" char="&#x1f589;" font="Segoe UI Symbol"/>
+  <symbol number="0021" entity="&#x0021;" char="&#x1f589;" font="Segoe UI Symbol"/>
+  <!--BLACK SCISSORS-->
+  <symbol number="F022" entity="&#xf022;" char="&#x2702;" font="Segoe UI Symbol"/>
+  <symbol number="0022" entity="&#x0022;" char="&#x2702;" font="Segoe UI Symbol"/>
+  <!--UPPER BLADE SCISSORS-->
+  <symbol number="F023" entity="&#xf023;" char="&#x2701;" font="Segoe UI Symbol"/>
+  <symbol number="0023" entity="&#x0023;" char="&#x2701;" font="Segoe UI Symbol"/>
+  <!--EYEGLASSES-->
+  <symbol number="F024" entity="&#xf024;" char="&#x1f453;" font="Segoe UI Symbol"/>
+  <symbol number="0024" entity="&#x0024;" char="&#x1f453;" font="Segoe UI Symbol"/>
+  <!--RINGING BELL-->
+  <symbol number="F025" entity="&#xf025;" char="&#x1f56d;" font="Segoe UI Symbol"/>
+  <symbol number="0025" entity="&#x0025;" char="&#x1f56d;" font="Segoe UI Symbol"/>
+  <!--BOOK-->
+  <symbol number="F026" entity="&#xf026;" char="&#x1f56e;" font="Segoe UI Symbol"/>
+  <symbol number="0026" entity="&#x0026;" char="&#x1f56e;" font="Segoe UI Symbol"/>
+  <!--CANDLE-->
+  <symbol number="F027" entity="&#xf027;" char="&#x1f56f;" font="Segoe UI Symbol"/>
+  <symbol number="0027" entity="&#x0027;" char="&#x1f56f;" font="Segoe UI Symbol"/>
+  <!--BLACK TOUCHTONE TELEPHONE-->
+  <symbol number="F028" entity="&#xf028;" char="&#x1f57f;" font="Segoe UI Symbol"/>
+  <symbol number="0028" entity="&#x0028;" char="&#x1f57f;" font="Segoe UI Symbol"/>
+  <!--TELEPHONE LOCATION SIGN-->
+  <symbol number="F029" entity="&#xf029;" char="&#x2706;" font="Segoe UI Symbol"/>
+  <symbol number="0029" entity="&#x0029;" char="&#x2706;" font="Segoe UI Symbol"/>
+  <!--BACK OF ENVELOPE-->
+  <symbol number="F02A" entity="&#xf02a;" char="&#x1f582;" font="Segoe UI Symbol"/>
+  <symbol number="002A" entity="&#x002a;" char="&#x1f582;" font="Segoe UI Symbol"/>
+  <!--STAMPED ENVELOPE-->
+  <symbol number="F02B" entity="&#xf02b;" char="&#x1f583;" font="Segoe UI Symbol"/>
+  <symbol number="002B" entity="&#x002b;" char="&#x1f583;" font="Segoe UI Symbol"/>
+  <!--CLOSED MAILBOX WITH LOWERED FLAG-->
+  <symbol number="F02C" entity="&#xf02c;" char="&#x1f4ea;" font="Segoe UI Symbol"/>
+  <symbol number="002C" entity="&#x002c;" char="&#x1f4ea;" font="Segoe UI Symbol"/>
+  <!--CLOSED MAILBOX WITH RAISED FLAG-->
+  <symbol number="F02D" entity="&#xf02d;" char="&#x1f4eb;" font="Segoe UI Symbol"/>
+  <symbol number="002D" entity="&#x002d;" char="&#x1f4eb;" font="Segoe UI Symbol"/>
+  <!--OPEN MAILBOX WITH RAISED FLAG-->
+  <symbol number="F02E" entity="&#xf02e;" char="&#x1f4ec;" font="Segoe UI Symbol"/>
+  <symbol number="002E" entity="&#x002e;" char="&#x1f4ec;" font="Segoe UI Symbol"/>
+  <!--OPEN MAILBOX WITH LOWERED FLAG-->
+  <symbol number="F02F" entity="&#xf02f;" char="&#x1f4ed;" font="Segoe UI Symbol"/>
+  <symbol number="002F" entity="&#x002f;" char="&#x1f4ed;" font="Segoe UI Symbol"/>
+  <!--FILE FOLDER-->
+  <symbol number="F030" entity="&#xf030;" char="&#x1f4c1;" font="Segoe UI Symbol"/>
+  <symbol number="0030" entity="&#x0030;" char="&#x1f4c1;" font="Segoe UI Symbol"/>
+  <!--OPEN FILE FOLDER-->
+  <symbol number="F031" entity="&#xf031;" char="&#x1f4c2;" font="Segoe UI Symbol"/>
+  <symbol number="0031" entity="&#x0031;" char="&#x1f4c2;" font="Segoe UI Symbol"/>
+  <!--PAGE FACING UP-->
+  <symbol number="F032" entity="&#xf032;" char="&#x1f4c4;" font="Segoe UI Symbol"/>
+  <symbol number="0032" entity="&#x0032;" char="&#x1f4c4;" font="Segoe UI Symbol"/>
+  <!--PAGE-->
+  <symbol number="F033" entity="&#xf033;" char="&#x1f5cf;" font="Segoe UI Symbol"/>
+  <symbol number="0033" entity="&#x0033;" char="&#x1f5cf;" font="Segoe UI Symbol"/>
+  <!--PAGES-->
+  <symbol number="F034" entity="&#xf034;" char="&#x1f5d0;" font="Segoe UI Symbol"/>
+  <symbol number="0034" entity="&#x0034;" char="&#x1f5d0;" font="Segoe UI Symbol"/>
+  <!--FILE CABINET-->
+  <symbol number="F035" entity="&#xf035;" char="&#x1f5c4;" font="Segoe UI Symbol"/>
+  <symbol number="0035" entity="&#x0035;" char="&#x1f5c4;" font="Segoe UI Symbol"/>
+  <!--HOURGLASS-->
+  <symbol number="F036" entity="&#xf036;" char="&#x231b;" font="Segoe UI Symbol"/>
+  <symbol number="0036" entity="&#x0036;" char="&#x231b;" font="Segoe UI Symbol"/>
+  <!--WIRED KEYBOARD-->
+  <symbol number="F037" entity="&#xf037;" char="&#x1f5ae;" font="Segoe UI Symbol"/>
+  <symbol number="0037" entity="&#x0037;" char="&#x1f5ae;" font="Segoe UI Symbol"/>
+  <!--TWO BUTTON MOUSE-->
+  <symbol number="F038" entity="&#xf038;" char="&#x1f5b0;" font="Segoe UI Symbol"/>
+  <symbol number="0038" entity="&#x0038;" char="&#x1f5b0;" font="Segoe UI Symbol"/>
+  <!--TRACKBALL-->
+  <symbol number="F039" entity="&#xf039;" char="&#x1f5b2;" font="Segoe UI Symbol"/>
+  <symbol number="0039" entity="&#x0039;" char="&#x1f5b2;" font="Segoe UI Symbol"/>
+  <!--OLD PERSONAL COMPUTER-->
+  <symbol number="F03A" entity="&#xf03a;" char="&#x1f5b3;" font="Segoe UI Symbol"/>
+  <symbol number="003A" entity="&#x003a;" char="&#x1f5b3;" font="Segoe UI Symbol"/>
+  <!--HARD DISK-->
+  <symbol number="F03B" entity="&#xf03b;" char="&#x1f5b4;" font="Segoe UI Symbol"/>
+  <symbol number="003B" entity="&#x003b;" char="&#x1f5b4;" font="Segoe UI Symbol"/>
+  <!--WHITE HARD SHELL FLOPPY DISK-->
+  <symbol number="F03C" entity="&#xf03c;" char="&#x1f5ab;" font="Segoe UI Symbol"/>
+  <symbol number="003C" entity="&#x003c;" char="&#x1f5ab;" font="Segoe UI Symbol"/>
+  <!--SOFT SHELL FLOPPY DISK-->
+  <symbol number="F03D" entity="&#xf03d;" char="&#x1f5ac;" font="Segoe UI Symbol"/>
+  <symbol number="003D" entity="&#x003d;" char="&#x1f5ac;" font="Segoe UI Symbol"/>
+  <!--TAPE DRIVE-->
+  <symbol number="F03E" entity="&#xf03e;" char="&#x2707;" font="Segoe UI Symbol"/>
+  <symbol number="003E" entity="&#x003e;" char="&#x2707;" font="Segoe UI Symbol"/>
+  <!--WRITING HAND-->
+  <symbol number="F03F" entity="&#xf03f;" char="&#x270d;" font="Segoe UI Symbol"/>
+  <symbol number="003F" entity="&#x003f;" char="&#x270d;" font="Segoe UI Symbol"/>
+  <!--LEFT WRITING HAND-->
+  <symbol number="F040" entity="&#xf040;" char="&#x1f58e;" font="Segoe UI Symbol"/>
+  <symbol number="0040" entity="&#x0040;" char="&#x1f58e;" font="Segoe UI Symbol"/>
+  <!--VICTORY HAND-->
+  <symbol number="F041" entity="&#xf041;" char="&#x270c;" font="Segoe UI Symbol"/>
+  <symbol number="0041" entity="&#x0041;" char="&#x270c;" font="Segoe UI Symbol"/>
+  <!--OK HAND SIGN-->
+  <symbol number="F042" entity="&#xf042;" char="&#x1f44c;" font="Segoe UI Symbol"/>
+  <symbol number="0042" entity="&#x0042;" char="&#x1f44c;" font="Segoe UI Symbol"/>
+  <!--THUMBS UP SIGN-->
+  <symbol number="F043" entity="&#xf043;" char="&#x1f44d;" font="Segoe UI Symbol"/>
+  <symbol number="0043" entity="&#x0043;" char="&#x1f44d;" font="Segoe UI Symbol"/>
+  <!--THUMBS DOWN SIGN-->
+  <symbol number="F044" entity="&#xf044;" char="&#x1f44e;" font="Segoe UI Symbol"/>
+  <symbol number="0044" entity="&#x0044;" char="&#x1f44e;" font="Segoe UI Symbol"/>
+  <!--WHITE LEFT POINTING INDEX-->
+  <symbol number="F045" entity="&#xf045;" char="&#x261c;" font="Segoe UI Symbol"/>
+  <symbol number="0045" entity="&#x0045;" char="&#x261c;" font="Segoe UI Symbol"/>
+  <!--WHITE RIGHT POINTING INDEX-->
+  <symbol number="F046" entity="&#xf046;" char="&#x261e;" font="Segoe UI Symbol"/>
+  <symbol number="0046" entity="&#x0046;" char="&#x261e;" font="Segoe UI Symbol"/>
+  <!--WHITE UP POINTING INDEX-->
+  <symbol number="F047" entity="&#xf047;" char="&#x261d;" font="Segoe UI Symbol"/>
+  <symbol number="0047" entity="&#x0047;" char="&#x261d;" font="Segoe UI Symbol"/>
+  <!--WHITE DOWN POINTING INDEX-->
+  <symbol number="F048" entity="&#xf048;" char="&#x261f;" font="Segoe UI Symbol"/>
+  <symbol number="0048" entity="&#x0048;" char="&#x261f;" font="Segoe UI Symbol"/>
+  <!--RAISED HAND WITH FINGERS SPLAYED-->
+  <symbol number="F049" entity="&#xf049;" char="&#x1f590;" char-msoffice="&#x270b;" font="Segoe UI Symbol"/>
+  <symbol number="0049" entity="&#x0049;" char="&#x1f590;" char-msoffice="&#x270b;" font="Segoe UI Symbol"/>
+  <!--WHITE SMILING FACE-->
+  <symbol number="F04A" entity="&#xf04a;" char="&#x263a;" font="Segoe UI Symbol"/>
+  <symbol number="004A" entity="&#x004a;" char="&#x263a;" font="Segoe UI Symbol"/>
+  <!--NEUTRAL FACE-->
+  <symbol number="F04B" entity="&#xf04b;" char="&#x1f610;" font="Segoe UI Symbol"/>
+  <symbol number="004B" entity="&#x004b;" char="&#x1f610;" font="Segoe UI Symbol"/>
+  <!--WHITE FROWNING FACE-->
+  <symbol number="F04C" entity="&#xf04c;" char="&#x2639;" font="Segoe UI Symbol"/>
+  <symbol number="004C" entity="&#x004c;" char="&#x2639;" font="Segoe UI Symbol"/>
+  <!--BOMB-->
+  <symbol number="F04D" entity="&#xf04d;" char="&#x1f4a3;" font="Segoe UI Symbol"/>
+  <symbol number="004D" entity="&#x004d;" char="&#x1f4a3;" font="Segoe UI Symbol"/>
+  <!--SKULL AND CROSSBONES-->
+  <symbol number="F04E" entity="&#xf04e;" char="&#x2620;" font="Segoe UI Symbol"/>
+  <symbol number="004E" entity="&#x004e;" char="&#x2620;" font="Segoe UI Symbol"/>
+  <!--WAVING WHITE FLAG-->
+  <symbol number="F04F" entity="&#xf04f;" char="&#x1f3f3;" font="Segoe UI Symbol"/>
+  <symbol number="004F" entity="&#x004f;" char="&#x1f3f3;" font="Segoe UI Symbol"/>
+  <!--WHITE PENNANT-->
+  <symbol number="F050" entity="&#xf050;" char="&#x1f3f1;" font="Segoe UI Symbol"/>
+  <symbol number="0050" entity="&#x0050;" char="&#x1f3f1;" font="Segoe UI Symbol"/>
+  <!--AIRPLANE-->
+  <symbol number="F051" entity="&#xf051;" char="&#x2708;" font="Segoe UI Symbol"/>
+  <symbol number="0051" entity="&#x0051;" char="&#x2708;" font="Segoe UI Symbol"/>
+  <!--WHITE SUN WITH RAYS-->
+  <symbol number="F052" entity="&#xf052;" char="&#x263c;" font="Segoe UI Symbol"/>
+  <symbol number="0052" entity="&#x0052;" char="&#x263c;" font="Segoe UI Symbol"/>
+  <!--DROPLET-->
+  <symbol number="F053" entity="&#xf053;" char="&#x1f4a7;" font="Segoe UI Symbol"/>
+  <symbol number="0053" entity="&#x0053;" char="&#x1f4a7;" font="Segoe UI Symbol"/>
+  <!--SNOWFLAKE-->
+  <symbol number="F054" entity="&#xf054;" char="&#x2744;" font="Segoe UI Symbol"/>
+  <symbol number="0054" entity="&#x0054;" char="&#x2744;" font="Segoe UI Symbol"/>
+  <!--WHITE LATIN CROSS-->
+  <symbol number="F055" entity="&#xf055;" char="&#x1f546;" font="Segoe UI Symbol"/>
+  <symbol number="0055" entity="&#x0055;" char="&#x1f546;" font="Segoe UI Symbol"/>
+  <!--SHADOWED WHITE LATIN CROSS-->
+  <symbol number="F056" entity="&#xf056;" char="&#x271e;" font="Segoe UI Symbol"/>
+  <symbol number="0056" entity="&#x0056;" char="&#x271e;" font="Segoe UI Symbol"/>
+  <!--CELTIC CROSS-->
+  <symbol number="F057" entity="&#xf057;" char="&#x1f548;" font="Segoe UI Symbol"/>
+  <symbol number="0057" entity="&#x0057;" char="&#x1f548;" font="Segoe UI Symbol"/>
+  <!--MALTESE CROSS-->
+  <symbol number="F058" entity="&#xf058;" char="&#x2720;" font="Segoe UI Symbol"/>
+  <symbol number="0058" entity="&#x0058;" char="&#x2720;" font="Segoe UI Symbol"/>
+  <!--STAR OF DAVID-->
+  <symbol number="F059" entity="&#xf059;" char="&#x2721;" font="Segoe UI Symbol"/>
+  <symbol number="0059" entity="&#x0059;" char="&#x2721;" font="Segoe UI Symbol"/>
+  <!--STAR AND CRESCENT-->
+  <symbol number="F05A" entity="&#xf05a;" char="&#x262a;" font="Segoe UI Symbol"/>
+  <symbol number="005A" entity="&#x005a;" char="&#x262a;" font="Segoe UI Symbol"/>
+  <!--YIN YANG-->
+  <symbol number="F05B" entity="&#xf05b;" char="&#x262f;" font="Segoe UI Symbol"/>
+  <symbol number="005B" entity="&#x005b;" char="&#x262f;" font="Segoe UI Symbol"/>
+  <!--DEVANAGARI OM-->
+  <symbol number="F05C" entity="&#xf05c;" char="&#x950;" font="Segoe UI Symbol"/>
+  <symbol number="005C" entity="&#x005c;" char="&#x950;" font="Segoe UI Symbol"/>
+  <!--WHEEL OF DHARMA-->
+  <symbol number="F05D" entity="&#xf05d;" char="&#x2638;" font="Segoe UI Symbol"/>
+  <symbol number="005D" entity="&#x005d;" char="&#x2638;" font="Segoe UI Symbol"/>
+  <!--ARIES-->
+  <symbol number="F05E" entity="&#xf05e;" char="&#x2648;" font="Segoe UI Symbol"/>
+  <symbol number="005E" entity="&#x005e;" char="&#x2648;" font="Segoe UI Symbol"/>
+  <!--TAURUS-->
+  <symbol number="F05F" entity="&#xf05f;" char="&#x2649;" font="Segoe UI Symbol"/>
+  <symbol number="005F" entity="&#x005f;" char="&#x2649;" font="Segoe UI Symbol"/>
+  <!--GEMINI-->
+  <symbol number="F060" entity="&#xf060;" char="&#x264a;" font="Segoe UI Symbol"/>
+  <symbol number="0060" entity="&#x0060;" char="&#x264a;" font="Segoe UI Symbol"/>
+  <!--CANCER-->
+  <symbol number="0061" entity="&#x0061;" char="&#x264b;" font="Segoe UI Symbol"/>
+  <symbol number="F061" entity="&#xf061;" char="&#x264b;" font="Segoe UI Symbol"/>
+  <!--LEO-->
+  <symbol number="F062" entity="&#xf062;" char="&#x264c;" font="Segoe UI Symbol"/>
+  <symbol number="0062" entity="&#x0062;" char="&#x264c;" font="Segoe UI Symbol"/>
+  <!--VIRGO-->
+  <symbol number="F063" entity="&#xf063;" char="&#x264d;" font="Segoe UI Symbol"/>
+  <symbol number="0063" entity="&#x0063;" char="&#x264d;" font="Segoe UI Symbol"/>
+  <!--LIBRA-->
+  <symbol number="F064" entity="&#xf064;" char="&#x264e;" font="Segoe UI Symbol"/>
+  <symbol number="0064" entity="&#x0064;" char="&#x264e;" font="Segoe UI Symbol"/>
+  <!--SCORPIO-->
+  <symbol number="F065" entity="&#xf065;" char="&#x264f;" font="Segoe UI Symbol"/>
+  <symbol number="0065" entity="&#x0065;" char="&#x264f;" font="Segoe UI Symbol"/>
+  <!--SAGITTARIUS-->
+  <symbol number="F066" entity="&#xf066;" char="&#x2650;" font="Segoe UI Symbol"/>
+  <symbol number="0066" entity="&#x0066;" char="&#x2650;" font="Segoe UI Symbol"/>
+  <!--CAPRICORN-->
+  <symbol number="F067" entity="&#xf067;" char="&#x2651;" font="Segoe UI Symbol"/>
+  <symbol number="0067" entity="&#x0067;" char="&#x2651;" font="Segoe UI Symbol"/>
+  <!--AQUARIUS-->
+  <symbol number="F068" entity="&#xf068;" char="&#x2652;" font="Segoe UI Symbol"/>
+  <symbol number="0068" entity="&#x0068;" char="&#x2652;" font="Segoe UI Symbol"/>
+  <!--PISCES-->
+  <symbol number="F069" entity="&#xf069;" char="&#x2653;" font="Segoe UI Symbol"/>
+  <symbol number="0069" entity="&#x0069;" char="&#x2653;" font="Segoe UI Symbol"/>
+  <!--SCRIPT LIGATURE ET ORNAMENT-->
+  <symbol number="F06A" entity="&#xf06a;" char="&#x1f670;" font="Segoe UI Symbol"/>
+  <symbol number="006A" entity="&#x006a;" char="&#x1f670;" font="Segoe UI Symbol"/>
+  <!--SWASH AMPERSAND ORNAMENT-->
+  <symbol number="F06B" entity="&#xf06b;" char="&#x1f675;" font="Segoe UI Symbol"/>
+  <symbol number="006B" entity="&#x006b;" char="&#x1f675;" font="Segoe UI Symbol"/>
+  <!--BLACK CIRCLE-->
+  <symbol number="F06C" entity="&#xf06c;" char="&#x25cf;" font="Segoe UI Symbol"/>
+  <symbol number="006C" entity="&#x006c;" char="&#x25cf;" font="Segoe UI Symbol"/>
+  <!--LOWER RIGHT SHADOWED WHITE CIRCLE-->
+  <symbol number="F06D" entity="&#xf06d;" char="&#x1f53e;" font="Segoe UI Symbol"/>
+  <symbol number="006D" entity="&#x006d;" char="&#x1f53e;" font="Segoe UI Symbol"/>
+  <!--BLACK SQUARE-->
+  <symbol number="006E" entity="&#x006e;" char="&#x25a0;" font="Segoe UI Symbol"/>
+  <symbol number="F06E" entity="&#xf06e;" char="&#x25a0;" font="Segoe UI Symbol"/>
+  <!--WHITE SQUARE-->
+  <symbol number="006F" entity="&#x006f;" char="&#x25a1;" font="Segoe UI Symbol"/>
+  <symbol number="F06F" entity="&#xf06f;" char="&#x25a1;" font="Segoe UI Symbol"/>
+  <!--BOLD WHITE SQUARE-->
+  <symbol number="F070" entity="&#xf070;" char="&#x1f790;" font="Segoe UI Symbol"/>
+  <symbol number="0070" entity="&#x0070;" char="&#x1f790;" font="Segoe UI Symbol"/>
+  <!--LOWER RIGHT SHADOWED WHITE SQUARE-->
+  <symbol number="F071" entity="&#xf071;" char="&#x2751;" font="Segoe UI Symbol"/>
+  <symbol number="0071" entity="&#x0071;" char="&#x2751;" font="Segoe UI Symbol"/>
+  <!--UPPER RIGHT SHADOWED WHITE SQUARE-->
+  <symbol number="F072" entity="&#xf072;" char="&#x2752;" font="Segoe UI Symbol"/>
+  <symbol number="0072" entity="&#x0072;" char="&#x2752;" font="Segoe UI Symbol"/>
+  <!--BLACK MEDIUM LOZENGE-->
+  <symbol number="F073" entity="&#xf073;" char="&#x2b27;" font="Segoe UI Symbol"/>
+  <symbol number="0073" entity="&#x0073;" char="&#x2b27;" font="Segoe UI Symbol"/>
+  <!--BLACK LOZENGE-->
+  <symbol number="F074" entity="&#xf074;" char="&#x29eb;" font="Segoe UI Symbol"/>
+  <symbol number="0074" entity="&#x0074;" char="&#x29eb;" font="Segoe UI Symbol"/>
+  <!--BLACK DIAMOND-->
+  <symbol number="F075" entity="&#xf075;" char="&#x25c6;" font="Segoe UI Symbol"/>
+  <symbol number="0075" entity="&#x0075;" char="&#x25c6;" font="Segoe UI Symbol"/>
+  <!--BLACK DIAMOND MINUS WHITE X-->
+  <symbol number="F076" entity="&#xf076;" char="&#x2756;" font="Segoe UI Symbol"/>
+  <symbol number="0076" entity="&#x0076;" char="&#x2756;" font="Segoe UI Symbol"/>
+  <!--BLACK MEDIUM DIAMOND-->
+  <symbol number="F077" entity="&#xf077;" char="&#x2b25;" font="Segoe UI Symbol"/>
+  <symbol number="0077" entity="&#x0077;" char="&#x2b25;" font="Segoe UI Symbol"/>
+  <!--X IN A RECTANGLE BOX-->
+  <symbol number="F078" entity="&#xf078;" char="&#x2327;" font="Segoe UI Symbol"/>
+  <symbol number="0078" entity="&#x0078;" char="&#x2327;" font="Segoe UI Symbol"/>
+  <!--UP ARROWHEAD IN A RECTANGLE BOX-->
+  <symbol number="F079" entity="&#xf079;" char="&#x2bb9;" font="Segoe UI Symbol"/>
+  <symbol number="0079" entity="&#x0079;" char="&#x2bb9;" font="Segoe UI Symbol"/>
+  <!--PLACE OF INTEREST SIGN-->
+  <symbol number="F07A" entity="&#xf07a;" char="&#x2318;" font="Segoe UI Symbol"/>
+  <symbol number="007A" entity="&#x007a;" char="&#x2318;" font="Segoe UI Symbol"/>
+  <!--ROSETTE-->
+  <symbol number="F07B" entity="&#xf07b;" char="&#x1f3f5;" font="Segoe UI Symbol"/>
+  <symbol number="007B" entity="&#x007b;" char="&#x1f3f5;" font="Segoe UI Symbol"/>
+  <!--BLACK ROSETTE-->
+  <symbol number="F07C" entity="&#xf07c;" char="&#x1f3f6;" font="Segoe UI Symbol"/>
+  <symbol number="007C" entity="&#x007c;" char="&#x1f3f6;" font="Segoe UI Symbol"/>
+  <!--SANS-SERIF HEAVY DOUBLE TURNED COMMA QUOTATION MARK ORNAMENT-->
+  <symbol number="F07D" entity="&#xf07d;" char="&#x1f676;" font="Segoe UI Symbol"/>
+  <symbol number="007D" entity="&#x007d;" char="&#x1f676;" font="Segoe UI Symbol"/>
+  <!--SANS-SERIF HEAVY DOUBLE COMMA QUOTATION MARK ORNAMENT-->
+  <symbol number="F07E" entity="&#xf07e;" char="&#x1f677;" font="Segoe UI Symbol"/>
+  <symbol number="007E" entity="&#x007e;" char="&#x1f677;" font="Segoe UI Symbol"/>
+  <!---->
+  <symbol number="F07F" entity="&#xf07f;" char="" font="Segoe UI Symbol"/>
+  <symbol number="007F" entity="&#x007f;" char="" font="Segoe UI Symbol"/>
+  <!--CIRCLED DIGIT ZERO-->
+  <symbol number="F080" entity="&#xf080;" char="&#x24ea;" font="Segoe UI Symbol"/>
+  <symbol number="0080" entity="&#x0080;" char="&#x24ea;" font="Segoe UI Symbol"/>
+  <!--CIRCLED DIGIT ONE-->
+  <symbol number="F081" entity="&#xf081;" char="&#x2460;" font="Segoe UI Symbol"/>
+  <symbol number="0081" entity="&#x0081;" char="&#x2460;" font="Segoe UI Symbol"/>
+  <!--CIRCLED DIGIT TWO-->
+  <symbol number="F082" entity="&#xf082;" char="&#x2461;" font="Segoe UI Symbol"/>
+  <symbol number="0082" entity="&#x0082;" char="&#x2461;" font="Segoe UI Symbol"/>
+  <!--CIRCLED DIGIT THREE-->
+  <symbol number="F083" entity="&#xf083;" char="&#x2462;" font="Segoe UI Symbol"/>
+  <symbol number="0083" entity="&#x0083;" char="&#x2462;" font="Segoe UI Symbol"/>
+  <!--CIRCLED DIGIT FOUR-->
+  <symbol number="F084" entity="&#xf084;" char="&#x2463;" font="Segoe UI Symbol"/>
+  <symbol number="0084" entity="&#x0084;" char="&#x2463;" font="Segoe UI Symbol"/>
+  <!--CIRCLED DIGIT FIVE-->
+  <symbol number="F085" entity="&#xf085;" char="&#x2464;" font="Segoe UI Symbol"/>
+  <symbol number="0085" entity="&#x0085;" char="&#x2464;" font="Segoe UI Symbol"/>
+  <!--CIRCLED DIGIT SIX-->
+  <symbol number="F086" entity="&#xf086;" char="&#x2465;" font="Segoe UI Symbol"/>
+  <symbol number="0086" entity="&#x0086;" char="&#x2465;" font="Segoe UI Symbol"/>
+  <!--CIRCLED DIGIT SEVEN-->
+  <symbol number="F087" entity="&#xf087;" char="&#x2466;" font="Segoe UI Symbol"/>
+  <symbol number="0087" entity="&#x0087;" char="&#x2466;" font="Segoe UI Symbol"/>
+  <!--CIRCLED DIGIT EIGHT-->
+  <symbol number="F088" entity="&#xf088;" char="&#x2467;" font="Segoe UI Symbol"/>
+  <symbol number="0088" entity="&#x0088;" char="&#x2467;" font="Segoe UI Symbol"/>
+  <!--CIRCLED DIGIT NINE-->
+  <symbol number="F089" entity="&#xf089;" char="&#x2468;" font="Segoe UI Symbol"/>
+  <symbol number="0089" entity="&#x0089;" char="&#x2468;" font="Segoe UI Symbol"/>
+  <!--CIRCLED NUMBER TEN-->
+  <symbol number="F08A" entity="&#xf08a;" char="&#x2469;" font="Segoe UI Symbol"/>
+  <symbol number="008A" entity="&#x008a;" char="&#x2469;" font="Segoe UI Symbol"/>
+  <!--NEGATIVE CIRCLED DIGIT ZERO-->
+  <symbol number="F08B" entity="&#xf08b;" char="&#x24ff;" font="Segoe UI Symbol"/>
+  <symbol number="008B" entity="&#x008b;" char="&#x24ff;" font="Segoe UI Symbol"/>
+  <!--DINGBAT NEGATIVE CIRCLED DIGIT ONE-->
+  <symbol number="F08C" entity="&#xf08c;" char="&#x2776;" font="Segoe UI Symbol"/>
+  <symbol number="008C" entity="&#x008c;" char="&#x2776;" font="Segoe UI Symbol"/>
+  <!--DINGBAT NEGATIVE CIRCLED DIGIT TWO-->
+  <symbol number="F08D" entity="&#xf08d;" char="&#x2777;" font="Segoe UI Symbol"/>
+  <symbol number="008D" entity="&#x008d;" char="&#x2777;" font="Segoe UI Symbol"/>
+  <!--DINGBAT NEGATIVE CIRCLED DIGIT THREE-->
+  <symbol number="F08E" entity="&#xf08e;" char="&#x2778;" font="Segoe UI Symbol"/>
+  <symbol number="008E" entity="&#x008e;" char="&#x2778;" font="Segoe UI Symbol"/>
+  <!--DINGBAT NEGATIVE CIRCLED DIGIT FOUR-->
+  <symbol number="F08F" entity="&#xf08f;" char="&#x2779;" font="Segoe UI Symbol"/>
+  <symbol number="008F" entity="&#x008f;" char="&#x2779;" font="Segoe UI Symbol"/>
+  <!--DINGBAT NEGATIVE CIRCLED DIGIT FIVE-->
+  <symbol number="F090" entity="&#xf090;" char="&#x277a;" font="Segoe UI Symbol"/>
+  <symbol number="0090" entity="&#x0090;" char="&#x277a;" font="Segoe UI Symbol"/>
+  <!--DINGBAT NEGATIVE CIRCLED DIGIT SIX-->
+  <symbol number="F091" entity="&#xf091;" char="&#x277b;" font="Segoe UI Symbol"/>
+  <symbol number="0091" entity="&#x0091;" char="&#x277b;" font="Segoe UI Symbol"/>
+  <!--DINGBAT NEGATIVE CIRCLED DIGIT SEVEN-->
+  <symbol number="F092" entity="&#xf092;" char="&#x277c;" font="Segoe UI Symbol"/>
+  <symbol number="0092" entity="&#x0092;" char="&#x277c;" font="Segoe UI Symbol"/>
+  <!--DINGBAT NEGATIVE CIRCLED DIGIT EIGHT-->
+  <symbol number="F093" entity="&#xf093;" char="&#x277d;" font="Segoe UI Symbol"/>
+  <symbol number="0093" entity="&#x0093;" char="&#x277d;" font="Segoe UI Symbol"/>
+  <!--DINGBAT NEGATIVE CIRCLED DIGIT NINE-->
+  <symbol number="F094" entity="&#xf094;" char="&#x277e;" font="Segoe UI Symbol"/>
+  <symbol number="0094" entity="&#x0094;" char="&#x277e;" font="Segoe UI Symbol"/>
+  <!--DINGBAT NEGATIVE CIRCLED NUMBER TEN-->
+  <symbol number="F095" entity="&#xf095;" char="&#x277f;" font="Segoe UI Symbol"/>
+  <symbol number="0095" entity="&#x0095;" char="&#x277f;" font="Segoe UI Symbol"/>
+  <!--NORTH EAST POINTING BUD-->
+  <symbol number="F096" entity="&#xf096;" char="&#x1f662;" font="Segoe UI Symbol"/>
+  <symbol number="0096" entity="&#x0096;" char="&#x1f662;" font="Segoe UI Symbol"/>
+  <!--NORTH WEST POINTING BUD-->
+  <symbol number="F097" entity="&#xf097;" char="&#x1f660;" font="Segoe UI Symbol"/>
+  <symbol number="0097" entity="&#x0097;" char="&#x1f660;" font="Segoe UI Symbol"/>
+  <!--SOUTH WEST POINTING BUD-->
+  <symbol number="F098" entity="&#xf098;" char="&#x1f661;" font="Segoe UI Symbol"/>
+  <symbol number="0098" entity="&#x0098;" char="&#x1f661;" font="Segoe UI Symbol"/>
+  <!--SOUTH EAST POINTING BUD-->
+  <symbol number="F099" entity="&#xf099;" char="&#x1f663;" font="Segoe UI Symbol"/>
+  <symbol number="0099" entity="&#x0099;" char="&#x1f663;" font="Segoe UI Symbol"/>
+  <!--HEAVY NORTH EAST POINTING VINE LEAF-->
+  <symbol number="F09A" entity="&#xf09a;" char="&#x1f65e;" font="Segoe UI Symbol"/>
+  <symbol number="009A" entity="&#x009a;" char="&#x1f65e;" font="Segoe UI Symbol"/>
+  <!--HEAVY NORTH WEST POINTING VINE LEAF-->
+  <symbol number="F09B" entity="&#xf09b;" char="&#x1f65c;" font="Segoe UI Symbol"/>
+  <symbol number="009B" entity="&#x009b;" char="&#x1f65c;" font="Segoe UI Symbol"/>
+  <!--HEAVY SOUTH WEST POINTING VINE LEAF-->
+  <symbol number="F09C" entity="&#xf09c;" char="&#x1f65d;" font="Segoe UI Symbol"/>
+  <symbol number="009C" entity="&#x009c;" char="&#x1f65d;" font="Segoe UI Symbol"/>
+  <!--HEAVY SOUTH EAST POINTING VINE LEAF-->
+  <symbol number="F09D" entity="&#xf09d;" char="&#x1f65f;" font="Segoe UI Symbol"/>
+  <symbol number="009D" entity="&#x009d;" char="&#x1f65f;" font="Segoe UI Symbol"/>
+  <!--MIDDLE DOT-->
+  <symbol number="F09E" entity="&#xf09e;" char="&#xb7;" font="Segoe UI Symbol"/>
+  <symbol number="009E" entity="&#x009e;" char="&#xb7;" font="Segoe UI Symbol"/>
+  <!--BULLET-->
+  <symbol number="F09F" entity="&#xf09f;" char="&#x2022;" font="Segoe UI Symbol"/>
+  <symbol number="009F" entity="&#x009f;" char="&#x2022;" font="Segoe UI Symbol"/>
+  <!--BLACK SMALL SQUARE-->
+  <symbol number="F0A0" entity="&#xf0a0;" char="&#x25aa;" font="Segoe UI Symbol"/>
+  <symbol number="00A0" entity="&#x00a0;" char="&#x25aa;" font="Segoe UI Symbol"/>
+  <!--MEDIUM WHITE CIRCLE-->
+  <symbol number="F0A1" entity="&#xf0a1;" char="&#x26aa;" font="Segoe UI Symbol"/>
+  <symbol number="00A1" entity="&#x00a1;" char="&#x26aa;" font="Segoe UI Symbol"/>
+  <!--HEAVY LARGE CIRCLE-->
+  <symbol number="F0A2" entity="&#xf0a2;" char="&#x1f786;" font="Segoe UI Symbol"/>
+  <symbol number="00A2" entity="&#x00a2;" char="&#x1f786;" font="Segoe UI Symbol"/>
+  <!--VERY HEAVY WHITE CIRCLE-->
+  <symbol number="F0A3" entity="&#xf0a3;" char="&#x1f788;" font="Segoe UI Symbol"/>
+  <symbol number="00A3" entity="&#x00a3;" char="&#x1f788;" font="Segoe UI Symbol"/>
+  <!--FISHEYE-->
+  <symbol number="F0A4" entity="&#xf0a4;" char="&#x25c9;" font="Segoe UI Symbol"/>
+  <symbol number="00A4" entity="&#x00a4;" char="&#x25c9;" font="Segoe UI Symbol"/>
+  <!--BULLSEYE-->
+  <symbol number="F0A5" entity="&#xf0a5;" char="&#x25ce;" font="Segoe UI Symbol"/>
+  <symbol number="00A5" entity="&#x00a5;" char="&#x25ce;" font="Segoe UI Symbol"/>
+  <!--UPPER RIGHT SHADOWED WHITE CIRCLE-->
+  <symbol number="F0A6" entity="&#xf0a6;" char="&#x1f53f;" font="Segoe UI Symbol"/>
+  <symbol number="00A6" entity="&#x00a6;" char="&#x1f53f;" font="Segoe UI Symbol"/>
+  <!--BLACK SMALL SQUARE-->
+  <symbol number="F0A7" entity="&#xf0a7;" char="&#x25aa;" font="Segoe UI Symbol"/>
+  <symbol number="00A7" entity="&#x00a7;" char="&#x25aa;" font="Segoe UI Symbol"/>
+  <!--WHITE MEDIUM SQUARE-->
+  <symbol number="F0A8" entity="&#xf0a8;" char="&#x25fb;" font="Segoe UI Symbol"/>
+  <symbol number="00A8" entity="&#x00a8;" char="&#x25fb;" font="Segoe UI Symbol"/>
+  <!--THREE POINTED BLACK STAR-->
+  <symbol number="F0A9" entity="&#xf0a9;" char="&#x1f7c2;" font="Segoe UI Symbol"/>
+  <symbol number="00A9" entity="&#x00a9;" char="&#x1f7c2;" font="Segoe UI Symbol"/>
+  <!--BLACK FOUR POINTED STAR-->
+  <symbol number="F0AA" entity="&#xf0aa;" char="&#x2726;" font="Segoe UI Symbol"/>
+  <symbol number="00AA" entity="&#x00aa;" char="&#x2726;" font="Segoe UI Symbol"/>
+  <!--BLACK STAR-->
+  <symbol number="F0AB" entity="&#xf0ab;" char="&#x2605;" font="Segoe UI Symbol"/>
+  <symbol number="00AB" entity="&#x00ab;" char="&#x2605;" font="Segoe UI Symbol"/>
+  <!--SIX POINTED BLACK STAR-->
+  <symbol number="F0AC" entity="&#xf0ac;" char="&#x2736;" font="Segoe UI Symbol"/>
+  <symbol number="00AC" entity="&#x00ac;" char="&#x2736;" font="Segoe UI Symbol"/>
+  <!--EIGHT POINTED BLACK STAR-->
+  <symbol number="F0AD" entity="&#xf0ad;" char="&#x2734;" font="Segoe UI Symbol"/>
+  <symbol number="00AD" entity="&#x00ad;" char="&#x2734;" font="Segoe UI Symbol"/>
+  <!--TWELVE POINTED BLACK STAR-->
+  <symbol number="F0AE" entity="&#xf0ae;" char="&#x2739;" font="Segoe UI Symbol"/>
+  <symbol number="00AE" entity="&#x00ae;" char="&#x2739;" font="Segoe UI Symbol"/>
+  <!--EIGHT POINTED PINWHEEL STAR-->
+  <symbol number="F0AF" entity="&#xf0af;" char="&#x2735;" font="Segoe UI Symbol"/>
+  <symbol number="00AF" entity="&#x00af;" char="&#x2735;" font="Segoe UI Symbol"/>
+  <!--SQUARE POSITION INDICATOR-->
+  <symbol number="F0B0" entity="&#xf0b0;" char="&#x2bd0;" font="Segoe UI Symbol"/>
+  <symbol number="00B0" entity="&#x00b0;" char="&#x2bd0;" font="Segoe UI Symbol"/>
+  <!--POSITION INDICATOR-->
+  <symbol number="F0B1" entity="&#xf0b1;" char="&#x2316;" font="Segoe UI Symbol"/>
+  <symbol number="00B1" entity="&#x00b1;" char="&#x2316;" font="Segoe UI Symbol"/>
+  <!--WHITE CONCAVE-SIDED DIAMOND-->
+  <symbol number="F0B2" entity="&#xf0b2;" char="&#x27e1;" font="Segoe UI Symbol"/>
+  <symbol number="00B2" entity="&#x00b2;" char="&#x27e1;" font="Segoe UI Symbol"/>
+  <!--SQUARE LOZENGE-->
+  <symbol number="F0B3" entity="&#xf0b3;" char="&#x2311;" font="Segoe UI Symbol"/>
+  <symbol number="00B3" entity="&#x00b3;" char="&#x2311;" font="Segoe UI Symbol"/>
+  <!--UNCERTAINTY SIGN-->
+  <symbol number="F0B4" entity="&#xf0b4;" char="&#x2bd1;" font="Segoe UI Symbol"/>
+  <symbol number="00B4" entity="&#x00b4;" char="&#x2bd1;" font="Segoe UI Symbol"/>
+  <!--CIRCLED WHITE STAR-->
+  <symbol number="F0B5" entity="&#xf0b5;" char="&#x272a;" font="Segoe UI Symbol"/>
+  <symbol number="00B5" entity="&#x00b5;" char="&#x272a;" font="Segoe UI Symbol"/>
+  <!--SHADOWED WHITE STAR-->
+  <symbol number="F0B6" entity="&#xf0b6;" char="&#x2730;" font="Segoe UI Symbol"/>
+  <symbol number="00B6" entity="&#x00b6;" char="&#x2730;" font="Segoe UI Symbol"/>
+  <!--CLOCK FACE ONE OCLOCK-->
+  <symbol number="F0B7" entity="&#xf0b7;" char="&#x1f550;" font="Segoe UI Symbol"/>
+  <symbol number="00B7" entity="&#x00b7;" char="&#x1f550;" font="Segoe UI Symbol"/>
+  <!--CLOCK FACE TWO OCLOCK-->
+  <symbol number="F0B8" entity="&#xf0b8;" char="&#x1f551;" font="Segoe UI Symbol"/>
+  <symbol number="00B8" entity="&#x00b8;" char="&#x1f551;" font="Segoe UI Symbol"/>
+  <!--CLOCK FACE THREE OCLOCK-->
+  <symbol number="F0B9" entity="&#xf0b9;" char="&#x1f552;" font="Segoe UI Symbol"/>
+  <symbol number="00B9" entity="&#x00b9;" char="&#x1f552;" font="Segoe UI Symbol"/>
+  <!--CLOCK FACE FOUR OCLOCK-->
+  <symbol number="F0BA" entity="&#xf0ba;" char="&#x1f553;" font="Segoe UI Symbol"/>
+  <symbol number="00BA" entity="&#x00ba;" char="&#x1f553;" font="Segoe UI Symbol"/>
+  <!--CLOCK FACE FIVE OCLOCK-->
+  <symbol number="F0BB" entity="&#xf0bb;" char="&#x1f554;" font="Segoe UI Symbol"/>
+  <symbol number="00BB" entity="&#x00bb;" char="&#x1f554;" font="Segoe UI Symbol"/>
+  <!--CLOCK FACE SIX OCLOCK-->
+  <symbol number="F0BC" entity="&#xf0bc;" char="&#x1f555;" font="Segoe UI Symbol"/>
+  <symbol number="00BC" entity="&#x00bc;" char="&#x1f555;" font="Segoe UI Symbol"/>
+  <!--CLOCK FACE SEVEN OCLOCK-->
+  <symbol number="F0BD" entity="&#xf0bd;" char="&#x1f556;" font="Segoe UI Symbol"/>
+  <symbol number="00BD" entity="&#x00bd;" char="&#x1f556;" font="Segoe UI Symbol"/>
+  <!--CLOCK FACE EIGHT OCLOCK-->
+  <symbol number="F0BE" entity="&#xf0be;" char="&#x1f557;" font="Segoe UI Symbol"/>
+  <symbol number="00BE" entity="&#x00be;" char="&#x1f557;" font="Segoe UI Symbol"/>
+  <!--CLOCK FACE NINE OCLOCK-->
+  <symbol number="F0BF" entity="&#xf0bf;" char="&#x1f558;" font="Segoe UI Symbol"/>
+  <symbol number="00BF" entity="&#x00bf;" char="&#x1f558;" font="Segoe UI Symbol"/>
+  <!--CLOCK FACE TEN OCLOCK-->
+  <symbol number="F0C0" entity="&#xf0c0;" char="&#x1f559;" font="Segoe UI Symbol"/>
+  <symbol number="00C0" entity="&#x00c0;" char="&#x1f559;" font="Segoe UI Symbol"/>
+  <!--CLOCK FACE ELEVEN OCLOCK-->
+  <symbol number="F0C1" entity="&#xf0c1;" char="&#x1f55a;" font="Segoe UI Symbol"/>
+  <symbol number="00C1" entity="&#x00c1;" char="&#x1f55a;" font="Segoe UI Symbol"/>
+  <!--CLOCK FACE TWELVE OCLOCK-->
+  <symbol number="F0C2" entity="&#xf0c2;" char="&#x1f55b;" font="Segoe UI Symbol"/>
+  <symbol number="00C2" entity="&#x00c2;" char="&#x1f55b;" font="Segoe UI Symbol"/>
+  <!--RIBBON ARROW DOWN LEFT-->
+  <symbol number="F0C3" entity="&#xf0c3;" char="&#x2bb0;" font="Segoe UI Symbol"/>
+  <symbol number="00C3" entity="&#x00c3;" char="&#x2bb0;" font="Segoe UI Symbol"/>
+  <!--RIBBON ARROW DOWN RIGHT-->
+  <symbol number="F0C4" entity="&#xf0c4;" char="&#x2bb1;" font="Segoe UI Symbol"/>
+  <symbol number="00C4" entity="&#x00c4;" char="&#x2bb1;" font="Segoe UI Symbol"/>
+  <!--RIBBON ARROW UP LEFT-->
+  <symbol number="F0C5" entity="&#xf0c5;" char="&#x2bb2;" font="Segoe UI Symbol"/>
+  <symbol number="00C5" entity="&#x00c5;" char="&#x2bb2;" font="Segoe UI Symbol"/>
+  <!--RIBBON ARROW UP RIGHT-->
+  <symbol number="F0C6" entity="&#xf0c6;" char="&#x2bb3;" font="Segoe UI Symbol"/>
+  <symbol number="00C6" entity="&#x00c6;" char="&#x2bb3;" font="Segoe UI Symbol"/>
+  <!--RIBBON ARROW LEFT UP-->
+  <symbol number="F0C7" entity="&#xf0c7;" char="&#x2bb4;" font="Segoe UI Symbol"/>
+  <symbol number="00C7" entity="&#x00c7;" char="&#x2bb4;" font="Segoe UI Symbol"/>
+  <!--RIBBON ARROW RIGHT UP-->
+  <symbol number="F0C8" entity="&#xf0c8;" char="&#x2bb5;" font="Segoe UI Symbol"/>
+  <symbol number="00C8" entity="&#x00c8;" char="&#x2bb5;" font="Segoe UI Symbol"/>
+  <!--RIBBON ARROW LEFT DOWN-->
+  <symbol number="F0C9" entity="&#xf0c9;" char="&#x2bb6;" font="Segoe UI Symbol"/>
+  <symbol number="00C9" entity="&#x00c9;" char="&#x2bb6;" font="Segoe UI Symbol"/>
+  <!--RIBBON ARROW RIGHT DOWN-->
+  <symbol number="F0CA" entity="&#xf0ca;" char="&#x2bb7;" font="Segoe UI Symbol"/>
+  <symbol number="00CA" entity="&#x00ca;" char="&#x2bb7;" font="Segoe UI Symbol"/>
+  <!--SOLID QUILT SQUARE ORNAMENT-->
+  <symbol number="F0CB" entity="&#xf0cb;" char="&#x1f66a;" font="Segoe UI Symbol"/>
+  <symbol number="00CB" entity="&#x00cb;" char="&#x1f66a;" font="Segoe UI Symbol"/>
+  <!--SOLID QUILT SQUARE ORNAMENT IN BLACK SQUARE-->
+  <symbol number="F0CB" entity="&#xf0cb;" char="&#x1f66b;" font="Segoe UI Symbol"/>
+  <symbol number="00CB" entity="&#x00cb;" char="&#x1f66b;" font="Segoe UI Symbol"/>
+  <!--TURNED SOUTH WEST POINTING LEAF-->
+  <symbol number="F0CD" entity="&#xf0cd;" char="&#x1f655;" font="Segoe UI Symbol"/>
+  <symbol number="00CD" entity="&#x00cd;" char="&#x1f655;" font="Segoe UI Symbol"/>
+  <!--TURNED NORTH WEST POINTING LEAF-->
+  <symbol number="F0CE" entity="&#xf0ce;" char="&#x1f654;" font="Segoe UI Symbol"/>
+  <symbol number="00CE" entity="&#x00ce;" char="&#x1f654;" font="Segoe UI Symbol"/>
+  <!--TURNED SOUTH EAST POINTING LEAF-->
+  <symbol number="F0CF" entity="&#xf0cf;" char="&#x1f657;" font="Segoe UI Symbol"/>
+  <symbol number="00CF" entity="&#x00cf;" char="&#x1f657;" font="Segoe UI Symbol"/>
+  <!--TURNED NORTH EAST POINTING LEAF-->
+  <symbol number="F0D0" entity="&#xf0d0;" char="&#x1f656;" font="Segoe UI Symbol"/>
+  <symbol number="00D0" entity="&#x00d0;" char="&#x1f656;" font="Segoe UI Symbol"/>
+  <!--NORTH WEST POINTING LEAF-->
+  <symbol number="F0D1" entity="&#xf0d1;" char="&#x1f650;" font="Segoe UI Symbol"/>
+  <symbol number="00D1" entity="&#x00d1;" char="&#x1f650;" font="Segoe UI Symbol"/>
+  <!--SOUTH WEST POINTING LEAF-->
+  <symbol number="F0D2" entity="&#xf0d2;" char="&#x1f651;" font="Segoe UI Symbol"/>
+  <symbol number="00D2" entity="&#x00d2;" char="&#x1f651;" font="Segoe UI Symbol"/>
+  <!--NORTH EAST POINTING LEAF-->
+  <symbol number="F0D3" entity="&#xf0d3;" char="&#x1f652;" font="Segoe UI Symbol"/>
+  <symbol number="00D3" entity="&#x00d3;" char="&#x1f652;" font="Segoe UI Symbol"/>
+  <!--SOUTH EAST POINTING LEAF-->
+  <symbol number="F0D4" entity="&#xf0d4;" char="&#x1f653;" font="Segoe UI Symbol"/>
+  <symbol number="00D4" entity="&#x00d4;" char="&#x1f653;" font="Segoe UI Symbol"/>
+  <!--ERASE TO THE LEFT-->
+  <symbol number="F0D5" entity="&#xf0d5;" char="&#x232b;" font="Segoe UI Symbol"/>
+  <symbol number="00D5" entity="&#x00d5;" char="&#x232b;" font="Segoe UI Symbol"/>
+  <!--ERASE TO THE RIGHT-->
+  <symbol number="F0D6" entity="&#xf0d6;" char="&#x2326;" font="Segoe UI Symbol"/>
+  <symbol number="00D6" entity="&#x00d6;" char="&#x2326;" font="Segoe UI Symbol"/>
+  <!--THREE-D TOP-LIGHTED LEFTWARDS EQUILATERAL ARROWHEAD-->
+  <symbol number="F0D7" entity="&#xf0d7;" char="&#x2b98;" font="Segoe UI Symbol"/>
+  <symbol number="00D7" entity="&#x00d7;" char="&#x2b98;" font="Segoe UI Symbol"/>
+  <!--THREE-D TOP-LIGHTED RIGHTWARDS EQUILATERAL ARROWHEAD-->
+  <symbol number="F0D8" entity="&#xf0d8;" char="&#x2b9a;" font="Segoe UI Symbol"/>
+  <symbol number="00D8" entity="&#x00d8;" char="&#x2b9a;" font="Segoe UI Symbol"/>
+  <!--THREE-D RIGHT-LIGHTED UPWARDS EQUILATERAL ARROWHEAD-->
+  <symbol number="F0D9" entity="&#xf0d9;" char="&#x2b99;" font="Segoe UI Symbol"/>
+  <symbol number="00D9" entity="&#x00d9;" char="&#x2b99;" font="Segoe UI Symbol"/>
+  <!--THREE-D LEFT-LIGHTED DOWNWARDS EQUILATERAL ARROWHEAD-->
+  <symbol number="F0DA" entity="&#xf0da;" char="&#x2b9b;" font="Segoe UI Symbol"/>
+  <symbol number="00DA" entity="&#x00da;" char="&#x2b9b;" font="Segoe UI Symbol"/>
+  <!--LEFTWARDS BLACK CIRCLED WHITE ARROW-->
+  <symbol number="F0DB" entity="&#xf0db;" char="&#x2b88;" font="Segoe UI Symbol"/>
+  <symbol number="00DB" entity="&#x00db;" char="&#x2b88;" font="Segoe UI Symbol"/>
+  <!--RIGHTWARDS BLACK CIRCLED WHITE ARROW-->
+  <symbol number="F0DC" entity="&#xf0dc;" char="&#x2b8a;" font="Segoe UI Symbol"/>
+  <symbol number="00DC" entity="&#x00dc;" char="&#x2b8a;" font="Segoe UI Symbol"/>
+  <!--UPWARDS BLACK CIRCLED WHITE ARROW-->
+  <symbol number="F0DD" entity="&#xf0dd;" char="&#x2b89;" font="Segoe UI Symbol"/>
+  <symbol number="00DD" entity="&#x00dd;" char="&#x2b89;" font="Segoe UI Symbol"/>
+  <!--DOWNWARDS BLACK CIRCLED WHITE ARROW-->
+  <symbol number="F0DE" entity="&#xf0de;" char="&#x2b8b;" font="Segoe UI Symbol"/>
+  <symbol number="00DE" entity="&#x00de;" char="&#x2b8b;" font="Segoe UI Symbol"/>
+  <!--WIDE-HEADED LEFTWARDS BARB ARROW-->
+  <symbol number="F0DF" entity="&#xf0df;" char="&#x1f868;" char-msoffice="&#x2190;" font="Segoe UI Symbol"/>
+  <symbol number="00DF" entity="&#x00df;" char="&#x1f868;" char-msoffice="&#x2190;" font="Segoe UI Symbol"/>
+  <!--WIDE-HEADED RIGHTWARDS BARB ARROW-->
+  <symbol number="F0E0" entity="&#xf0e0;" char="&#x1f86a;" char-msoffice="&#x2192;" font="Segoe UI Symbol"/>
+  <symbol number="00E0" entity="&#x00e0;" char="&#x1f86a;" char-msoffice="&#x2192;" font="Segoe UI Symbol"/>
+  <!--WIDE-HEADED UPWARDS BARB ARROW-->
+  <symbol number="F0E1" entity="&#xf0e1;" char="&#x1f869;" char-msoffice="&#x2191;" font="Segoe UI Symbol"/>
+  <symbol number="00E1" entity="&#x00e1;" char="&#x1f869;" char-msoffice="&#x2191;" font="Segoe UI Symbol"/>
+  <!--WIDE-HEADED DOWNWARDS BARB ARROW-->
+  <symbol number="F0E2" entity="&#xf0e2;" char="&#x1f86b;" char-msoffice="&#x2193;" font="Segoe UI Symbol"/>
+  <symbol number="00E2" entity="&#x00e2;" char="&#x1f86b;" char-msoffice="&#x2193;" font="Segoe UI Symbol"/>
+  <!--WIDE-HEADED NORTH WEST BARB ARROW-->
+  <symbol number="F0E3" entity="&#xf0e3;" char="&#x1f86c;" char-msoffice="&#x2196;" font="Segoe UI Symbol"/>
+  <symbol number="00E3" entity="&#x00e3;" char="&#x1f86c;" char-msoffice="&#x2196;" font="Segoe UI Symbol"/>
+  <!--WIDE-HEADED NORTH EAST BARB ARROW-->
+  <symbol number="F0E4" entity="&#xf0e4;" char="&#x1f86d;" char-msoffice="&#x2197;" font="Segoe UI Symbol"/>
+  <symbol number="00E4" entity="&#x00e4;" char="&#x1f86d;" char-msoffice="&#x2197;" font="Segoe UI Symbol"/>
+  <!--WIDE-HEADED SOUTH WEST BARB ARROW-->
+  <symbol number="F0E5" entity="&#xf0e5;" char="&#x1f86f;" char-msoffice="&#x2199;" font="Segoe UI Symbol"/>
+  <symbol number="00E5" entity="&#x00e5;" char="&#x1f86f;" char-msoffice="&#x2199;" font="Segoe UI Symbol"/>
+  <!--WIDE-HEADED SOUTH EAST BARB ARROW-->
+  <symbol number="F0E6" entity="&#xf0e6;" char="&#x1f86e;" char-msoffice="&#x2198;" font="Segoe UI Symbol"/>
+  <symbol number="00E6" entity="&#x00e6;" char="&#x1f86e;" char-msoffice="&#x2198;" font="Segoe UI Symbol"/>
+  <!--WIDE-HEADED LEFTWARDS HEAVY BARB ARROW-->
+  <symbol number="F0E7" entity="&#xf0e7;" char="&#x1f878;" char-msoffice="&#x2b05;" font="Segoe UI Symbol"/>
+  <symbol number="00E7" entity="&#x00e7;" char="&#x1f878;" char-msoffice="&#x2b05;" font="Segoe UI Symbol"/>
+  <!--WIDE-HEADED RIGHTWARDS HEAVY BARB ARROW-->
+  <symbol number="F0E8" entity="&#xf0e8;" char="&#x1f87a;" char-msoffice="&#x2b95;" font="Segoe UI Symbol"/>
+  <symbol number="00E8" entity="&#x00e8;" char="&#x1f87a;" char-msoffice="&#x2b95;" font="Segoe UI Symbol"/>
+  <!--WIDE-HEADED UPWARDS HEAVY BARB ARROW-->
+  <symbol number="F0E9" entity="&#xf0e9;" char="&#x1f879;" char-msoffice="&#x2b06;" font="Segoe UI Symbol"/>
+  <symbol number="00E9" entity="&#x00e9;" char="&#x1f879;" char-msoffice="&#x2b06;" font="Segoe UI Symbol"/>
+  <!--WIDE-HEADED DOWNWARDS HEAVY BARB ARROW-->
+  <symbol number="F0EA" entity="&#xf0ea;" char="&#x1f87b;" char-msoffice="&#x2b07;" font="Segoe UI Symbol"/>
+  <symbol number="00EA" entity="&#x00ea;" char="&#x1f87b;" char-msoffice="&#x2b07;" font="Segoe UI Symbol"/>
+  <!--WIDE-HEADED NORTH WEST HEAVY BARB ARROW-->
+  <symbol number="F0EB" entity="&#xf0eb;" char="&#x1f87c;" char-msoffice="&#x2b09;" font="Segoe UI Symbol"/>
+  <symbol number="00EB" entity="&#x00eb;" char="&#x1f87c;" char-msoffice="&#x2b09;" font="Segoe UI Symbol"/>
+  <!--WIDE-HEADED NORTH EAST HEAVY BARB ARROW-->
+  <symbol number="F0EC" entity="&#xf0ec;" char="&#x1f87d;" char-msoffice="&#x2b08;" font="Segoe UI Symbol"/>
+  <symbol number="00EC" entity="&#x00ec;" char="&#x1f87d;" char-msoffice="&#x2b08;" font="Segoe UI Symbol"/>
+  <!--WIDE-HEADED SOUTH WEST HEAVY BARB ARROW-->
+  <symbol number="F0ED" entity="&#xf0ed;" char="&#x1f87f;" char-msoffice="&#x2b0b;" font="Segoe UI Symbol"/>
+  <symbol number="00ED" entity="&#x00ed;" char="&#x1f87f;" char-msoffice="&#x2b0b;" font="Segoe UI Symbol"/>
+  <!--WIDE-HEADED SOUTH EAST HEAVY BARB ARROW-->
+  <symbol number="F0EE" entity="&#xf0ee;" char="&#x1f87e;" char-msoffice="&#x2b0a;" font="Segoe UI Symbol"/>
+  <symbol number="00EE" entity="&#x00ee;" char="&#x1f87e;" char-msoffice="&#x2b0a;" font="Segoe UI Symbol"/>
+  <!--LEFTWARDS WHITE ARROW-->
+  <symbol number="F0EF" entity="&#xf0ef;" char="&#x21e6;" font="Segoe UI Symbol"/>
+  <symbol number="00EF" entity="&#x00ef;" char="&#x21e6;" font="Segoe UI Symbol"/>
+  <!--RIGHTWARDS WHITE ARROW-->
+  <symbol number="F0F0" entity="&#xf0f0;" char="&#x21e8;" font="Segoe UI Symbol"/>
+  <symbol number="00E0" entity="&#x00e0;" char="&#x2192;" font="Segoe UI Symbol"/>
+  <!--UPWARDS WHITE ARROW-->
+  <symbol number="F0F1" entity="&#xf0f1;" char="&#x21e7;" font="Segoe UI Symbol"/>
+  <symbol number="00F1" entity="&#x00f1;" char="&#x21e7;" font="Segoe UI Symbol"/>
+  <!--DOWNWARDS WHITE ARROW-->
+  <symbol number="F0F2" entity="&#xf0f2;" char="&#x21e9;" font="Segoe UI Symbol"/>
+  <symbol number="00F2" entity="&#x00f2;" char="&#x21e9;" font="Segoe UI Symbol"/>
+  <!--LEFT RIGHT WHITE ARROW-->
+  <symbol number="F0F3" entity="&#xf0f3;" char="&#x2b04;" font="Segoe UI Symbol"/>
+  <symbol number="00F3" entity="&#x00f3;" char="&#x2b04;" font="Segoe UI Symbol"/>
+  <!--UP DOWN WHITE ARROW-->
+  <symbol number="F0F4" entity="&#xf0f4;" char="&#x21f3;" font="Segoe UI Symbol"/>
+  <symbol number="00F4" entity="&#x00f4;" char="&#x21f3;" font="Segoe UI Symbol"/>
+  <!--NORTH EAST WHITE ARROW-->
+  <symbol number="F0F5" entity="&#xf0f5;" char="&#x2b00;" font="Segoe UI Symbol"/>
+  <symbol number="00F5" entity="&#x00f5;" char="&#x2b00;" font="Segoe UI Symbol"/>
+  <!--NORTH WEST WHITE ARROW-->
+  <symbol number="F0F6" entity="&#xf0f6;" char="&#x2b01;" font="Segoe UI Symbol"/>
+  <symbol number="00F6" entity="&#x00f6;" char="&#x2b01;" font="Segoe UI Symbol"/>
+  <!--SOUTH WEST WHITE ARROW-->
+  <symbol number="F0F7" entity="&#xf0f7;" char="&#x2b03;" font="Segoe UI Symbol"/>
+  <symbol number="00F7" entity="&#x00f7;" char="&#x2b03;" font="Segoe UI Symbol"/>
+  <!--SOUTH EAST WHITE ARROW-->
+  <symbol number="F0F8" entity="&#xf0f8;" char="&#x2b02;" font="Segoe UI Symbol"/>
+  <symbol number="00F8" entity="&#x00f8;" char="&#x2b02;" font="Segoe UI Symbol"/>
+  <!--WHITE ARROW SHAFT WIDTH ONE-->
+  <symbol number="F0F9" entity="&#xf0f9;" char="&#x1f8ac;" font="Segoe UI Symbol"/>
+  <symbol number="00F9" entity="&#x00f9;" char="&#x1f8ac;" font="Segoe UI Symbol"/>
+  <!--WHITE ARROW SHAFT WIDTH TWO THIRDS-->
+  <symbol number="F0FA" entity="&#xf0fa;" char="&#x1f8ad;" font="Segoe UI Symbol"/>
+  <symbol number="00FA" entity="&#x00fa;" char="&#x1f8ad;" font="Segoe UI Symbol"/>
+  <!--BALLOT BOLD SCRIPT X-->
+  <symbol number="F0FB" entity="&#xf0fb;" char="&#x1f5f6;" font="Segoe UI Symbol"/>
+  <symbol number="00FB" entity="&#x00fb;" char="&#x1f5f6;" font="Segoe UI Symbol"/>
+  <!--HEAVY CHECK MARK-->
+  <symbol number="F0FC" entity="&#xf0fc;" char="&#x2714;" font="Segoe UI Symbol"/>
+  <symbol number="00FC" entity="&#x00fc;" char="&#x2714;" font="Segoe UI Symbol"/>
+  <!--BALLOT BOX WITH BOLD SCRIPT X-->
+  <symbol number="F0FD" entity="&#xf0fd;" char="&#x1f5f7;" font="Segoe UI Symbol"/>
+  <symbol number="00FD" entity="&#x00fd;" char="&#x1f5f7;" font="Segoe UI Symbol"/>
+  <!--BALLOT BOX WITH BOLD CHECK-->
+  <symbol number="F0FE" entity="&#xf0fe;" char="&#x1f5f9;" font="Segoe UI Symbol"/>
+  <symbol number="00FE" entity="&#x00fe;" char="&#x1f5f9;" font="Segoe UI Symbol"/>
+</symbols>

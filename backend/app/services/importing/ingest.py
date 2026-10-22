@@ -7,18 +7,29 @@ from __future__ import annotations
 
 import asyncio
 import glob
+import logging
 import re
 import shutil
 import uuid
 import zipfile
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
-from typing import BinaryIO, Optional
+from typing import BinaryIO, List, Optional
 from urllib.parse import quote, unquote, urlsplit
 
 import pypandoc
 
 from app.core.config import settings
+
+from .docx_math import (
+    MathTypeResult,
+    build_warnings,
+    count_vector_images,
+    preprocess_mathtype,
+    restore_math_tokens,
+)
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -28,6 +39,7 @@ class CanonicalDoc:
     filename: Optional[str] = None           # 传给 AI 抽取的文件名上下文
     image_data: Optional[bytes] = None       # 视觉抽取用
     image_url: Optional[str] = None          # 图像源的公开访问 URL
+    warnings: List[str] = field(default_factory=list)  # 摄取阶段的非致命问题(如公式未能转换)
 
 
 def _ensure_task_id(task_id: Optional[str]) -> str:
@@ -211,10 +223,19 @@ class DocxIngestor:
         media_dir.mkdir(parents=True, exist_ok=True)
         output_path = task_dir / "content.md"
 
+        # MathType/Equation 3.0 的 OLE 公式 pandoc 只能输出 WMF 预览图，先替换为占位符。
+        try:
+            math_result = await asyncio.to_thread(
+                preprocess_mathtype, file_path, task_dir / "mathtype_preprocessed.docx"
+            )
+        except Exception as e:  # noqa: BLE001 - 预处理失败不影响原有转换
+            logger.warning("MathType preprocessing failed for %s: %s", file_path.name, e)
+            math_result = MathTypeResult(docx_path=file_path)
+
         try:
             await asyncio.to_thread(
                 pypandoc.convert_file,
-                glob.escape(str(file_path.resolve())),
+                glob.escape(str(math_result.docx_path.resolve())),
                 # 只保留 pipe 表格(禁用 grid/multiline/simple):下游 markdown-it 仅解析 pipe 表格。
                 "markdown-grid_tables-multiline_tables-simple_tables",
                 outputfile=str(output_path),
@@ -242,13 +263,15 @@ class DocxIngestor:
                 public_media_url = f"/static/media/{task_id}/"
                 content_str = content_str.replace(pandoc_media_prefix, public_media_url)
 
+            content_str = restore_math_tokens(content_str, math_result.formulas)
             content_str = _fix_text_wrapped_greek(content_str)
             output_path.write_text(content_str, encoding="utf-8")
             return content_str
 
         content = await asyncio.to_thread(handle_media_and_update_content, content)
+        warnings = build_warnings(math_result, count_vector_images(content))
 
-        return CanonicalDoc(task_id=task_id, markdown=content, filename=file_path.name)
+        return CanonicalDoc(task_id=task_id, markdown=content, filename=file_path.name, warnings=warnings)
 
 
 class ImageIngestor:

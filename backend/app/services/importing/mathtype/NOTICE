@@ -1,0 +1,59 @@
+mathtypejx
+==========
+
+This repository contains the Python MathType OLE parsing/conversion package
+extracted from a private research workspace. Large document corpora, generated
+outputs, local build products, and private debugging artifacts are intentionally
+excluded from this public repository.
+
+Third-party notices
+-------------------
+
+Acknowledged upstream projects:
+
+  jure/mathtype
+    https://github.com/jure/mathtype
+    Ruby gem for reading MathType binaries and converting them to an XML
+    representation of MTEF.
+    Copyright (c) 2015 Jure Triglav.
+    MIT License.
+
+  sbulka/mathtype
+    https://github.com/sbulka/mathtype
+    Fork of jure/mathtype used as a compatibility reference for MTEF records
+    and XML shape.
+
+  jure/mathtype_to_mathml
+    https://github.com/jure/mathtype_to_mathml
+    Ruby/XSLT project for converting MTEF XML to MathML.
+    Copyright (c) 2015 Jure Triglav.
+    MIT License.
+
+  transpect/mathtype-extension
+    https://github.com/transpect/mathtype-extension
+    Calabash extension that documents the broader MathType binary to MathML
+    pipeline, incorporates the (J)Ruby mathtype gem, and adapts XSLT from
+    jure/mathtype_to_mathml.
+
+  mathtype_to_mathml_plus
+    https://rubygems.org/gems/mathtype_to_mathml_plus
+    Ruby gem that converts MathType binary equations to MathML by using the
+    mathtype gem followed by XSLT conversion.
+
+The font map assets in:
+
+  src/mathtypejx/mtef/xslt/xsl/fontmaps
+
+include upstream material with this copyright notice:
+
+  Copyright (c) 2018-2024, transpect.io
+  All rights reserved.
+
+Those files are distributed under the BSD-style terms preserved in:
+
+  src/mathtypejx/mtef/xslt/xsl/fontmaps/LICENSE
+
+Some parser modules and XSLT-facing transforms were implemented by studying
+the public behavior and structure of existing MathType-to-MathML tooling.
+Their source comments may mention those compatibility targets so future
+maintainers can understand the data model being matched.

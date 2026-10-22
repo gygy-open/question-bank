@@ -35,6 +35,7 @@ dependencies = [
     "markdown-it-py>=4.0.0",
     "mdit-py-plugins>=0.6.1",
     "mathml2omml>=0.0.2",
+    "olefile>=0.47",
 ]
 
 [dependency-groups]

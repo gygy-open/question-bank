@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<symbols>
+  <symbol number="0031" entity="&#x0031;" char="&#x2218;"/><!-- white circle / ringoperator -->
+  <symbol number="F023" entity="&#xF023;" char="&#x2212;"/><!-- MINUS Sign -->
+  <symbol number="F024" entity="&#xF024;" char="&#x22C5;"/><!-- Dot Operator -->
+  <symbol number="F025" entity="&#xF025;" char="&#x00D7;"/><!-- Multiplication Sign -->
+  <symbol number="F02F" entity="&#xF02F;" char="&#x2A00;"/><!-- N-ary Circled Dot Operator -->
+  <symbol number="F031" entity="&#xF031;" char="&#x2218;"/><!-- white circle / ringoperator -->
+  <symbol number="F041" entity="&#xF041;" char="&#x22B0;"/><!-- Precedes Under Relation -->
+  <symbol number="F055" entity="&#xF055;" char="&#x2208;"/><!--  Element Of -->
+  <symbol number="F056" entity="&#xF056;" char="&#x220B;"/><!--  Contains As Member -->
+  <symbol number="F057" entity="&#xF057;" char="&#x0394;"/><!-- GREEK CAPITAL LETTER DELTA -->
+  <symbol number="F03C" entity="&#xF03C;" char="&#x2248;"/><!-- Almost Equal To -->
+  <symbol number="F05B" entity="&#xF05B;" char="&#x2200;"/><!-- For All -->
+  <symbol number="F05E" entity="&#xF05E;" char="&#x2205;"/><!-- Empty Set -->
+  <symbol number="F062" entity="&#xF062;" char="&#x22A5;"/><!--  Up Tack -->
+  <symbol number="F080" entity="&#xF080;" char="&#x2229;"/><!-- Intersection -->
+  <symbol number="F08E" entity="&#xF08E;" char="&#x007C;"/><!-- Vertical Line -->
+  <symbol number="F08F" entity="&#xF08F;" char="&#x2225;"/><!-- Parallel To -->
+  <symbol number="F0A6" entity="&#xF0A6;" char="&#x0394;"/><!-- GREEK CAPITAL LETTER DELTA -->
+  <symbol number="F0A7" entity="&#xF0A7;" char="&#x2208;"/><!-- Element Of -->
+  <symbol number="F0AF" entity="&#xF0AF;" char="&#x2222;"/><!-- Spherical Angle -->
+  <symbol number="F0CF" entity="&#xF0CF;" char="&#x2259;"/><!-- Estimates -->
+</symbols>

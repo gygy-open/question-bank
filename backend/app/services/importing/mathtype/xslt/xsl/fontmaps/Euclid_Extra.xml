@@ -1,0 +1,68 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<symbols>
+  <!--  *
+        * Euclid Extra
+        * -->
+  <!-- SPACE -->
+  <symbol number="0009" entity="&#x0009;" char="&#x0020;"/>
+  <!-- HAIR SPACE -->
+  <symbol number="002C" entity="&#x002c;" char="&#x200a;"/>
+  <!-- TILDE OPERATOR -->
+  <symbol number="F03A" entity="&#xf03a;" char="&#x223c;"/>
+  <!-- ASYMPTOTICALLY EQUAL TO -->
+  <symbol number="F03B" entity="&#xf03b;" char="&#x2243;"/>
+  <!-- WHITE LEFT-POINTING TRIANGLE -->
+  <symbol number="F03C" entity="&#xf03c;" char="&#x25c1;"/>
+  <!-- MUCH LESS-THAN -->
+  <symbol number="F03D" entity="&#xf03d;" char="&#x226a;"/>
+  <!-- RIGHT LEFT-POINTING TRIANGLE -->
+  <symbol number="F03E" entity="&#xf03e;" char="&#x25b7;"/>
+  <!-- MUCH GREATER-THAN -->
+  <symbol number="F03F" entity="&#xf03d;" char="&#x226b;"/>
+  <!-- DELTA EQUAL TO -->
+  <symbol number="F040" entity="&#xf040;" char="&#x225c;"/>
+  <!-- ESTIMATES -->
+  <symbol number="F041" entity="&#xf041;" char="&#x2259;"/>
+  <!-- APPROACHES THE LIMIT	 -->
+  <symbol number="F042" entity="&#xf042;" char="&#x2250;"/>
+  <!-- N-ARY COPRODUCT	 -->
+  <symbol number="F043" entity="&#xf043;" char="&#x2210;"/>
+  <!-- LATIN SMALL LETTER LAMBDA WITH STROKE -->
+  <symbol number="F044" entity="&#xf044;" char="&#x19b;"/>
+  <!-- RIGHTHAND INTERIOR PRODUCT -->
+  <symbol number="F045" entity="&#xf045;" char="&#x2a3d;"/>
+  <!-- INTERIOR PRODUCT -->
+  <symbol number="F046" entity="&#xf046;" char="&#x2a3c;"/>
+  <!-- REVERSED NOT SIGN -->
+  <symbol number="F047" entity="&#xf047;" char="&#x2310;"/>
+  <!-- NOT SIGN -->
+  <symbol number="F048" entity="&#xf048;" char="&#xffe2;"/>
+  <!-- N-ARY INTERSECTION -->
+  <symbol number="F049" entity="&#xf049;" char="&#x22c2;"/>
+  <!-- INVERTED OHM SIGN -->
+  <symbol number="F04a" entity="&#xf04a;" char="&#x2127;"/>
+  <!-- ELLIPSIS -->
+  <symbol number="F04b" entity="&#xf04b;" char="&#x2026;"/>
+  <!-- MIDLINE HORIZONTAL ELLIPSIS -->
+  <symbol number="F04c" entity="&#xf04c;" char="&#x22ef;"/>
+  <!-- VERTICAL ELLIPSIS -->
+  <symbol number="F04d" entity="&#xf04d;" char="&#x22ee;"/>
+  <!-- UP RIGHT DIAGONAL ELLIPSIS -->
+  <symbol number="F04e" entity="&#xf04e;" char="&#x22f0;"/>
+  <!-- DOWN RIGHT DIAGONAL ELLIPSIS	 -->
+  <symbol number="F04f" entity="&#xf04f;" char="&#x22f1;"/>
+  <!-- PARALLEL TO	 -->
+  <symbol number="F050" entity="&#xf050;" char="&#x2225;"/>
+  <!-- BECAUSE -->
+  <symbol number="F051" entity="&#xf051;" char="&#x2235;"/>
+  <!-- MEASURED ANGLE -->
+  <symbol number="F052" entity="&#xf052;" char="&#x2221;"/>
+  <!-- SPHERICAL ANGLE -->
+  <symbol number="F053" entity="&#xf053;" char="&#x2222;"/>
+  <!-- N-ARY UNION -->
+  <symbol number="F055" entity="&#xf055;" char="&#x22c3;"/>
+  <!-- WHITE UP-POINTING TRIANGLE -->
+  <symbol number="F056" entity="&#xf056;" char="&#x25b3;"/>
+  <!-- WHITE LARGE SQUARE -->
+  <symbol number="F057" entity="&#xf057;" char="&#x2b1c;"/>
+</symbols>

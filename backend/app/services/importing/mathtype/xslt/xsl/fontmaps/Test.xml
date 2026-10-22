@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<collection>
+  <!-- This is the same fontmap as used in mathtype2mml.xpl.
+    It is in a distinct Saxon catalog file so that we can supply its
+    uri as collection-uri=http://transpect.io/docx2hub/xsl/fontmaps.catalog.xml
+    when invoking non-XProc omml2mml conversions, for example, in
+    https://github.com/transpect/latex-math-images/blob/main/basex-webapp/omml2mml.xsl -->
+  <doc href="http://transpect.io/fontmaps/MT_Extra.xml"/>
+  <doc href="http://transpect.io/fontmaps/Symbol.xml"/>
+  <doc href="http://transpect.io/fontmaps/Webdings.xml"/>
+  <doc href="http://transpect.io/fontmaps/Wingdings.xml"/>
+  <doc href="http://transpect.io/fontmaps/Wingdings_2.xml"/>
+  <doc href="http://transpect.io/fontmaps/Wingdings_3.xml"/>
+  <doc href="http://transpect.io/fontmaps/Euclid_Extra.xml"/>
+  <doc href="http://transpect.io/fontmaps/Euclid_Fraktur.xml"/>
+  <doc href="http://transpect.io/fontmaps/Euclid_Math_One.xml"/>
+  <doc href="http://transpect.io/fontmaps/Euclid_Math_Two.xml"/>
+</collection>

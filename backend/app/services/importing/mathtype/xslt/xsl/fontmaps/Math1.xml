@@ -1,0 +1,423 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<symbols>
+  <symbol number="0009" entity="&#x0009;" char="&#x0020;"/><!-- SPACE -->
+  <symbol number="000B" entity="" char="&#x000a;"/><!-- NICHTS -->
+  <symbol number="F020" entity="&#xF020;" char="&#x0020;"/><!-- SPACE -->
+  <symbol number="0020" entity="&#x0020;" char="&#x0020;"/><!-- SPACE -->
+  <symbol number="F021" entity="&#xF021;" char="&#x0021;"/><!-- EXCLAMATION MARK -->
+  <symbol number="0021" entity="&#x0021;" char="&#x0021;"/><!-- EXCLAMATION MARK -->
+  <symbol number="F022" entity="&#xF022;" char="&#x2200;"/><!-- FOR ALL -->
+  <symbol number="0022" entity="&#x0022;" char="&#x2200;"/><!-- FOR ALL -->
+  <symbol number="F023" entity="&#xF023;" char="&#x0023;"/><!-- NUMBER SIGN -->
+  <symbol number="0023" entity="&#x0023;" char="&#x0023;"/><!-- NUMBER SIGN -->
+  <symbol number="F024" entity="&#xF024;" char="&#x2203;"/><!-- THERE EXISTS -->
+  <symbol number="0024" entity="&#x0024;" char="&#x2203;"/><!-- THERE EXISTS -->
+  <symbol number="F025" entity="&#xF025;" char="&#x0025;"/><!-- PERCENT SIGN -->
+  <symbol number="0025" entity="&#x0025;" char="&#x0025;"/><!-- PERCENT SIGN -->
+  <symbol number="F026" entity="&#xF026;" char="&#x0026;"/><!-- AMPERSAND -->
+  <symbol number="0026" entity="&#x0026;" char="&#x0026;"/><!-- AMPERSAND -->
+  <symbol number="F027" entity="&#xF027;" char="&#x220D;"/><!-- SMALL CONTAINS AS MEMBER -->
+  <symbol number="0027" entity="&#x0027;" char="&#x220D;"/><!-- SMALL CONTAINS AS MEMBER -->
+  <symbol number="F028" entity="&#xF028;" char="&#x0028;"/><!-- LEFT PARENTHESIS -->
+  <symbol number="0028" entity="&#x0028;" char="&#x0028;"/><!-- LEFT PARENTHESIS -->
+  <symbol number="F029" entity="&#xF029;" char="&#x0029;"/><!-- RIGHT PARENTHESIS -->
+  <symbol number="0029" entity="&#x0029;" char="&#x0029;"/><!-- RIGHT PARENTHESIS -->
+  <symbol number="F02A" entity="&#xF02A;" char="&#x2217;"/><!-- ASTERISK OPERATOR -->
+  <symbol number="002A" entity="&#x002A;" char="&#x2217;"/><!-- ASTERISK OPERATOR -->
+  <symbol number="F02B" entity="&#xF02B;" char="&#x002B;"/><!-- PLUS SIGN -->
+  <symbol number="002B" entity="&#x002B;" char="&#x002B;"/><!-- PLUS SIGN -->
+  <symbol number="F02C" entity="&#xF02C;" char="&#x002C;"/><!-- COMMA -->
+  <symbol number="002C" entity="&#x002C;" char="&#x002C;"/><!-- COMMA -->
+  <symbol number="F02D" entity="&#xF02D;" char="&#x2212;"/><!-- MINUS SIGN -->
+  <symbol number="002D" entity="&#x002D;" char="&#x2212;"/><!-- MINUS SIGN -->
+  <symbol number="F02E" entity="&#xF02E;" char="&#x002E;"/><!-- FULL STOP -->
+  <symbol number="002E" entity="&#x002E;" char="&#x002E;"/><!-- FULL STOP -->
+  <symbol number="F02F" entity="&#xF02F;" char="&#x002F;"/><!-- SOLIDUS -->
+  <symbol number="002F" entity="&#x002F;" char="&#x002F;"/><!-- SOLIDUS -->
+  <symbol number="F030" entity="&#xF030;" char="&#x0030;"/><!-- DIGIT ZERO -->
+  <symbol number="0030" entity="&#x0030;" char="&#x0030;"/><!-- DIGIT ZERO -->
+  <symbol number="F031" entity="&#xF031;" char="&#x0031;"/><!-- DIGIT ONE -->
+  <symbol number="0031" entity="&#x0031;" char="&#x0031;"/><!-- DIGIT ONE -->
+  <symbol number="F032" entity="&#xF032;" char="&#x0032;"/><!-- DIGIT TWO -->
+  <symbol number="0032" entity="&#x0032;" char="&#x0032;"/><!-- DIGIT TWO -->
+  <symbol number="F033" entity="&#xF033;" char="&#x0033;"/><!-- DIGIT THREE -->
+  <symbol number="0033" entity="&#x0033;" char="&#x0033;"/><!-- DIGIT THREE -->
+  <symbol number="F034" entity="&#xF034;" char="&#x0034;"/><!-- DIGIT FOUR -->
+  <symbol number="0034" entity="&#x0034;" char="&#x0034;"/><!-- DIGIT FOUR -->
+  <symbol number="F035" entity="&#xF035;" char="&#x0035;"/><!-- DIGIT FIVE -->
+  <symbol number="0035" entity="&#x0035;" char="&#x0035;"/><!-- DIGIT FIVE -->
+  <symbol number="F036" entity="&#xF036;" char="&#x0036;"/><!-- DIGIT SIX -->
+  <symbol number="0036" entity="&#x0036;" char="&#x0036;"/><!-- DIGIT SIX -->
+  <symbol number="F037" entity="&#xF037;" char="&#x0037;"/><!-- DIGIT SEVEN -->
+  <symbol number="0037" entity="&#x0037;" char="&#x0037;"/><!-- DIGIT SEVEN -->
+  <symbol number="F038" entity="&#xF038;" char="&#x0038;"/><!-- DIGIT EIGHT -->
+  <symbol number="0038" entity="&#x0038;" char="&#x0038;"/><!-- DIGIT EIGHT -->
+  <symbol number="F039" entity="&#xF039;" char="&#x0039;"/><!-- DIGIT NINE -->
+  <symbol number="0039" entity="&#x0039;" char="&#x0039;"/><!-- DIGIT NINE -->
+  <symbol number="F03A" entity="&#xF03A;" char="&#x003A;"/><!-- COLON -->
+  <symbol number="003A" entity="&#x003A;" char="&#x003A;"/><!-- COLON -->
+  <symbol number="F03B" entity="&#xF03B;" char="&#x003B;"/><!-- SEMICOLON -->
+  <symbol number="003B" entity="&#x003B;" char="&#x003B;"/><!-- SEMICOLON -->
+  <symbol number="F03C" entity="&#xF03C;" char="&#x003C;"/><!-- LESS-THAN SIGN -->
+  <symbol number="003C" entity="&#x003C;" char="&#x003C;"/><!-- LESS-THAN SIGN -->
+  <symbol number="F03D" entity="&#xF03D;" char="&#x003D;"/><!-- EQUALS SIGN -->
+  <symbol number="003D" entity="&#x003D;" char="&#x003D;"/><!-- EQUALS SIGN -->
+  <symbol number="F03E" entity="&#xF03E;" char="&#x003E;"/><!-- GREATER-THAN SIGN -->
+  <symbol number="003E" entity="&#x003E;" char="&#x003E;"/><!-- GREATER-THAN SIGN -->
+  <symbol number="F03F" entity="&#xF03F;" char="&#x003F;"/><!-- QUESTION MARK -->
+  <symbol number="003F" entity="&#x003F;" char="&#x003F;"/><!-- QUESTION MARK -->
+  <symbol number="F040" entity="&#xF040;" char="&#x2245;"/><!-- APPROXIMATELY EQUAL TO -->
+  <symbol number="0040" entity="&#x0040;" char="&#x2245;"/><!-- APPROXIMATELY EQUAL TO -->
+  <symbol number="F041" entity="&#xF041;" char="&#x0391;"/><!-- GREEK CAPITAL LETTER ALPHA -->
+  <symbol number="0041" entity="&#x0041;" char="&#x0391;"/><!-- GREEK CAPITAL LETTER ALPHA -->
+  <symbol number="F042" entity="&#xF042;" char="&#x0392;"/><!-- GREEK CAPITAL LETTER BETA -->
+  <symbol number="0042" entity="&#x0042;" char="&#x0392;"/><!-- GREEK CAPITAL LETTER BETA -->
+  <symbol number="F043" entity="&#xF043;" char="&#x03A7;"/><!-- GREEK CAPITAL LETTER CHI -->
+  <symbol number="0043" entity="&#x0043;" char="&#x03A7;"/><!-- GREEK CAPITAL LETTER CHI -->
+  <symbol number="F044" entity="&#xF044;" char="&#x0394;"/><!-- GREEK CAPITAL LETTER DELTA -->
+  <symbol number="0044" entity="&#x0044;" char="&#x0394;"/><!-- GREEK CAPITAL LETTER DELTA -->
+  <symbol number="F045" entity="&#xF045;" char="&#x0395;"/><!-- GREEK CAPITAL LETTER EPSILON -->
+  <symbol number="0045" entity="&#x0045;" char="&#x0395;"/><!-- GREEK CAPITAL LETTER EPSILON -->
+  <symbol number="F046" entity="&#xF046;" char="&#x03A6;"/><!-- GREEK CAPITAL LETTER PHI -->
+  <symbol number="0046" entity="&#x0046;" char="&#x03A6;"/><!-- GREEK CAPITAL LETTER PHI -->
+  <symbol number="F047" entity="&#xF047;" char="&#x0393;"/><!-- GREEK CAPITAL LETTER GAMMA -->
+  <symbol number="0047" entity="&#x0047;" char="&#x0393;"/><!-- GREEK CAPITAL LETTER GAMMA -->
+  <symbol number="F048" entity="&#xF048;" char="&#x0397;"/><!-- GREEK CAPITAL LETTER ETA -->
+  <symbol number="0048" entity="&#x0048;" char="&#x0397;"/><!-- GREEK CAPITAL LETTER ETA -->
+  <symbol number="F049" entity="&#xF049;" char="&#x0399;"/><!-- GREEK CAPITAL LETTER IOTA -->
+  <symbol number="0049" entity="&#x0049;" char="&#x0399;"/><!-- GREEK CAPITAL LETTER IOTA -->
+  <symbol number="F04A" entity="&#xF04A;" char="&#x03D1;"/><!-- GREEK THETA SYMBOL -->
+  <symbol number="004A" entity="&#x004A;" char="&#x03D1;"/><!-- GREEK THETA SYMBOL -->
+  <symbol number="F04B" entity="&#xF04B;" char="&#x039A;"/><!-- GREEK CAPITAL LETTER KAPPA -->
+  <symbol number="004B" entity="&#x004B;" char="&#x039A;"/><!-- GREEK CAPITAL LETTER KAPPA -->
+  <symbol number="F04C" entity="&#xF04C;" char="&#x039B;"/><!-- GREEK CAPITAL LETTER LAMDA -->
+  <symbol number="004C" entity="&#x004C;" char="&#x039B;"/><!-- GREEK CAPITAL LETTER LAMDA -->
+  <symbol number="F04D" entity="&#xF04D;" char="&#x039C;"/><!-- GREEK CAPITAL LETTER MU -->
+  <symbol number="004D" entity="&#x004D;" char="&#x039C;"/><!-- GREEK CAPITAL LETTER MU -->
+  <symbol number="F04E" entity="&#xF04E;" char="&#x039D;"/><!-- GREEK CAPITAL LETTER NU -->
+  <symbol number="004E" entity="&#x004E;" char="&#x039D;"/><!-- GREEK CAPITAL LETTER NU -->
+  <symbol number="F04F" entity="&#xF04F;" char="&#x039F;"/><!-- GREEK CAPITAL LETTER OMICRON -->
+  <symbol number="004F" entity="&#x004F;" char="&#x039F;"/><!-- GREEK CAPITAL LETTER OMICRON -->
+  <symbol number="F050" entity="&#xF050;" char="&#x03A0;"/><!-- GREEK CAPITAL LETTER PI -->
+  <symbol number="0050" entity="&#x0050;" char="&#x03A0;"/><!-- GREEK CAPITAL LETTER PI -->
+  <symbol number="F051" entity="&#xF051;" char="&#x0398;"/><!-- GREEK CAPITAL LETTER THETA -->
+  <symbol number="0051" entity="&#x0051;" char="&#x0398;"/><!-- GREEK CAPITAL LETTER THETA -->
+  <symbol number="F052" entity="&#xF052;" char="&#x03A1;"/><!-- GREEK CAPITAL LETTER RHO -->
+  <symbol number="0052" entity="&#x0052;" char="&#x03A1;"/><!-- GREEK CAPITAL LETTER RHO -->
+  <symbol number="F053" entity="&#xF053;" char="&#x03A3;"/><!-- GREEK CAPITAL LETTER SIGMA -->
+  <symbol number="0053" entity="&#x0053;" char="&#x03A3;"/><!-- GREEK CAPITAL LETTER SIGMA -->
+  <symbol number="F054" entity="&#xF054;" char="&#x03A4;"/><!-- GREEK CAPITAL LETTER TAU -->
+  <symbol number="0054" entity="&#x0054;" char="&#x03A4;"/><!-- GREEK CAPITAL LETTER TAU -->
+  <symbol number="F055" entity="&#xF055;" char="&#x03A5;"/><!-- GREEK CAPITAL LETTER UPSILON -->
+  <symbol number="0055" entity="&#x0055;" char="&#x03A5;"/><!-- GREEK CAPITAL LETTER UPSILON -->
+  <symbol number="F056" entity="&#xF056;" char="&#x03C2;"/><!-- GREEK SMALL LETTER FINAL SIGMA -->
+  <symbol number="0056" entity="&#x0056;" char="&#x03C2;"/><!-- GREEK SMALL LETTER FINAL SIGMA -->
+  <symbol number="F057" entity="&#xF057;" char="&#x03A9;"/><!-- GREEK CAPITAL LETTER OMEGA -->
+  <symbol number="0057" entity="&#x0057;" char="&#x03A9;"/><!-- GREEK CAPITAL LETTER OMEGA -->
+  <symbol number="F058" entity="&#xF058;" char="&#x039E;"/><!-- GREEK CAPITAL LETTER XI -->
+  <symbol number="0058" entity="&#x0058;" char="&#x039E;"/><!-- GREEK CAPITAL LETTER XI -->
+  <symbol number="F059" entity="&#xF059;" char="&#x03A8;"/><!-- GREEK CAPITAL LETTER PSI -->
+  <symbol number="0059" entity="&#x0059;" char="&#x03A8;"/><!-- GREEK CAPITAL LETTER PSI -->
+  <symbol number="F05A" entity="&#xF05A;" char="&#x0396;"/><!-- GREEK CAPITAL LETTER ZETA -->
+  <symbol number="005A" entity="&#x005A;" char="&#x0396;"/><!-- GREEK CAPITAL LETTER ZETA -->
+  <symbol number="F05B" entity="&#xF05B;" char="&#x005B;"/><!-- LEFT SQUARE BRACKET -->
+  <symbol number="005B" entity="&#x005B;" char="&#x005B;"/><!-- LEFT SQUARE BRACKET -->
+  <symbol number="F05C" entity="&#xF05C;" char="&#x2234;"/><!-- THEREFORE -->
+  <symbol number="005C" entity="&#x005C;" char="&#x2234;"/><!-- THEREFORE -->
+  <symbol number="F05D" entity="&#xF05D;" char="&#x005D;"/><!-- RIGHT SQUARE BRACKET -->
+  <symbol number="005D" entity="&#x005D;" char="&#x005D;"/><!-- RIGHT SQUARE BRACKET -->
+  <symbol number="F05E" entity="&#xF05E;" char="&#x22A5;"/><!-- UP TACK -->
+  <symbol number="005E" entity="&#x005E;" char="&#x22A5;"/><!-- UP TACK -->
+  <symbol number="F05F" entity="&#xF05F;" char="&#x005F;"/><!-- LOW LINE -->
+  <symbol number="005F" entity="&#x005F;" char="&#x005F;"/><!-- LOW LINE -->
+  <symbol number="F060" entity="&#xF060;" char="&#xF8E5;"/><!-- radical extender # corporate char --><!-- Math1: circumflex/hat? -->
+  <symbol number="0060" entity="&#x0060;" char="&#xF8E5;"/><!-- radical extender # corporate char -->
+  <symbol number="F061" entity="&#xF061;" char="&#x03B1;"/><!-- GREEK SMALL LETTER ALPHA -->
+  <symbol number="0061" entity="&#x0061;" char="&#x03B1;"/><!-- GREEK SMALL LETTER ALPHA -->
+  <symbol number="F062" entity="&#xF062;" char="&#x03B2;"/><!-- GREEK SMALL LETTER BETA -->
+  <symbol number="0062" entity="&#x0062;" char="&#x03B2;"/><!-- GREEK SMALL LETTER BETA -->
+  <symbol number="F063" entity="&#xF063;" char="&#x03C7;"/><!-- GREEK SMALL LETTER CHI -->
+  <symbol number="0063" entity="&#x0063;" char="&#x03C7;"/><!-- GREEK SMALL LETTER CHI -->
+  <symbol number="F064" entity="&#xF064;" char="&#x03B4;"/><!-- GREEK SMALL LETTER DELTA -->
+  <symbol number="0064" entity="&#x0064;" char="&#x03B4;"/><!-- GREEK SMALL LETTER DELTA -->
+  <symbol number="F065" entity="&#xF065;" char="&#x03B5;"/><!-- GREEK SMALL LETTER EPSILON -->
+  <symbol number="0065" entity="&#x0065;" char="&#x03B5;"/><!-- GREEK SMALL LETTER EPSILON -->
+  <symbol number="F066" entity="&#xF066;" char="&#x03D5;"/><!-- GREEK SMALL LETTER PHI -->
+  <symbol number="0066" entity="&#x0066;" char="&#x03D5;"/><!-- GREEK SMALL LETTER PHI -->
+  <symbol number="F067" entity="&#xF067;" char="&#x03B3;"/><!-- GREEK SMALL LETTER GAMMA -->
+  <symbol number="0067" entity="&#x0067;" char="&#x03B3;"/><!-- GREEK SMALL LETTER GAMMA -->
+  <symbol number="F068" entity="&#xF068;" char="&#x03B7;"/><!-- GREEK SMALL LETTER ETA -->
+  <symbol number="0068" entity="&#x0068;" char="&#x03B7;"/><!-- GREEK SMALL LETTER ETA -->
+  <symbol number="F069" entity="&#xF069;" char="&#x03B9;"/><!-- GREEK SMALL LETTER IOTA -->
+  <symbol number="0069" entity="&#x0069;" char="&#x03B9;"/><!-- GREEK SMALL LETTER IOTA -->
+  <symbol number="F06A" entity="&#xF06A;" char="&#x03C6;"/><!-- GREEK PHI SYMBOL -->
+  <symbol number="006A" entity="&#x006A;" char="&#x03C6;"/><!-- GREEK PHI SYMBOL -->
+  <symbol number="F06B" entity="&#xF06B;" char="&#x03BA;"/><!-- GREEK SMALL LETTER KAPPA -->
+  <symbol number="006B" entity="&#x006B;" char="&#x03BA;"/><!-- GREEK SMALL LETTER KAPPA -->
+  <symbol number="F06C" entity="&#xF06C;" char="&#x03BB;"/><!-- GREEK SMALL LETTER LAMDA -->
+  <symbol number="006C" entity="&#x006C;" char="&#x03BB;"/><!-- GREEK SMALL LETTER LAMDA -->
+  <symbol number="F06D" entity="&#xF06D;" char="&#x03BC;"/><!-- GREEK SMALL LETTER MU -->
+  <symbol number="006D" entity="&#x006D;" char="&#x03BC;"/><!-- GREEK SMALL LETTER MU -->
+  <symbol number="F06E" entity="&#xF06E;" char="&#x03BD;"/><!-- GREEK SMALL LETTER NU -->
+  <symbol number="006E" entity="&#x006E;" char="&#x03BD;"/><!-- GREEK SMALL LETTER NU -->
+  <symbol number="F06F" entity="&#xF06F;" char="&#x03BF;"/><!-- GREEK SMALL LETTER OMICRON -->
+  <symbol number="006F" entity="&#x006F;" char="&#x03BF;"/><!-- GREEK SMALL LETTER OMICRON -->
+  <symbol number="F070" entity="&#xF070;" char="&#x03C0;"/><!-- GREEK SMALL LETTER PI -->
+  <symbol number="0070" entity="&#x0070;" char="&#x03C0;"/><!-- GREEK SMALL LETTER PI -->
+  <symbol number="F071" entity="&#xF071;" char="&#x03B8;"/><!-- GREEK SMALL LETTER THETA -->
+  <symbol number="0071" entity="&#x0071;" char="&#x03B8;"/><!-- GREEK SMALL LETTER THETA -->
+  <symbol number="F072" entity="&#xF072;" char="&#x03C1;"/><!-- GREEK SMALL LETTER RHO -->
+  <symbol number="0072" entity="&#x0072;" char="&#x03C1;"/><!-- GREEK SMALL LETTER RHO -->
+  <symbol number="F073" entity="&#xF073;" char="&#x03C3;"/><!-- GREEK SMALL LETTER SIGMA -->
+  <symbol number="0073" entity="&#x0073;" char="&#x03C3;"/><!-- GREEK SMALL LETTER SIGMA -->
+  <symbol number="F074" entity="&#xF074;" char="&#x03C4;"/><!-- GREEK SMALL LETTER TAU -->
+  <symbol number="0074" entity="&#x0074;" char="&#x03C4;"/><!-- GREEK SMALL LETTER TAU -->
+  <symbol number="F075" entity="&#xF075;" char="&#x03C5;"/><!-- GREEK SMALL LETTER UPSILON -->
+  <symbol number="0075" entity="&#x0075;" char="&#x03C5;"/><!-- GREEK SMALL LETTER UPSILON -->
+  <symbol number="F076" entity="&#xF076;" char="&#x03D6;"/><!-- GREEK PI SYMBOL -->
+  <symbol number="0076" entity="&#x0076;" char="&#x03D6;"/><!-- GREEK PI SYMBOL -->
+  <symbol number="F077" entity="&#xF077;" char="&#x03C9;"/><!-- GREEK SMALL LETTER OMEGA -->
+  <symbol number="0077" entity="&#x0077;" char="&#x03C9;"/><!-- GREEK SMALL LETTER OMEGA -->
+  <symbol number="F078" entity="&#xF078;" char="&#x03BE;"/><!-- GREEK SMALL LETTER XI -->
+  <symbol number="0078" entity="&#x0078;" char="&#x03BE;"/><!-- GREEK SMALL LETTER XI -->
+  <symbol number="F079" entity="&#xF079;" char="&#x03C8;"/><!-- GREEK SMALL LETTER PSI -->
+  <symbol number="0079" entity="&#x0079;" char="&#x03C8;"/><!-- GREEK SMALL LETTER PSI -->
+  <symbol number="F07A" entity="&#xF07A;" char="&#x03B6;"/><!-- GREEK SMALL LETTER ZETA -->
+  <symbol number="007A" entity="&#x007A;" char="&#x03B6;"/><!-- GREEK SMALL LETTER ZETA -->
+  <symbol number="F07B" entity="&#xF07B;" char="&#x007B;"/><!-- LEFT CURLY BRACKET -->
+  <symbol number="007B" entity="&#x007B;" char="&#x007B;"/><!-- LEFT CURLY BRACKET -->
+  <symbol number="F07C" entity="&#xF07C;" char="&#x007C;"/><!-- VERTICAL LINE -->
+  <symbol number="007C" entity="&#x007C;" char="&#x007C;"/><!-- VERTICAL LINE -->
+  <symbol number="F07D" entity="&#xF07D;" char="&#x007D;"/><!-- RIGHT CURLY BRACKET -->
+  <symbol number="007D" entity="&#x007D;" char="&#x007D;"/><!-- RIGHT CURLY BRACKET -->
+  <symbol number="F07E" entity="&#xF07E;" char="&#x223C;"/><!-- TILDE OPERATOR -->
+  <symbol number="007E" entity="&#x007E;" char="&#x223C;"/><!-- TILDE OPERATOR -->
+  
+  <symbol number="F080" entity="&#xF080;" char="&#x002D;"/><!-- HYPHEN-MINUS -->
+  <symbol number="F081" entity="&#xF081;" /><!-- triple dashes? -->
+  <symbol number="F082" entity="&#xF082;" char="&#x25A0;"/><!-- BLACK SQUARE -->
+  <symbol number="F083" entity="&#xF083;" char="&#x25A1;"/><!-- WHITE SQUARE -->
+  <symbol number="F084" entity="&#xF084;" char="&#x22F1;"/><!-- DOWN RIGHT DIAGONAL ELLIPSIS -->
+  <symbol number="F085" entity="&#xF085;" /><!-- bold dash (hyphen-minus)? -->
+  <symbol number="F086" entity="&#xF086;" char="&#x226A;"/><!-- MUCH LESS-THAN -->
+  <symbol number="F087" entity="&#xF087;" char="&#x226B;"/><!-- MUCH GREATER-THAN -->
+  <symbol number="F088" entity="&#xF088;" char="&#x23B5;"/><!-- BOTTOM SQUARE BRACKET (is narrower, but so what)-->
+  <symbol number="F089" entity="&#xF089;" char="&#x00D7;"/><!-- MULTIPLICATION SIGN -->
+  <symbol number="F08A" entity="&#xF08A;" char="&#x2A75;"/><!-- TWO CONSECUTIVE EQUALS SIGNS -->
+  <symbol number="F08B" entity="&#xF08B;" char="&#x0060;"/>
+  <symbol number="F08C" entity="&#xF08C;" char="&#x00B4;"/>
+  <symbol number="F08D" entity="&#xF08D;" char="&#x02DD;"/>
+  <symbol number="F08E" entity="&#xF08E;" char="&#x02DC;"/>
+  <symbol number="F08F" entity="&#xF08F;" char="&#x00AF;"/>
+  
+  <symbol number="F090" entity="&#xF090;" char="&#x21D5;"/>
+  <symbol number="F091" entity="&#xF091;"/><!-- (vertical double arrow extender) -->
+  <symbol number="F092" entity="&#xF092;" char="&#x21D0;"/><!-- LEFTWARDS DOUBLE ARROW (longer variant) -->
+  <symbol number="F093" entity="&#xF093;" /><!-- horizontal double arrow extender -->
+  <symbol number="F094" entity="&#xF094;" char="&#x21D2;"/><!-- RIGHTWARDS DOUBLE ARROW (longer variant) -->
+  <symbol number="F095" entity="&#xF095;" char="&#x21D4;"/><!-- LEFT RIGHT DOUBLE ARROW (longer variant) -->
+  <symbol number="F096" entity="&#xF096;" />
+  <symbol number="F097" entity="&#xF097;" char="&#x2195;"/>
+  <symbol number="F098" entity="&#xF098;" char="&#x2190;"/><!-- longer variant -->
+  <symbol number="F099" entity="&#xF099;" char="&#x2192;"/><!-- longer variant -->
+  <symbol number="F09A" entity="&#xF09A;" />
+  <symbol number="F09B" entity="&#xF09B;" char="&#x2254;"/>
+  <symbol number="F09C" entity="&#xF09C;" char="&#x22C4;"/><!-- DIAMOND OPERATOR (variant?) -->
+  <symbol number="F09D" entity="&#xF09D;" char="&#x2287;"/>
+  <symbol number="F09E" entity="&#xF09E;" char="&#x0040;"/>
+  <symbol number="F09F" entity="&#xF09F;" char="&#x25AA;"/><!-- BLACK SMALL SQUARE (looks taller though, but should be different from F082) -->
+  
+  <symbol number="F0A0" entity="&#xF0A0;" char="&#x002E;"/><!-- plain dot? -->
+  
+  <symbol number="F0A1" entity="&#xF0A1;" char="&#x03D2;"/><!-- GREEK UPSILON WITH HOOK SYMBOL -->
+  <symbol number="00A1" entity="&#x00A1;" char="&#x03D2;"/><!-- GREEK UPSILON WITH HOOK SYMBOL -->
+  <symbol number="F0A2" entity="&#xF0A2;" char="&#x2032;"/><!-- PRIME	# minute -->
+  <symbol number="00A2" entity="&#x00A2;" char="&#x2032;"/><!-- PRIME	# minute -->
+  <symbol number="F0A3" entity="&#xF0A3;" char="&#x2264;"/><!-- LESS-THAN OR EQUAL TO -->
+  <symbol number="00A3" entity="&#x00A3;" char="&#x2264;"/><!-- LESS-THAN OR EQUAL TO -->
+  <symbol number="F0A4" entity="&#xF0A4;" char="&#x2044;"/><!-- FRACTION SLASH -->
+  <symbol number="00A4" entity="&#x00A4;" char="&#x2044;"/><!-- FRACTION SLASH -->
+  <symbol number="F0A5" entity="&#xF0A5;" char="&#x221E;"/><!-- INFINITY -->
+  <symbol number="00A5" entity="&#x00A5;" char="&#x221E;"/><!-- INFINITY -->
+ 
+  <symbol number="F0A6" entity="&#xF0A6;" /><!-- :→ -->
+  
+  <symbol number="F0A7" entity="&#xF0A7;" char="&#x2663;"/><!-- BLACK CLUB SUIT -->
+  <symbol number="00A7" entity="&#x00A7;" char="&#x2663;"/><!-- BLACK CLUB SUIT -->
+  <symbol number="F0A8" entity="&#xF0A8;" char="&#x2666;"/><!-- BLACK DIAMOND SUIT -->
+  <symbol number="00A8" entity="&#x00A8;" char="&#x2666;"/><!-- BLACK DIAMOND SUIT -->
+  <symbol number="F0A9" entity="&#xF0A9;" char="&#x2665;"/><!-- BLACK HEART SUIT -->
+  <symbol number="00A9" entity="&#x00A9;" char="&#x2665;"/><!-- BLACK HEART SUIT -->
+  <symbol number="F0AA" entity="&#xF0AA;" char="&#x2660;"/><!-- BLACK SPADE SUIT -->
+  <symbol number="00AA" entity="&#x00AA;" char="&#x2660;"/><!-- BLACK SPADE SUIT -->
+  <symbol number="F0AB" entity="&#xF0AB;" char="&#x2194;"/><!-- LEFT RIGHT ARROW -->
+  <symbol number="00AB" entity="&#x00AB;" char="&#x2194;"/><!-- LEFT RIGHT ARROW -->
+  <symbol number="F0AC" entity="&#xF0AC;" char="&#x2190;"/><!-- LEFTWARDS ARROW -->
+  <symbol number="00AC" entity="&#x00AC;" char="&#x2190;"/><!-- LEFTWARDS ARROW -->
+  <symbol number="F0AD" entity="&#xF0AD;" char="&#x2191;"/><!-- UPWARDS ARROW -->
+  <symbol number="00AD" entity="&#x00AD;" char="&#x2191;"/><!-- UPWARDS ARROW -->
+  <symbol number="F0AE" entity="&#xF0AE;" char="&#x2192;"/><!-- RIGHTWARDS ARROW -->
+  <symbol number="00AE" entity="&#x00AE;" char="&#x2192;"/><!-- RIGHTWARDS ARROW -->
+  <symbol number="F0AF" entity="&#xF0AF;" char="&#x2193;"/><!-- DOWNWARDS ARROW -->
+  <symbol number="00AF" entity="&#x00AF;" char="&#x2193;"/><!-- DOWNWARDS ARROW -->
+  <symbol number="F0B0" entity="&#xF0B0;" char="&#x00B0;"/><!-- DEGREE SIGN -->
+  <symbol number="00B0" entity="&#x00B0;" char="&#x00B0;"/><!-- DEGREE SIGN -->
+  <symbol number="F0B1" entity="&#xF0B1;" char="&#x00B1;"/><!-- PLUS-MINUS SIGN -->
+  <symbol number="00B1" entity="&#x00B1;" char="&#x00B1;"/><!-- PLUS-MINUS SIGN -->
+  <symbol number="F0B2" entity="&#xF0B2;" char="&#x2033;"/><!-- DOUBLE PRIME	# second -->
+  <symbol number="00B2" entity="&#x00B2;" char="&#x2033;"/><!-- DOUBLE PRIME	# second -->
+  <symbol number="F0B3" entity="&#xF0B3;" char="&#x2265;"/><!-- GREATER-THAN OR EQUAL TO -->
+  <symbol number="00B3" entity="&#x00B3;" char="&#x2265;"/><!-- GREATER-THAN OR EQUAL TO -->
+
+  <symbol number="F0B4" entity="&#xF0B4;" char="&#x2A2F;"/><!-- VECTOR OR CROSS PRODUCT (unsure about that – in symbol, this will be mapped to U+D7) -->
+
+  <symbol number="F0B5" entity="&#xF0B5;" char="&#x221D;"/><!-- PROPORTIONAL TO -->
+  <symbol number="00B5" entity="&#x00B5;" char="&#x221D;"/><!-- PROPORTIONAL TO -->
+  <symbol number="F0B6" entity="&#xF0B6;" char="&#x2202;"/><!-- PARTIAL DIFFERENTIAL -->
+  <symbol number="00B6" entity="&#x00B6;" char="&#x2202;"/><!-- PARTIAL DIFFERENTIAL -->
+  <symbol number="F0B7" entity="&#xF0B7;" char="&#x2022;"/><!-- BULLET -->
+  <symbol number="00B7" entity="&#x00B7;" char="&#x2022;"/><!-- BULLET -->
+  <symbol number="F0B8" entity="&#xF0B8;" char="&#x00F7;"/><!-- DIVISION SIGN -->
+  <symbol number="00B8" entity="&#x00B8;" char="&#x00F7;"/><!-- DIVISION SIGN -->
+  <symbol number="F0B9" entity="&#xF0B9;" char="&#x2260;"/><!-- NOT EQUAL TO -->
+  <symbol number="00B9" entity="&#x00B9;" char="&#x2260;"/><!-- NOT EQUAL TO -->
+  <symbol number="F0BA" entity="&#xF0BA;" char="&#x2261;"/><!-- IDENTICAL TO -->
+  <symbol number="00BA" entity="&#x00BA;" char="&#x2261;"/><!-- IDENTICAL TO -->
+  <symbol number="F0BB" entity="&#xF0BB;" char="&#x2248;"/><!-- ALMOST EQUAL TO -->
+  <symbol number="00BB" entity="&#x00BB;" char="&#x2248;"/><!-- ALMOST EQUAL TO -->
+  <symbol number="F0BC" entity="&#xF0BC;" char="&#x2026;"/><!-- HORIZONTAL ELLIPSIS -->
+  <symbol number="00BC" entity="&#x00BC;" char="&#x2026;"/><!-- HORIZONTAL ELLIPSIS -->
+  <symbol number="F0BD" entity="&#xF0BD;" char="&#x23D0;"/><!-- VERTICAL LINE EXTENSION (for arrows) # for Unicode 4.0 and later -->
+  <symbol number="00BD" entity="&#x00BD;" char="&#x23D0;"/><!-- VERTICAL LINE EXTENSION (for arrows) # for Unicode 4.0 and later -->
+  <symbol number="F0BE" entity="&#xF0BE;" char="&#x23AF;"/><!-- HORIZONTAL LINE EXTENSION (for arrows) # for Unicode 3.2 and later -->
+  <symbol number="00BE" entity="&#x00BE;" char="&#x23AF;"/><!-- HORIZONTAL LINE EXTENSION (for arrows) # for Unicode 3.2 and later -->
+  <symbol number="F0BF" entity="&#xF0BF;" char="&#x21B5;"/><!-- DOWNWARDS ARROW WITH CORNER LEFTWARDS -->
+  <symbol number="00BF" entity="&#x00BF;" char="&#x21B5;"/><!-- DOWNWARDS ARROW WITH CORNER LEFTWARDS -->
+  <symbol number="F0C0" entity="&#xF0C0;" char="&#x2135;"/><!-- ALEF SYMBOL -->
+  <symbol number="00C0" entity="&#x00C0;" char="&#x2135;"/><!-- ALEF SYMBOL -->
+  <symbol number="F0C1" entity="&#xF0C1;" char="&#x2111;"/><!-- BLACK-LETTER CAPITAL I -->
+  <symbol number="00C1" entity="&#x00C1;" char="&#x2111;"/><!-- BLACK-LETTER CAPITAL I -->
+  <symbol number="F0C2" entity="&#xF0C2;" char="&#x211C;"/><!-- BLACK-LETTER CAPITAL R -->
+  <symbol number="00C2" entity="&#x00C2;" char="&#x211C;"/><!-- BLACK-LETTER CAPITAL R -->
+  <symbol number="F0C3" entity="&#xF0C3;" char="&#x2118;"/><!-- SCRIPT CAPITAL P -->
+  <symbol number="00C3" entity="&#x00C3;" char="&#x2118;"/><!-- SCRIPT CAPITAL P -->
+  <symbol number="F0C4" entity="&#xF0C4;" char="&#x2297;"/><!-- CIRCLED TIMES -->
+  <symbol number="00C4" entity="&#x00C4;" char="&#x2297;"/><!-- CIRCLED TIMES -->
+  <symbol number="F0C5" entity="&#xF0C5;" char="&#x2295;"/><!-- CIRCLED PLUS -->
+  <symbol number="00C5" entity="&#x00C5;" char="&#x2295;"/><!-- CIRCLED PLUS -->
+  <symbol number="F0C6" entity="&#xF0C6;" char="&#x2205;"/><!-- EMPTY SET -->
+  <symbol number="00C6" entity="&#x00C6;" char="&#x2205;"/><!-- EMPTY SET -->
+  <symbol number="F0C7" entity="&#xF0C7;" char="&#x2229;"/><!-- INTERSECTION -->
+  <symbol number="00C7" entity="&#x00C7;" char="&#x2229;"/><!-- INTERSECTION -->
+  <symbol number="F0C8" entity="&#xF0C8;" char="&#x222A;"/><!-- UNION -->
+  <symbol number="00C8" entity="&#x00C8;" char="&#x222A;"/><!-- UNION -->
+  <symbol number="F0C9" entity="&#xF0C9;" char="&#x2283;"/><!-- SUPERSET OF -->
+  <symbol number="00C9" entity="&#x00C9;" char="&#x2283;"/><!-- SUPERSET OF -->
+
+  <symbol number="F0CB" entity="&#xF0CB;" char="&#x2284;"/><!-- NOT A SUBSET OF -->
+  <symbol number="00CB" entity="&#x00CB;" char="&#x2284;"/><!-- NOT A SUBSET OF -->
+  <symbol number="F0CC" entity="&#xF0CC;" char="&#x2282;"/><!-- SUBSET OF -->
+  <symbol number="00CC" entity="&#x00CC;" char="&#x2282;"/><!-- SUBSET OF -->
+  <symbol number="F0CD" entity="&#xF0CD;" char="&#x2286;"/><!-- SUBSET OF OR EQUAL TO -->
+  <symbol number="00CD" entity="&#x00CD;" char="&#x2286;"/><!-- SUBSET OF OR EQUAL TO -->
+  <symbol number="F0CE" entity="&#xF0CE;" char="&#x2208;"/><!-- ELEMENT OF -->
+  <symbol number="00CE" entity="&#x00CE;" char="&#x2208;"/><!-- ELEMENT OF -->
+  <symbol number="F0CF" entity="&#xF0CF;" char="&#x2209;"/><!-- NOT AN ELEMENT OF -->
+  <symbol number="00CF" entity="&#x00CF;" char="&#x2209;"/><!-- NOT AN ELEMENT OF -->
+  <symbol number="F0D0" entity="&#xF0D0;" char="&#x2220;"/><!-- ANGLE -->
+  <symbol number="00D0" entity="&#x00D0;" char="&#x2220;"/><!-- ANGLE -->
+  <symbol number="F0D1" entity="&#xF0D1;" char="&#x2207;"/><!-- NABLA -->
+  <symbol number="00D1" entity="&#x00D1;" char="&#x2207;"/><!-- NABLA -->
+  <symbol number="F0D2" entity="&#xF0D2;" char="&#x00AE;"/><!-- REGISTERED SIGN # serif -->
+  <symbol number="00D2" entity="&#x00D2;" char="&#x00AE;"/><!-- REGISTERED SIGN # serif -->
+  <symbol number="F0D3" entity="&#xF0D3;" char="&#x00A9;"/><!-- COPYRIGHT SIGN # serif -->
+  <symbol number="00D3" entity="&#x00D3;" char="&#x00A9;"/><!-- COPYRIGHT SIGN # serif -->
+  <symbol number="F0D4" entity="&#xF0D4;" char="&#x2122;"/><!-- TRADE MARK SIGN # serif -->
+  <symbol number="00D4" entity="&#x00D4;" char="&#x2122;"/><!-- TRADE MARK SIGN # serif -->
+  <symbol number="F0D5" entity="&#xF0D5;" char="&#x220F;"/><!-- N-ARY PRODUCT -->
+  <symbol number="00D5" entity="&#x00D5;" char="&#x220F;"/><!-- N-ARY PRODUCT -->
+  <symbol number="F0D6" entity="&#xF0D6;" char="&#x221A;"/><!-- SQUARE ROOT -->
+  <symbol number="00D6" entity="&#x00D6;" char="&#x221A;"/><!-- SQUARE ROOT -->
+  <symbol number="F0D7" entity="&#xF0D7;" char="&#x22C5;"/><!-- DOT OPERATOR -->
+  <symbol number="00D7" entity="&#x00D7;" char="&#x22C5;"/><!-- DOT OPERATOR -->
+  <symbol number="F0D8" entity="&#xF0D8;" char="&#x00AC;"/><!-- NOT SIGN -->
+  <symbol number="00D8" entity="&#x00D8;" char="&#x00AC;"/><!-- NOT SIGN -->
+  <symbol number="F0D9" entity="&#xF0D9;" char="&#x2227;"/><!-- LOGICAL AND -->
+  <symbol number="00D9" entity="&#x00D9;" char="&#x2227;"/><!-- LOGICAL AND -->
+  <symbol number="F0DA" entity="&#xF0DA;" char="&#x2228;"/><!-- LOGICAL OR -->
+  <symbol number="00DA" entity="&#x00DA;" char="&#x2228;"/><!-- LOGICAL OR -->
+  <symbol number="F0DB" entity="&#xF0DB;" char="&#x21D4;"/><!-- LEFT RIGHT DOUBLE ARROW -->
+  <symbol number="00DB" entity="&#x00DB;" char="&#x21D4;"/><!-- LEFT RIGHT DOUBLE ARROW -->
+  <symbol number="F0DC" entity="&#xF0DC;" char="&#x21D0;"/><!-- LEFTWARDS DOUBLE ARROW -->
+  <symbol number="00DC" entity="&#x00DC;" char="&#x21D0;"/><!-- LEFTWARDS DOUBLE ARROW -->
+  <symbol number="F0DD" entity="&#xF0DD;" char="&#x21D1;"/><!-- UPWARDS DOUBLE ARROW -->
+  <symbol number="00DD" entity="&#x00DD;" char="&#x21D1;"/><!-- UPWARDS DOUBLE ARROW -->
+  <symbol number="F0DE" entity="&#xF0DE;" char="&#x21D2;"/><!-- RIGHTWARDS DOUBLE ARROW -->
+  <symbol number="00DE" entity="&#x00DE;" char="&#x21D2;"/><!-- RIGHTWARDS DOUBLE ARROW -->
+  <symbol number="F0DF" entity="&#xF0DF;" char="&#x21D3;"/><!-- DOWNWARDS DOUBLE ARROW -->
+  <symbol number="00DF" entity="&#x00DF;" char="&#x21D3;"/><!-- DOWNWARDS DOUBLE ARROW -->
+  <symbol number="F0E0" entity="&#xF0E0;" char="&#x22C4;"/><!-- DIAMOND OPERATOR -->
+  <symbol number="00E0" entity="&#x00E0;" char="&#x22C4;"/><!-- DIAMOND OPERATOR -->
+  <symbol number="F0E1" entity="&#xF0E1;" char="&#x3008;"/><!-- LEFT ANGLE BRACKET -->
+  <symbol number="00E1" entity="&#x00E1;" char="&#x3008;"/><!-- LEFT ANGLE BRACKET -->
+  
+  <symbol number="F0E2" entity="&#xF0E2;" char="&#x2146;"/><!-- Mathematica’s differential operator -->
+  <symbol number="F0E3" entity="&#x00E2;" char="&#x2147;"/><!-- Mathematica’s Euler number  -->
+  <symbol number="F0E4" entity="&#xF0E3;" char="&#x2148;"/><!-- Mathematica’s imaginary unit -->
+  
+  <symbol number="F0E5" entity="&#xF0E5;" char="&#x2211;"/><!-- N-ARY SUMMATION -->
+  <symbol number="00E5" entity="&#x00E5;" char="&#x2211;"/><!-- N-ARY SUMMATION -->
+  <symbol number="F0E6" entity="&#xF0E6;" char="&#x239B;"/><!-- LEFT PARENTHESIS UPPER HOOK # for Unicode 3.2 and later -->
+  <symbol number="00E6" entity="&#x00E6;" char="&#x239B;"/><!-- LEFT PARENTHESIS UPPER HOOK # for Unicode 3.2 and later -->
+  <symbol number="F0E7" entity="&#xF0E7;" char="&#x239C;"/><!-- LEFT PARENTHESIS EXTENSION # for Unicode 3.2 and later -->
+  <symbol number="00E7" entity="&#x00E7;" char="&#x239C;"/><!-- LEFT PARENTHESIS EXTENSION # for Unicode 3.2 and later -->
+  <symbol number="F0E8" entity="&#xF0E8;" char="&#x239D;"/><!-- LEFT PARENTHESIS LOWER HOOK # for Unicode 3.2 and later -->
+  <symbol number="00E8" entity="&#x00E8;" char="&#x239D;"/><!-- LEFT PARENTHESIS LOWER HOOK # for Unicode 3.2 and later -->
+  <symbol number="F0E9" entity="&#xF0E9;" char="&#x23A1;"/><!-- LEFT SQUARE BRACKET UPPER CORNER # for Unicode 3.2 and later -->
+  <symbol number="00E9" entity="&#x00E9;" char="&#x23A1;"/><!-- LEFT SQUARE BRACKET UPPER CORNER # for Unicode 3.2 and later -->
+  <symbol number="F0EA" entity="&#xF0EA;" char="&#x23A2;"/><!-- LEFT SQUARE BRACKET EXTENSION # for Unicode 3.2 and later -->
+  <symbol number="00EA" entity="&#x00EA;" char="&#x23A2;"/><!-- LEFT SQUARE BRACKET EXTENSION # for Unicode 3.2 and later -->
+  <symbol number="F0EB" entity="&#xF0EB;" char="&#x23A3;"/><!-- LEFT SQUARE BRACKET LOWER CORNER # for Unicode 3.2 and later -->
+  <symbol number="00EB" entity="&#x00EB;" char="&#x23A3;"/><!-- LEFT SQUARE BRACKET LOWER CORNER # for Unicode 3.2 and later -->
+  <symbol number="F0EC" entity="&#xF0EC;" char="&#x23A7;"/><!-- LEFT CURLY BRACKET UPPER HOOK # for Unicode 3.2 and later -->
+  <symbol number="00EC" entity="&#x00EC;" char="&#x23A7;"/><!-- LEFT CURLY BRACKET UPPER HOOK # for Unicode 3.2 and later -->
+  <symbol number="F0ED" entity="&#xF0ED;" char="&#x23A8;"/><!-- LEFT CURLY BRACKET MIDDLE PIECE # for Unicode 3.2 and later -->
+  <symbol number="00ED" entity="&#x00ED;" char="&#x23A8;"/><!-- LEFT CURLY BRACKET MIDDLE PIECE # for Unicode 3.2 and later -->
+  <symbol number="F0EE" entity="&#xF0EE;" char="&#x23A9;"/><!-- LEFT CURLY BRACKET LOWER HOOK # for Unicode 3.2 and later -->
+  <symbol number="00EE" entity="&#x00EE;" char="&#x23A9;"/><!-- LEFT CURLY BRACKET LOWER HOOK # for Unicode 3.2 and later -->
+  <symbol number="F0EF" entity="&#xF0EF;" char="&#x23AA;"/><!-- CURLY BRACKET EXTENSION # for Unicode 3.2 and later -->
+  <symbol number="00EF" entity="&#x00EF;" char="&#x23AA;"/><!-- CURLY BRACKET EXTENSION # for Unicode 3.2 and later -->
+
+  <symbol number="F0F0" entity="&#xF0F0;" char="&#x0023;"/> <!-- hash mark / pound sign variant? --> 
+
+  <symbol number="F0F1" entity="&#xF0F1;" char="&#x3009;"/><!-- RIGHT ANGLE BRACKET -->
+  <symbol number="00F1" entity="&#x00F1;" char="&#x3009;"/><!-- RIGHT ANGLE BRACKET -->
+  <symbol number="F0F2" entity="&#xF0F2;" char="&#x222B;"/><!-- INTEGRAL -->
+  <symbol number="00F2" entity="&#x00F2;" char="&#x222B;"/><!-- INTEGRAL -->
+  <symbol number="F0F3" entity="&#xF0F3;" char="&#x2320;"/><!-- TOP HALF INTEGRAL -->
+  <symbol number="00F3" entity="&#x00F3;" char="&#x2320;"/><!-- TOP HALF INTEGRAL -->
+  <symbol number="F0F4" entity="&#xF0F4;" char="&#x23AE;"/><!-- INTEGRAL EXTENSION # for Unicode 3.2 and later -->
+  <symbol number="00F4" entity="&#x00F4;" char="&#x23AE;"/><!-- INTEGRAL EXTENSION # for Unicode 3.2 and later -->
+  <symbol number="F0F5" entity="&#xF0F5;" char="&#x2321;"/><!-- BOTTOM HALF INTEGRAL -->
+  <symbol number="00F5" entity="&#x00F5;" char="&#x2321;"/><!-- BOTTOM HALF INTEGRAL -->
+  <symbol number="F0F6" entity="&#xF0F6;" char="&#x239E;"/><!-- RIGHT PARENTHESIS UPPER HOOK # for Unicode 3.2 and later -->
+  <symbol number="00F6" entity="&#x00F6;" char="&#x239E;"/><!-- RIGHT PARENTHESIS UPPER HOOK # for Unicode 3.2 and later -->
+  <symbol number="F0F7" entity="&#xF0F7;" char="&#x239F;"/><!-- RIGHT PARENTHESIS EXTENSION # for Unicode 3.2 and later -->
+  <symbol number="00F7" entity="&#x00F7;" char="&#x239F;"/><!-- RIGHT PARENTHESIS EXTENSION # for Unicode 3.2 and later -->
+  <symbol number="F0F8" entity="&#xF0F8;" char="&#x23A0;"/><!-- RIGHT PARENTHESIS LOWER HOOK # for Unicode 3.2 and later -->
+  <symbol number="00F8" entity="&#x00F8;" char="&#x23A0;"/><!-- RIGHT PARENTHESIS LOWER HOOK # for Unicode 3.2 and later -->
+  <symbol number="F0F9" entity="&#xF0F9;" char="&#x23A4;"/><!-- RIGHT SQUARE BRACKET UPPER CORNER # for Unicode 3.2 and later -->
+  <symbol number="00F9" entity="&#x00F9;" char="&#x23A4;"/><!-- RIGHT SQUARE BRACKET UPPER CORNER # for Unicode 3.2 and later -->
+  <symbol number="F0FA" entity="&#xF0FA;" char="&#x23A5;"/><!-- RIGHT SQUARE BRACKET EXTENSION # for Unicode 3.2 and later -->
+  <symbol number="00FA" entity="&#x00FA;" char="&#x23A5;"/><!-- RIGHT SQUARE BRACKET EXTENSION # for Unicode 3.2 and later -->
+  <symbol number="F0FB" entity="&#xF0FB;" char="&#x23A6;"/><!-- RIGHT SQUARE BRACKET LOWER CORNER # for Unicode 3.2 and later -->
+  <symbol number="00FB" entity="&#x00FB;" char="&#x23A6;"/><!-- RIGHT SQUARE BRACKET LOWER CORNER # for Unicode 3.2 and later -->
+  <symbol number="F0FC" entity="&#xF0FC;" char="&#x23AB;"/><!-- RIGHT CURLY BRACKET UPPER HOOK # for Unicode 3.2 and later -->
+  <symbol number="00FC" entity="&#x00FC;" char="&#x23AB;"/><!-- RIGHT CURLY BRACKET UPPER HOOK # for Unicode 3.2 and later -->
+  <symbol number="F0FD" entity="&#xF0FD;" char="&#x23AC;"/><!-- RIGHT CURLY BRACKET MIDDLE PIECE # for Unicode 3.2 and later -->
+  <symbol number="00FD" entity="&#x00FD;" char="&#x23AC;"/><!-- RIGHT CURLY BRACKET MIDDLE PIECE # for Unicode 3.2 and later -->
+  <symbol number="F0FE" entity="&#xF0FE;" char="&#x23AD;"/><!-- RIGHT CURLY BRACKET LOWER HOOK # for Unicode 3.2 and later -->
+  <symbol number="00FE" entity="&#x00FE;" char="&#x23AD;"/><!-- RIGHT CURLY BRACKET LOWER HOOK # for Unicode 3.2 and later -->
+  <symbol number="F0FF" entity="&#xF0FF;" /><!-- fox? dog? horse? -->
+  
+</symbols>

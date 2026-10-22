@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<symbols xmlns:css="http://www.w3.org/1996/css">
+  <symbol number="F022" entity="&#xF022;" char="&#x0394;" css:font-style="normal"/><!-- GREEK CAPITAL LETTER DELTA -->
+  <!--<symbol number="F041" entity="&#xF041;" char="&#x3C7;" css:font-style="normal"/>--><!-- italic(!?) --><!-- Greek Small Letter Chi -->
+  <symbol number="F05E" entity="&#xF05E;" char="&#x2205;" css:font-style="normal"/><!-- Empty Set -->
+  <symbol number="F08E" entity="&#xF08E;" char="&#x007C;" css:font-style="normal"/><!-- Vertical Line -->
+  <symbol number="F0B8" entity="&#xF0B8;" char="&#x1D53C;" css:font-style="normal"/><!-- Mathematical Double-struck Capital E -->
+  <symbol number="F0BA" entity="&#xF0BA;" char="&#x1D53E;" css:font-style="normal"/><!-- Mathematical Double-struck Capital G -->
+  <symbol number="F0BE" entity="&#xF0BE;" char="&#x1D542;" css:font-style="normal"/><!-- Mathematical Double-struck Capital K -->
+  <symbol number="F0BF" entity="&#xF0BF;" char="&#x1D543;" css:font-style="normal"/><!-- Mathematical Double-struck Capital L -->
+  <symbol number="F0C1" entity="&#xF0C1;" char="&#x2115;" css:font-style="normal"/><!-- DOUBLE-STRUCK CAPITAL N -->
+  <symbol number="F0C3" entity="&#xF0C3;" char="&#x2119;" css:font-style="normal"/><!-- DOUBLE-STRUCK CAPITAL P -->
+  <symbol number="F0C4" entity="&#xF0C4;" char="&#x211A;" css:font-style="normal"/><!-- DOUBLE-STRUCK CAPITAL Q -->
+  <symbol number="F0C5" entity="&#xF0C5;" char="&#x211D;" css:font-style="normal"/><!-- DOUBLE-STRUCK CAPITAL R -->
+  <symbol number="F0CA" entity="&#xF0CA;" char="&#x1D54E;" css:font-style="normal"/><!-- Mathematical Double-struck Capital W -->
+  <symbol number="F0CD" entity="&#xF0CD;" char="&#x2124;" css:font-style="normal"/><!-- DOUBLE-STRUCK CAPITAL Z --> 
+  <symbol number="F02D" entity="&#xF02D;" char="&#x03B2;" css:font-style="italic"/><!-- GREEK SMALL LETTER BETA -->
+  <symbol number="F02E" entity="&#xF02E;" char="&#x03B3;" css:font-style="italic"/><!-- GREEK SMALL LETTER GAMMA -->
+  <symbol number="F02F" entity="&#xF02F;" char="&#x03B4;" css:font-style="italic"/><!-- GREEK SMALL LETTER DELTA -->
+  <symbol number="F044" entity="&#xF044;" char="&#x03B5;" css:font-style="italic"/><!-- GREEK SMALL LETTER EPSILON -->
+  <symbol number="F0F7" entity="&#xF0F7;" char="&#x2A61;" css:font-style="normal"/><!-- Small Vee With Underbar -->
+</symbols>
