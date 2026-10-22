@@ -15,8 +15,9 @@ export default defineNuxtPlugin((nuxtApp) => {
       }
     },
     onResponseError({ response }) {
-      // 后端尚未完成首次安装：跳转到安装向导
-      if (response.status === 503 && response._data?.detail === 'setup_required') {
+      // 后端尚未完成首次初始化（数据库或首个管理员）：跳转到安装向导
+      const detail = response._data?.detail
+      if (response.status === 503 && (detail === 'setup_required' || detail === 'admin_required')) {
         nuxtApp.runWithContext(() => navigateTo('/setup'))
         return
       }

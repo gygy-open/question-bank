@@ -20,7 +20,7 @@ uv sync
 # 应用数据库迁移
 uv run alembic upgrade head
 
-# 创建超管(按需)
+# 创建超管(按需；也可以首次打开前端时在 /setup 向导中创建)
 uv run python scripts/create_superuser.py
 
 # 启动开发服务器(热重载)

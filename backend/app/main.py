@@ -13,6 +13,7 @@ from app._version import __version__
 from app.api.v1.api import api_router
 from app.capabilities.errors import DomainError, status_for
 from app.core.config import settings, is_configured
+from app.services import setup_state
 from app.services.embedding import reload_embedding_function
 
 logging.basicConfig(level=settings.LOG_LEVEL)
@@ -46,12 +47,18 @@ _SETUP_EXEMPT = (_SETUP_PREFIX, f"{settings.API_V1_STR}/system/version")
 
 @app.middleware("http")
 async def require_setup(request: Request, call_next):
-    """Until a database is configured, block all API calls except the setup
-    wizard so the frontend can detect first-run state and redirect to /setup."""
-    if not is_configured():
-        path = request.url.path
-        if path.startswith("/api") and not path.startswith(_SETUP_EXEMPT):
+    """Block API calls (except the setup wizard and exempt endpoints) until
+    initialization is complete, so the frontend can redirect to /setup:
+
+    - no database configured        -> 503 ``setup_required``
+    - database but no active admin  -> 503 ``admin_required``
+    """
+    path = request.url.path
+    if path.startswith("/api") and not path.startswith(_SETUP_EXEMPT):
+        if not is_configured():
             return JSONResponse(status_code=503, content={"detail": "setup_required"})
+        if not await setup_state.is_admin_ready():
+            return JSONResponse(status_code=503, content={"detail": "admin_required"})
     return await call_next(request)
 
 # Ensure static directories exist

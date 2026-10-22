@@ -284,3 +284,4 @@ export interface UserUpdatePassword {
   current_password: string
   new_password: string
 }
+export type { SetupStatus } from './setup'

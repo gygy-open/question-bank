@@ -81,3 +81,24 @@ async def client(engine):
     async with AsyncClient(transport=transport, base_url="http://test") as c:
         yield c
     app.dependency_overrides.clear()
+
+
+@pytest_asyncio.fixture(autouse=True)
+def _admin_ready():
+    """Most tests seed users directly; skip the first-admin gate by default.
+    The setup-gate tests reset it explicitly."""
+    from app.services import setup_state
+
+    setup_state.mark_admin_ready()
+    yield
+    setup_state.mark_admin_ready()
+
+
+@pytest_asyncio.fixture
+def setup_sessionmaker(engine, monkeypatch):
+    """Point the setup-state DB checks (which bypass FastAPI deps) at the test engine."""
+    from app.services import setup_state
+
+    maker = async_sessionmaker(bind=engine, class_=AsyncSession, expire_on_commit=False)
+    monkeypatch.setattr(setup_state, "get_sessionmaker", lambda: maker)
+    return maker

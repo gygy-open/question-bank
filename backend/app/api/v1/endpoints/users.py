@@ -1,8 +1,9 @@
-from typing import Any, List
+from typing import Any, List, Optional
 
 from fastapi import APIRouter, Body, Depends, HTTPException, UploadFile, File
 from fastapi.encoders import jsonable_encoder
 from fastapi.responses import StreamingResponse
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api import deps
 from app.crud import crud_user
@@ -17,9 +18,34 @@ from app.schemas.user import (
 )
 from app.schemas.subject_member import MyPermissions, SubjectMembershipMini
 from app.core import security
-from app.services import user_import_service
+from app.models.user import User as UserModel
+from app.services import setup_state, user_import_service
 
 router = APIRouter()
+
+
+async def _ensure_not_last_active_superuser(
+    session: AsyncSession,
+    target: UserModel,
+    *,
+    removing: bool,
+    user_in: Optional[UserUpdate] = None,
+) -> None:
+    """Reject changes that would leave the system without an active superuser,
+    which would otherwise reopen the first-admin setup wizard."""
+    if not (target.is_superuser and target.is_active):
+        return
+    if not removing:
+        demoted = user_in is not None and user_in.is_superuser is False
+        deactivated = user_in is not None and user_in.is_active is False
+        if not (demoted or deactivated):
+            return
+    if await setup_state.count_active_superusers(session) <= 1:
+        raise HTTPException(
+            status_code=400,
+            detail="Cannot remove, demote or deactivate the last active superuser",
+        )
+
 
 MAX_IMPORT_SIZE = 5 * 1024 * 1024  # 5 MB
 
@@ -136,7 +162,8 @@ async def update_user_me(
         # Let's allow it here too for consistency, or maybe restrict it.
         # Given the schema, it's allowed.
         pass
-        
+
+    await _ensure_not_last_active_superuser(session, current_user, removing=False, user_in=user_in)
     user = await crud_user.user.update(session, db_obj=current_user, obj_in=user_in)
     return user
 
@@ -217,6 +244,7 @@ async def update_user(
                 status_code=400,
                 detail="The user with this username already exists in the system.",
             )
+    await _ensure_not_last_active_superuser(session, user, removing=False, user_in=user_in)
     user = await crud_user.user.update(session, db_obj=user, obj_in=user_in)
     return user
 
@@ -236,5 +264,6 @@ async def delete_user(
             status_code=404,
             detail="The user with this username does not exist in the system",
         )
+    await _ensure_not_last_active_superuser(session, user, removing=True)
     user = await crud_user.user.remove(session, id=user_id)
     return user
