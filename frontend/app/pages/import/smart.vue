@@ -189,9 +189,12 @@ const filteredKnowledgePoints = computed(() => {
 // --- Handlers ---
 
 const handleFileChange = (e: Event) => {
-    const target = e.target as HTMLInputElement
-    if (target.files && target.files.length > 0) {
-        const picked = target.files[0]
+    if (isUploading.value) return
+    const files = e.type === 'drop'
+        ? (e as DragEvent).dataTransfer?.files
+        : (e.target as HTMLInputElement | null)?.files
+    if (files && files.length > 0) {
+        const picked = files[0]
         if (!picked) return
         file.value = picked
         // If it's an image, clear pasted image
