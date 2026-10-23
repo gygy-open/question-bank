@@ -13,20 +13,76 @@ persisted random value (see ``app.core.config``), so exposing the app on the
 LAN does not fall back to an insecure default.
 """
 
+import json
 import multiprocessing
 import os
 import socket
 import sys
 import threading
 import time
+import urllib.request
 import webbrowser
 
 from app import channel
 
-PORT = int(os.getenv("PORT", str(channel.DEFAULT_PORT)))
-URL_LOCAL = f"http://127.0.0.1:{PORT}/"
-_FIREWALL_RULE = f"QuestionBank ({PORT})"
+DEFAULT_PORT = int(os.getenv("PORT", str(channel.DEFAULT_PORT)))
+_PORT_SCAN = 10  # 默认端口被别的程序占用时,往后最多再试这么多个
+# 启动时解析一次:默认端口可能被无关程序占着,此时顺延而不是直接崩在 WinError 10048。
+PORT = DEFAULT_PORT
 _MUTEX_HANDLE = None
+
+
+def _url() -> str:
+    return f"http://127.0.0.1:{PORT}/"
+
+
+def _port_available(host: str, port: int) -> bool:
+    """能否在该地址上监听。刻意不设 SO_REUSEADDR——在 Windows 上那会让探测"成功"在一个已被占用的端口上。"""
+    sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    try:
+        sock.bind((host, port))
+        return True
+    except OSError:
+        return False
+    finally:
+        sock.close()
+
+
+def _instance_responding(port: int) -> bool:
+    """该端口上是否已经有一个题库服务在应答。"""
+    try:
+        with urllib.request.urlopen(
+            f"http://127.0.0.1:{port}/api/v1/system/version", timeout=2
+        ) as resp:
+            data = json.load(resp)
+    except Exception:  # noqa: BLE001 - 任何异常都只说明"不是我们"
+        return False
+    return bool(data.get("version")) and str(data.get("repo", "")).endswith("question-bank")
+
+
+def _running_instance_port() -> "int | None":
+    """已在运行的本应用实例所用端口(含它顺延到的端口),没有则 None。"""
+    for port in range(DEFAULT_PORT, DEFAULT_PORT + _PORT_SCAN + 1):
+        if not _port_available("127.0.0.1", port) and _instance_responding(port):
+            return port
+    return None
+
+
+def _resolve_port(host: str) -> "int | None":
+    for port in range(DEFAULT_PORT, DEFAULT_PORT + _PORT_SCAN + 1):
+        if _port_available(host, port):
+            return port
+    return None
+
+
+def _wait_for_instance(timeout: float = 30.0) -> "int | None":
+    deadline = time.time() + timeout
+    while time.time() < deadline:
+        port = _running_instance_port()
+        if port is not None:
+            return port
+        time.sleep(0.5)
+    return None
 
 
 def _acquire_single_instance() -> bool:
@@ -36,14 +92,17 @@ def _acquire_single_instance() -> bool:
     try:
         import ctypes
 
-        kernel32 = ctypes.windll.kernel32
-        handle = kernel32.CreateMutexW(None, False, channel.INSTANCE_MUTEX)
+        kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
+        kernel32.CreateMutexW.restype = ctypes.c_void_p
+        kernel32.CreateMutexW.argtypes = [ctypes.c_void_p, ctypes.c_int, ctypes.c_wchar_p]
+        handle = kernel32.CreateMutexW(None, 0, channel.INSTANCE_MUTEX)
+        last_error = ctypes.get_last_error()
         error_already_exists = 183
-        if kernel32.GetLastError() == error_already_exists:
-            return False
+        if not handle:
+            return True  # 创建失败说明判断不了,交给端口探测兜底
         global _MUTEX_HANDLE
         _MUTEX_HANDLE = handle
-        return True
+        return last_error != error_already_exists
     except Exception:  # noqa: BLE001
         return True
 
@@ -97,6 +156,13 @@ def _wait_for_port(host: str, port: int, timeout: float = 30.0) -> bool:
 def _open_when_ready(url: str) -> None:
     if _wait_for_port("127.0.0.1", PORT):
         webbrowser.open(url)
+        return
+    from app.core.config import settings
+
+    channel.message_box(
+        f"服务未能启动。\n\n请把日志发给我们排查：\n{settings.DATA_DIR / 'logs' / 'app.log'}",
+        channel.MB_ICONERROR,
+    )
 
 
 def _lan_ip() -> str:
@@ -112,24 +178,34 @@ def _lan_ip() -> str:
         return "127.0.0.1"
 
 
-def _set_firewall_rule(enable: bool) -> None:
-    """Add/remove an inbound firewall rule for the server port (Windows only).
+def _firewall_command(enable: bool, program: str, netsh: str = "netsh") -> str:
+    """给 cmd /c 用的命令串:一次提权里顺带清掉旧版按端口命名的规则。"""
+    base = f"{netsh} advfirewall firewall"
+    commands = [
+        f'{base} delete rule name="{channel.LEGACY_FIREWALL_RULE}"',
+        f'{base} delete rule name="{channel.FIREWALL_RULE}"',
+    ]
+    if enable:
+        # 按程序放行而非按端口:端口可能顺延,规则不该跟着失效。
+        commands.append(
+            f'{base} add rule name="{channel.FIREWALL_RULE}" '
+            f'dir=in action=allow protocol=TCP program="{program}" enable=yes'
+        )
+    return " & ".join(commands)
 
-    Uses an elevated, hidden ``netsh`` call (one UAC prompt per toggle).
-    """
+
+def _set_firewall_rule(enable: bool) -> None:
+    """Add/remove the inbound firewall rule (Windows only; one UAC prompt per toggle)."""
     if os.name != "nt":
         return
-    if enable:
-        args = (
-            f'advfirewall firewall add rule name="{_FIREWALL_RULE}" '
-            f"dir=in action=allow protocol=TCP localport={PORT}"
-        )
-    else:
-        args = f'advfirewall firewall delete rule name="{_FIREWALL_RULE}"'
+    system32 = os.path.join(os.environ.get("SystemRoot", r"C:\Windows"), "System32")
+    command = _firewall_command(enable, sys.executable, os.path.join(system32, "netsh.exe"))
     try:
         import ctypes
 
-        ctypes.windll.shell32.ShellExecuteW(None, "runas", "netsh", args, None, 0)
+        ctypes.windll.shell32.ShellExecuteW(
+            None, "runas", os.path.join(system32, "cmd.exe"), f"/c {command}", None, 0
+        )
     except Exception:  # noqa: BLE001 - firewall is best-effort
         pass
 
@@ -202,6 +278,8 @@ def _make_image():
 
 
 def run_tray() -> None:
+    global PORT
+
     import pystray
     from pystray import Menu, MenuItem
 
@@ -210,15 +288,36 @@ def run_tray() -> None:
     ensure_std_streams()
 
     # Bring the existing instance's UI forward instead of starting a second one.
+    # 端口是机器级的唯一资源,互斥量只到会话级(快速用户切换/多用户登录各有一份)。
+    running = _running_instance_port()
+    if running is not None:
+        webbrowser.open(f"http://127.0.0.1:{running}/")
+        return
     if not _acquire_single_instance():
-        webbrowser.open(URL_LOCAL)
+        # 另一实例刚启动还没监听,等它起来后按它实际的端口打开
+        running = _wait_for_instance()
+        if running is not None:
+            webbrowser.open(f"http://127.0.0.1:{running}/")
         return
 
+    lan = get_lan_share()
+    port = _resolve_port("0.0.0.0" if lan else "127.0.0.1")
+    if port is None:
+        channel.message_box(
+            f"端口 {DEFAULT_PORT}~{DEFAULT_PORT + _PORT_SCAN} 都被其他程序占用，无法启动。\n\n"
+            "请关闭占用这些端口的程序后重试。",
+            channel.MB_ICONERROR,
+        )
+        return
+    if port != DEFAULT_PORT:
+        channel.message_box(f"端口 {DEFAULT_PORT} 已被其他程序占用，本次改用 {port}。")
+    PORT = port
+
     server = _Server()
-    server.start(get_lan_share())
+    server.start(lan)
 
     # Auto-open the UI once on launch.
-    threading.Thread(target=_open_when_ready, args=(URL_LOCAL,), daemon=True).start()
+    threading.Thread(target=_open_when_ready, args=(_url(),), daemon=True).start()
 
     icon = pystray.Icon("question-bank", _make_image(), channel.DISPLAY_NAME)
 
@@ -229,7 +328,7 @@ def run_tray() -> None:
             pass
 
     def on_open(_icon, _item) -> None:
-        webbrowser.open(URL_LOCAL)
+        webbrowser.open(_url())
 
     def on_toggle_lan(_icon, _item) -> None:
         from app.services import mdns

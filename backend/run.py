@@ -62,18 +62,6 @@ def start_worker() -> None:
     worker.main()
 
 
-def _message_box(text: str, flags: int) -> int:
-    """Windows 原生对话框;其他平台(桌面版只发 Windows)返回 0。"""
-    if os.name != "nt":
-        return 0
-    import ctypes
-
-    from app.channel import DISPLAY_NAME
-
-    mb_setforeground = 0x10000
-    return ctypes.windll.user32.MessageBoxW(None, text, DISPLAY_NAME, flags | mb_setforeground)
-
-
 def _offer_preview_seed() -> None:
     """测试版首次启动:询问是否复制一份正式版数据。必须先于任何导入 config 的代码执行。"""
     from app import channel
@@ -82,29 +70,27 @@ def _offer_preview_seed() -> None:
         return
     stable, preview = channel.desktop_data_dir(False), channel.desktop_data_dir(True)
     state = channel.seed_state(stable, preview)
-    mb_yesno, mb_iconquestion, mb_iconinfo, idyes = 0x4, 0x20, 0x40, 6
     if state == "available":
-        answer = _message_box(
+        answer = channel.message_box(
             "检测到正式版的题库数据。\n\n"
             "是否复制一份到测试版中使用？\n"
             "· 选「是」：测试版使用这份副本，正式版的数据不会被修改。\n"
             "· 选「否」：测试版以全新状态启动。",
-            mb_yesno | mb_iconquestion,
+            channel.MB_YESNO | channel.MB_ICONQUESTION,
         )
-        if answer != idyes:
+        if answer != channel.IDYES:
             channel.decline_seed(preview)
             return
         try:
             channel.seed_from_stable(stable, preview)
         except Exception as exc:  # noqa: BLE001
-            _message_box(f"复制正式版数据失败：{exc}\n\n测试版将以全新状态启动。", mb_iconinfo)
+            channel.message_box(f"复制正式版数据失败：{exc}\n\n测试版将以全新状态启动。")
             channel.decline_seed(preview)
     elif state == "mysql":
-        _message_box(
+        channel.message_box(
             "正式版使用的是 MySQL 数据库，无法自动复制。\n\n"
             "测试版将以全新状态启动。如需使用正式版数据，请先复制一个数据库，"
-            "再在设置向导中连接它；不要连接正式版正在使用的数据库。",
-            mb_iconinfo,
+            "再在设置向导中连接它；不要连接正式版正在使用的数据库。"
         )
         channel.decline_seed(preview)
 

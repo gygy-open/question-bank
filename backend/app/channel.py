@@ -35,9 +35,30 @@ def is_preview(version: str = __version__, frozen: Optional[bool] = None) -> boo
 
 PREVIEW = is_preview()
 DEFAULT_PORT = 8001 if PREVIEW else 8000
-INSTANCE_MUTEX = "Global\\QuestionBankTrayPreview" if PREVIEW else "Global\\QuestionBankTray"
+# 必须用 Local\:Global\ 命名空间需要 SeCreateGlobalPrivilege,普通(未提权)启动的桌面程序没有这项
+# 权限,CreateMutexW 会直接失败,单实例判断形同虚设。跨用户会话的实例由端口探测兜底(app.tray)。
+INSTANCE_MUTEX = "Local\\QuestionBankTrayPreview" if PREVIEW else "Local\\QuestionBankTray"
 DISPLAY_NAME = "QuestionBank 测试版" if PREVIEW else "QuestionBank"
 MDNS_HOST = "questionbank-preview" if PREVIEW else "questionbank"
+# 与 deploy/windows/installer.iss 的 MyFwRule / MyLegacyFwRule 保持一致。
+FIREWALL_RULE = "QuestionBank Preview" if PREVIEW else "QuestionBank"
+LEGACY_FIREWALL_RULE = f"QuestionBank ({DEFAULT_PORT})"  # 旧版按端口放行时的规则名
+
+MB_YESNO = 0x4
+MB_ICONERROR = 0x10
+MB_ICONQUESTION = 0x20
+MB_ICONINFO = 0x40
+IDYES = 6
+
+
+def message_box(text: str, flags: int = MB_ICONINFO) -> int:
+    """Windows 原生对话框;其他平台(桌面版只发 Windows)返回 0。"""
+    if os.name != "nt":
+        return 0
+    import ctypes
+
+    mb_setforeground = 0x10000
+    return ctypes.windll.user32.MessageBoxW(None, text, DISPLAY_NAME, flags | mb_setforeground)
 
 
 def desktop_data_root() -> Path:

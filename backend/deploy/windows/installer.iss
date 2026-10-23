@@ -31,16 +31,18 @@
   #define MyAppDir "QuestionBank Preview"
   #define MyAppExe "question-bank-preview.exe"
   #define MyRunKey "QuestionBankPreview"
-  #define MyPort "8001"
+  #define MyFwRule "QuestionBank Preview"
+  #define MyLegacyFwRule "QuestionBank (8001)"
 #else
   #define MyAppId "{{8F3A2B14-9C7E-4D6A-B1F2-3E5C7A9D0B11}"
   #define MyAppName "QuestionBank"
   #define MyAppDir "QuestionBank"
   #define MyAppExe "question-bank.exe"
   #define MyRunKey "QuestionBank"
-  #define MyPort "8000"
+  #define MyFwRule "QuestionBank"
+  #define MyLegacyFwRule "QuestionBank (8000)"
 #endif
-#define MyFwRule "QuestionBank (" + MyPort + ")"
+; Keep in sync with app/channel.py FIREWALL_RULE / LEGACY_FIREWALL_RULE.
 
 [Setup]
 AppId={#MyAppId}
@@ -70,13 +72,14 @@ Name: "desktopicon"; Description: "创建桌面快捷方式"; Flags: unchecked
 [Files]
 Source: "{#PayloadDir}\*"; DestDir: "{app}"; Flags: recursesubdirs ignoreversion
 
-[INI]
-; Internet shortcut used by the Start Menu "open" icon (opens the running app).
-Filename: "{app}\QuestionBank.url"; Section: "InternetShortcut"; Key: "URL"; String: "http://localhost:{#MyPort}/"
+[InstallDelete]
+; Older versions shipped a localhost:<port> internet shortcut; the port is now resolved at runtime.
+Type: files; Name: "{app}\QuestionBank.url"
 
 [Icons]
 Name: "{group}\{#MyAppName}"; Filename: "{app}\{#MyAppExe}"
-Name: "{group}\打开题库"; Filename: "{app}\QuestionBank.url"
+; Running the exe again just opens the UI of the already-running instance on its actual port.
+Name: "{group}\打开题库"; Filename: "{app}\{#MyAppExe}"
 Name: "{group}\卸载题库"; Filename: "{uninstallexe}"
 Name: "{autodesktop}\{#MyAppName}"; Filename: "{app}\{#MyAppExe}"; Tasks: desktopicon
 
@@ -92,9 +95,7 @@ Filename: "{app}\{#MyAppExe}"; Description: "立即启动题库"; Flags: nowait 
 ; Close the running tray so its files can be removed, and drop any firewall rule.
 Filename: "{sys}\taskkill.exe"; Parameters: "/im {#MyAppExe} /f"; Flags: runhidden; RunOnceId: "StopTray"
 Filename: "{sys}\netsh.exe"; Parameters: "advfirewall firewall delete rule name=""{#MyFwRule}"""; Flags: runhidden; RunOnceId: "RemoveFirewall"
-
-[UninstallDelete]
-Type: files; Name: "{app}\QuestionBank.url"
+Filename: "{sys}\netsh.exe"; Parameters: "advfirewall firewall delete rule name=""{#MyLegacyFwRule}"""; Flags: runhidden; RunOnceId: "RemoveLegacyFirewall"
 
 [Code]
 { Close any running tray instance before copying files, otherwise the running
