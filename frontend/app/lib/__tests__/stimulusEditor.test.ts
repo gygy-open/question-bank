@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import type { QuestionSummary } from '@/types'
 import { getApiErrorDetail, isRevisionConflict } from '@/lib/apiErrors'
 import {
@@ -14,6 +14,15 @@ import {
   publicMembersUnderPrivate,
   validateMembers,
 } from '@/lib/stimulusEditor'
+import { setTranslator } from '@/lib/locale'
+
+// 校验错误是界面文案（走 i18n）：测试里把 key 与参数原样拼出来，断言结构而不依赖具体语言。
+beforeAll(() => {
+  setTranslator((key, params) => (params ? `${key}(${Object.values(params).join('|')})` : key))
+})
+afterAll(() => {
+  setTranslator((key) => key)
+})
 
 const doc = (text: string) => ({ type: 'doc', content: [{ type: 'paragraph', content: [{ type: 'text', text }] }] })
 const question = (id: number, overrides: Partial<QuestionSummary> = {}): QuestionSummary => ({
@@ -99,7 +108,7 @@ describe('stimulus member validation', () => {
   it('reports the first invalid new or edited member by position', () => {
     const untouched = entryFromQuestion(question(1, { content: null }))
     const created = newEntry({ status: 'draft', visibility: 'public' })
-    expect(validateMembers([untouched, created], meta())).toBe('第 2 小题：题干不能为空')
+    expect(validateMembers([untouched, created], meta())).toBe('stimuli.memberError(2|questionModel.validation.contentRequired)')
     created.draft.content = doc('题干')
     expect(validateMembers([untouched, created], meta())).toBeNull()
   })

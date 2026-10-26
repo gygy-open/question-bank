@@ -6,6 +6,8 @@ import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
 
 /** 勾选要启用的模型，并可调整“识图 / 向量”能力标记（默认按模型名推断）。 */
+const { t } = useI18n()
+
 const props = defineProps<{
   candidates: AIModelInput[]
   existingNames?: string[]
@@ -69,7 +71,7 @@ const addManual = () => {
   <div class="space-y-3">
     <div v-if="rows.length > 6" class="relative">
       <Search class="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-      <Input v-model="query" placeholder="搜索模型" class="pl-9" />
+      <Input v-model="query" :placeholder="t('aiModels.picker.search')" class="pl-9" />
     </div>
 
     <div v-if="rows.length" class="max-h-72 overflow-y-auto rounded-md border divide-y">
@@ -87,33 +89,33 @@ const addManual = () => {
             :class="row.is_vision_capable ? 'border-blue-300 bg-blue-50 text-blue-700' : 'text-muted-foreground'"
             :disabled="row.is_embedding_model"
             :aria-pressed="row.is_vision_capable"
-            title="是否支持识图"
+            :title="t('aiModels.picker.visionTitle')"
             @click="row.is_vision_capable = !row.is_vision_capable"
-          >识图</button>
+          >{{ t('aiModels.capabilities.vision') }}</button>
           <button
             type="button"
             class="rounded border px-1.5 py-0.5 text-[11px] transition-colors"
             :class="row.is_embedding_model ? 'border-purple-300 bg-purple-50 text-purple-700' : 'text-muted-foreground'"
             :aria-pressed="row.is_embedding_model"
-            title="是否为向量模型"
+            :title="t('aiModels.picker.embeddingTitle')"
             @click="toggleEmbedding(row)"
-          >向量</button>
+          >{{ t('aiModels.capabilities.embedding') }}</button>
         </div>
       </div>
-      <p v-if="!visibleRows.length" class="px-3 py-4 text-center text-xs text-muted-foreground">没有匹配的模型</p>
+      <p v-if="!visibleRows.length" class="px-3 py-4 text-center text-xs text-muted-foreground">{{ t('aiModels.picker.noMatch') }}</p>
     </div>
     <p v-else class="text-sm text-muted-foreground">
-      没有可选的模型，请手动填写模型名称（与服务商文档中的 model 参数一致）。
+      {{ t('aiModels.picker.noCandidates') }}
     </p>
 
     <div class="flex gap-2">
-      <Input v-model="manualName" placeholder="手动添加，例如 deepseek-chat" @keydown.enter.prevent="addManual" />
+      <Input v-model="manualName" :placeholder="t('aiModels.picker.manualPlaceholder', { example: 'deepseek-chat' })" @keydown.enter.prevent="addManual" />
       <Button type="button" variant="outline" @click="addManual">
-        <Plus class="mr-1 h-4 w-4" />添加
+        <Plus class="mr-1 h-4 w-4" />{{ t('aiModels.picker.add') }}
       </Button>
     </div>
     <p class="text-xs text-muted-foreground">
-      已选 {{ selected.length }} 个。“识图”“向量”标记按模型名自动推断，可点击修改。
+      {{ t('aiModels.picker.summary', { count: selected.length }) }}
     </p>
   </div>
 </template>

@@ -19,7 +19,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { questionTypeLabel } from '@/lib/answerFormat'
+import { questionTypeDisplayLabel } from '@/lib/answerFormat'
 import { getApiErrorDetail, isRevisionConflict } from '@/lib/apiErrors'
 import {
   type BundleMeta,
@@ -39,6 +39,7 @@ import {
 import type { Question, QuestionStatus, QuestionSummary, RichDoc, StimulusDetail } from '@/types'
 
 const props = defineProps<{ stimulusId?: number }>()
+const { t } = useI18n()
 const router = useRouter()
 const route = useRoute()
 const { $api } = useNuxtApp()
@@ -85,14 +86,20 @@ const meta = computed<BundleMeta>(() => ({
 const selectedIds = computed(() => entries.value.flatMap(entry => (entry.id == null ? [] : [entry.id])))
 const incompatible = computed(() => publicMembersUnderPrivate(entries.value, meta.value))
 const incompatibleMessage = computed(() => incompatible.value.length
-  ? `私有材料题下不能包含公开小题（第 ${incompatible.value.join('、')} 小题）。请移出这些小题，或在“设置”中把材料题改为公开。`
+  ? t('stimuli.form.incompatibleMessage', { items: incompatible.value.join(t('stimuli.form.listSeparator')) })
   : '')
 const settingsOpen = ref(false)
 // 冲突提示要求改可见性时，把设置区展开到用户眼前。
 watch(incompatible, (items) => { if (items.length) settingsOpen.value = true })
-const STATUS_LABELS: Record<QuestionStatus, string> = { draft: '草稿', pending: '待审核', published: '已发布', archived: '已归档' }
+const STATUS_KEYS: Record<QuestionStatus, string> = {
+  draft: 'questions.statuses.draft',
+  pending: 'questions.statuses.pending',
+  published: 'questions.statuses.published',
+  archived: 'questions.statuses.archived',
+}
+const visibilityLabel = (value: 'public' | 'private') => t(value === 'private' ? 'materials.filters.private' : 'materials.filters.public')
 const settingsSummary = computed(() =>
-  [STATUS_LABELS[status.value], visibility.value === 'private' ? '私有' : '公开', source.value.trim()].filter(Boolean).join(' · '))
+  [t(STATUS_KEYS[status.value]), visibilityLabel(visibility.value), source.value.trim()].filter(Boolean).join(' · '))
 
 const resetBaseline = (questionIds: number[]) => {
   saved.value = { status: status.value, visibility: visibility.value, snapshot: snapshot.value, questionIds }
@@ -108,9 +115,9 @@ const staleForCompositions = computed(() =>
 const impactHint = computed(() => {
   if (!isEdit.value || !dirty.value) return ''
   const parts: string[] = []
-  if (meta.value.syncMembers && saved.value.questionIds.length) parts.push(`状态和可见性会同步到 ${saved.value.questionIds.length} 道小题`)
-  if (compositionCount.value && staleForCompositions.value) parts.push(`${compositionCount.value} 份稿件会提示同步更新`)
-  return parts.length ? `保存后${parts.join('，')}。` : ''
+  if (meta.value.syncMembers && saved.value.questionIds.length) parts.push(t('stimuli.form.impactSyncMembers', { count: saved.value.questionIds.length }))
+  if (compositionCount.value && staleForCompositions.value) parts.push(t('stimuli.form.impactCompositions', { count: compositionCount.value }))
+  return parts.length ? t('stimuli.form.impactHint', { parts: parts.join(t('stimuli.form.clauseSeparator')) }) : ''
 })
 
 const applyStimulus = (stimulus: StimulusDetail) => {
@@ -136,12 +143,12 @@ const takeQueryQuestion = async (key: 'from_question' | 'add_question'): Promise
   try {
     const question = await $api<Question>(`/questions/${questionId}`)
     if (question.stimulus_id != null && question.stimulus_id !== props.stimulusId) {
-      errorMessage.value = `题目 #${question.id} 已属于材料题 #${question.stimulus_id}，需先从原材料题移出。`
+      errorMessage.value = t('stimuli.form.questionInOtherStimulus', { id: question.id, stimulusId: question.stimulus_id })
       return null
     }
     return question
   } catch (error) {
-    errorMessage.value = getApiErrorDetail(error, '题目加载失败')
+    errorMessage.value = getApiErrorDetail(error, t('stimuli.form.questionLoadFailed'))
     return null
   }
 }
@@ -168,7 +175,7 @@ const appendRequestedQuestion = async () => {
   const question = await takeQueryQuestion('add_question')
   if (!question || selectedIds.value.includes(question.id)) return
   entries.value = addExisting(entries.value, [question as unknown as QuestionSummary])
-  toast.info(`已把题目 #${question.id} 加到末尾，保存后生效`)
+  toast.info(t('stimuli.form.questionAppended', { id: question.id }))
   await nextTick()
   document.getElementById(`member-q-${question.id}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' })
 }
@@ -179,7 +186,7 @@ const load = async (force = false) => {
   try {
     applyStimulus(await getStimulus(editorSubjectId.value, props.stimulusId))
   } catch (error) {
-    errorMessage.value = getApiErrorDetail(error, '材料题加载失败')
+    errorMessage.value = getApiErrorDetail(error, t('materials.loadFailed'))
     return
   } finally {
     loading.value = false
@@ -218,7 +225,7 @@ const beforeUnloadHandler = (event: BeforeUnloadEvent) => {
 }
 onMounted(() => window.addEventListener('beforeunload', beforeUnloadHandler))
 onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnloadHandler))
-onBeforeRouteLeave(() => !dirty.value || window.confirm('材料题有未保存的修改，确定要离开吗？'))
+onBeforeRouteLeave(() => !dirty.value || window.confirm(t('stimuli.form.leaveConfirm')))
 
 const toggleExpanded = (key: string) => {
   const next = new Set(expanded.value)
@@ -237,17 +244,17 @@ const addQuestions = (questions: QuestionSummary[]) => {
 }
 const removeEntry = (entry: MemberEntry) => {
   const edited = entry.id == null ? !isEmptyRichDoc(entry.draft.content) : isBodyDirty(entry)
-  const message = entry.id == null ? '删除这道未保存的小题？' : '这道小题的未保存修改将丢失，确定移出吗？'
+  const message = entry.id == null ? t('stimuli.form.deleteNewConfirm') : t('stimuli.form.removeDirtyConfirm')
   if (edited && !window.confirm(message)) return
   entries.value = entries.value.filter(item => item.key !== entry.key)
 }
 const moveQuestion = (from: number, to: number) => { entries.value = moveMember(entries.value, from, to) }
 
 const validationMessage = (): string => {
-  if (!editorSubjectId.value) return '请先选择学科'
-  if (subjectMismatch.value) return '请先切回草稿所属学科'
-  if (!canEdit.value) return '你没有编辑该学科材料题的权限'
-  if (isEmptyRichDoc(content.value)) return '请填写材料内容'
+  if (!editorSubjectId.value) return t('materials.selectSubjectFirst')
+  if (subjectMismatch.value) return t('stimuli.form.switchBackSubjectFirst')
+  if (!canEdit.value) return t('stimuli.form.noPermission')
+  if (isEmptyRichDoc(content.value)) return t('stimuli.form.contentRequired')
   if (incompatibleMessage.value) return incompatibleMessage.value
   return validateMembers(entries.value, meta.value) ?? ''
 }
@@ -275,11 +282,11 @@ const submit = async () => {
       ? await createStimulusBundle(subjectId, payload)
       : await updateStimulusBundle(subjectId, props.stimulusId, { ...payload, expected_revision: revision.value! })
     applyStimulus(detail)
-    toast.success(isEdit.value ? '材料题已保存' : '材料题已创建')
+    toast.success(isEdit.value ? t('stimuli.form.saved') : t('stimuli.form.created'))
     if (!isEdit.value) await router.replace(`/materials/${detail.id}/edit`)
   } catch (error) {
     if (isRevisionConflict(error)) conflict.value = true
-    else errorMessage.value = getApiErrorDetail(error, '保存材料题失败')
+    else errorMessage.value = getApiErrorDetail(error, t('stimuli.form.saveFailed'))
   } finally {
     saving.value = false
   }
@@ -290,55 +297,55 @@ const submit = async () => {
   <div class="flex flex-1 flex-col">
     <header class="flex min-h-14 items-center justify-between gap-3 border-b px-4">
       <div class="flex items-center gap-2">
-        <Button variant="ghost" size="icon" title="返回材料题列表" aria-label="返回材料题列表" @click="router.push('/materials')"><ArrowLeft class="size-4" /></Button>
-        <h1 class="text-base font-semibold">{{ isEdit ? '编辑材料题' : '新建材料题' }}</h1>
+        <Button variant="ghost" size="icon" :title="t('stimuli.form.backToList')" :aria-label="t('stimuli.form.backToList')" @click="router.push('/materials')"><ArrowLeft class="size-4" /></Button>
+        <h1 class="text-base font-semibold">{{ isEdit ? t('stimuli.form.editTitle') : t('materials.create') }}</h1>
       </div>
       <div class="flex items-center gap-2">
         <Button
           v-if="isEdit"
           variant="outline"
           :disabled="dirty || saved.questionIds.length === 0"
-          :title="dirty ? '请先保存修改' : '把材料和全部小题作为一道材料题加入稿件'"
+          :title="dirty ? t('stimuli.form.saveFirst') : t('stimuli.form.addToCompositionHint')"
           @click="compositionPickerOpen = true"
         >
-          <FilePlus2 class="mr-2 size-4" />加入稿件
+          <FilePlus2 class="mr-2 size-4" />{{ t('stimuli.form.addToComposition') }}
         </Button>
-        <Button :disabled="saving || loading || !canEdit || subjectMismatch || (isEdit && !dirty)" @click="submit"><Loader2 v-if="saving" class="mr-2 size-4 animate-spin" /><Save v-else class="mr-2 size-4" />保存</Button>
+        <Button :disabled="saving || loading || !canEdit || subjectMismatch || (isEdit && !dirty)" @click="submit"><Loader2 v-if="saving" class="mr-2 size-4 animate-spin" /><Save v-else class="mr-2 size-4" />{{ t('common.save') }}</Button>
       </div>
     </header>
 
     <main class="mx-auto flex w-full max-w-5xl flex-1 flex-col gap-5 px-4 py-6">
-      <Alert v-if="!currentSubjectId || !canEdit" variant="destructive"><AlertTriangle class="size-4" /><AlertTitle>无法编辑</AlertTitle><AlertDescription>{{ !currentSubjectId ? '请先选择学科。' : '你没有编辑该学科材料题的权限。' }}</AlertDescription></Alert>
-      <Alert v-if="subjectMismatch"><AlertTriangle class="size-4" /><AlertTitle>当前学科已切换</AlertTitle><AlertDescription class="space-y-3"><p>本地草稿仍属于学科 #{{ editorSubjectId }}，未被重新加载或覆盖。请切回原学科后继续保存，或返回列表放弃草稿。</p><div class="flex flex-wrap gap-2"><Button size="sm" variant="outline" @click="restoreSubject">切回原学科</Button><Button size="sm" variant="ghost" @click="router.push('/materials')">返回材料题列表</Button></div></AlertDescription></Alert>
+      <Alert v-if="!currentSubjectId || !canEdit" variant="destructive"><AlertTriangle class="size-4" /><AlertTitle>{{ t('stimuli.form.cannotEdit') }}</AlertTitle><AlertDescription>{{ !currentSubjectId ? t('stimuli.form.selectSubjectFirstSentence') : t('stimuli.form.noPermissionSentence') }}</AlertDescription></Alert>
+      <Alert v-if="subjectMismatch"><AlertTriangle class="size-4" /><AlertTitle>{{ t('stimuli.form.subjectSwitched') }}</AlertTitle><AlertDescription class="space-y-3"><p>{{ t('stimuli.form.subjectSwitchedDescription', { id: editorSubjectId }) }}</p><div class="flex flex-wrap gap-2"><Button size="sm" variant="outline" @click="restoreSubject">{{ t('stimuli.form.restoreSubject') }}</Button><Button size="sm" variant="ghost" @click="router.push('/materials')">{{ t('stimuli.form.backToList') }}</Button></div></AlertDescription></Alert>
       <Alert v-if="conflict" variant="destructive">
-        <AlertTriangle class="size-4" /><AlertTitle>材料题已被其他人修改</AlertTitle>
-        <AlertDescription class="space-y-3"><p>你的本地内容与小题顺序仍然保留。可以加载服务器最新版本，或继续编辑本地草稿后再决定。</p><div class="flex flex-wrap gap-2"><Button size="sm" variant="destructive" @click="load(true)">加载最新并放弃本地</Button><Button size="sm" variant="outline" @click="conflict = false">继续编辑本地</Button></div></AlertDescription>
+        <AlertTriangle class="size-4" /><AlertTitle>{{ t('stimuli.form.conflictTitle') }}</AlertTitle>
+        <AlertDescription class="space-y-3"><p>{{ t('stimuli.form.conflictDescription') }}</p><div class="flex flex-wrap gap-2"><Button size="sm" variant="destructive" @click="load(true)">{{ t('stimuli.form.loadLatest') }}</Button><Button size="sm" variant="outline" @click="conflict = false">{{ t('stimuli.form.keepLocal') }}</Button></div></AlertDescription>
       </Alert>
-      <Alert v-if="incompatible.length" variant="destructive"><AlertTriangle class="size-4" /><AlertTitle>私有材料题下有公开小题</AlertTitle><AlertDescription>{{ incompatibleMessage }}</AlertDescription></Alert>
-      <Alert v-if="errorMessage" variant="destructive"><AlertTriangle class="size-4" /><AlertTitle>操作失败</AlertTitle><AlertDescription>{{ errorMessage }}</AlertDescription></Alert>
+      <Alert v-if="incompatible.length" variant="destructive"><AlertTriangle class="size-4" /><AlertTitle>{{ t('stimuli.form.incompatibleTitle') }}</AlertTitle><AlertDescription>{{ incompatibleMessage }}</AlertDescription></Alert>
+      <Alert v-if="errorMessage" variant="destructive"><AlertTriangle class="size-4" /><AlertTitle>{{ t('common.operationFailed') }}</AlertTitle><AlertDescription>{{ errorMessage }}</AlertDescription></Alert>
       <p v-if="impactHint" class="text-sm text-muted-foreground" role="status">{{ impactHint }}</p>
       <div v-if="loading" class="flex justify-center py-20"><Loader2 class="size-7 animate-spin text-muted-foreground" /></div>
       <template v-else>
         <div class="space-y-2">
-          <Label>材料</Label>
-          <p class="text-xs text-muted-foreground">文章、图表或背景内容，小题围绕它作答。可以先只写材料，稍后再出题。</p>
+          <Label>{{ t('stimuli.form.material') }}</Label>
+          <p class="text-xs text-muted-foreground">{{ t('stimuli.form.materialHint') }}</p>
           <RichEditor v-model="content" />
         </div>
 
         <section class="space-y-3">
           <div class="flex flex-wrap items-center justify-between gap-2">
             <div>
-              <h2 class="text-sm font-semibold">小题（{{ entries.length }}）</h2>
-              <p class="text-xs text-muted-foreground">按此顺序出现在稿件中；移出后保留为单题。小题与材料一起保存。</p>
+              <h2 class="text-sm font-semibold">{{ t('stimuli.form.membersTitle', { count: entries.length }) }}</h2>
+              <p class="text-xs text-muted-foreground">{{ t('stimuli.form.membersHint') }}</p>
             </div>
             <div class="flex gap-2">
-              <Button size="sm" :disabled="!canEdit" @click="addNewQuestion"><Plus class="mr-2 size-4" />新建小题</Button>
+              <Button size="sm" :disabled="!canEdit" @click="addNewQuestion"><Plus class="mr-2 size-4" />{{ t('stimuli.form.newMember') }}</Button>
               <DropdownMenu>
                 <DropdownMenuTrigger as-child>
-                  <Button variant="outline" size="icon" class="size-8" :disabled="!canEdit" title="更多" aria-label="更多"><Ellipsis class="size-4" /></Button>
+                  <Button variant="outline" size="icon" class="size-8" :disabled="!canEdit" :title="t('common.moreActions')" :aria-label="t('common.moreActions')"><Ellipsis class="size-4" /></Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
-                  <DropdownMenuItem @click="pickerOpen = true"><ListPlus class="mr-2 size-4" />从题库添加已有单题…</DropdownMenuItem>
+                  <DropdownMenuItem @click="pickerOpen = true"><ListPlus class="mr-2 size-4" />{{ t('stimuli.form.addExisting') }}</DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
             </div>
@@ -347,58 +354,58 @@ const submit = async () => {
             <template #item="{ element: entry, index }">
               <article :id="`member-${entry.key}`" class="scroll-mt-20 py-3">
                 <div class="flex items-start gap-2">
-                  <button type="button" class="drag-handle mt-1 cursor-grab text-muted-foreground" title="拖动排序" aria-label="拖动排序"><GripVertical class="size-4" /></button>
+                  <button type="button" class="drag-handle mt-1 cursor-grab text-muted-foreground" :title="t('stimuli.form.dragToSort')" :aria-label="t('stimuli.form.dragToSort')"><GripVertical class="size-4" /></button>
                   <span class="mt-1 w-6 text-center text-xs text-muted-foreground">{{ index + 1 }}</span>
                   <div class="min-w-0 flex-1">
                     <div class="mb-1 flex flex-wrap gap-2">
-                      <Badge v-if="entry.id == null" variant="default">新</Badge>
+                      <Badge v-if="entry.id == null" variant="default">{{ t('stimuli.form.newBadge') }}</Badge>
                       <Badge v-else variant="outline">#{{ entry.id }}</Badge>
-                      <Badge variant="secondary">{{ questionTypeLabel(entry.draft.q_type) }}</Badge>
-                      <Badge variant="outline">{{ STATUS_LABELS[effectiveMeta(entry, meta).status] }}</Badge>
-                      <Badge v-if="effectiveMeta(entry, meta).visibility === 'private'" variant="outline">私有</Badge>
-                      <Badge v-if="entry.id != null && isBodyDirty(entry)" variant="outline" class="border-amber-500/50 text-amber-700 dark:text-amber-400">已修改</Badge>
-                      <Badge v-if="incompatible.includes(index + 1)" variant="destructive">公开小题不能放在私有材料题下</Badge>
+                      <Badge variant="secondary">{{ questionTypeDisplayLabel(entry.draft.q_type) }}</Badge>
+                      <Badge variant="outline">{{ t(STATUS_KEYS[effectiveMeta(entry, meta).status]) }}</Badge>
+                      <Badge v-if="effectiveMeta(entry, meta).visibility === 'private'" variant="outline">{{ t('materials.filters.private') }}</Badge>
+                      <Badge v-if="entry.id != null && isBodyDirty(entry)" variant="outline" class="border-amber-500/50 text-amber-700 dark:text-amber-400">{{ t('stimuli.form.modified') }}</Badge>
+                      <Badge v-if="incompatible.includes(index + 1)" variant="destructive">{{ t('stimuli.form.incompatibleBadge') }}</Badge>
                     </div>
                     <button v-if="!expanded.has(entry.key)" type="button" class="block w-full text-left" @click="toggleExpanded(entry.key)">
-                      <RichContent :content="entry.draft.content" empty-text="（未填写题干）" class="line-clamp-3 text-sm" />
+                      <RichContent :content="entry.draft.content" :empty-text="t('stimuli.form.emptyStem')" class="line-clamp-3 text-sm" />
                     </button>
                   </div>
                   <div class="flex shrink-0">
-                    <Button variant="ghost" size="icon" :title="expanded.has(entry.key) ? '收起' : '编辑'" :aria-label="expanded.has(entry.key) ? '收起' : '编辑'" @click="toggleExpanded(entry.key)">
+                    <Button variant="ghost" size="icon" :title="expanded.has(entry.key) ? t('stimuli.form.collapse') : t('common.edit')" :aria-label="expanded.has(entry.key) ? t('stimuli.form.collapse') : t('common.edit')" @click="toggleExpanded(entry.key)">
                       <ChevronUp v-if="expanded.has(entry.key)" class="size-4" /><Pencil v-else class="size-4" />
                     </Button>
-                    <Button variant="ghost" size="icon" :disabled="index === 0" title="上移" aria-label="上移" @click="moveQuestion(index, index - 1)"><ArrowUp class="size-4" /></Button>
-                    <Button variant="ghost" size="icon" :disabled="index === entries.length - 1" title="下移" aria-label="下移" @click="moveQuestion(index, index + 1)"><ArrowDown class="size-4" /></Button>
-                    <Button v-if="entry.id == null" variant="ghost" size="icon" class="text-destructive" title="删除此小题" aria-label="删除此小题" @click="removeEntry(entry)"><Trash2 class="size-4" /></Button>
-                    <Button v-else variant="ghost" size="icon" title="移出（保留为单题）" aria-label="移出（保留为单题）" @click="removeEntry(entry)"><Unlink class="size-4" /></Button>
+                    <Button variant="ghost" size="icon" :disabled="index === 0" :title="t('stimuli.form.moveUp')" :aria-label="t('stimuli.form.moveUp')" @click="moveQuestion(index, index - 1)"><ArrowUp class="size-4" /></Button>
+                    <Button variant="ghost" size="icon" :disabled="index === entries.length - 1" :title="t('stimuli.form.moveDown')" :aria-label="t('stimuli.form.moveDown')" @click="moveQuestion(index, index + 1)"><ArrowDown class="size-4" /></Button>
+                    <Button v-if="entry.id == null" variant="ghost" size="icon" class="text-destructive" :title="t('stimuli.form.deleteMember')" :aria-label="t('stimuli.form.deleteMember')" @click="removeEntry(entry)"><Trash2 class="size-4" /></Button>
+                    <Button v-else variant="ghost" size="icon" :title="t('stimuli.form.detachMember')" :aria-label="t('stimuli.form.detachMember')" @click="removeEntry(entry)"><Unlink class="size-4" /></Button>
                   </div>
                 </div>
                 <div v-if="expanded.has(entry.key)" class="mt-3 ml-8 border-l-2 pl-4">
                   <QuestionDraftEditor :model-value="entry.draft" />
                   <div class="mt-4 flex justify-end">
-                    <Button variant="outline" size="sm" @click="toggleExpanded(entry.key)"><ChevronUp class="mr-2 size-4" />收起</Button>
+                    <Button variant="outline" size="sm" @click="toggleExpanded(entry.key)"><ChevronUp class="mr-2 size-4" />{{ t('stimuli.form.collapse') }}</Button>
                   </div>
                 </div>
               </article>
             </template>
           </draggable>
-          <p v-if="entries.length === 0" class="border border-dashed py-12 text-center text-sm text-muted-foreground">还没有小题。点击“新建小题”开始出题；也可以先保存材料，稍后再出题。</p>
-          <Button v-if="entries.length > 0" variant="outline" class="w-full border-dashed" :disabled="!canEdit" @click="addNewQuestion"><Plus class="mr-2 size-4" />新建小题</Button>
+          <p v-if="entries.length === 0" class="border border-dashed py-12 text-center text-sm text-muted-foreground">{{ t('stimuli.form.emptyMembers') }}</p>
+          <Button v-if="entries.length > 0" variant="outline" class="w-full border-dashed" :disabled="!canEdit" @click="addNewQuestion"><Plus class="mr-2 size-4" />{{ t('stimuli.form.newMember') }}</Button>
         </section>
 
         <Collapsible v-model:open="settingsOpen" class="border-t pt-4">
           <CollapsibleTrigger as-child>
             <button type="button" class="flex w-full items-center gap-2 text-left text-sm">
               <ChevronDown class="size-4 shrink-0 text-muted-foreground transition-transform" :class="settingsOpen ? '' : '-rotate-90'" />
-              <span class="font-semibold">设置</span>
+              <span class="font-semibold">{{ t('stimuli.form.settings') }}</span>
               <span class="truncate text-xs text-muted-foreground">{{ settingsSummary }}</span>
             </button>
           </CollapsibleTrigger>
           <CollapsibleContent>
             <div class="mt-3 grid gap-4 bg-muted/40 p-4 sm:grid-cols-3">
-              <div class="space-y-2"><Label>状态</Label><Select v-model="status"><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="draft">草稿</SelectItem><SelectItem value="pending">待审核</SelectItem><SelectItem value="published">已发布</SelectItem><SelectItem value="archived">已归档</SelectItem></SelectContent></Select></div>
-              <div class="space-y-2"><Label>可见性</Label><Select v-model="visibility"><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="public">公开</SelectItem><SelectItem value="private">私有</SelectItem></SelectContent></Select></div>
-              <div class="space-y-2"><Label for="stimulus-source">来源</Label><Input id="stimulus-source" v-model="source" placeholder="可选" /></div>
+              <div class="space-y-2"><Label>{{ t('materials.filters.status') }}</Label><Select v-model="status"><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem v-for="(key, value) in STATUS_KEYS" :key="value" :value="value">{{ t(key) }}</SelectItem></SelectContent></Select></div>
+              <div class="space-y-2"><Label>{{ t('materials.filters.visibility') }}</Label><Select v-model="visibility"><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="public">{{ t('materials.filters.public') }}</SelectItem><SelectItem value="private">{{ t('materials.filters.private') }}</SelectItem></SelectContent></Select></div>
+              <div class="space-y-2"><Label for="stimulus-source">{{ t('stimuli.form.source') }}</Label><Input id="stimulus-source" v-model="source" :placeholder="t('stimuli.form.optional')" /></div>
             </div>
           </CollapsibleContent>
         </Collapsible>

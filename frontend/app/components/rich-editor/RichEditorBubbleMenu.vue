@@ -8,6 +8,7 @@ import { getTableFormatItemGroups } from './tableFormatItems'
 import RichEditorAlignMenu from './RichEditorAlignMenu.vue'
 
 const props = defineProps<{ editor: Editor }>()
+const { t } = useI18n()
 
 const items = getInlineFormatItems(props.editor)
 const imageAlignItems = getImageAlignFormatItems(props.editor)
@@ -44,12 +45,12 @@ function shouldShow({ editor, from, to }: { editor: Editor; from: number; to: nu
             <template v-if="editor.isActive('image')">
                 <Button
                     v-for="item in imageAlignItems"
-                    :key="item.label"
+                    :key="item.labelKey"
                     type="button"
                     size="icon"
                     class="size-8"
                     :variant="item.isActive?.() ? 'secondary' : 'ghost'"
-                    :title="item.label"
+                    :title="t(item.labelKey)"
                     @click="item.action"
                 >
                     <component :is="item.icon" class="size-4" />
@@ -60,13 +61,13 @@ function shouldShow({ editor, from, to }: { editor: Editor; from: number; to: nu
                     <div v-if="groupIndex > 0" aria-hidden="true" class="mx-0.5 h-6 w-px shrink-0 bg-border" />
                     <Button
                         v-for="item in group"
-                        :key="item.label"
+                        :key="item.labelKey"
                         type="button"
                         size="icon"
                         class="size-8"
                         variant="ghost"
                         :disabled="item.disabled?.()"
-                        :title="item.label"
+                        :title="t(item.labelKey)"
                         @click="item.action"
                     >
                         <component :is="item.icon" class="size-4" />
@@ -76,12 +77,12 @@ function shouldShow({ editor, from, to }: { editor: Editor; from: number; to: nu
             <template v-else>
                 <Button
                     v-for="item in items"
-                    :key="item.label"
+                    :key="item.labelKey"
                     type="button"
                     size="icon"
                     class="size-8"
                     :variant="item.isActive?.() ? 'secondary' : 'ghost'"
-                    :title="item.label"
+                    :title="t(item.labelKey)"
                     @click="item.action"
                 >
                     <component :is="item.icon" class="size-4" />

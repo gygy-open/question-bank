@@ -20,6 +20,8 @@ interface ConfirmOptions {
   destructive?: boolean
 }
 
+const { t } = useI18n()
+
 const open = ref(false)
 const options = ref<ConfirmOptions>({ title: '' })
 let resolver: ((r: ConfirmResult) => void) | null = null
@@ -53,10 +55,10 @@ defineExpose({ ask })
         </AlertDialogDescription>
       </AlertDialogHeader>
       <AlertDialogFooter>
-        <AlertDialogCancel @click="finish('cancel')">取消</AlertDialogCancel>
+        <AlertDialogCancel @click="finish('cancel')">{{ t('common.cancel') }}</AlertDialogCancel>
         <Button v-if="options.altLabel" variant="outline" @click="finish('alt')">{{ options.altLabel }}</Button>
         <Button :variant="options.destructive ? 'destructive' : 'default'" @click="finish('confirm')">
-          {{ options.confirmLabel ?? '确定' }}
+          {{ options.confirmLabel ?? t('common.confirm') }}
         </Button>
       </AlertDialogFooter>
     </AlertDialogContent>

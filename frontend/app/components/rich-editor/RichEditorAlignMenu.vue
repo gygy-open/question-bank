@@ -11,6 +11,7 @@ import {
 import { getAlignFormatItems } from './alignFormatItems'
 
 const props = defineProps<{ editor: Editor }>()
+const { t } = useI18n()
 
 const items = getAlignFormatItems(props.editor)
 const activeItem = computed(() => items.find((item) => item.isActive?.()) ?? items[0]!)
@@ -19,19 +20,19 @@ const activeItem = computed(() => items.find((item) => item.isActive?.()) ?? ite
 <template>
     <DropdownMenu>
         <DropdownMenuTrigger as-child>
-            <Button type="button" size="icon" class="size-8" variant="ghost" title="对齐方式">
+            <Button type="button" size="icon" class="size-8" variant="ghost" :title="t('richEditor.align.title')">
                 <component :is="activeItem.icon" class="size-4" />
             </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="start">
             <DropdownMenuItem
                 v-for="item in items"
-                :key="item.label"
+                :key="item.labelKey"
                 :class="item.isActive?.() ? 'bg-accent' : ''"
                 @click="item.action"
             >
                 <component :is="item.icon" class="mr-2 size-4" />
-                {{ item.label }}
+                {{ t(item.labelKey) }}
             </DropdownMenuItem>
         </DropdownMenuContent>
     </DropdownMenu>

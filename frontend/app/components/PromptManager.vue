@@ -12,6 +12,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 
+const { t } = useI18n()
 const { $api } = useNuxtApp()
 
 interface Prompt {
@@ -83,7 +84,7 @@ const savePrompt = async () => {
 }
 
 const deletePrompt = async (id: number) => {
-    if (!confirm('确定要删除这个常用指令吗？')) return
+    if (!confirm(t('prompts.manager.deleteConfirm'))) return
     try {
         await $api(`/chat/prompts/${id}`, { method: 'DELETE' })
         prompts.value = prompts.value.filter(p => p.id !== id)
@@ -106,7 +107,7 @@ onMounted(() => {
     <Dialog :open="open" @update:open="$emit('update:open', $event)">
         <DialogContent class="sm:max-w-[800px] h-[600px] flex flex-col p-0 gap-0 overflow-hidden">
             <DialogHeader class="p-6 pb-2">
-                <DialogTitle>常用指令</DialogTitle>
+                <DialogTitle>{{ t('prompts.manager.title') }}</DialogTitle>
             </DialogHeader>
             
             <div class="flex-1 flex min-h-0">
@@ -115,7 +116,7 @@ onMounted(() => {
                     <div class="p-4 border-b">
                         <Button class="w-full justify-start gap-2" variant="outline" @click="resetForm">
                             <Plus class="w-4 h-4" />
-                            新建指令
+                            {{ t('prompts.manager.new') }}
                         </Button>
                     </div>
                     <ScrollArea class="flex-1">
@@ -133,10 +134,10 @@ onMounted(() => {
                                 <div class="text-xs text-muted-foreground line-clamp-2">{{ prompt.content }}</div>
                                 
                                 <div class="absolute right-2 top-2 opacity-0 group-hover:opacity-100 flex gap-1 bg-background/80 rounded shadow-sm border">
-                                    <button @click.stop="startEdit(prompt)" class="p-1.5 hover:text-primary transition-colors" title="编辑">
+                                    <button @click.stop="startEdit(prompt)" class="p-1.5 hover:text-primary transition-colors" :title="t('common.edit')">
                                         <Pencil class="w-3 h-3" />
                                     </button>
-                                    <button @click.stop="deletePrompt(prompt.id)" class="p-1.5 hover:text-destructive transition-colors" title="删除">
+                                    <button @click.stop="deletePrompt(prompt.id)" class="p-1.5 hover:text-destructive transition-colors" :title="t('common.delete')">
                                         <Trash2 class="w-3 h-3" />
                                     </button>
                                 </div>
@@ -148,21 +149,21 @@ onMounted(() => {
                 <!-- Editor -->
                 <div class="flex-1 flex flex-col p-6 gap-4 bg-background">
                     <div class="space-y-2">
-                        <label class="text-sm font-medium">标题</label>
-                        <Input v-model="form.title" placeholder="例如：翻译成中文" />
+                        <label class="text-sm font-medium">{{ t('prompts.manager.titleLabel') }}</label>
+                        <Input v-model="form.title" :placeholder="t('prompts.manager.titlePlaceholder')" />
                     </div>
                     <div class="space-y-2 flex-1 flex flex-col min-h-0">
-                        <label class="text-sm font-medium">指令内容</label>
+                        <label class="text-sm font-medium">{{ t('prompts.manager.contentLabel') }}</label>
                         <Textarea 
                             v-model="form.content" 
-                            placeholder="输入指令内容..." 
+                            :placeholder="t('prompts.manager.contentPlaceholder')"
                             class="flex-1 resize-none font-mono text-sm"
                         />
                     </div>
                     <div class="flex justify-end gap-2 pt-2">
-                        <Button v-if="isEditing" variant="ghost" @click="resetForm">取消编辑</Button>
+                        <Button v-if="isEditing" variant="ghost" @click="resetForm">{{ t('prompts.manager.cancelEdit') }}</Button>
                         <Button @click="savePrompt" :disabled="!form.title || !form.content">
-                            {{ isEditing ? '保存修改' : '添加指令' }}
+                            {{ isEditing ? t('prompts.manager.saveChanges') : t('prompts.manager.add') }}
                         </Button>
                     </div>
                 </div>

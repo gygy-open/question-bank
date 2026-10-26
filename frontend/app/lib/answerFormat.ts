@@ -1,5 +1,6 @@
 import type { AnswerSpec, OptionSpec, QuestionType } from '@/types'
 import { richDocToPlainText } from '@/components/rich-editor/richDoc'
+import { translate } from '@/lib/locale'
 
 /** 单选/多选题：把 answer 引用的 option id 映射为可读 label（找不到时回退 id）。 */
 export function optionLabelsForAnswer(
@@ -63,6 +64,8 @@ export function answerToPlainText(
     }
 }
 
+// 中文题型名属于内容语言：questionTypeLabel 也被稿件大纲（喂给 AI 模型）使用，保持原样。
+// 界面展示请用 questionTypeLabelKey + t()。
 const TYPE_LABELS: Record<QuestionType, string> = {
     single_choice: '单选题',
     multiple_choice: '多选题',
@@ -74,4 +77,24 @@ const TYPE_LABELS: Record<QuestionType, string> = {
 
 export function questionTypeLabel(qType: QuestionType | string): string {
     return TYPE_LABELS[qType as QuestionType] ?? String(qType)
+}
+
+const TYPE_LABEL_KEYS: Record<QuestionType, string> = {
+    single_choice: 'questions.types.singleChoice',
+    multiple_choice: 'questions.types.multipleChoice',
+    true_false: 'questions.types.trueFalse',
+    fill_in_the_blank: 'questions.types.fillInTheBlank',
+    free_response: 'questions.types.freeResponse',
+    option_matching: 'questions.types.optionMatching',
+}
+
+/** 题型的 i18n key（界面展示用）；未知题型返回 null，调用方回退原值。 */
+export function questionTypeLabelKey(qType: QuestionType | string): string | null {
+    return TYPE_LABEL_KEYS[qType as QuestionType] ?? null
+}
+
+/** 题型的界面显示名（随界面语言），供组件模板直接调用。 */
+export function questionTypeDisplayLabel(qType: QuestionType | string): string {
+    const key = questionTypeLabelKey(qType)
+    return key ? translate(key) : String(qType)
 }

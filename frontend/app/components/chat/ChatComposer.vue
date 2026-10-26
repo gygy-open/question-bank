@@ -13,6 +13,7 @@ import {
 } from '@/components/ui/select'
 import { useGlobalChat } from '@/composables/useGlobalChat'
 
+const { t } = useI18n()
 const chat = useGlobalChat()
 
 const modelGroups = computed(() => {
@@ -20,7 +21,7 @@ const modelGroups = computed(() => {
   const mine = models.filter(m => m.isPersonal)
   const shared = models.filter(m => !m.isPersonal)
   return mine.length && shared.length
-    ? [{ label: '我的模型', items: mine }, { label: '全局模型', items: shared }]
+    ? [{ label: t('chat.composer.myModels'), items: mine }, { label: t('chat.composer.globalModels'), items: shared }]
     : [{ label: '', items: models }]
 })
 const fileInputRef = ref<HTMLInputElement | null>(null)
@@ -78,7 +79,7 @@ const onEnter = (e: KeyboardEvent) => {
     <div class="mb-2">
       <Select v-model="chat.selectedModelId.value">
         <SelectTrigger class="h-8 w-full text-xs">
-          <SelectValue placeholder="选择模型" />
+          <SelectValue :placeholder="t('chat.composer.selectModel')" />
         </SelectTrigger>
         <SelectContent>
           <SelectGroup v-for="group in modelGroups" :key="group.label">
@@ -91,7 +92,7 @@ const onEnter = (e: KeyboardEvent) => {
             </SelectItem>
           </SelectGroup>
           <div v-if="!chat.allModels.value.length" class="px-2 py-1.5 text-xs text-muted-foreground">
-            暂无可用模型，请在“设置 → 我的 AI 模型”中配置
+            {{ t('chat.composer.noModels') }}
           </div>
         </SelectContent>
       </Select>
@@ -106,7 +107,7 @@ const onEnter = (e: KeyboardEvent) => {
         variant="outline"
         size="icon"
         class="h-9 w-9 shrink-0"
-        title="上传图片"
+        :title="t('chat.composer.uploadImage')"
         @click="triggerFileInput"
       >
         <ImageIcon class="h-4 w-4" />
@@ -117,7 +118,7 @@ const onEnter = (e: KeyboardEvent) => {
         variant="outline"
         size="icon"
         class="h-9 w-9 shrink-0"
-        title="常用指令"
+        :title="t('prompts.manager.title')"
         @click="chat.isPromptManagerOpen.value = true"
       >
         <Book class="h-4 w-4" />
@@ -125,7 +126,7 @@ const onEnter = (e: KeyboardEvent) => {
 
       <Textarea
         v-model="chat.input.value"
-        :placeholder="chat.isVisionCapable.value ? '输入消息... (支持粘贴图片)' : '输入消息...'"
+        :placeholder="chat.isVisionCapable.value ? t('chat.composer.placeholderVision') : t('chat.composer.placeholder')"
         class="max-h-[160px] min-h-[38px] resize-none"
         rows="1"
         @keydown.enter="onEnter"

@@ -30,7 +30,13 @@
     "deleteFailed": "Failed to delete",
     "operationFailed": "Operation failed",
     "loading": "Loading…",
-    "loadMore": "Load More"
+    "loadMore": "Load More",
+    "confirmDelete": "Confirm Deletion",
+    "done": "Done",
+    "add": "Add",
+    "download": "Download",
+    "confirm": "OK",
+    "close": "Close"
   },
   "language": {
     "label": "Language",
@@ -106,6 +112,25 @@
       "noAccount": "Don't have an account?",
       "register": "Sign up",
       "verifyFailed": "Sign-in verification failed. Check your network connection and device time, then try again."
+    },
+    "register": {
+      "title": "Create Account",
+      "description": "Create a new account to use the system.",
+      "disabled": "Sign-up is currently disabled.",
+      "usernameRequired": "Enter a username.",
+      "fullName": "Full Name",
+      "fullNameRequired": "Enter your full name.",
+      "passwordMin": "Password must be at least {min} characters.",
+      "confirmPassword": "Confirm Password",
+      "confirmRequired": "Enter your password again.",
+      "passwordMismatch": "Passwords do not match.",
+      "approvalHint": "After signing up, an administrator must approve your account before you can sign in.",
+      "submit": "Sign Up",
+      "success": "Signed up successfully. Please sign in.",
+      "successPendingApproval": "Signed up successfully. You can sign in once an administrator approves your account.",
+      "failed": "Sign-up failed.",
+      "hasAccount": "Already have an account?",
+      "backToLogin": "Back to Sign In"
     }
   },
   "subjectSelector": {
@@ -1009,6 +1034,1206 @@
       "slot": "Blank {index}",
       "number": "Number",
       "scoreUnit": "pts"
+    }
+  },
+  "users": {
+    "searchPlaceholder": "Search by username or name...",
+    "allRoles": "All Roles",
+    "roleAdmin": "Administrator",
+    "roleNormal": "Standard User",
+    "batchImport": "Batch Import",
+    "create": "New User",
+    "editUser": "Edit User",
+    "deleteUser": "Delete User",
+    "resetPassword": "Reset Password",
+    "columns": {
+      "avatar": "Avatar",
+      "username": "Username",
+      "fullName": "Full Name",
+      "status": "Status",
+      "role": "Role"
+    },
+    "empty": "No users yet",
+    "noMatch": "No matching users",
+    "active": "Active",
+    "disabled": "Disabled",
+    "total": "{count} users",
+    "required": "Required",
+    "avatarUrl": "Avatar URL",
+    "password": "Password",
+    "hidePassword": "Hide password",
+    "showPassword": "Show password",
+    "dialog": {
+      "editDescription": "Edit user details. Leave the password blank to keep it unchanged.",
+      "createDescription": "Create a new user account."
+    },
+    "validation": {
+      "usernameRequired": "Username is required.",
+      "passwordRequired": "Password is required when creating a user.",
+      "fullNameRequired": "Full name is required.",
+      "newPasswordRequired": "Enter a new password.",
+      "passwordMismatch": "Passwords do not match."
+    },
+    "toast": {
+      "updated": "User updated.",
+      "created": "User created.",
+      "deleted": "User deleted.",
+      "usernameMismatch": "Username does not match.",
+      "passwordReset": "Password reset.",
+      "resetFailed": "Reset failed."
+    },
+    "delete": {
+      "title": "Delete this user?",
+      "warning": "Warning: This action cannot be undone!",
+      "warningDescription": "Deleting a user permanently removes their activity data. Unless necessary, disable the user instead.",
+      "confirmLabel": "Enter the username {username} to confirm deletion",
+      "inputPlaceholder": "Enter username"
+    },
+    "reset": {
+      "description": "Set a new password for {username}.",
+      "newPassword": "New Password",
+      "confirmPassword": "Confirm Password",
+      "confirm": "Reset"
+    }
+  },
+  "userImport": {
+    "title": "Batch Import Users",
+    "description": "Create multiple user accounts at once from an Excel file.",
+    "instructions": "Instructions",
+    "steps": {
+      "download": "Download the Excel template and review the sample format",
+      "fill": "Fill in the {username}, {fullName}, and {password} columns (the {admin} column is optional)",
+      "upload": "Upload the completed file"
+    },
+    "section": {
+      "template": "1. Download and Fill In the Template",
+      "upload": "2. Upload the Completed File"
+    },
+    "templateColumns": "Template columns: {username} (required), {fullName} (required), {password} (required, at least 6 characters), {admin} (optional, enter “{yes}”)",
+    "downloadTemplate": "Download Excel Template",
+    "dropHint": "Click to select a file or drag it here",
+    "formatHint": "Only .xlsx files are supported, up to 5 MB.",
+    "invalidFormat": "Invalid file format. Please upload an .xlsx file.",
+    "fileTooLarge": "File is too large. It must be smaller than 5 MB.",
+    "downloadTemplateFailed": "Failed to download template: {error}",
+    "importFailed": "Import failed.",
+    "errorLine": "Row {row}: {message}",
+    "errorsCopied": "Error details copied.",
+    "start": "Start Import",
+    "processing": "Processing, please wait…",
+    "importing": "Importing users…",
+    "resultTitle": "Import Results",
+    "resultSummary": "{total} rows: {created} succeeded, {failed} failed",
+    "status": {
+      "success": "All users imported",
+      "partial": "Partially imported"
+    },
+    "createdCount": "Created {count} users",
+    "errorDetails": "Failures ({count})",
+    "rowLabel": "Row {row}",
+    "fileLabel": "File",
+    "continue": "Import More"
+  },
+  "subjects": {
+    "listTitle": "Subjects",
+    "create": "Create Subject",
+    "edit": "Edit Subject",
+    "editDescription": "Edit subject details.",
+    "createDescription": "Add a new subject.",
+    "slug": "Slug",
+    "slugLabel": "Slug",
+    "description": "Description",
+    "namePlaceholder": "e.g. Math",
+    "slugPlaceholder": "e.g. math",
+    "descriptionPlaceholder": "Subject description...",
+    "deleteConfirm": "Are you sure you want to delete this subject?",
+    "validation": {
+      "nameMin": "Name must be at least 2 characters.",
+      "nameMax": "Name must be at most 50 characters.",
+      "slugMin": "Slug must be at least 2 characters.",
+      "slugMax": "Slug must be at most 50 characters."
+    },
+    "deleteConfirmWithImpact": "Are you sure you want to delete this subject? This may affect related questions and directories.",
+    "createNew": "New Subject",
+    "requiredReviewCount": "Required Reviews",
+    "members": "Manage Members",
+    "empty": "No subjects yet",
+    "dialogDescription": "Configure the subject's basic information.",
+    "namePlaceholderFull": "e.g. High School Math",
+    "slugPlaceholderFull": "e.g. math-hs",
+    "slugHint": "Used in URLs and as an internal identifier. English is recommended.",
+    "descriptionPlaceholderOptional": "Optional: detailed description of the subject",
+    "requiredReviewHint": "Number of reviews a question needs before it can be published."
+  },
+  "subjectMembers": {
+    "title": "Members · {name}",
+    "description": "Grant teachers a role in this subject: Viewer, Editor, or Manager. Teachers not listed here can't see this subject.",
+    "selectTeacher": "Select Teacher",
+    "role": "Role",
+    "teacher": "Teacher",
+    "empty": "No members yet",
+    "userDisplay": "{name} ({username})",
+    "roleUpdated": "Member role updated.",
+    "removed": "Member removed.",
+    "roles": {
+      "viewer": "Viewer",
+      "editor": "Editor",
+      "manager": "Manager"
+    }
+  },
+  "tagCategories": {
+    "navLabel": "Tag Categories",
+    "heading": "Categories",
+    "whatIs": "What are categories?",
+    "help": "Categories group tags (e.g. \"Difficulty\", \"Source\", \"Question Type\"). Every tag must belong to a category, making it easy to filter by dimension and quickly find tags when editing questions.",
+    "create": "New Category",
+    "namePlaceholder": "Category name",
+    "newNameLabel": "New category name",
+    "sortOrder": "Sort Order",
+    "createTagIn": "New Tag in “{name}”",
+    "createTagHere": "New tag in this category",
+    "editNamed": "Edit category {name}",
+    "deleteNamed": "Delete category {name}",
+    "empty": "No categories yet",
+    "deleteConfirm": "Are you sure you want to delete this category? All tags in it will also be deleted!",
+    "toast": {
+      "updated": "Category updated.",
+      "updateFailed": "Failed to update category.",
+      "created": "Category created.",
+      "createFailed": "Failed to create category.",
+      "deleted": "Category deleted.",
+      "deleteFailed": "Failed to delete category."
+    }
+  },
+  "tagImport": {
+    "title": "Batch Import Tags",
+    "description": "Create multiple tags for the current subject at once from an Excel file.",
+    "instructions": "Instructions",
+    "steps": {
+      "download": "Download the Excel template and review the sample format",
+      "fill": "Fill in the {name} column, the {category} column (optional; missing categories are created automatically), and the {color} column (optional)",
+      "upload": "Upload the completed file. Tags with existing names are skipped automatically (other tags still import). The whole file is rejected only on format errors (e.g. an empty {name} column); just fix them and upload again"
+    },
+    "section": {
+      "template": "1. Download and Fill In the Template",
+      "upload": "2. Upload the Completed File"
+    },
+    "templateColumns": "Template columns: {name} (required), {category} (optional; created automatically if missing), {color} (optional; hex value such as #4F81BD)",
+    "downloadTemplate": "Download Excel Template",
+    "dropHint": "Click to select a file or drag it here",
+    "formatHint": "Only .xlsx files are supported, up to 5 MB.",
+    "invalidFormat": "Invalid file format. Please upload an .xlsx file.",
+    "fileTooLarge": "File is too large. It must be smaller than 5 MB.",
+    "downloadTemplateFailed": "Failed to download template: {error}",
+    "importFailed": "Import failed.",
+    "errorLine": "Row {row}: {message}",
+    "errorsCopied": "Error details copied.",
+    "start": "Start Import",
+    "processing": "Processing, please wait…",
+    "importing": "Importing tags…",
+    "resultTitle": "Import Results",
+    "resultSummary": "{total} rows: {created} created, {skipped} duplicates skipped",
+    "status": {
+      "success": "Import complete",
+      "failed": "Validation failed. No tags were created."
+    },
+    "createdCount": "Created {count} tags",
+    "skippedSuffix": ", skipped {count} tags with existing names",
+    "fixAndRetry": "Fix the file as described below and upload it again.",
+    "errorDetails": "Errors ({count})",
+    "rowLabel": "Row {row}",
+    "fileLabel": "File",
+    "continue": "Import More"
+  },
+  "kpImport": {
+    "title": "Batch Import Knowledge Points",
+    "step1": "Step 1 of 2: Prepare the Import File",
+    "step2": "Step 2 of 2: Confirm Import Settings",
+    "instructions": "Instructions",
+    "intro": "Use this feature to create knowledge point trees in bulk, with up to eight levels of nesting. Follow these steps:",
+    "steps": {
+      "download": "Download the Excel template and review the sample format",
+      "fill": "Fill in the knowledge point data in the template",
+      "upload": "Upload the completed file"
+    },
+    "section": {
+      "template": "1. Download and Fill In the Template",
+      "upload": "2. Upload the Completed File"
+    },
+    "templateColumns": "Template columns: {subject} (required), {level1} (required), {level2}–{level8} (optional)",
+    "downloadTemplate": "Download Excel Template",
+    "dropHint": "Click to select a file or drag it here",
+    "formatHint": "Only .xlsx files are supported, up to 5 MB.",
+    "invalidFormat": "Invalid file format. Please upload an .xlsx file.",
+    "fileTooLarge": "File is too large. It must be smaller than 5 MB.",
+    "downloadTemplateFailed": "Failed to download template: {error}",
+    "importFailed": "Import failed.",
+    "errorLine": "Row {row}: {message}",
+    "errorsCopied": "Error details copied.",
+    "next": "Next",
+    "prev": "Back",
+    "start": "Start Import",
+    "fileName": "Import file: {name}",
+    "selectMode": "Select Import Mode",
+    "mode": {
+      "incremental": "Incremental Add",
+      "rebuild": "Clear and Rebuild"
+    },
+    "recommended": "Recommended",
+    "useWithCaution": "Use with Caution",
+    "incremental": {
+      "skipExisting": "• Existing knowledge points (same subject, parent, and name) are skipped automatically",
+      "createNew": "• New knowledge points are created normally; {em}",
+      "createNewEm": "existing questions keep their knowledge point links",
+      "useCase": "Best for: routine additions, or re-importing after fixing data"
+    },
+    "rebuild": {
+      "deleteAll": "• First deletes {em} knowledge points of the subjects in the file, then imports the new data",
+      "deleteAllEm": "all",
+      "loseLinks": "⚠️ Linked questions will lose their knowledge point tags (the questions themselves are kept)",
+      "irreversible": "⚠️ This action cannot be undone",
+      "useCase": "Best for: completely restructuring the knowledge point system"
+    },
+    "importingTitle": "Importing knowledge points...",
+    "importingHint": "Parsing and saving knowledge points. Do not close this window.",
+    "status": {
+      "success": "Import complete",
+      "partial": "Import complete (with warnings)"
+    },
+    "result": {
+      "created": "Created: {count} knowledge points",
+      "skipped": "Duplicates skipped: {count}",
+      "failed": "Failed: {count}",
+      "meta": "Mode: {mode} · Took {duration}s",
+      "vectorSynced": "Vector index synced",
+      "vectorNotConfigured": "No vector model configured. You can rebuild the index manually later."
+    },
+    "errorDetails": "Failure Details",
+    "rowPrefix": "Row {row}: ",
+    "copyErrors": "Copy Errors",
+    "partialHint": "Fix the affected rows in the Excel file and upload it again. Successfully imported data will be skipped automatically.",
+    "backToEdit": "Back to Edit",
+    "danger": {
+      "title": "Confirm Clear and Rebuild",
+      "description": "You are about to perform an irreversible, destructive action. Please review carefully.",
+      "impact": "Data Impact",
+      "existing": "• {count} existing knowledge points in subject “{subject}” will be deleted",
+      "affected": "• {count} questions will lose their knowledge point tags",
+      "questionsKept": "• Question content itself will not be deleted",
+      "noRollback": "• This action cannot be undone or rolled back",
+      "confirmLabel": "Enter the subject name “{name}” to confirm:",
+      "confirm": "Delete and Import"
+    }
+  },
+  "folders": {
+    "createChild": "New Subfolder",
+    "rename": "Rename",
+    "move": "Move"
+  },
+  "kpManager": {
+    "addChild": "Add Child",
+    "newChildName": "New child name",
+    "pageDescription": "Manage the knowledge point structure of each subject.",
+    "noSubjects": "No subjects yet. Add a subject first.",
+    "treeTitle": "Knowledge Point Tree",
+    "batchImport": "Batch Import",
+    "addRoot": "Add Root",
+    "rootNamePlaceholder": "Root name",
+    "empty": "This subject has no knowledge points yet.",
+    "deleteConfirm": "Are you sure you want to delete this knowledge point and all its children?",
+    "vector": {
+      "notConfigured": "{reason}. To automatically match knowledge points during Smart Import, configure an Embedding model first. Otherwise, you can ignore this message.",
+      "goToSettings": "Go to Settings",
+      "needsReindex": "{reason}. Rebuild the vector index to enable semantic search.",
+      "reindex": "Rebuild Vector Index"
+    },
+    "toast": {
+      "rootCreated": "Root created.",
+      "childCreated": "Child created.",
+      "createFailed": "Creation failed: {error}",
+      "updated": "Updated.",
+      "updateFailed": "Update failed: {error}",
+      "deleted": "Deleted.",
+      "deleteFailed": "Deletion failed: {error}",
+      "moved": "Moved.",
+      "moveFailed": "Move failed: {error}",
+      "reindexed": "Vector index rebuilt ({count} knowledge points, took {duration}s).",
+      "reindexFailed": "Rebuild failed: {error}"
+    }
+  },
+  "tags": {
+    "uncategorized": "Uncategorized",
+    "batchImport": "Batch Import",
+    "create": "New Tag",
+    "edit": "Edit Tag",
+    "total": "{count} tags",
+    "batchDelete": "Delete Selected ({count})",
+    "category": "Category",
+    "color": "Color",
+    "empty": "No tags yet",
+    "dialogDescription": "Configure the tag's name, category, and color.",
+    "namePlaceholder": "e.g. 2023, Gaokao, Common Mistakes",
+    "selectCategory": "Select Category",
+    "categoryHint": "Determines which group this tag appears under when filtering and selecting.",
+    "deleteConfirm": "Are you sure you want to delete this tag?",
+    "batchDeleteConfirm": "Are you sure you want to delete the {count} selected tags?",
+    "selectSubjectFirst": "Select a subject first.",
+    "toast": {
+      "updated": "Tag updated.",
+      "created": "Tag created.",
+      "saveFailed": "Failed to save tag.",
+      "batchDeleted": "Deleted {count} tags.",
+      "batchDeleteFailed": "Batch delete failed."
+    }
+  },
+  "activityLogs": {
+    "selectUser": "Select User",
+    "allUsers": "All Users",
+    "total": "{count} records",
+    "empty": "No logs yet",
+    "columns": {
+      "user": "User",
+      "action": "Action",
+      "resourceType": "Resource Type",
+      "resourceId": "Resource ID",
+      "ipAddress": "IP Address",
+      "time": "Time",
+      "details": "Details"
+    }
+  },
+  "media": {
+    "kind": {
+      "image": "Image",
+      "audio": "Audio"
+    },
+    "usage": {
+      "used": "Used",
+      "unused": "Unused"
+    },
+    "sort": {
+      "newest": "Newest First",
+      "oldest": "Oldest First",
+      "size": "File Size"
+    },
+    "batch": {
+      "delete": {
+        "done": "Deleted {affected} files.",
+        "partial": "Deleted {affected} files. {skipped} still in use were kept.",
+        "failed": "Deletion failed."
+      },
+      "update": {
+        "done": "Updated {affected} files.",
+        "partial": "Updated {affected} files. {skipped} were not updated.",
+        "failed": "Update failed."
+      },
+      "deleteConfirm": "Delete the unused files among the {count} selected? Files still referenced will be kept.",
+      "setSource": "Set Source",
+      "deleteUnused": "Delete Unused",
+      "sourceDialogTitle": "Set Source / Copyright",
+      "sourceDialogHint": "Applies to the {count} selected files. Leave blank to clear the source."
+    },
+    "uploadFileFailed": "{name}: {error}",
+    "uploaded": "Uploaded {count} files (files identical to existing ones are reused).",
+    "usageCount": "{count} uses",
+    "upload": "Upload",
+    "pageDescription": "Images and audio used in this subject's questions, material questions, and compositions. You can pick from here when inserting media in the editor.",
+    "filters": {
+      "search": "Search",
+      "searchPlaceholder": "File name or alt text",
+      "kind": "Type",
+      "usage": "Usage",
+      "sort": "Sort"
+    },
+    "view": {
+      "label": "View",
+      "grid": "Grid View",
+      "list": "List View"
+    },
+    "selectSubjectFirst": "Select a subject first.",
+    "loadFailed": "Failed to load media library.",
+    "noMatch": "No matching files",
+    "clearFilters": "Clear Filters",
+    "empty": "The media library is empty. Images inserted into questions or imported from documents will appear here automatically.",
+    "uploadFiles": "Upload Files",
+    "noPreview": "No preview",
+    "missingAlt": "No alt",
+    "selectItem": "Select {name}",
+    "selectPage": "Select Page",
+    "deselectAll": "Deselect All",
+    "columns": {
+      "preview": "Preview",
+      "format": "Format",
+      "dimension": "Dimensions / Duration",
+      "size": "Size",
+      "usage": "Usage",
+      "uploadedAt": "Uploaded"
+    },
+    "selectedCount": "{count} selected",
+    "clearSelection": "Clear Selection",
+    "total": "{count} files",
+    "pageIndicator": "Page {page} of {pages}",
+    "unnamedImage": "Image #{id}",
+    "unnamedAudio": "Audio #{id}",
+    "owner": {
+      "question": "Question",
+      "stimulus": "Material Question",
+      "composition": "Composition",
+      "compositionVersion": "Finalized Version"
+    },
+    "replace": {
+      "summary": "Replaced {count} references",
+      "summarySkipped": ", {count} not replaced due to missing permissions",
+      "summaryFrozen": ", {count} finalized versions keep the original",
+      "failed": "Replacement failed.",
+      "title": "Replace {noun}",
+      "description": "Replace this {noun} in the selected content with a new one. The original file stays in the media library.",
+      "originalAlt": "Original",
+      "newAlt": "New image",
+      "scopeAll": "All references ({count})",
+      "scopeSome": "Only selected content",
+      "frozenNote": "{count} finalized versions are unaffected and keep using the original file.",
+      "hiddenNote": "{count} other references you don't have access to won't be replaced.",
+      "concurrentNote": "Anyone currently editing this content will be notified that it changed when they save.",
+      "confirm": "Replace"
+    },
+    "detail": {
+      "pickAnother": "Select a different file.",
+      "copiedTo": "Added to the media library of “{name}”.",
+      "copyFailed": "Failed to add.",
+      "referencesLoadFailed": "Failed to load references.",
+      "deleteConfirm": "Delete “{name}”?",
+      "deleted": "Image deleted.",
+      "description": "Changing the name, alt text, or source only updates metadata, not the file itself.",
+      "unsupportedFormat": "Your browser can't display this format ({mime}). Download the original to view it.",
+      "duration": "Duration",
+      "dimension": "Dimensions",
+      "alt": "Alt Text",
+      "altPlaceholder": "Describe the image for search and accessibility",
+      "source": "Source / Copyright",
+      "referencedIn": "Referenced In",
+      "notReferenced": "Not used anywhere",
+      "groupLabel": "{label} ({count})",
+      "ownerDeleted": "Deleted",
+      "frozenVersion": "v{version} · Frozen",
+      "hiddenCount": "{count} other references you don't have access to",
+      "downloadOriginal": "Download Original",
+      "noReplaceable": "No replaceable references",
+      "replace": "Replace",
+      "copyToSubject": "Add to Another Subject",
+      "copyToSubjectHint": "Copy to the target subject's media library",
+      "deleteBlocked": "Still referenced. Remove it from that content before deleting.",
+      "deleteBlockedHint": "Files still referenced can't be deleted; replace them with another file first. Frozen finalized versions always keep their references."
+    }
+  },
+  "mediaPicker": {
+    "noun": {
+      "image": "image",
+      "audio": "audio file"
+    },
+    "selectAudioFile": "Select an audio file.",
+    "audioUploadFailed": "Audio upload failed.",
+    "selectImageFile": "Select an image file.",
+    "title": "Insert {noun}",
+    "description": "Upload a new {noun} or choose one from this subject's media library.",
+    "selectSubjectFirst": "Select a subject before inserting a {noun}.",
+    "recent": "Recently Used",
+    "uploading": "Uploading…",
+    "dropHint": "Click to select or drop a {noun} here",
+    "audioFormats": "MP3, M4A, OGG, and WAV supported, up to 100 MB each",
+    "imageFormats": "PNG, JPEG, GIF, and WebP supported, up to 10 MB each",
+    "searchPlaceholder": "Search by file name or alt text",
+    "noMatch": "No matching {noun}",
+    "empty": "No {noun} in the media library yet. Upload one to get started.",
+    "unsupportedFormat": "Your browser can't display this format",
+    "unnamed": "{noun} #{id}",
+    "noRecent": "No {noun} inserted yet"
+  },
+  "settings": {
+    "title": "Settings",
+    "titleAdmin": "System Settings",
+    "nav": {
+      "general": "General",
+      "globalAi": "Global AI Models",
+      "myAi": "My AI Models",
+      "prompts": "Prompts",
+      "registration": "Sign-Up"
+    },
+    "toast": {
+      "fetchFailed": "Failed to load settings.",
+      "saveSuccess": "Saved.",
+      "settingUpdated": "Setting {key} updated."
+    },
+    "general": {
+      "description": "Manage global environment variables and basic system configuration.",
+      "valuePlaceholder": "Value",
+      "save": "Save Settings",
+      "emptyTitle": "No Settings",
+      "emptyDescription": "No configurable settings have been registered yet."
+    },
+    "globalAi": {
+      "description": "Connect AI providers and set the default model for each feature."
+    },
+    "myAi": {
+      "description": "Choose the models you use, or connect your own AI provider account."
+    },
+    "prompts": {
+      "description": "If you understand how large language models work, you can fine-tune how they handle instructions here."
+    },
+    "registration": {
+      "description": "Control whether visitors can sign up for accounts themselves.",
+      "enabledLabel": "Allow Self Sign-Up",
+      "enabledHint": "When enabled, the sign-in page shows a sign-up link and visitors can create their own accounts.",
+      "approvalLabel": "Require Administrator Approval",
+      "approvalHint": "When enabled, new users are disabled by default and can only sign in after an administrator enables them in User Management."
+    }
+  },
+  "setup": {
+    "title": "System Setup",
+    "description": "First time here? Configure the database and administrator account.",
+    "descriptionDbReady": "The database is ready. Create the first administrator account.",
+    "steps": {
+      "database": "Database",
+      "admin": "Administrator"
+    },
+    "sqliteHint": "Standalone, zero config. Recommended for personal use.",
+    "mysqlHint": "Shared on an intranet for team collaboration.",
+    "mysql": {
+      "host": "Host",
+      "port": "Port",
+      "database": "Database Name",
+      "user": "Username",
+      "password": "Password",
+      "test": "Test Connection"
+    },
+    "startNow": "Get Started",
+    "next": "Next",
+    "admin": {
+      "username": "Administrator Username",
+      "password": "Password",
+      "passwordPlaceholder": "At least {min} characters",
+      "confirm": "Confirm Password",
+      "confirmPlaceholder": "Enter password again"
+    },
+    "finish": "Finish Setup",
+    "toast": {
+      "dbConnected": "Database connected.",
+      "connectFailed": "Connection failed.",
+      "testMysqlFirst": "Test the MySQL connection first.",
+      "dbReady": "Database is ready.",
+      "dbInitFailed": "Failed to initialize the database.",
+      "usernameRequired": "Enter an administrator username.",
+      "passwordMin": "Password must be at least {min} characters.",
+      "passwordMismatch": "Passwords do not match.",
+      "done": "Setup complete. Please sign in.",
+      "initFailed": "Setup failed."
+    }
+  },
+  "onboarding": {
+    "title": "Create Your First Subject",
+    "description": "The question bank is organized by subject. Create one to start; you can add or remove subjects anytime in Subject Management.",
+    "name": "Subject Name",
+    "namePlaceholder": "e.g. High School Math",
+    "slug": "Slug",
+    "slugPlaceholder": "e.g. math",
+    "slugHint": "Used in URLs and as an internal identifier. Lowercase English is recommended; enter it manually if the name is not in English.",
+    "descriptionLabel": "Description",
+    "optional": "(Optional)",
+    "descriptionPlaceholder": "Optional: a brief description of the subject",
+    "start": "Get Started",
+    "toast": {
+      "nameRequired": "Enter a subject name.",
+      "slugRequired": "Enter a subject slug.",
+      "created": "Subject created. You're all set!",
+      "createFailed": "Failed to create. Please try again."
+    }
+  },
+  "about": {
+    "title": "About",
+    "productName": "QuestionBank",
+    "tagline": "AI-Native Question Bank System",
+    "currentVersion": "Current version v{version}",
+    "checkUpdate": "Check for Updates",
+    "downloadNew": "Download v{version}",
+    "newVersionContactAdmin": "New version v{version} available · Contact your administrator to update",
+    "checking": "Checking version...",
+    "upToDate": "You're up to date",
+    "feedback": "Report an Issue",
+    "thanksTitle": "Special Thanks",
+    "thanksDescription": "Thanks to everyone who has quietly supported this project as it grew.",
+    "contributors": {
+      "xuemeiWang": "Without her, this project would not exist.",
+      "xunmeng": "His thoughtful feedback and suggestions keep pushing the project forward."
+    },
+    "ossTitle": "Open Source Foundations",
+    "license": "This project is open source under the AGPL-3.0 license. Thanks to the open source community for its generous contributions.",
+    "toast": {
+      "checkFailed": "Failed to check for updates."
+    }
+  },
+  "preview": {
+    "defaultFileName": "Source File",
+    "noTask": "No import task specified.",
+    "notFound": "The source file does not exist or you don't have permission to view it.",
+    "loadFailed": "Failed to load the file.",
+    "title": "File Preview: {name}",
+    "download": "Download File",
+    "loading": "Loading file...",
+    "unsupported": "This format can't be previewed online. Download it to view."
+  },
+  "aiSettings": {
+    "current": {
+      "title": "Currently in Use",
+      "globalDescription": "Default models for each feature, applied to all users. Users can switch to their own providers in \"My AI Models\"."
+    },
+    "globalProviders": {
+      "title": "Global Providers",
+      "description": "Maintained by administrators and available to all users."
+    },
+    "userProviders": {
+      "title": "User Providers",
+      "description": "Connected by users for their own use only. You can view and delete them, but can't see their API Keys."
+    },
+    "empty": {
+      "title": "No AI Providers Connected",
+      "description": "Connect one to use AI chat, question extraction from documents, image recognition, and knowledge point matching."
+    },
+    "changeEmbedding": {
+      "title": "Change Embedding Model",
+      "description": "Indexes generated by different embedding models are incompatible. After changing, you must rebuild the knowledge point index, or similar question search and knowledge point matching will stop working.\nRebuilding processes all knowledge points with the new model and may take some time.",
+      "confirm": "Save and Rebuild Index",
+      "saveOnly": "Save Only"
+    },
+    "my": {
+      "defaultTitle": "My Default Models",
+      "defaultDescription": "Follows the administrator's global settings by default. You can also pick another global model or one you connected yourself. This only affects you.",
+      "textDescription": "Your default model for AI chat, and for document imports and knowledge point matching you start.",
+      "visionDescription": "The model used when you upload images to recognize questions.",
+      "embeddingNote": "The embedding model for similar question search is set by administrators.",
+      "providersTitle": "My Providers",
+      "providersDescription": "Use your own API Key. Charges go to your own account.",
+      "emptyTitle": "No Providers of Your Own",
+      "emptyDescription": "You can use the administrator-configured models without adding one. To use your own account (e.g. DeepSeek credits you purchased or a stronger model), connect it here.",
+      "connect": "Connect My Provider"
+    },
+    "toast": {
+      "loadFailed": "Failed to load configuration.",
+      "loadFailedShort": "Failed to load.",
+      "reindexing": "Rebuilding embedding index…",
+      "reindexed": "Embedding index rebuilt ({count} items in {duration}s).",
+      "reindexFailed": "Failed to rebuild index.",
+      "reindexFailedDescription": "{error}. You can retry later on the Knowledge Points page.",
+      "providerAdded": "Added \"{name}\".",
+      "prefilled": "Models have been preselected for unconfigured scenes. Review them above and save.",
+      "prefilledMine": "Preselected as your default model. Review it above and save."
+    }
+  },
+  "aiModels": {
+    "scenes": {
+      "text": {
+        "label": "Text Model",
+        "description": "Used for AI chat, question extraction from documents, and knowledge point matching."
+      },
+      "vision": {
+        "label": "Vision Model",
+        "description": "Used to recognize questions from images and screenshots. Requires a vision-capable model."
+      },
+      "embedding": {
+        "label": "Embedding Model",
+        "description": "Used for similar question search and semantic knowledge point matching. Shared site-wide."
+      }
+    },
+    "unset": "Not Set",
+    "followGlobal": "Follow Global Default",
+    "status": {
+      "usingGlobal": "Using global default: {model}",
+      "globalUnset": "Not configured globally either. This feature is unavailable.",
+      "unset": "Not configured. This feature is unavailable.",
+      "ok": "Available",
+      "deleted": "The selected model was deleted. Please choose another.",
+      "providerDisabled": "Provider \"{name}\" is disabled.",
+      "capabilityMismatch": "Model capabilities don't match. Please choose another."
+    },
+    "deletedModel": "Deleted Model #{id}",
+    "groups": {
+      "personal": "My Providers",
+      "global": "Global Providers"
+    },
+    "unavailablePrefix": "(Unavailable) ",
+    "noOptions": "No {scene} available. Add one below first.",
+    "unsaved": "Unsaved changes",
+    "revert": "Revert",
+    "capabilities": {
+      "vision": "Vision",
+      "embedding": "Embedding"
+    },
+    "modelName": "Model Name",
+    "visionCapable": "Vision-capable (can recognize questions from images)",
+    "embeddingModel": "Embedding model (search only, can't chat)",
+    "picker": {
+      "search": "Search models",
+      "visionTitle": "Vision-capable?",
+      "embeddingTitle": "Embedding model?",
+      "noMatch": "No matching models",
+      "noCandidates": "No models to choose from. Enter the model name manually (matching the model parameter in the provider's docs).",
+      "manualPlaceholder": "Add manually, e.g. {example}",
+      "add": "Add",
+      "summary": "{count} selected. \"Vision\" and \"Embedding\" tags are inferred from model names; click to change."
+    }
+  },
+  "aiProviders": {
+    "add": "Add Provider",
+    "presets": {
+      "deepseek": {
+        "hint": "Cost-effective; good for question extraction and chat"
+      },
+      "qwen": {
+        "name": "Qwen",
+        "hint": "Includes vision (qwen-vl) and embedding models"
+      },
+      "zhipu": {
+        "name": "Zhipu GLM",
+        "hint": "Includes a vision model (glm-4v)"
+      },
+      "kimi": {
+        "hint": "Good with long documents"
+      },
+      "openai": {
+        "hint": "Requires access to overseas networks"
+      },
+      "gemini": {
+        "hint": "Requires access to overseas networks; native vision support"
+      }
+    },
+    "interfaceTypes": {
+      "openai": "OpenAI-Compatible API",
+      "gemini": "Gemini API"
+    },
+    "interfaceType": "API Type",
+    "baseUrl": "Base URL",
+    "baseUrlPlaceholder": "e.g. {url}",
+    "baseUrlPlaceholderGemini": "Leave blank to use the official URL",
+    "namePlaceholder": "A name you'll recognize, e.g. My DeepSeek",
+    "keyHintPersonal": "The key is stored encrypted and used only for your own AI requests. Administrators can't view it.",
+    "keyHintGlobal": "The key is stored encrypted. All users share this provider's quota.",
+    "connectFailed": "Connection failed: {message}",
+    "testConnection": "Test Connection",
+    "discoverFailed": "Couldn't fetch the model list: {message}",
+    "disabled": "Disabled",
+    "enable": "Enable",
+    "keyNotSet": "Key Not Set",
+    "editConnection": "Edit Connection",
+    "addModels": "Add Models",
+    "addModelsCount": "Add {count} Models",
+    "noModels": "No models yet.",
+    "editModelAria": "Edit {name}",
+    "deleteModelAria": "Delete {name}",
+    "listSeparator": ", ",
+    "wizard": {
+      "stepOf": "Step {current} of {total}: ",
+      "steps": {
+        "preset": "Choose a Provider",
+        "credentials": "Enter API Key and Test Connection",
+        "models": "Choose Models to Use"
+      },
+      "custom": "Other / Custom",
+      "customHint": "Any OpenAI-compatible service or self-hosted proxy",
+      "hideAdvanced": "Hide Advanced Settings",
+      "showAdvanced": "Advanced Settings (Base URL)",
+      "mostProviders": "(Most providers)",
+      "skipDiscover": "Some providers don't offer a model list. If everything looks right, skip and enter models manually.",
+      "prev": "Back",
+      "testAndDiscover": "Test and Fetch Models",
+      "finish": "Finish",
+      "selectAtLeastOne": "Select at least one model.",
+      "addFailed": "Failed to add."
+    },
+    "inUse": {
+      "title": "Still in Use",
+      "description": "{error}\nAfter deletion, the affected scenes will become \"Not configured\" and related AI features will pause until you choose a new model.",
+      "confirm": "Delete Anyway"
+    },
+    "deleteProvider": {
+      "action": "Delete Provider",
+      "title": "Delete provider \"{name}\"?",
+      "titleWithOwner": "Delete provider \"{name}\" (owned by {owner})?",
+      "description": "Its {count} models will also be deleted. This action can't be undone."
+    },
+    "deleteModel": {
+      "title": "Delete model \"{name}\"?"
+    },
+    "disable": {
+      "title": "Disable \"{name}\"?",
+      "description": "Its models are currently used as {scenes}. These scenes will become unavailable after disabling (personal settings will fall back to the global defaults).",
+      "confirm": "Disable"
+    },
+    "edit": {
+      "title": "Edit Provider",
+      "description": "Edit connection details. Leave the API Key blank to keep it unchanged.",
+      "keySet": "Set (leave blank to keep)",
+      "keyRequired": "Required"
+    },
+    "addModelsDialog": {
+      "title": "Add Models to \"{name}\"",
+      "description": "Select from the list returned by the provider, or enter manually.",
+      "loading": "Fetching model list…"
+    },
+    "editModel": {
+      "title": "Edit Model",
+      "description": "The model name must exactly match the provider's model parameter."
+    },
+    "toast": {
+      "providerDeleted": "Provider deleted.",
+      "modelDeleted": "Model deleted.",
+      "modelsAdded": "Added {count} models.",
+      "modelUpdated": "Model updated."
+    }
+  },
+  "prompts": {
+    "subject": "Subject",
+    "selectSubject": "Select Subject",
+    "subjectHint": "Prompts are configured per subject. Subjects without customizations use the system defaults.",
+    "custom": "Customized",
+    "usingDefault": "Default",
+    "placeholder": "Saving an empty prompt has no effect. To restore the system default, click \"Reset to Default\". Click \"Fill Default Template\" to start from the default.",
+    "viewDefault": "View System Default Template",
+    "placeholdersHint": "Supports placeholders such as {name} and {description}, replaced automatically at runtime.",
+    "fillDefault": "Fill Default Template",
+    "resetToDefault": "Reset to Default",
+    "saveOverride": "Save Override",
+    "emptyTitle": "No Configurable Prompts",
+    "emptyDescription": "Select a subject first.",
+    "noSubjectsTitle": "No Subjects to Manage",
+    "noSubjectsDescription": "Subject lead permissions are required to configure prompts.",
+    "toast": {
+      "fetchSubjectsFailed": "Failed to load subjects.",
+      "fetchFailed": "Failed to load prompts.",
+      "empty": "Content is empty",
+      "emptyDescription": "To restore the default, use \"Reset to Default\".",
+      "savedDescription": "{title} applied to the current subject.",
+      "resetDone": "Reset to default",
+      "resetDescription": "{title} now uses the system default.",
+      "resetFailed": "Reset failed."
+    },
+    "manager": {
+      "title": "Saved Instructions",
+      "new": "New Instruction",
+      "titleLabel": "Title",
+      "titlePlaceholder": "e.g. Translate to English",
+      "contentLabel": "Instruction",
+      "contentPlaceholder": "Enter instruction...",
+      "cancelEdit": "Cancel",
+      "saveChanges": "Save Changes",
+      "add": "Add Instruction",
+      "deleteConfirm": "Delete this saved instruction?"
+    }
+  },
+  "chat": {
+    "newSession": "New Chat",
+    "untitled": "Chat",
+    "copyMarkdown": "Copy Markdown",
+    "composer": {
+      "myModels": "My Models",
+      "globalModels": "Global Models",
+      "selectModel": "Select Model",
+      "noModels": "No models available. Configure one in \"Settings → My AI Models\".",
+      "uploadImage": "Upload Image",
+      "placeholder": "Type a message...",
+      "placeholderVision": "Type a message... (paste images supported)"
+    },
+    "history": {
+      "rename": "Rename",
+      "empty": "No chats yet",
+      "deleteConfirm": "Delete this chat?"
+    },
+    "messages": {
+      "loadMoreHistory": "Load Earlier Messages",
+      "empty": "Start chatting with AI...",
+      "scrollToLatest": "Jump to Latest"
+    },
+    "selection": {
+      "count": "{count} selected"
+    },
+    "header": {
+      "backToChat": "Back to Chat",
+      "history": "Chat History",
+      "multiSelect": "Select Messages",
+      "resetLayout": "Reset Position and Size",
+      "expand": "Expand",
+      "minimize": "Minimize"
+    },
+    "message": {
+      "deleteConfirm": "Delete this message?",
+      "viewQuestion": "View Question {id}",
+      "exportDocx": "Export Docx"
+    },
+    "errors": {
+      "interrupted": "Connection ended unexpectedly. Please try again.",
+      "toolInterrupted": "Connection ended unexpectedly before the tool result was received."
+    }
+  },
+  "questionEditor": {
+    "createTitle": "New Question",
+    "editTitle": "Edit Question",
+    "importTitle": "Edit Imported Question",
+    "update": "Update",
+    "discardConfirm": "This question has unsaved changes that will be discarded. Continue?",
+    "joinStimulusHint": "Add this question to an existing material question, or create a new one.",
+    "sourcePlaceholder": "Enter question source",
+    "visibilityPublic": "Public (shared within subject)",
+    "visibilityPrivate": "Private (only visible to you)",
+    "knowledgePoints": "Knowledge Points",
+    "selectSubjectForKnowledgePoints": "Select a subject first to load knowledge points.",
+    "otherTags": "Other",
+    "type": "Question Type",
+    "stem": "Stem",
+    "options": "Options",
+    "optionPool": "Option Pool (shared by all slots)",
+    "optionPlaceholder": "Enter option content…",
+    "removeOption": "Remove Option",
+    "addOption": "Add Option",
+    "preview": {
+      "content": "Question Preview",
+      "options": "Options Preview",
+      "emptyOption": "(Empty option)",
+      "notFilled": "(Not filled in)"
+    },
+    "structure": {
+      "title": "Question Derivation",
+      "description": "View the source question, derived questions, and related knowledge points.",
+      "source": "Source Question",
+      "current": "Current Question",
+      "derived": "Derived Questions",
+      "view": "View Question",
+      "noDerived": "No derived questions yet."
+    }
+  },
+  "answerEditor": {
+    "clear": "Skip for Now",
+    "refill": "Re-enter Answer",
+    "addOptionsFirst": "Add options first.",
+    "blank": {
+      "stemDrivenHint": "The number and order of blanks are determined by the blank placeholders in the stem. Each blank can have multiple accepted answers.",
+      "title": "Blank {index} (accepted answers)",
+      "placeholder": "Enter reference answer…",
+      "addAccept": "Add Alternative Answer",
+      "addBlank": "Add Blank"
+    },
+    "freeResponse": {
+      "placeholder": "Enter reference answer / solution…"
+    },
+    "matching": {
+      "stemDrivenHint": "The number and order of slots are determined by the slot placeholders in the stem. Choose the correct option from the pool for each slot.",
+      "manualHint": "Insert slot placeholders in the stem, or add and remove slots manually here.",
+      "allowReuse": "Allow an option to be used in multiple slots",
+      "slot": "Slot {index}",
+      "unset": "(Not selected)",
+      "duplicated": "Some options are used in multiple slots. If reuse is intended, turn on the toggle above.",
+      "addSlot": "Add Slot"
+    }
+  },
+  "answerDisplay": {
+    "or": "or",
+    "legacyTitle": "Legacy Answer (Unparsed)",
+    "legacyEmpty": "(No content)",
+    "true": "True",
+    "false": "False",
+    "choiceSeparator": ", "
+  },
+  "questionModel": {
+    "validation": {
+      "contentRequired": "Stem is required.",
+      "answerRequired": "Enter an answer before submitting for review or publishing.",
+      "legacyAnswer": "This question has an unparsed legacy answer. Re-enter the answer before saving.",
+      "answerTypeMismatch": "Answer type does not match the question type.",
+      "minOptions": "Choice questions need at least {min} options.",
+      "unknownOption": "The answer references an option that does not exist.",
+      "selectCorrect": "Select the correct answer.",
+      "selectAtLeastOne": "Select at least one correct answer.",
+      "referenceRequired": "Enter a reference answer before submitting for review or publishing.",
+      "duplicateMatching": "When reuse is not allowed, each slot must have a different answer.",
+      "slotMismatch": "Slots in the stem do not match the answers in number or order.",
+      "slotRequired": "Matching questions need at least one slot. Insert a slot in the stem.",
+      "slotUnanswered": "No answer selected for slot {index}.",
+      "blankRequired": "Fill-in-the-blank questions need at least one blank.",
+      "blankAcceptRequired": "Blank {index} needs at least one reference answer.",
+      "blankMismatch": "Blanks in the stem do not match the answers in number or order."
+    }
+  },
+  "mathEditor": {
+    "keyboard": "Virtual Keyboard",
+    "keyboardHint": "Tip: Click the button above to show or hide the virtual keyboard."
+  },
+  "svgRenderer": {
+    "title": "SVG Preview",
+    "preview": "Preview",
+    "viewCode": "View Code",
+    "copyCode": "Copy SVG Code",
+    "download": "Download SVG"
+  },
+  "richEditor": {
+    "placeholder": "Type something, or type “/” for commands…",
+    "blockActions": "Block Actions",
+    "insert": "Insert",
+    "toolbar": {
+      "insertBlank": "Insert Blank",
+      "undo": "Undo",
+      "redo": "Redo"
+    },
+    "format": {
+      "bold": "Bold",
+      "italic": "Italic",
+      "underline": "Underline",
+      "superscript": "Superscript",
+      "subscript": "Subscript",
+      "clear": "Clear Formatting"
+    },
+    "align": {
+      "title": "Alignment",
+      "left": "Align Left",
+      "center": "Center",
+      "right": "Align Right",
+      "justify": "Justify"
+    },
+    "imageAlign": {
+      "left": "Align Image Left",
+      "center": "Center Image",
+      "right": "Align Image Right"
+    },
+    "heading": {
+      "title": "Paragraph Style",
+      "level": "Heading {level}"
+    },
+    "table": {
+      "insert": "Insert Table",
+      "rows": "Rows",
+      "cols": "Columns",
+      "withHeaderRow": "Header Row",
+      "addRowBefore": "Insert Row Above",
+      "addRowAfter": "Insert Row Below",
+      "deleteRow": "Delete Row",
+      "addColumnBefore": "Insert Column Left",
+      "addColumnAfter": "Insert Column Right",
+      "deleteColumn": "Delete Column",
+      "mergeCells": "Merge Cells",
+      "splitCell": "Split Cell",
+      "toggleHeaderRow": "Toggle Header Row",
+      "toggleHeaderColumn": "Toggle Header Column",
+      "deleteTable": "Delete Table"
+    },
+    "blank": {
+      "label": "Blank",
+      "width": "Blank Length",
+      "presets": {
+        "short": "Short",
+        "medium": "Medium",
+        "long": "Long"
+      }
+    },
+    "math": {
+      "placeholder": "Click to enter formula",
+      "done": "Done"
+    },
+    "image": {
+      "selectSubjectFirst": "Select a subject before inserting images.",
+      "uploadFailed": "Image upload failed."
+    },
+    "slash": {
+      "noResults": "No results",
+      "items": {
+        "paragraph": "Text",
+        "bulletList": "Bulleted List",
+        "orderedList": "Numbered List",
+        "image": "Image",
+        "audio": "Audio",
+        "inlineMath": "Inline Formula",
+        "blockMath": "Block Formula"
+      }
+    }
+  },
+  "stimuli": {
+    "emptyMaterial": "(Empty material)",
+    "questionCount": "Sub-questions: {count}",
+    "memberError": "Sub-question {index}: {error}",
+    "form": {
+      "editTitle": "Edit Material Question",
+      "backToList": "Back to Material Questions",
+      "saveFirst": "Save your changes first.",
+      "addToComposition": "Add to Composition",
+      "addToCompositionHint": "Add the material and all its sub-questions to a composition as one material question.",
+      "cannotEdit": "Cannot Edit",
+      "selectSubjectFirstSentence": "Select a subject first.",
+      "noPermission": "You don't have permission to edit material questions in this subject",
+      "noPermissionSentence": "You don't have permission to edit material questions in this subject.",
+      "switchBackSubjectFirst": "Switch back to the draft's subject first.",
+      "contentRequired": "Enter the material content.",
+      "subjectSwitched": "Subject Changed",
+      "subjectSwitchedDescription": "The local draft still belongs to subject #{id} and has not been reloaded or overwritten. Switch back to that subject to continue saving, or return to the list to discard the draft.",
+      "restoreSubject": "Switch Back",
+      "conflictTitle": "Material question was modified by someone else",
+      "conflictDescription": "Your local content and sub-question order are preserved. You can load the latest version from the server, or keep editing your local draft and decide later.",
+      "loadLatest": "Load Latest and Discard Local",
+      "keepLocal": "Keep Editing Local",
+      "incompatibleTitle": "Public sub-questions in a private material question",
+      "incompatibleMessage": "A private material question cannot contain public sub-questions (sub-question {items}). Remove them, or make the material question public in Settings.",
+      "incompatibleBadge": "Public sub-questions can't be in a private material question",
+      "listSeparator": ", ",
+      "clauseSeparator": "; ",
+      "impactHint": "After saving: {parts}.",
+      "impactSyncMembers": "status and visibility will sync to {count} sub-question(s)",
+      "impactCompositions": "{count} composition(s) will be prompted to sync",
+      "questionInOtherStimulus": "Question #{id} already belongs to material question #{stimulusId}. Remove it from that material question first.",
+      "questionLoadFailed": "Failed to load question.",
+      "questionAppended": "Question #{id} added to the end. Save to apply.",
+      "leaveConfirm": "This material question has unsaved changes. Leave anyway?",
+      "deleteNewConfirm": "Delete this unsaved sub-question?",
+      "removeDirtyConfirm": "Unsaved changes to this sub-question will be lost. Remove it anyway?",
+      "saved": "Material question saved.",
+      "created": "Material question created.",
+      "saveFailed": "Failed to save material question.",
+      "material": "Material",
+      "materialHint": "A passage, chart, or background content that the sub-questions are based on. You can write the material first and add questions later.",
+      "membersTitle": "Sub-questions ({count})",
+      "membersHint": "Sub-questions appear in compositions in this order. Removed ones are kept as standalone questions. Sub-questions are saved together with the material.",
+      "newMember": "New Sub-question",
+      "addExisting": "Add Existing Question from Bank…",
+      "dragToSort": "Drag to Reorder",
+      "newBadge": "New",
+      "modified": "Modified",
+      "emptyStem": "(No stem)",
+      "collapse": "Collapse",
+      "moveUp": "Move Up",
+      "moveDown": "Move Down",
+      "deleteMember": "Delete Sub-question",
+      "detachMember": "Remove (Keep as Standalone)",
+      "emptyMembers": "No sub-questions yet. Click “New Sub-question” to start, or save the material first and add questions later.",
+      "settings": "Settings",
+      "source": "Source",
+      "optional": "Optional"
+    },
+    "questionPicker": {
+      "title": "Add Sub-questions from Question Bank",
+      "description": "Only standalone questions not in any material question are listed. Public questions can't be added to a private material question.",
+      "searchPlaceholder": "Search stems",
+      "added": "Added",
+      "empty": "No questions available to add.",
+      "confirm": "Add Questions ({count})"
+    },
+    "row": {
+      "questionsLoadFailed": "Failed to load sub-questions.",
+      "usedByCompositions": "Used in {count} composition(s)",
+      "emptyStem": "(Empty stem)",
+      "addToComposition": "Add Material Question to Composition",
+      "restore": "Restore Material Question",
+      "delete": "Delete Material Question"
+    },
+    "targetPicker": {
+      "title": "Add to Material Question",
+      "description": "Choose the material question to add this question to. It will become one of its sub-questions after you save.",
+      "createHint": "Add a material, with this question as sub-question 1.",
+      "searchPlaceholder": "Search material content or source",
+      "incompatible": "Public questions can't be added to a private material question",
+      "noMatch": "No matching material questions.",
+      "empty": "No material questions yet."
     }
   }
 }

@@ -20,6 +20,8 @@ import { formatBytes, mediaDimension, mediaFormat, mediaName } from '@/lib/media
 
 const PAGE_SIZE = 40
 
+const { t } = useI18n()
+
 const { currentSubjectId } = useSubjectContext()
 const { can } = usePermissions()
 const canEdit = computed(() => can(Capability.EDIT_QUESTION, currentSubjectId.value))
@@ -60,14 +62,14 @@ function toggleAll(value: boolean | 'indeterminate') {
     checked.value = value === true ? new Set(items.value.map(item => item.id)) : new Set()
 }
 
-async function runBatch(action: () => Promise<{ affected: number; skipped: number }>, verb: string, skipReason: string) {
+async function runBatch(action: () => Promise<{ affected: number; skipped: number }>, kind: 'delete' | 'update') {
     batchBusy.value = true
     try {
         const { affected, skipped } = await action()
-        toast.success(skipped ? `已${verb} ${affected} 张，${skipped} 张${skipReason}` : `已${verb} ${affected} 张`)
+        toast.success(skipped ? t(`media.batch.${kind}.partial`, { affected, skipped }) : t(`media.batch.${kind}.done`, { affected }))
         await load()
     } catch (error) {
-        toast.error(getApiErrorDetail(error, `${verb}失败`))
+        toast.error(getApiErrorDetail(error, t(`media.batch.${kind}.failed`)))
     } finally {
         batchBusy.value = false
     }
@@ -75,15 +77,15 @@ async function runBatch(action: () => Promise<{ affected: number; skipped: numbe
 
 function deleteChecked() {
     const sid = currentSubjectId.value
-    if (!sid || !confirm(`删除所选 ${checked.value.size} 个文件中未被使用的？仍被引用的会保留。`)) return
-    runBatch(() => batchDelete(sid, [...checked.value]), '删除', '仍被使用已保留')
+    if (!sid || !confirm(t('media.batch.deleteConfirm', { count: checked.value.size }))) return
+    runBatch(() => batchDelete(sid, [...checked.value]), 'delete')
 }
 
 async function saveBatchSource() {
     const sid = currentSubjectId.value
     if (!sid) return
     sourceDialogOpen.value = false
-    await runBatch(() => batchUpdateSource(sid, [...checked.value], batchSource.value.trim() || null), '更新', '未更新')
+    await runBatch(() => batchUpdateSource(sid, [...checked.value], batchSource.value.trim() || null), 'update')
 }
 
 function downloadChecked() {
@@ -98,23 +100,23 @@ function downloadChecked() {
 const pages = computed(() => Math.max(1, Math.ceil(total.value / PAGE_SIZE)))
 const hasFilters = computed(() => !!keyword.value.trim() || (!!usage.value && usage.value !== '0') || (!!kindFilter.value && kindFilter.value !== '0'))
 
-const kindOptions = [
-    { label: '全部', value: '0' },
-    { label: '图片', value: 'image' },
-    { label: '音频', value: 'audio' },
-]
+const kindOptions = computed(() => [
+    { label: t('common.all'), value: '0' },
+    { label: t('media.kind.image'), value: 'image' },
+    { label: t('media.kind.audio'), value: 'audio' },
+])
 
-const usageOptions = [
-    { label: '全部', value: '0' },
-    { label: '已使用', value: 'used' },
-    { label: '未使用', value: 'unused' },
-]
-const sortOptions = [
-    { label: '最近上传', value: 'newest' },
-    { label: '最早上传', value: 'oldest' },
-    { label: '名称', value: 'name' },
-    { label: '文件大小', value: 'size' },
-]
+const usageOptions = computed(() => [
+    { label: t('common.all'), value: '0' },
+    { label: t('media.usage.used'), value: 'used' },
+    { label: t('media.usage.unused'), value: 'unused' },
+])
+const sortOptions = computed(() => [
+    { label: t('media.sort.newest'), value: 'newest' },
+    { label: t('media.sort.oldest'), value: 'oldest' },
+    { label: t('common.name'), value: 'name' },
+    { label: t('media.sort.size'), value: 'size' },
+])
 
 async function load() {
     const sid = currentSubjectId.value
@@ -190,12 +192,12 @@ async function uploadFiles(files: FileList | File[] | null | undefined) {
             await uploadContentImage(sid, file)
             ok++
         } catch (error) {
-            toast.error(`${file.name}：${getApiErrorDetail(error, '上传失败')}`)
+            toast.error(t('media.uploadFileFailed', { name: file.name, error: getApiErrorDetail(error, t('common.uploadFailed')) }))
         }
     }
     uploading.value = false
     if (ok > 0) {
-        toast.success(`已上传 ${ok} 个文件（与库中相同的文件会直接复用）`)
+        toast.success(t('media.uploaded', { count: ok }))
         if (page.value !== 1 || sort.value !== 'newest') {
             sort.value = 'newest'
             page.value = 1
@@ -217,15 +219,15 @@ function onDrop(event: DragEvent) {
 }
 
 function usageLabel(count: number) {
-    return count > 0 ? `${count} 处使用` : '未使用'
+    return count > 0 ? t('media.usageCount', { count }) : t('media.usage.unused')
 }
 </script>
 
 <template>
-    <PageHeader title="媒体库">
+    <PageHeader :title="t('nav.media')">
         <template #actions>
             <Button v-if="canEdit && currentSubjectId" size="sm" :disabled="uploading" @click="fileInputRef?.click()">
-                <Loader2 v-if="uploading" class="mr-2 size-4 animate-spin" /><Upload v-else class="mr-2 size-4" />上传
+                <Loader2 v-if="uploading" class="mr-2 size-4 animate-spin" /><Upload v-else class="mr-2 size-4" />{{ t('media.upload') }}
             </Button>
         </template>
     </PageHeader>
@@ -238,23 +240,23 @@ function usageLabel(count: number) {
         @dragleave.self="dragOver = false"
         @drop.prevent="onDrop"
     >
-        <p class="text-sm text-muted-foreground">本学科题目、材料题与稿件中使用的图片和音频。编辑器里插入时可以直接从这里选择。</p>
+        <p class="text-sm text-muted-foreground">{{ t('media.pageDescription') }}</p>
 
         <div class="grid gap-3 bg-muted/40 p-4 sm:grid-cols-[2fr_1fr_1fr_1fr_auto] sm:items-end">
             <div class="space-y-2">
-                <Label class="text-xs">搜索</Label>
-                <ClearableInput v-model="keyword" placeholder="文件名或替代文本" />
+                <Label class="text-xs">{{ t('media.filters.search') }}</Label>
+                <ClearableInput v-model="keyword" :placeholder="t('media.filters.searchPlaceholder')" />
             </div>
             <div class="space-y-2">
-                <Label class="text-xs">类型</Label>
+                <Label class="text-xs">{{ t('media.filters.kind') }}</Label>
                 <ClearableSelect v-model="kindFilter" :options="kindOptions" />
             </div>
             <div class="space-y-2">
-                <Label class="text-xs">使用情况</Label>
+                <Label class="text-xs">{{ t('media.filters.usage') }}</Label>
                 <ClearableSelect v-model="usage" :options="usageOptions" />
             </div>
             <div class="space-y-2">
-                <Label class="text-xs">排序</Label>
+                <Label class="text-xs">{{ t('media.filters.sort') }}</Label>
                 <Select v-model="sort">
                     <SelectTrigger class="w-full"><SelectValue /></SelectTrigger>
                     <SelectContent>
@@ -262,26 +264,26 @@ function usageLabel(count: number) {
                     </SelectContent>
                 </Select>
             </div>
-            <ToggleGroup v-model="view" type="single" variant="outline" aria-label="视图">
-                <ToggleGroupItem value="grid" aria-label="网格视图" title="网格视图"><LayoutGrid class="size-4" /></ToggleGroupItem>
-                <ToggleGroupItem value="list" aria-label="列表视图" title="列表视图"><List class="size-4" /></ToggleGroupItem>
+            <ToggleGroup v-model="view" type="single" variant="outline" :aria-label="t('media.view.label')">
+                <ToggleGroupItem value="grid" :aria-label="t('media.view.grid')" :title="t('media.view.grid')"><LayoutGrid class="size-4" /></ToggleGroupItem>
+                <ToggleGroupItem value="list" :aria-label="t('media.view.list')" :title="t('media.view.list')"><List class="size-4" /></ToggleGroupItem>
             </ToggleGroup>
         </div>
 
-        <div v-if="!currentSubjectId" class="py-16 text-center text-sm text-muted-foreground">请先选择学科</div>
+        <div v-if="!currentSubjectId" class="py-16 text-center text-sm text-muted-foreground">{{ t('media.selectSubjectFirst') }}</div>
         <div v-else-if="loading && items.length === 0" class="flex justify-center py-16"><Loader2 class="size-7 animate-spin text-muted-foreground" /></div>
         <div v-else-if="failed" class="flex flex-col items-center gap-3 py-16 text-sm text-muted-foreground">
-            <AlertCircle class="size-6" /><span>媒体库加载失败</span>
-            <Button variant="outline" size="sm" @click="load"><RotateCw class="mr-2 size-4" />重试</Button>
+            <AlertCircle class="size-6" /><span>{{ t('media.loadFailed') }}</span>
+            <Button variant="outline" size="sm" @click="load"><RotateCw class="mr-2 size-4" />{{ t('common.retry') }}</Button>
         </div>
         <div v-else-if="items.length === 0" class="flex flex-col items-center gap-3 py-16 text-sm text-muted-foreground">
             <template v-if="hasFilters">
-                <span>没有符合条件的图片</span>
-                <Button variant="outline" size="sm" @click="clearFilters">清除筛选</Button>
+                <span>{{ t('media.noMatch') }}</span>
+                <Button variant="outline" size="sm" @click="clearFilters">{{ t('media.clearFilters') }}</Button>
             </template>
             <template v-else>
-                <span>媒体库还是空的。题目中插入或导入文档时的图片会自动出现在这里。</span>
-                <Button v-if="canEdit" size="sm" @click="fileInputRef?.click()"><Upload class="mr-2 size-4" />上传文件</Button>
+                <span>{{ t('media.empty') }}</span>
+                <Button v-if="canEdit" size="sm" @click="fileInputRef?.click()"><Upload class="mr-2 size-4" />{{ t('media.uploadFiles') }}</Button>
             </template>
         </div>
 
@@ -304,15 +306,15 @@ function usageLabel(count: number) {
                     <span class="truncate text-sm">{{ mediaName(item) }}</span>
                     <span class="flex flex-wrap gap-x-2 text-xs">
                         <span :class="item.usage_count ? 'text-muted-foreground' : 'text-muted-foreground/60'">{{ usageLabel(item.usage_count) }}</span>
-                        <span v-if="!item.displayable" class="text-amber-600">无法预览</span>
-                        <span v-else-if="item.kind === 'image' && !item.alt" class="text-muted-foreground/60">缺 alt</span>
+                        <span v-if="!item.displayable" class="text-amber-600">{{ t('media.noPreview') }}</span>
+                        <span v-else-if="item.kind === 'image' && !item.alt" class="text-muted-foreground/60">{{ t('media.missingAlt') }}</span>
                     </span>
                 </button>
                 <Checkbox
                     class="absolute left-3 top-3 bg-background transition-opacity"
                     :class="checked.size ? 'opacity-100' : 'opacity-0 group-hover:opacity-100 focus-visible:opacity-100'"
                     :model-value="checked.has(item.id)"
-                    :aria-label="`选择 ${mediaName(item)}`"
+                    :aria-label="t('media.selectItem', { name: mediaName(item) })"
                     @update:model-value="(v) => toggleChecked(item.id, v)"
                 />
             </div>
@@ -321,20 +323,20 @@ function usageLabel(count: number) {
         <table v-else class="w-full text-sm">
             <thead class="border-b text-left text-xs text-muted-foreground">
                 <tr>
-                    <th class="w-8 py-2 font-normal"><Checkbox :model-value="allChecked" aria-label="全选本页" @update:model-value="toggleAll" /></th>
-                    <th class="w-16 py-2 font-normal">预览</th>
-                    <th class="py-2 font-normal">名称</th>
-                    <th class="hidden py-2 font-normal sm:table-cell">格式</th>
-                    <th class="hidden py-2 font-normal md:table-cell">尺寸 / 时长</th>
-                    <th class="py-2 font-normal">大小</th>
-                    <th class="py-2 font-normal">使用</th>
-                    <th class="hidden py-2 font-normal md:table-cell">上传时间</th>
+                    <th class="w-8 py-2 font-normal"><Checkbox :model-value="allChecked" :aria-label="t('media.selectPage')" @update:model-value="toggleAll" /></th>
+                    <th class="w-16 py-2 font-normal">{{ t('media.columns.preview') }}</th>
+                    <th class="py-2 font-normal">{{ t('common.name') }}</th>
+                    <th class="hidden py-2 font-normal sm:table-cell">{{ t('media.columns.format') }}</th>
+                    <th class="hidden py-2 font-normal md:table-cell">{{ t('media.columns.dimension') }}</th>
+                    <th class="py-2 font-normal">{{ t('media.columns.size') }}</th>
+                    <th class="py-2 font-normal">{{ t('media.columns.usage') }}</th>
+                    <th class="hidden py-2 font-normal md:table-cell">{{ t('media.columns.uploadedAt') }}</th>
                 </tr>
             </thead>
             <tbody>
                 <tr v-for="item in items" :key="item.id" class="cursor-pointer border-b hover:bg-muted/50" tabindex="0" @click="openDetail(item)" @keydown.enter="openDetail(item)">
                     <td class="py-1.5" @click.stop>
-                        <Checkbox :model-value="checked.has(item.id)" :aria-label="`选择 ${mediaName(item)}`" @update:model-value="(v) => toggleChecked(item.id, v)" />
+                        <Checkbox :model-value="checked.has(item.id)" :aria-label="t('media.selectItem', { name: mediaName(item) })" @update:model-value="(v) => toggleChecked(item.id, v)" />
                     </td>
                     <td class="py-1.5">
                         <div class="flex size-12 items-center justify-center overflow-hidden rounded bg-muted">
@@ -354,24 +356,24 @@ function usageLabel(count: number) {
         </table>
 
         <div v-if="checked.size" class="sticky bottom-4 z-10 flex flex-wrap items-center gap-2 rounded-md border bg-background p-2 shadow-md">
-            <span class="px-2 text-sm">已选 {{ checked.size }} 张</span>
-            <Button variant="ghost" size="sm" @click="toggleAll(!allChecked)">{{ allChecked ? '取消全选' : '全选本页' }}</Button>
+            <span class="px-2 text-sm">{{ t('media.selectedCount', { count: checked.size }) }}</span>
+            <Button variant="ghost" size="sm" @click="toggleAll(!allChecked)">{{ allChecked ? t('media.deselectAll') : t('media.selectPage') }}</Button>
             <div class="ml-auto flex flex-wrap gap-2">
-                <Button variant="outline" size="sm" @click="downloadChecked"><Download class="mr-2 size-4" />下载</Button>
+                <Button variant="outline" size="sm" @click="downloadChecked"><Download class="mr-2 size-4" />{{ t('common.download') }}</Button>
                 <template v-if="canEdit">
-                    <Button variant="outline" size="sm" :disabled="batchBusy" @click="batchSource = ''; sourceDialogOpen = true"><Tag class="mr-2 size-4" />设置来源</Button>
-                    <Button variant="outline" size="sm" class="text-destructive" :disabled="batchBusy" @click="deleteChecked"><Trash2 class="mr-2 size-4" />删除未使用</Button>
+                    <Button variant="outline" size="sm" :disabled="batchBusy" @click="batchSource = ''; sourceDialogOpen = true"><Tag class="mr-2 size-4" />{{ t('media.batch.setSource') }}</Button>
+                    <Button variant="outline" size="sm" class="text-destructive" :disabled="batchBusy" @click="deleteChecked"><Trash2 class="mr-2 size-4" />{{ t('media.batch.deleteUnused') }}</Button>
                 </template>
-                <Button variant="ghost" size="icon" title="清除选择" aria-label="清除选择" @click="toggleAll(false)"><X class="size-4" /></Button>
+                <Button variant="ghost" size="icon" :title="t('media.clearSelection')" :aria-label="t('media.clearSelection')" @click="toggleAll(false)"><X class="size-4" /></Button>
             </div>
         </div>
 
         <div v-if="total > 0" class="flex flex-wrap items-center justify-between gap-3 text-sm text-muted-foreground">
-            <span>共 {{ total }} 个文件</span>
+            <span>{{ t('media.total', { count: total }) }}</span>
             <div class="flex items-center gap-2">
-                <Button variant="outline" size="icon" :disabled="page <= 1 || loading" title="上一页" aria-label="上一页" @click="page--"><ChevronLeft class="size-4" /></Button>
-                <span>第 {{ page }} / {{ pages }} 页</span>
-                <Button variant="outline" size="icon" :disabled="page >= pages || loading" title="下一页" aria-label="下一页" @click="page++"><ChevronRight class="size-4" /></Button>
+                <Button variant="outline" size="icon" :disabled="page <= 1 || loading" :title="t('common.prevPage')" :aria-label="t('common.prevPage')" @click="page--"><ChevronLeft class="size-4" /></Button>
+                <span>{{ t('media.pageIndicator', { page, pages }) }}</span>
+                <Button variant="outline" size="icon" :disabled="page >= pages || loading" :title="t('common.nextPage')" :aria-label="t('common.nextPage')" @click="page++"><ChevronRight class="size-4" /></Button>
             </div>
         </div>
     </main>
@@ -380,15 +382,15 @@ function usageLabel(count: number) {
 
     <Dialog v-model:open="sourceDialogOpen">
         <DialogContent class="sm:max-w-md">
-            <DialogHeader><DialogTitle>设置来源 / 版权</DialogTitle></DialogHeader>
+            <DialogHeader><DialogTitle>{{ t('media.batch.sourceDialogTitle') }}</DialogTitle></DialogHeader>
             <form class="space-y-4" @submit.prevent="saveBatchSource">
                 <div class="space-y-1.5">
-                    <Label for="batch-source">应用到所选 {{ checked.size }} 个文件；留空则清除来源</Label>
+                    <Label for="batch-source">{{ t('media.batch.sourceDialogHint', { count: checked.size }) }}</Label>
                     <Input id="batch-source" v-model="batchSource" maxlength="255" />
                 </div>
                 <DialogFooter>
-                    <Button type="button" variant="outline" @click="sourceDialogOpen = false">取消</Button>
-                    <Button type="submit">保存</Button>
+                    <Button type="button" variant="outline" @click="sourceDialogOpen = false">{{ t('common.cancel') }}</Button>
+                    <Button type="submit">{{ t('common.save') }}</Button>
                 </DialogFooter>
             </form>
         </DialogContent>

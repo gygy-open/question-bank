@@ -1,4 +1,5 @@
-import { describe, expect, it } from 'vitest'
+import { beforeAll, describe, expect, it } from 'vitest'
+import { setTranslator } from '../locale'
 import { formatBytes, formatDuration, groupMediaReferences, mediaDimension, mediaFormat, mediaName, mediaReferenceLink, referenceKey, replaceableReferences, replaceSummary } from '../mediaLibrary'
 
 const ref = (owner_type: string, extra: Record<string, unknown> = {}) => ({
@@ -6,6 +7,11 @@ const ref = (owner_type: string, extra: Record<string, unknown> = {}) => ({
 })
 
 describe('mediaLibrary', () => {
+    // 测试环境没有 i18n 插件：用 key + 参数作为译文，断言调用了正确的 key。
+    beforeAll(() => {
+        setTranslator((key, params) => (params ? `${key}${JSON.stringify(params)}` : key))
+    })
+
     it('按引用方类型生成跳转地址，已删除的不给链接', () => {
         expect(mediaReferenceLink(ref('question'))).toBe('/questions?id=7')
         expect(mediaReferenceLink(ref('stimulus'))).toBe('/materials/7/edit')
@@ -17,7 +23,7 @@ describe('mediaLibrary', () => {
 
     it('按固定顺序分组并省略空组', () => {
         const groups = groupMediaReferences([ref('composition'), ref('question'), ref('question')])
-        expect(groups.map((g) => [g.label, g.items.length])).toEqual([['题目', 2], ['稿件', 1]])
+        expect(groups.map((g) => [g.label, g.items.length])).toEqual([['media.owner.question', 2], ['media.owner.composition', 1]])
     })
 
     it('格式化文件大小', () => {
@@ -32,15 +38,15 @@ describe('mediaLibrary', () => {
     })
 
     it('替换结果摘要只列出非零项', () => {
-        expect(replaceSummary({ replaced: [{ owner_type: 'question', owner_id: 1 }], skipped: 0, frozen: 0 })).toBe('已替换 1 处引用')
-        expect(replaceSummary({ replaced: [], skipped: 2, frozen: 1 })).toBe('已替换 0 处引用，2 处无权修改未替换，1 个定稿版本保持原图')
+        expect(replaceSummary({ replaced: [{ owner_type: 'question', owner_id: 1 }], skipped: 0, frozen: 0 })).toBe('media.replace.summary{"count":1}')
+        expect(replaceSummary({ replaced: [], skipped: 2, frozen: 1 })).toBe('media.replace.summary{"count":0}media.replace.summarySkipped{"count":2}media.replace.summaryFrozen{"count":1}')
     })
 
     it('图片与音频的显示文字', () => {
         expect(formatDuration(65.4)).toBe('1:05')
         expect(formatDuration(3725)).toBe('1:02:05')
         expect(formatDuration(null)).toBe('')
-        expect(mediaName({ id: 3, kind: 'audio', original_filename: null })).toBe('音频 #3')
+        expect(mediaName({ id: 3, kind: 'audio', original_filename: null })).toBe('media.unnamedAudio{"id":3}')
         expect(mediaFormat('audio/mpeg')).toBe('MP3')
         expect(mediaFormat('image/png')).toBe('PNG')
         expect(mediaDimension({ kind: 'audio', duration: 90 })).toBe('1:30')

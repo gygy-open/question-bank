@@ -10,6 +10,7 @@ definePageMeta({
   layout: false
 })
 
+const { t } = useI18n()
 const route = useRoute()
 const { $api } = useNuxtApp()
 const fileName = ref('')
@@ -27,9 +28,9 @@ const releaseDownloadUrl = () => {
 
 const loadFile = async () => {
   const taskId = Number(route.query.task)
-  fileName.value = String(route.query.name || '源文件')
+  fileName.value = String(route.query.name || t('preview.defaultFileName'))
   if (!Number.isInteger(taskId) || taskId <= 0) {
-    error.value = '未指定导入任务'
+    error.value = t('preview.noTask')
     loading.value = false
     return
   }
@@ -69,7 +70,7 @@ const loadFile = async () => {
     }
   } catch (e: any) {
     console.error(e)
-    error.value = e?.statusCode === 404 ? '源文件不存在或无权查看' : (e?.message || '加载文件失败')
+    error.value = e?.statusCode === 404 ? t('preview.notFound') : (e?.message || t('preview.loadFailed'))
   } finally {
     loading.value = false
   }
@@ -91,12 +92,12 @@ watch(() => route.query.task, () => {
     <header class="bg-white border-b px-6 py-3 flex items-center justify-between sticky top-0 z-10 shadow-sm">
       <div class="flex items-center gap-2">
         <h1 class="font-medium text-lg truncate max-w-md" :title="fileName">
-          文件预览: {{ fileName }}
+          {{ t('preview.title', { name: fileName }) }}
         </h1>
       </div>
       <div class="flex items-center gap-2">
         <Button v-if="downloadUrl" variant="outline" size="sm" as-child>
-          <a :href="downloadUrl" :download="fileName">下载文件</a>
+          <a :href="downloadUrl" :download="fileName">{{ t('preview.download') }}</a>
         </Button>
       </div>
     </header>
@@ -108,14 +109,14 @@ watch(() => route.query.task, () => {
         <!-- Loading -->
         <div v-if="loading" class="flex flex-col items-center justify-center h-64 text-muted-foreground">
           <Loader2 class="h-8 w-8 animate-spin mb-2" />
-          <p>正在加载文件...</p>
+          <p>{{ t('preview.loading') }}</p>
         </div>
 
         <!-- Error -->
         <div v-else-if="error" class="flex flex-col items-center justify-center h-64 text-destructive">
           <FileWarning class="h-10 w-10 mb-2" />
           <p>{{ error }}</p>
-          <Button variant="link" @click="loadFile" class="mt-2">重试</Button>
+          <Button variant="link" @click="loadFile" class="mt-2">{{ t('common.retry') }}</Button>
         </div>
 
         <!-- Docx Viewer -->
@@ -130,7 +131,7 @@ watch(() => route.query.task, () => {
 
         <div v-if="!loading && !error && fileType === 'unknown'" class="flex flex-col items-center justify-center h-64 text-muted-foreground">
           <FileWarning class="h-10 w-10 mb-2" />
-          <p>该格式不支持在线预览，请下载后查看。</p>
+          <p>{{ t('preview.unsupported') }}</p>
         </div>
       </div>
     </main>

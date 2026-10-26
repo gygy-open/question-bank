@@ -15,6 +15,7 @@ import {
 } from '@/components/ui/message-scroller'
 import { useGlobalChat } from '@/composables/useGlobalChat'
 
+const { t } = useI18n()
 const chat = useGlobalChat()
 </script>
 
@@ -25,7 +26,7 @@ const chat = useGlobalChat()
         <div v-if="chat.hasMore.value" class="flex justify-center px-4 pt-4">
           <Button variant="ghost" size="sm" :disabled="chat.isLoadingMore.value" @click="chat.loadMore()">
             <Loader2 v-if="chat.isLoadingMore.value" class="mr-2 h-4 w-4 animate-spin" />
-            {{ chat.isLoadingMore.value ? '加载中...' : '加载更多历史消息' }}
+            {{ chat.isLoadingMore.value ? t('common.loading') : t('chat.messages.loadMoreHistory') }}
           </Button>
         </div>
 
@@ -34,7 +35,7 @@ const chat = useGlobalChat()
           class="flex h-48 flex-col items-center justify-center text-muted-foreground"
         >
           <Bot class="mb-3 h-10 w-10 opacity-20" />
-          <p class="text-sm">开始与 AI 对话吧...</p>
+          <p class="text-sm">{{ t('chat.messages.empty') }}</p>
         </div>
 
         <MessageScrollerContent class="gap-6 p-4">
@@ -80,12 +81,12 @@ const chat = useGlobalChat()
       <TooltipProvider :delay-duration="300">
         <Tooltip>
           <TooltipTrigger as-child>
-            <MessageScrollerButton direction="end" aria-label="回到最新消息">
+            <MessageScrollerButton direction="end" :aria-label="t('chat.messages.scrollToLatest')">
               <ArrowDown />
-              <span class="sr-only">回到最新消息</span>
+              <span class="sr-only">{{ t('chat.messages.scrollToLatest') }}</span>
             </MessageScrollerButton>
           </TooltipTrigger>
-          <TooltipContent>回到最新消息</TooltipContent>
+          <TooltipContent>{{ t('chat.messages.scrollToLatest') }}</TooltipContent>
         </Tooltip>
       </TooltipProvider>
     </MessageScroller>

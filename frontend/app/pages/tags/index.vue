@@ -51,6 +51,7 @@ import {
 import { toast } from 'vue-sonner'
 
 // State
+const { t } = useI18n()
 const { $api } = useNuxtApp()
 const { currentSubjectId, currentSubject, hasSubjects } = useSubjectContext()
 const { can } = usePermissions()
@@ -125,8 +126,8 @@ const categories = computed(() => {
 })
 
 const currentCategoryLabel = computed(() => {
-    if (selectedCategory.value === 'all') return '全部'
-    return categories.value.find(c => c.value === selectedCategory.value)?.label || '未分类'
+    if (selectedCategory.value === 'all') return t('common.all')
+    return categories.value.find(c => c.value === selectedCategory.value)?.label || t('tags.uncategorized')
 })
 
 // Select 组件用字符串值，'none' 代表未分类（category_id = null）
@@ -136,7 +137,7 @@ const categorySelectValue = computed<string>({
 })
 
 const isAllPageSelected = computed(() => {
-    return tags.value.length > 0 && tags.value.every(t => selectedTags.value.includes(t.id))
+    return tags.value.length > 0 && tags.value.every(tag => selectedTags.value.includes(tag.id))
 })
 
 // Actions
@@ -170,24 +171,24 @@ const saveTag = async () => {
                 method: 'PUT',
                 body: currentTag.value
             })
-            toast.success('标签更新成功')
+            toast.success(t('tags.toast.updated'))
         } else {
             await $api('/tags', {
                 method: 'POST',
                 body: { ...currentTag.value, subject_id: currentSubjectId.value }
             })
-            toast.success('标签创建成功')
+            toast.success(t('tags.toast.created'))
         }
         await refresh()
         isDialogOpen.value = false
     } catch (error: any) {
         console.error('Failed to save tag', error)
-        toast.error(error.data?.detail || '保存标签失败')
+        toast.error(error.data?.detail || t('tags.toast.saveFailed'))
     }
 }
 
 const deleteTag = async (id: number) => {
-    if (!confirm('确定要删除这个标签吗？')) return
+    if (!confirm(t('tags.deleteConfirm'))) return
     try {
         await $api(`/tags/${id}`, { method: 'DELETE' })
         await refresh()
@@ -200,7 +201,7 @@ const deleteTag = async (id: number) => {
 
 const toggleAllPage = (checked: boolean) => {
     if (checked) {
-        selectedTags.value = tags.value.map(t => t.id)
+        selectedTags.value = tags.value.map(tag => tag.id)
     } else {
         selectedTags.value = []
     }
@@ -218,18 +219,18 @@ const toggleSelect = (id: number, checked: boolean) => {
 
 const batchDelete = async () => {
     if (selectedTags.value.length === 0) return
-    if (!confirm(`确定要删除选中的 ${selectedTags.value.length} 个标签吗？`)) return
+    if (!confirm(t('tags.batchDeleteConfirm', { count: selectedTags.value.length }))) return
 
     try {
         await Promise.all(selectedTags.value.map(id => $api(`/tags/${id}`, { method: 'DELETE' })))
-        toast.success(`成功删除 ${selectedTags.value.length} 个标签`)
+        toast.success(t('tags.toast.batchDeleted', { count: selectedTags.value.length }))
         selectedTags.value = []
         await refresh()
         // Batch-deleting the rest of a page (not page 1) would otherwise leave an empty page.
         if (tags.value.length === 0 && page.value > 1) page.value -= 1
     } catch (error) {
         console.error('Batch delete failed', error)
-        toast.error('批量删除失败')
+        toast.error(t('tags.toast.batchDeleteFailed'))
     }
 }
 
@@ -244,16 +245,16 @@ const saveCategory = async () => {
         await refreshCategories()
         editingCategoryId.value = null
         editingCategory.value = {}
-        toast.success('分类更新成功')
+        toast.success(t('tagCategories.toast.updated'))
     } catch (error: any) {
         console.error('Failed to update category', error)
-        toast.error(error.data?.detail || '更新分类失败')
+        toast.error(error.data?.detail || t('tagCategories.toast.updateFailed'))
     }
 }
 
 const createCategory = async () => {
     if (!currentSubjectId.value) {
-        toast.error('请先选择学科')
+        toast.error(t('tags.selectSubjectFirst'))
         return
     }
 
@@ -268,39 +269,39 @@ const createCategory = async () => {
         await refreshCategories()
         newCategory.value = { name: '', sort_order: 0, is_active: true }
         isAddingCategory.value = false
-        toast.success('分类创建成功')
+        toast.success(t('tagCategories.toast.created'))
     } catch (error: any) {
         console.error('Failed to create category', error)
-        toast.error(error.data?.detail || '创建分类失败')
+        toast.error(error.data?.detail || t('tagCategories.toast.createFailed'))
     }
 }
 
 const deleteCategory = async (id: number) => {
-    if (!confirm('确定要删除这个分类吗？这将同时删除该分类下的所有标签！')) return
+    if (!confirm(t('tagCategories.deleteConfirm'))) return
     try {
         await $api(`/tag-categories/${id}`, { method: 'DELETE' })
         await refreshCategories()
         if (selectedCategory.value === id) {
             selectedCategory.value = 'all'
         }
-        toast.success('分类删除成功')
+        toast.success(t('tagCategories.toast.deleted'))
     } catch (error) {
         console.error('Failed to delete category', error)
-        toast.error('删除分类失败')
+        toast.error(t('tagCategories.toast.deleteFailed'))
     }
 }
 </script>
 
 <template>
-    <PageHeader title="标签管理">
+    <PageHeader :title="t('nav.tags')">
         <template #actions>
             <Button v-if="canManage" variant="outline" :disabled="!hasSubjects" @click="isImportOpen = true">
                 <Upload class="w-4 h-4 mr-2" />
-                批量导入
+                {{ t('tags.batchImport') }}
             </Button>
             <Button v-if="canManage" :disabled="!hasSubjects" @click="openCreateDialog">
                 <Plus class="w-4 h-4 mr-2" />
-                新建标签
+                {{ t('tags.create') }}
             </Button>
         </template>
     </PageHeader>
@@ -337,7 +338,7 @@ const deleteCategory = async (id: number) => {
                             </SheetTrigger>
                             <SheetContent side="left" class="w-72 p-4">
                                 <SheetHeader class="p-0">
-                                    <SheetTitle>标签分类</SheetTitle>
+                                    <SheetTitle>{{ t('tagCategories.navLabel') }}</SheetTitle>
                                 </SheetHeader>
                                 <TagCategorySidebar
                                     class="mt-4"
@@ -360,10 +361,10 @@ const deleteCategory = async (id: number) => {
                     <h2 class="hidden text-sm font-medium text-muted-foreground md:block">
                         {{ currentCategoryLabel }}
                     </h2>
-                    <span class="hidden text-sm text-muted-foreground md:block">共 {{ total }} 个标签</span>
+                    <span class="hidden text-sm text-muted-foreground md:block">{{ t('tags.total', { count: total }) }}</span>
                     <Button v-if="canManage && selectedTags.length > 0" variant="destructive" size="sm" @click="batchDelete">
                         <Trash2 class="w-4 h-4 mr-2" />
-                        批量删除 ({{ selectedTags.length }})
+                        {{ t('tags.batchDelete', { count: selectedTags.length }) }}
                     </Button>
                 </div>
 
@@ -378,10 +379,10 @@ const deleteCategory = async (id: number) => {
                                     />
                                 </TableHead>
                                 <TableHead>ID</TableHead>
-                                <TableHead>名称</TableHead>
-                                <TableHead>分类</TableHead>
-                                <TableHead>颜色</TableHead>
-                                <TableHead class="text-right">操作</TableHead>
+                                <TableHead>{{ t('common.name') }}</TableHead>
+                                <TableHead>{{ t('tags.category') }}</TableHead>
+                                <TableHead>{{ t('tags.color') }}</TableHead>
+                                <TableHead class="text-right">{{ t('common.actions') }}</TableHead>
                             </TableRow>
                         </TableHeader>
                         <TableBody>
@@ -399,7 +400,7 @@ const deleteCategory = async (id: number) => {
                                     </Badge>
                                 </TableCell>
                                 <TableCell>
-                                    <Badge variant="secondary">{{ categories.find(c => c.value === tag.category_id)?.label || '未分类' }}</Badge>
+                                    <Badge variant="secondary">{{ categories.find(c => c.value === tag.category_id)?.label || t('tags.uncategorized') }}</Badge>
                                 </TableCell>
                                 <TableCell>
                                     <div class="flex items-center gap-2">
@@ -423,7 +424,7 @@ const deleteCategory = async (id: number) => {
                             </TableRow>
                             <TableRow v-if="tags.length === 0">
                                 <TableCell colspan="5" class="text-center py-8 text-muted-foreground">
-                                    暂无标签
+                                    {{ t('tags.empty') }}
                                 </TableCell>
                             </TableRow>
                         </TableBody>
@@ -434,7 +435,7 @@ const deleteCategory = async (id: number) => {
                     <Pagination v-model:page="page" :total="total" :sibling-count="1" show-edges :default-page="1"
                         :items-per-page="pageSize">
                         <PaginationContent v-slot="{ items }" class="flex items-center gap-1">
-                            <PaginationPrevious class="h-8 w-8 p-0" aria-label="上一页">
+                            <PaginationPrevious class="h-8 w-8 p-0" :aria-label="t('common.prevPage')">
                                 <ChevronLeft class="h-4 w-4" />
                             </PaginationPrevious>
                             <template v-for="(item, index) in items">
@@ -451,7 +452,7 @@ const deleteCategory = async (id: number) => {
                                 </PaginationItem>
                                 <PaginationEllipsis v-else :key="item.type" :index="index" class="size-8" />
                             </template>
-                            <PaginationNext class="h-8 w-8 p-0" aria-label="下一页">
+                            <PaginationNext class="h-8 w-8 p-0" :aria-label="t('common.nextPage')">
                                 <ChevronRight class="h-4 w-4" />
                             </PaginationNext>
                         </PaginationContent>
@@ -462,36 +463,36 @@ const deleteCategory = async (id: number) => {
             <Dialog v-model:open="isDialogOpen">
                 <DialogContent>
                     <DialogHeader>
-                        <DialogTitle>{{ isEditing ? '编辑标签' : '新建标签' }}</DialogTitle>
+                        <DialogTitle>{{ isEditing ? t('tags.edit') : t('tags.create') }}</DialogTitle>
                         <DialogDescription>
-                            配置标签的名称、分类和颜色。
+                            {{ t('tags.dialogDescription') }}
                         </DialogDescription>
                     </DialogHeader>
 
                     <div class="grid gap-4 py-4">
                         <div class="grid gap-2">
-                            <label>名称</label>
-                            <Input v-model="currentTag.name" placeholder="例如：2023, 高考, 易错题" />
+                            <label>{{ t('common.name') }}</label>
+                            <Input v-model="currentTag.name" :placeholder="t('tags.namePlaceholder')" />
                         </div>
 
                         <div class="grid gap-2">
-                            <label>分类</label>
+                            <label>{{ t('tags.category') }}</label>
                             <Select v-model="categorySelectValue">
                                 <SelectTrigger>
-                                    <SelectValue placeholder="选择分类" />
+                                    <SelectValue :placeholder="t('tags.selectCategory')" />
                                 </SelectTrigger>
                                 <SelectContent>
-                                    <SelectItem value="none">未分类</SelectItem>
+                                    <SelectItem value="none">{{ t('tags.uncategorized') }}</SelectItem>
                                     <SelectItem v-for="cat in categories" :key="cat.value" :value="String(cat.value)">
                                         {{ cat.label }}
                                     </SelectItem>
                                 </SelectContent>
                             </Select>
-                            <p class="text-xs text-muted-foreground">决定这个标签在筛选和选择时归到哪一组</p>
+                            <p class="text-xs text-muted-foreground">{{ t('tags.categoryHint') }}</p>
                         </div>
 
                         <div class="grid gap-2">
-                            <label>颜色</label>
+                            <label>{{ t('tags.color') }}</label>
                             <div class="flex gap-2">
                                 <Input v-model="currentTag.color" type="color" class="w-12 p-1 h-10" />
                                 <Input v-model="currentTag.color" placeholder="#000000" />
@@ -500,8 +501,8 @@ const deleteCategory = async (id: number) => {
                     </div>
 
                     <DialogFooter>
-                        <Button variant="outline" @click="isDialogOpen = false">取消</Button>
-                        <Button :disabled="!currentTag.name?.trim()" @click="saveTag">保存</Button>
+                        <Button variant="outline" @click="isDialogOpen = false">{{ t('common.cancel') }}</Button>
+                        <Button :disabled="!currentTag.name?.trim()" @click="saveTag">{{ t('common.save') }}</Button>
                     </DialogFooter>
                 </DialogContent>
             </Dialog>

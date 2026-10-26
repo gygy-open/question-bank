@@ -59,7 +59,7 @@ describe('chat stream actions', () => {
     expect(actions[0].status).toBe('completed')
     expect(actions[1]).toMatchObject({
       status: 'error',
-      output: '连接提前中断，未收到工具执行结果',
+      output: 'chat.errors.toolInterrupted',
     })
   })
 

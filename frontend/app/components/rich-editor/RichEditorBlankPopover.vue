@@ -14,6 +14,8 @@ const props = defineProps<{
     anchorEl: HTMLElement | null
 }>()
 
+const { t } = useI18n()
+
 const emit = defineEmits<{
     update: [number]
     delete: []
@@ -21,10 +23,10 @@ const emit = defineEmits<{
 }>()
 
 /** 长度预设：短 / 中 / 长（em）。 */
-const PRESETS: { label: string; value: number }[] = [
-    { label: '短', value: 2 },
-    { label: '中', value: 4 },
-    { label: '长', value: 8 },
+const PRESETS: { labelKey: string; value: number }[] = [
+    { labelKey: 'richEditor.blank.presets.short', value: 2 },
+    { labelKey: 'richEditor.blank.presets.medium', value: 4 },
+    { labelKey: 'richEditor.blank.presets.long', value: 8 },
 ]
 
 const popoverRef = ref<HTMLElement | null>(null)
@@ -133,7 +135,7 @@ onBeforeUnmount(() => {
             :style="posStyle"
         >
             <div class="mb-2 flex items-center justify-between">
-                <span class="text-xs text-muted-foreground">填空长度</span>
+                <span class="text-xs text-muted-foreground">{{ t('richEditor.blank.width') }}</span>
                 <div class="flex items-center gap-1">
                     <input
                         type="number"
@@ -168,7 +170,7 @@ onBeforeUnmount(() => {
                         @pointerdown.prevent
                         @click="setWidth(preset.value)"
                     >
-                        {{ preset.label }}
+                        {{ t(preset.labelKey) }}
                     </Button>
                 </div>
                 <Button
@@ -179,7 +181,7 @@ onBeforeUnmount(() => {
                     @pointerdown.prevent
                     @click="emit('delete')"
                 >
-                    删除
+                    {{ t('common.delete') }}
                 </Button>
             </div>
         </div>

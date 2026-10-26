@@ -12,6 +12,7 @@ if (typeof window !== 'undefined') {
 }
 
 const props = defineProps(nodeViewProps)
+const { t } = useI18n()
 
 const isBlock = computed(() => props.node.type.name === 'blockMath')
 const latex = computed<string>(() => (props.node.attrs.latex as string) || '')
@@ -126,7 +127,7 @@ onMounted(() => {
         />
         <span v-else class="rich-math__display" @click="startEdit">
             <span v-if="latex" v-html="rendered" />
-            <span v-else class="rich-math__placeholder">点击输入公式</span>
+            <span v-else class="rich-math__placeholder">{{ t('richEditor.math.placeholder') }}</span>
         </span>
     </NodeViewWrapper>
 </template>

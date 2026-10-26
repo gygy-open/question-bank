@@ -35,11 +35,12 @@ const model = defineModel<RichDoc>({ default: null })
 const props = withDefaults(
     defineProps<{ placeholder?: string; allowBlank?: boolean }>(),
     {
-        placeholder: '输入内容，或输入 “/” 唤起命令菜单…',
+        placeholder: undefined,
         allowBlank: false,
     },
 )
 
+const { t } = useI18n()
 const { uploadImage } = useImageUpload()
 const imagePickerOpen = ref(false)
 
@@ -234,7 +235,8 @@ const editor = useEditor({
         }),
         ResetFormatOnEnter,
         Placeholder.configure({
-            placeholder: props.placeholder,
+            // 用函数形式，切换语言后下次重绘即取到新文案。
+            placeholder: () => props.placeholder ?? t('richEditor.placeholder'),
             showOnlyCurrent: false,
         }),
         SlashCommand.configure({
@@ -316,16 +318,16 @@ watch(model, (value) => {
             <DragHandle v-if="editor" :editor="editor" class="rich-editor__drag-handle" :on-node-change="onHandleNodeChange">
                 <DropdownMenu>
                     <DropdownMenuTrigger as-child>
-                        <button type="button" class="flex size-full items-center justify-center" aria-label="块操作">
+                        <button type="button" class="flex size-full items-center justify-center" :aria-label="t('richEditor.blockActions')">
                             <GripVertical class="size-4 text-muted-foreground" />
                         </button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="start" side="bottom" class="w-40">
                         <DropdownMenuItem @click="duplicateHandleNode">
-                            <Copy class="mr-2 size-4" />复制
+                            <Copy class="mr-2 size-4" />{{ t('common.copy') }}
                         </DropdownMenuItem>
                         <DropdownMenuItem class="text-destructive focus:text-destructive" @click="deleteHandleNode">
-                            <Trash2 class="mr-2 size-4" />删除
+                            <Trash2 class="mr-2 size-4" />{{ t('common.delete') }}
                         </DropdownMenuItem>
                     </DropdownMenuContent>
                 </DropdownMenu>

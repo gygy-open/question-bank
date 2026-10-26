@@ -7,6 +7,7 @@ import {
   hasOptionPool,
   validateQuestionDraft,
 } from '@/lib/questionModel'
+import { translate } from '@/lib/locale'
 
 type Visibility = 'public' | 'private'
 
@@ -109,7 +110,7 @@ export function validateMembers(entries: MemberEntry[], meta: BundleMeta): strin
   for (const [index, entry] of entries.entries()) {
     if (!isBodyDirty(entry) && !meta.syncMembers) continue
     const error = validateQuestionDraft({ ...entry.draft, ...effectiveMeta(entry, meta) })
-    if (error) return `第 ${index + 1} 小题：${error}`
+    if (error) return translate('stimuli.memberError', { index: index + 1, error })
   }
   return null
 }

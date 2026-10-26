@@ -7,6 +7,7 @@ definePageMeta({
   layout: 'empty',
 })
 
+const { t } = useI18n()
 const { $api } = useNuxtApp()
 const router = useRouter()
 
@@ -72,9 +73,9 @@ async function testConnection() {
   try {
     await $api('/setup/test-db', { method: 'POST', body: dbPayload() })
     testPassed.value = true
-    toast.success('数据库连接成功')
+    toast.success(t('setup.toast.dbConnected'))
   } catch (e: any) {
-    toast.error(e?.data?.detail || '连接失败')
+    toast.error(e?.data?.detail || t('setup.toast.connectFailed'))
   } finally {
     testing.value = false
   }
@@ -82,16 +83,16 @@ async function testConnection() {
 
 async function configureDatabase() {
   if (dbType.value === 'mysql' && !testPassed.value) {
-    toast.error('请先测试 MySQL 连接')
+    toast.error(t('setup.toast.testMysqlFirst'))
     return
   }
   submitting.value = true
   try {
     await $api('/setup/database', { method: 'POST', body: dbPayload() })
-    toast.success('数据库已就绪')
+    toast.success(t('setup.toast.dbReady'))
     step.value = 2
   } catch (e: any) {
-    toast.error(e?.data?.detail || '数据库初始化失败')
+    toast.error(e?.data?.detail || t('setup.toast.dbInitFailed'))
   } finally {
     submitting.value = false
   }
@@ -99,15 +100,15 @@ async function configureDatabase() {
 
 async function createAdmin() {
   if (admin.username.trim().length < 1) {
-    toast.error('请输入管理员用户名')
+    toast.error(t('setup.toast.usernameRequired'))
     return
   }
   if (admin.password.length < 6) {
-    toast.error('密码至少 6 位')
+    toast.error(t('setup.toast.passwordMin', { min: 6 }))
     return
   }
   if (admin.password !== admin.confirm) {
-    toast.error('两次输入的密码不一致')
+    toast.error(t('setup.toast.passwordMismatch'))
     return
   }
   submitting.value = true
@@ -119,10 +120,10 @@ async function createAdmin() {
         password: admin.password,
       },
     })
-    toast.success('初始化完成，请登录')
+    toast.success(t('setup.toast.done'))
     router.replace('/login')
   } catch (e: any) {
-    toast.error(e?.data?.detail || '初始化失败')
+    toast.error(e?.data?.detail || t('setup.toast.initFailed'))
   } finally {
     submitting.value = false
   }
@@ -136,9 +137,9 @@ async function createAdmin() {
         <div class="flex justify-center mb-2">
           <img src="/logo.svg" alt="Logo" class="h-14 w-auto" />
         </div>
-        <CardTitle class="text-2xl text-center">系统初始化</CardTitle>
+        <CardTitle class="text-2xl text-center">{{ t('setup.title') }}</CardTitle>
         <CardDescription class="text-center">
-          {{ dbPreconfigured ? '数据库已就绪，请创建首个管理员账号' : '首次使用，请完成数据库与管理员账号配置' }}
+          {{ dbPreconfigured ? t('setup.descriptionDbReady') : t('setup.description') }}
         </CardDescription>
 
         <!-- 步骤指示 -->
@@ -151,7 +152,7 @@ async function createAdmin() {
               <Check v-if="step > 1" class="h-4 w-4" />
               <template v-else>1</template>
             </span>
-            <span class="text-sm" :class="step >= 1 ? 'font-medium' : 'text-muted-foreground'">数据库</span>
+            <span class="text-sm" :class="step >= 1 ? 'font-medium' : 'text-muted-foreground'">{{ t('setup.steps.database') }}</span>
           </div>
           <Separator class="w-8 shrink-0 data-[orientation=horizontal]:w-8" />
           <div class="flex items-center gap-2">
@@ -159,7 +160,7 @@ async function createAdmin() {
               class="flex h-7 w-7 items-center justify-center rounded-full text-sm"
               :class="step >= 2 ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground'"
             >2</span>
-            <span class="text-sm" :class="step >= 2 ? 'font-medium' : 'text-muted-foreground'">管理员</span>
+            <span class="text-sm" :class="step >= 2 ? 'font-medium' : 'text-muted-foreground'">{{ t('setup.steps.admin') }}</span>
           </div>
         </div>
       </CardHeader>
@@ -180,7 +181,7 @@ async function createAdmin() {
             >
               <HardDrive class="h-5 w-5" />
               <span class="font-medium">SQLite</span>
-              <span class="text-xs text-muted-foreground">单机 / 零配置，推荐个人使用</span>
+              <span class="text-xs text-muted-foreground">{{ t('setup.sqliteHint') }}</span>
             </button>
             <button
               type="button"
@@ -190,7 +191,7 @@ async function createAdmin() {
             >
               <Server class="h-5 w-5" />
               <span class="font-medium">MySQL</span>
-              <span class="text-xs text-muted-foreground">内网团队共享，多人协作</span>
+              <span class="text-xs text-muted-foreground">{{ t('setup.mysqlHint') }}</span>
             </button>
           </div>
 
@@ -198,25 +199,25 @@ async function createAdmin() {
           <div v-if="dbType === 'mysql'" class="grid gap-3 rounded-lg border p-4">
             <div class="grid grid-cols-3 gap-3">
               <div class="col-span-2 grid gap-1.5">
-                <Label>主机</Label>
+                <Label>{{ t('setup.mysql.host') }}</Label>
                 <Input v-model="mysql.host" placeholder="localhost" />
               </div>
               <div class="grid gap-1.5">
-                <Label>端口</Label>
+                <Label>{{ t('setup.mysql.port') }}</Label>
                 <Input v-model.number="mysql.port" type="number" placeholder="3306" />
               </div>
             </div>
             <div class="grid gap-1.5">
-              <Label>数据库名</Label>
+              <Label>{{ t('setup.mysql.database') }}</Label>
               <Input v-model="mysql.database" placeholder="question_bank" />
             </div>
             <div class="grid grid-cols-2 gap-3">
               <div class="grid gap-1.5">
-                <Label>用户名</Label>
+                <Label>{{ t('setup.mysql.user') }}</Label>
                 <Input v-model="mysql.user" placeholder="question_bank" />
               </div>
               <div class="grid gap-1.5">
-                <Label>密码</Label>
+                <Label>{{ t('setup.mysql.password') }}</Label>
                 <Input v-model="mysql.password" type="password" placeholder="******" />
               </div>
             </div>
@@ -224,33 +225,33 @@ async function createAdmin() {
               <Loader2 v-if="testing" class="mr-2 h-4 w-4 animate-spin" />
               <Check v-else-if="testPassed" class="mr-2 h-4 w-4 text-green-600" />
               <Database v-else class="mr-2 h-4 w-4" />
-              测试连接
+              {{ t('setup.mysql.test') }}
             </Button>
           </div>
 
           <Button type="button" class="w-full" :disabled="submitting" @click="configureDatabase">
             <Loader2 v-if="submitting" class="mr-2 h-4 w-4 animate-spin" />
-            {{ dbType === 'sqlite' ? '直接开始' : '下一步' }}
+            {{ dbType === 'sqlite' ? t('setup.startNow') : t('setup.next') }}
           </Button>
         </div>
 
         <!-- 步骤 2：管理员账号 -->
         <div v-else class="grid gap-4">
           <div class="grid gap-1.5">
-            <Label>管理员用户名</Label>
+            <Label>{{ t('setup.admin.username') }}</Label>
             <Input v-model="admin.username" placeholder="admin" />
           </div>
           <div class="grid gap-1.5">
-            <Label>密码</Label>
-            <Input v-model="admin.password" type="password" placeholder="至少 6 位" />
+            <Label>{{ t('setup.admin.password') }}</Label>
+            <Input v-model="admin.password" type="password" :placeholder="t('setup.admin.passwordPlaceholder', { min: 6 })" />
           </div>
           <div class="grid gap-1.5">
-            <Label>确认密码</Label>
-            <Input v-model="admin.confirm" type="password" placeholder="再次输入密码" />
+            <Label>{{ t('setup.admin.confirm') }}</Label>
+            <Input v-model="admin.confirm" type="password" :placeholder="t('setup.admin.confirmPlaceholder')" />
           </div>
           <Button type="button" class="w-full" :disabled="submitting" @click="createAdmin">
             <Loader2 v-if="submitting" class="mr-2 h-4 w-4 animate-spin" />
-            完成初始化
+            {{ t('setup.finish') }}
           </Button>
         </div>
       </CardContent>

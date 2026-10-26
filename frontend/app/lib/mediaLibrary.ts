@@ -1,9 +1,10 @@
 import type { MediaAsset, MediaReferenceItem, MediaReplaceResult, MediaReplaceTarget } from '@/composables/useMedia'
+import { translate } from '@/lib/locale'
 
 const FORMAT_LABELS: Record<string, string> = { 'audio/mpeg': 'MP3', 'audio/mp4': 'M4A' }
 
 export function mediaName(asset: Pick<MediaAsset, 'id' | 'kind' | 'original_filename'>): string {
-    return asset.original_filename || `${asset.kind === 'audio' ? '音频' : '图片'} #${asset.id}`
+    return asset.original_filename || translate(asset.kind === 'audio' ? 'media.unnamedAudio' : 'media.unnamedImage', { id: asset.id })
 }
 
 export function mediaFormat(mime: string): string {
@@ -16,11 +17,17 @@ export function mediaDimension(asset: Pick<MediaAsset, 'kind' | 'width' | 'heigh
     return asset.width && asset.height ? `${asset.width}×${asset.height}` : '—'
 }
 
-export const MEDIA_OWNER_LABELS: Record<string, string> = {
-    question: '题目',
-    stimulus: '材料题',
-    composition: '稿件',
-    composition_version: '定稿版本',
+const MEDIA_OWNER_LABEL_KEYS: Record<string, string> = {
+    question: 'media.owner.question',
+    stimulus: 'media.owner.stimulus',
+    composition: 'media.owner.composition',
+    composition_version: 'media.owner.compositionVersion',
+}
+
+/** 引用方类型（后端 owner_type）的显示名；未知类型原样返回。 */
+export function mediaOwnerLabel(type: string): string {
+    const key = MEDIA_OWNER_LABEL_KEYS[type]
+    return key ? translate(key) : type
 }
 
 const OWNER_ORDER = ['question', 'stimulus', 'composition', 'composition_version']
@@ -46,7 +53,7 @@ export function mediaReferenceLink(ref: MediaReferenceItem): string | null {
 
 export function groupMediaReferences(items: MediaReferenceItem[]): { type: string; label: string; items: MediaReferenceItem[] }[] {
     return OWNER_ORDER
-        .map((type) => ({ type, label: MEDIA_OWNER_LABELS[type] ?? type, items: items.filter((i) => i.owner_type === type) }))
+        .map((type) => ({ type, label: mediaOwnerLabel(type), items: items.filter((i) => i.owner_type === type) }))
         .filter((group) => group.items.length > 0)
 }
 
@@ -77,8 +84,8 @@ export function referenceKey(item: { owner_type: string; owner_id: number }): st
 }
 
 export function replaceSummary(result: MediaReplaceResult): string {
-    const parts = [`已替换 ${result.replaced.length} 处引用`]
-    if (result.skipped) parts.push(`${result.skipped} 处无权修改未替换`)
-    if (result.frozen) parts.push(`${result.frozen} 个定稿版本保持原图`)
-    return parts.join('，')
+    let summary = translate('media.replace.summary', { count: result.replaced.length })
+    if (result.skipped) summary += translate('media.replace.summarySkipped', { count: result.skipped })
+    if (result.frozen) summary += translate('media.replace.summaryFrozen', { count: result.frozen })
+    return summary
 }

@@ -19,6 +19,8 @@ import {
 } from '@lucide/vue'
 import type { CompositionFolderNode } from '~/types/composition'
 
+const { t } = useI18n()
+
 defineProps<{
   nodes: CompositionFolderNode[]
   selectedId: number | null
@@ -79,17 +81,17 @@ const emit = defineEmits<{
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
             <DropdownMenuItem @click="emit('create-child', node.id)">
-              <FolderPlus class="mr-2 h-4 w-4" /> 新建子文件夹
+              <FolderPlus class="mr-2 h-4 w-4" /> {{ t('folders.createChild') }}
             </DropdownMenuItem>
             <DropdownMenuItem @click="emit('rename', node)">
-              <Pencil class="mr-2 h-4 w-4" /> 重命名
+              <Pencil class="mr-2 h-4 w-4" /> {{ t('folders.rename') }}
             </DropdownMenuItem>
             <DropdownMenuItem @click="emit('move', node)">
-              <FolderInput class="mr-2 h-4 w-4" /> 移动
+              <FolderInput class="mr-2 h-4 w-4" /> {{ t('folders.move') }}
             </DropdownMenuItem>
             <DropdownMenuSeparator />
             <DropdownMenuItem class="text-destructive" @click="emit('delete', node)">
-              <Trash2 class="mr-2 h-4 w-4" /> 删除
+              <Trash2 class="mr-2 h-4 w-4" /> {{ t('common.delete') }}
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>

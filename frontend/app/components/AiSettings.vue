@@ -11,6 +11,7 @@ import ConfirmDialog from '~/components/ai/ConfirmDialog.vue'
 import { Button } from '@/components/ui/button'
 import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from '@/components/ui/empty'
 
+const { t } = useI18n()
 const { $api } = useNuxtApp()
 const { notifyAIConfigChanged } = useGlobalChat()
 
@@ -32,7 +33,7 @@ const usage = computed(() => usageMap(saved.value))
 const rows = computed<AssignmentRow[]>(() => (['text', 'vision', 'embedding'] as Scene[]).map(scene => ({
   scene,
   options: modelsForScene(globalModels.value, scene),
-  emptyLabel: '不设置',
+  emptyLabel: t('aiModels.unset'),
 })))
 
 const fromActive = (c: ActiveAIConfig): Assignment => ({
@@ -51,19 +52,19 @@ const fetchData = async () => {
     saved.value = fromActive(active)
     if (!wasDirty) draft.value = { ...saved.value }
   } catch (e) {
-    toast.error('加载配置失败', { description: apiErrorMessage(e) })
+    toast.error(t('aiSettings.toast.loadFailed'), { description: apiErrorMessage(e) })
   } finally {
     loading.value = false
   }
 }
 
 const reindex = async () => {
-  const id = toast.loading('正在重建向量索引…')
+  const id = toast.loading(t('aiSettings.toast.reindexing'))
   try {
     const res = await $api<ReindexResult>('/knowledge-points/reindex-vectors', { method: 'POST' })
-    toast.success(`向量索引已重建（${res.reindexed} 条，用时 ${res.duration}s）`, { id })
+    toast.success(t('aiSettings.toast.reindexed', { count: res.reindexed, duration: res.duration }), { id })
   } catch (e) {
-    toast.error('重建索引失败', { id, description: `${apiErrorMessage(e)}。可稍后在“知识点”页面重试。` })
+    toast.error(t('aiSettings.toast.reindexFailed'), { id, description: t('aiSettings.toast.reindexFailedDescription', { error: apiErrorMessage(e) }) })
   }
 }
 
@@ -72,10 +73,10 @@ const save = async () => {
   const embeddingChanged = (draft.value.embedding ?? null) !== (saved.value.embedding ?? null)
   if (embeddingChanged && draft.value.embedding != null) {
     const r = await confirmRef.value?.ask({
-      title: '更换向量模型',
-      description: '不同向量模型生成的索引互不兼容。更换后需要重建知识点索引，否则相似题检索和知识点匹配会失效。\n重建会调用新模型处理所有知识点，可能需要一些时间。',
-      confirmLabel: '保存并重建索引',
-      altLabel: '仅保存',
+      title: t('aiSettings.changeEmbedding.title'),
+      description: t('aiSettings.changeEmbedding.description'),
+      confirmLabel: t('aiSettings.changeEmbedding.confirm'),
+      altLabel: t('aiSettings.changeEmbedding.saveOnly'),
     })
     if (!r || r === 'cancel') return
     rebuild = r === 'confirm'
@@ -93,9 +94,9 @@ const save = async () => {
     })
     saved.value = { ...draft.value }
     notifyAIConfigChanged()
-    toast.success('已保存')
+    toast.success(t('common.saved'))
   } catch (e) {
-    toast.error('保存失败', { description: apiErrorMessage(e) })
+    toast.error(t('common.saveFailed'), { description: apiErrorMessage(e) })
     return
   } finally {
     saving.value = false
@@ -105,7 +106,7 @@ const save = async () => {
 
 /** 新服务商加好后，为还没配置的场景预选模型（只改草稿，由管理员确认保存）。 */
 const onCreated = async (provider: AIProvider) => {
-  toast.success(`已添加“${provider.name}”`)
+  toast.success(t('aiSettings.toast.providerAdded', { name: provider.name }))
   await fetchData()
   const fresh = flattenModels([provider])
   const picks: string[] = []
@@ -120,7 +121,7 @@ const onCreated = async (provider: AIProvider) => {
   }
   if (picks.length) {
     draft.value = next
-    toast.info('已为未配置的场景预选了模型，请在上方确认后保存')
+    toast.info(t('aiSettings.toast.prefilled'))
   }
 }
 
@@ -135,8 +136,8 @@ onMounted(fetchData)
   <div v-else class="space-y-10">
     <section>
       <div class="mb-3">
-        <h3 class="text-lg font-semibold">当前在用</h3>
-        <p class="text-sm text-muted-foreground">各项功能默认使用的模型，对所有用户生效。用户也可以在“我的 AI 模型”里改用自己的服务商。</p>
+        <h3 class="text-lg font-semibold">{{ t('aiSettings.current.title') }}</h3>
+        <p class="text-sm text-muted-foreground">{{ t('aiSettings.current.globalDescription') }}</p>
       </div>
       <ModelAssignmentPanel
         v-model="draft"
@@ -152,22 +153,22 @@ onMounted(fetchData)
     <section>
       <div class="mb-3 flex items-end justify-between gap-4">
         <div>
-          <h3 class="text-lg font-semibold">全局服务商</h3>
-          <p class="text-sm text-muted-foreground">由管理员维护，所有用户都可以使用。</p>
+          <h3 class="text-lg font-semibold">{{ t('aiSettings.globalProviders.title') }}</h3>
+          <p class="text-sm text-muted-foreground">{{ t('aiSettings.globalProviders.description') }}</p>
         </div>
         <Button v-if="globalProviders.length" @click="wizardOpen = true">
-          <Plus class="mr-2 h-4 w-4" />添加服务商
+          <Plus class="mr-2 h-4 w-4" />{{ t('aiProviders.add') }}
         </Button>
       </div>
 
       <Empty v-if="!globalProviders.length" class="border border-dashed">
         <EmptyHeader>
           <EmptyMedia variant="icon"><Server /></EmptyMedia>
-          <EmptyTitle>还没有接入 AI 服务商</EmptyTitle>
-          <EmptyDescription>接入后即可使用 AI 对话、文档题目抽取、图片识别和知识点匹配。</EmptyDescription>
+          <EmptyTitle>{{ t('aiSettings.empty.title') }}</EmptyTitle>
+          <EmptyDescription>{{ t('aiSettings.empty.description') }}</EmptyDescription>
         </EmptyHeader>
         <EmptyContent>
-          <Button @click="wizardOpen = true"><Plus class="mr-2 h-4 w-4" />添加服务商</Button>
+          <Button @click="wizardOpen = true"><Plus class="mr-2 h-4 w-4" />{{ t('aiProviders.add') }}</Button>
         </EmptyContent>
       </Empty>
       <ProviderList v-else :providers="globalProviders" scope="global" :usage="usage" @changed="fetchData" />
@@ -175,8 +176,8 @@ onMounted(fetchData)
 
     <section v-if="personalProviders.length">
       <div class="mb-3">
-        <h3 class="text-lg font-semibold">用户个人服务商</h3>
-        <p class="text-sm text-muted-foreground">用户自行接入、仅供本人使用。你可以查看和删除，但看不到 API Key。</p>
+        <h3 class="text-lg font-semibold">{{ t('aiSettings.userProviders.title') }}</h3>
+        <p class="text-sm text-muted-foreground">{{ t('aiSettings.userProviders.description') }}</p>
       </div>
       <ProviderList :providers="personalProviders" scope="global" review @changed="fetchData" />
     </section>

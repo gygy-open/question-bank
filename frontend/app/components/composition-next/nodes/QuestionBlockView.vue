@@ -14,7 +14,7 @@ import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { Trash2, Eye, Maximize2, Ellipsis, AlertTriangle, RefreshCw, Columns3 } from '@lucide/vue'
-import { questionTypeLabel } from '@/lib/answerFormat'
+import { questionTypeDisplayLabel } from '@/lib/answerFormat'
 import {
   effectiveQuestionField, questionNodeStatus, questionNumberOf, questionOptionLayoutOf,
   questionPropsWithNumber, questionPropsWithOptionLayout, questionPropsWithScore,
@@ -67,7 +67,7 @@ const shim = computed(() => ({ props: qProps.value }) as unknown as EditorNode)
 
 const { t } = useI18n()
 
-const typeLabel = computed(() => (snapshot.value ? questionTypeLabel(snapshot.value.q_type) : t('compositionNodes.question.fallbackType')))
+const typeLabel = computed(() => (snapshot.value ? questionTypeDisplayLabel(snapshot.value.q_type) : t('compositionNodes.question.fallbackType')))
 
 function setProps(next: QuestionProps) {
   props.updateAttributes({ props: Object.keys(next).length ? next : null })

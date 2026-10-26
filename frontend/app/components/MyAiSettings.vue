@@ -9,6 +9,7 @@ import ProviderWizard from '~/components/ai/ProviderWizard.vue'
 import { Button } from '@/components/ui/button'
 import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from '@/components/ui/empty'
 
+const { t } = useI18n()
 const { $api } = useNuxtApp()
 const { notifyAIConfigChanged } = useGlobalChat()
 
@@ -36,11 +37,11 @@ const globalLabel = (scene: Scene): string | null => {
 const rows = computed<AssignmentRow[]>(() => SCENES_HERE.map(scene => ({
   scene,
   options: modelsForScene(models.value, scene),
-  emptyLabel: '跟随全局默认',
+  emptyLabel: t('aiModels.followGlobal'),
   fallbackLabel: globalLabel(scene),
   description: scene === 'text'
-    ? '你的 AI 对话默认模型，以及你发起的文档导入、知识点匹配所用的模型。'
-    : '你上传图片识别题目时使用的模型。',
+    ? t('aiSettings.my.textDescription')
+    : t('aiSettings.my.visionDescription'),
 })))
 
 const fromPref = (p: UserAIPreference): Assignment => ({ text: p.text_model_id, vision: p.vision_model_id })
@@ -59,7 +60,7 @@ const fetchData = async () => {
     saved.value = fromPref(pref)
     if (!wasDirty) draft.value = { ...saved.value }
   } catch (e) {
-    toast.error('加载失败', { description: apiErrorMessage(e) })
+    toast.error(t('aiSettings.toast.loadFailedShort'), { description: apiErrorMessage(e) })
   } finally {
     loading.value = false
   }
@@ -75,9 +76,9 @@ const save = async () => {
     saved.value = fromPref(pref)
     draft.value = { ...saved.value }
     notifyAIConfigChanged()
-    toast.success('已保存')
+    toast.success(t('common.saved'))
   } catch (e) {
-    toast.error('保存失败', { description: apiErrorMessage(e) })
+    toast.error(t('common.saveFailed'), { description: apiErrorMessage(e) })
   } finally {
     saving.value = false
   }
@@ -85,7 +86,7 @@ const save = async () => {
 
 /** 用户加自己的服务商，多半就是想用它：预选为默认，由用户确认保存。 */
 const onCreated = async (provider: AIProvider) => {
-  toast.success(`已添加“${provider.name}”`)
+  toast.success(t('aiSettings.toast.providerAdded', { name: provider.name }))
   await fetchData()
   const fresh = flattenModels([provider])
   const next = { ...draft.value }
@@ -100,7 +101,7 @@ const onCreated = async (provider: AIProvider) => {
   }
   if (picked) {
     draft.value = next
-    toast.info('已预选为你的默认模型，请在上方确认后保存')
+    toast.info(t('aiSettings.toast.prefilledMine'))
   }
 }
 
@@ -115,8 +116,8 @@ onMounted(fetchData)
   <div v-else class="space-y-10">
     <section>
       <div class="mb-3">
-        <h3 class="text-lg font-semibold">我的默认模型</h3>
-        <p class="text-sm text-muted-foreground">默认跟随管理员的全局设置。也可以改选其他全局模型，或你自己接入的模型。只影响你本人。</p>
+        <h3 class="text-lg font-semibold">{{ t('aiSettings.my.defaultTitle') }}</h3>
+        <p class="text-sm text-muted-foreground">{{ t('aiSettings.my.defaultDescription') }}</p>
       </div>
       <ModelAssignmentPanel
         v-model="draft"
@@ -127,30 +128,30 @@ onMounted(fetchData)
         @save="save"
         @reset="draft = { ...saved }"
       />
-      <p class="mt-2 text-xs text-muted-foreground">相似题检索使用的向量模型由管理员统一设置。</p>
+      <p class="mt-2 text-xs text-muted-foreground">{{ t('aiSettings.my.embeddingNote') }}</p>
     </section>
 
     <section>
       <div class="mb-3 flex items-end justify-between gap-4">
         <div>
-          <h3 class="text-lg font-semibold">我的服务商</h3>
-          <p class="text-sm text-muted-foreground">使用你自己的 API Key，费用计入你自己的账户。</p>
+          <h3 class="text-lg font-semibold">{{ t('aiSettings.my.providersTitle') }}</h3>
+          <p class="text-sm text-muted-foreground">{{ t('aiSettings.my.providersDescription') }}</p>
         </div>
         <Button v-if="myProviders.length" @click="wizardOpen = true">
-          <Plus class="mr-2 h-4 w-4" />添加服务商
+          <Plus class="mr-2 h-4 w-4" />{{ t('aiProviders.add') }}
         </Button>
       </div>
 
       <Empty v-if="!myProviders.length" class="border border-dashed">
         <EmptyHeader>
           <EmptyMedia variant="icon"><KeyRound /></EmptyMedia>
-          <EmptyTitle>还没有自己的服务商</EmptyTitle>
+          <EmptyTitle>{{ t('aiSettings.my.emptyTitle') }}</EmptyTitle>
           <EmptyDescription>
-            不添加也可以直接使用管理员配置的模型。如果想用自己的账号（例如自己购买的 DeepSeek 额度或更强的模型），可以在这里接入。
+            {{ t('aiSettings.my.emptyDescription') }}
           </EmptyDescription>
         </EmptyHeader>
         <EmptyContent>
-          <Button variant="outline" @click="wizardOpen = true"><Plus class="mr-2 h-4 w-4" />接入我的服务商</Button>
+          <Button variant="outline" @click="wizardOpen = true"><Plus class="mr-2 h-4 w-4" />{{ t('aiSettings.my.connect') }}</Button>
         </EmptyContent>
       </Empty>
       <ProviderList v-else :providers="myProviders" scope="personal" :usage="usage" @changed="fetchData" />

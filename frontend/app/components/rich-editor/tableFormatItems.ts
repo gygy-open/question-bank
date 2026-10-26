@@ -17,19 +17,19 @@ export function getTableFormatItemGroups(editor: Editor): ToolbarItem[][] {
     return [
         [
             {
-                label: '上方插入行',
+                labelKey: 'richEditor.table.addRowBefore',
                 icon: ArrowUpToLine,
                 action: () => editor.chain().focus().addRowBefore().run(),
                 disabled: () => !editor.can().addRowBefore(),
             },
             {
-                label: '下方插入行',
+                labelKey: 'richEditor.table.addRowAfter',
                 icon: ArrowDownToLine,
                 action: () => editor.chain().focus().addRowAfter().run(),
                 disabled: () => !editor.can().addRowAfter(),
             },
             {
-                label: '删除行',
+                labelKey: 'richEditor.table.deleteRow',
                 icon: Trash2,
                 action: () => editor.chain().focus().deleteRow().run(),
                 disabled: () => !editor.can().deleteRow(),
@@ -37,19 +37,19 @@ export function getTableFormatItemGroups(editor: Editor): ToolbarItem[][] {
         ],
         [
             {
-                label: '左侧插入列',
+                labelKey: 'richEditor.table.addColumnBefore',
                 icon: ArrowLeftToLine,
                 action: () => editor.chain().focus().addColumnBefore().run(),
                 disabled: () => !editor.can().addColumnBefore(),
             },
             {
-                label: '右侧插入列',
+                labelKey: 'richEditor.table.addColumnAfter',
                 icon: ArrowRightToLine,
                 action: () => editor.chain().focus().addColumnAfter().run(),
                 disabled: () => !editor.can().addColumnAfter(),
             },
             {
-                label: '删除列',
+                labelKey: 'richEditor.table.deleteColumn',
                 icon: Trash2,
                 action: () => editor.chain().focus().deleteColumn().run(),
                 disabled: () => !editor.can().deleteColumn(),
@@ -57,13 +57,13 @@ export function getTableFormatItemGroups(editor: Editor): ToolbarItem[][] {
         ],
         [
             {
-                label: '合并单元格',
+                labelKey: 'richEditor.table.mergeCells',
                 icon: TableCellsMerge,
                 action: () => editor.chain().focus().mergeCells().run(),
                 disabled: () => !editor.can().mergeCells(),
             },
             {
-                label: '拆分单元格',
+                labelKey: 'richEditor.table.splitCell',
                 icon: TableCellsSplit,
                 action: () => editor.chain().focus().splitCell().run(),
                 disabled: () => !editor.can().splitCell(),
@@ -71,17 +71,17 @@ export function getTableFormatItemGroups(editor: Editor): ToolbarItem[][] {
         ],
         [
             {
-                label: '切换表头行',
+                labelKey: 'richEditor.table.toggleHeaderRow',
                 icon: PanelTopDashed,
                 action: () => editor.chain().focus().toggleHeaderRow().run(),
             },
             {
-                label: '切换表头列',
+                labelKey: 'richEditor.table.toggleHeaderColumn',
                 icon: PanelLeftDashed,
                 action: () => editor.chain().focus().toggleHeaderColumn().run(),
             },
             {
-                label: '删除表格',
+                labelKey: 'richEditor.table.deleteTable',
                 icon: Trash2,
                 action: () => editor.chain().focus().deleteTable().run(),
             },

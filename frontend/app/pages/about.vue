@@ -10,6 +10,7 @@ definePageMeta({
   layout: 'default',
 })
 
+const { t } = useI18n()
 const { user } = useAuth()
 const isSuperuser = computed(() => !!user.value?.is_superuser)
 
@@ -20,9 +21,10 @@ const REPO_URL = 'https://github.com/gygy-open/question-bank'
 const ISSUE_URL = `${REPO_URL}/issues/new`
 
 // 手动维护的共创者名单：名字 + 一句致敬描述
-const contributors: { name: string; note: string; url?: string }[] = [
-  { name: 'Xuemei Wang', note: '没有她就没有这个项目' },
-  { name: '寻梦', note: '他以优质的反馈和建议鞭策项目不断完善' },
+// note 存 i18n key，展示时再 t()
+const contributors: { name: string; noteKey: string; url?: string }[] = [
+  { name: 'Xuemei Wang', noteKey: 'about.contributors.xuemeiWang' },
+  { name: '寻梦', noteKey: 'about.contributors.xunmeng' },
 ]
 
 // 精选的核心开源依赖（完整清单见 package.json / pyproject.toml）
@@ -51,11 +53,11 @@ const ossCredits: { name: string; license: string; url: string }[] = [
 const handleCheckUpdate = async () => {
   await checkUpdate(true)
   if (updateState.value.error) {
-    toast.error('检查更新失败', { description: updateState.value.error })
+    toast.error(t('about.toast.checkFailed'), { description: updateState.value.error })
   } else if (updateState.value.hasUpdate) {
     window.open(updateState.value.releaseUrl, '_blank')
   } else {
-    toast.success('已是最新版本', { description: `当前版本 v${updateState.value.current}` })
+    toast.success(t('about.upToDate'), { description: t('about.currentVersion', { version: updateState.value.current }) })
   }
 }
 
@@ -74,39 +76,39 @@ onMounted(async () => {
     <div class="absolute top-0 left-1/2 h-[300px] w-[600px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-primary/15 blur-[100px] dark:bg-primary/20"></div>
   </div>
 
-  <PageHeader title="关于" class="relative z-10" />
+  <PageHeader :title="t('about.title')" class="relative z-10" />
 
   <div class="relative z-10 mx-auto w-full max-w-3xl space-y-10 p-4 sm:p-6 lg:p-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
     <!-- Hero 区域：增加微小的间距调整和副标题变淡，突出按钮层次 -->
     <section class="flex flex-col items-center gap-4 py-8 text-center">
       <div class="relative shadow-sm rounded-2xl bg-white dark:bg-zinc-900 p-3 ring-1 ring-zinc-200 dark:ring-zinc-800">
-        <img src="/logo.svg" alt="题库系统" class="size-14" />
+        <img src="/logo.svg" :alt="t('app.name')" class="size-14" />
       </div>
       <div class="space-y-2 mt-2">
         <h1 class="text-3xl font-extrabold tracking-tight bg-gradient-to-br from-foreground to-foreground/60 bg-clip-text text-transparent">
-            QuestionBank 题库系统
+            {{ t('about.productName') }}
         </h1>
         <p class="text-muted-foreground/80 max-w-md text-base leading-relaxed mx-auto">
-          AI 原生的题库系统
+          {{ t('about.tagline') }}
         </p>
       </div>
       <p class="text-muted-foreground text-sm font-medium bg-secondary/40 px-3 py-1 rounded-full">
-        当前版本 v{{ localVersion }}
+        {{ t('about.currentVersion', { version: localVersion }) }}
       </p>
       <div class="flex flex-wrap items-center justify-center gap-3 pt-4">
         <Button v-if="isSuperuser" variant="default" class="rounded-full px-6 shadow-md" @click="handleCheckUpdate">
           <Download v-if="updateState.hasUpdate" class="mr-2 h-4 w-4" />
           <RefreshCw v-else class="mr-2 h-4 w-4" :class="updateState.checking ? 'animate-spin' : ''" />
-          {{ updateState.hasUpdate ? `下载新版本 v${updateState.latest}` : '检查更新' }}
+          {{ updateState.hasUpdate ? t('about.downloadNew', { version: updateState.latest }) : t('about.checkUpdate') }}
         </Button>
         <Button v-else variant="secondary" disabled class="rounded-full px-6 opacity-80">
           <Download v-if="updateState.hasUpdate" class="mr-2 h-4 w-4" />
           <RefreshCw v-else class="mr-2 h-4 w-4" :class="updateState.checking ? 'animate-spin' : ''" />
-          {{ updateState.hasUpdate ? `发现新版 v${updateState.latest} · 请联系管理员更新` : (updateState.checking ? '检查版本中...' : '已是最新版本') }}
+          {{ updateState.hasUpdate ? t('about.newVersionContactAdmin', { version: updateState.latest }) : (updateState.checking ? t('about.checking') : t('about.upToDate')) }}
         </Button>
         <Button variant="outline" class="rounded-full px-5" as-child>
           <a :href="ISSUE_URL" target="_blank" rel="noopener noreferrer">
-            <Bug class="mr-2 h-4 w-4 text-orange-500" /> 反馈问题
+            <Bug class="mr-2 h-4 w-4 text-orange-500" /> {{ t('about.feedback') }}
           </a>
         </Button>
         <Button variant="ghost" class="rounded-full px-5" as-child>
@@ -122,8 +124,8 @@ onMounted(async () => {
       <!-- 鸣谢标题改为居中对齐，维持和顶部 Hero 的中轴对称 -->
       <div class="flex flex-col items-center justify-center gap-1 mb-8 text-center">
         <Heart class="h-6 w-6 text-primary/80 mb-1 fill-primary/10 dark:fill-primary/20" />
-        <h2 class="text-xl font-bold tracking-tight">特别鸣谢</h2>
-        <p class="text-sm text-muted-foreground">感谢陪伴本项目成长并默默付出的每一位朋友</p>
+        <h2 class="text-xl font-bold tracking-tight">{{ t('about.thanksTitle') }}</h2>
+        <p class="text-sm text-muted-foreground">{{ t('about.thanksDescription') }}</p>
       </div>
       
       <div class="grid gap-4 sm:grid-cols-2">
@@ -151,7 +153,7 @@ onMounted(async () => {
             </span>
             
             <p class="text-sm text-muted-foreground/80 leading-relaxed font-medium">
-              {{ c.note }}
+              {{ t(c.noteKey) }}
             </p>
           </div>
         </div>
@@ -162,7 +164,7 @@ onMounted(async () => {
     <section class="rounded-[20px] border border-border/50 bg-background/50 p-6 mt-8">
       <div class="flex items-center justify-center gap-2 mb-6">
         <Package class="h-4 w-4 text-muted-foreground" />
-        <h2 class="font-semibold">开源基石</h2>
+        <h2 class="font-semibold">{{ t('about.ossTitle') }}</h2>
       </div>
       <div class="flex flex-wrap justify-center gap-2.5">
         <a
@@ -178,7 +180,7 @@ onMounted(async () => {
         </a>
       </div>
       <p class="mt-8 text-[11px] text-muted-foreground/60 flex items-center justify-center border-t pt-4">
-        本项目以 AGPL-3.0 许可开源，感谢开源社区的无私贡献。
+        {{ t('about.license') }}
       </p>
     </section>
   </div>

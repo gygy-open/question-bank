@@ -78,6 +78,7 @@ const emit = defineEmits<{
   (e: 'save', question: ImportDraft): void
 }>()
 
+const { t } = useI18n()
 const { $api } = useNuxtApp()
 
 const isImportMode = computed(() => props.mode === 'import')
@@ -169,7 +170,7 @@ const initialDraft = ref('')
 watch(() => props.question, () => { initialDraft.value = JSON.stringify(draft.value) }, { immediate: true })
 watch(() => props.open, (isOpen) => { if (isOpen) initialDraft.value = JSON.stringify(draft.value) })
 
-const title = computed(() => (props.mode === 'edit' ? '编辑题目' : '新增题目'))
+const title = computed(() => (props.mode === 'edit' ? t('questionEditor.editTitle') : t('questionEditor.createTitle')))
 
 const canConvertToStimulus = computed(() => {
   const question = props.question as Partial<Question> | null | undefined
@@ -178,7 +179,7 @@ const canConvertToStimulus = computed(() => {
 const stimulusPickerOpen = ref(false)
 const joinStimulus = async (stimulusId: number | null) => {
   if (draft.value && JSON.stringify(draft.value) !== initialDraft.value
-    && !window.confirm('本题有未保存的修改，继续将丢弃这些修改。确定继续吗？')) return
+    && !window.confirm(t('questionEditor.discardConfirm'))) return
   const questionId = String((props.question as Partial<Question>).id)
   emit('update:open', false)
   await navigateTo(stimulusId == null
@@ -216,7 +217,7 @@ const handlePublish = async () => {
     emit('update:open', false)
   } catch (err: unknown) {
     console.error(err)
-    toast.error('保存失败', { description: err instanceof Error ? err.message : undefined })
+    toast.error(t('common.saveFailed'), { description: err instanceof Error ? err.message : undefined })
   } finally {
     isSubmitting.value = false
   }
@@ -236,7 +237,7 @@ const onInteractOutside = (event: Event) => {
 // --- tags (db mode only) ---
 const selectedTags = computed(() => {
   if (!tags.value || !draft.value) return []
-  return tags.value.filter(t => draft.value!.tag_ids.includes(t.id))
+  return tags.value.filter(tag => draft.value!.tag_ids.includes(tag.id))
 })
 const toggleTag = (tagId: number) => {
   if (!draft.value) return
@@ -256,28 +257,28 @@ const toggleTag = (tagId: number) => {
       <div class="flex w-full flex-col bg-background min-h-screen lg:h-full">
         <!-- Header -->
         <div class="sticky top-0 z-50 flex items-center justify-between border-b border-border/50 px-6 py-4 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80 lg:static lg:bg-background">
-          <DialogTitle class="text-lg">{{ isImportMode ? '编辑导入题目' : title }}</DialogTitle>
+          <DialogTitle class="text-lg">{{ isImportMode ? t('questionEditor.importTitle') : title }}</DialogTitle>
           <div class="flex items-center gap-2">
             <Button
               v-if="canConvertToStimulus"
               variant="outline"
               size="sm"
-              title="把本题加入已有材料题，或新建一道材料题"
+              :title="t('questionEditor.joinStimulusHint')"
               @click="stimulusPickerOpen = true"
             >
               <Layers3 class="mr-2 h-4 w-4" />
-              加入材料题
+              {{ t('stimuli.targetPicker.title') }}
             </Button>
             <Button v-if="!isImportMode" size="sm" @click="handlePublish" :disabled="isSubmitting">
               <Loader2 v-if="isSubmitting" class="mr-2 h-4 w-4 animate-spin" />
               <Save v-else class="mr-2 h-4 w-4" />
-              {{ mode === 'create' ? '保存' : '更新' }}
+              {{ mode === 'create' ? t('common.save') : t('questionEditor.update') }}
             </Button>
             <Button v-else size="sm" @click="handleSaveImport">
               <Save class="mr-2 h-4 w-4" />
-              保存
+              {{ t('common.save') }}
             </Button>
-            <Button variant="outline" size="sm" @click="handleClose">关闭</Button>
+            <Button variant="outline" size="sm" @click="handleClose">{{ t('common.close') }}</Button>
           </div>
         </div>
 
@@ -291,14 +292,14 @@ const toggleTag = (tagId: number) => {
                 <QuestionDraftEditor v-if="draft" :model-value="draft">
                   <template v-if="!isImportMode" #meta>
                     <div class="space-y-2">
-                      <Label>状态</Label>
+                      <Label>{{ t('questions.filters.status') }}</Label>
                       <Select v-model="draft.status">
                         <SelectTrigger><SelectValue /></SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="draft">草稿</SelectItem>
-                          <SelectItem value="pending">待审核</SelectItem>
-                          <SelectItem value="published">已发布</SelectItem>
-                          <SelectItem value="archived">已归档</SelectItem>
+                          <SelectItem value="draft">{{ t('questions.statuses.draft') }}</SelectItem>
+                          <SelectItem value="pending">{{ t('questions.statuses.pending') }}</SelectItem>
+                          <SelectItem value="published">{{ t('questions.statuses.published') }}</SelectItem>
+                          <SelectItem value="archived">{{ t('questions.statuses.archived') }}</SelectItem>
                         </SelectContent>
                       </Select>
                     </div>
@@ -306,26 +307,26 @@ const toggleTag = (tagId: number) => {
                   <template #fields>
                 <!-- Source (db only) -->
                 <div v-if="!isImportMode" class="space-y-2">
-                  <Label>来源</Label>
-                  <Input v-model="draft.source" placeholder="输入题目来源" />
+                  <Label>{{ t('questions.filters.source') }}</Label>
+                  <Input v-model="draft.source" :placeholder="t('questionEditor.sourcePlaceholder')" />
                 </div>
 
                 <!-- Visibility (db only) -->
                 <div v-if="!isImportMode" class="space-y-2">
-                  <Label>可见性</Label>
+                  <Label>{{ t('materials.filters.visibility') }}</Label>
                   <Select v-model="draft.visibility">
                     <SelectTrigger><SelectValue /></SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="public">公开（学科内共享）</SelectItem>
-                      <SelectItem value="private">私有（仅自己可见）</SelectItem>
+                      <SelectItem value="public">{{ t('questionEditor.visibilityPublic') }}</SelectItem>
+                      <SelectItem value="private">{{ t('questionEditor.visibilityPrivate') }}</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
 
                 <!-- Knowledge Points -->
                 <div class="space-y-2">
-                  <Label>所属知识点</Label>
-                  <div v-if="!activeSubjectId" class="text-xs text-muted-foreground mb-1">请先选择学科以加载知识点</div>
+                  <Label>{{ t('questionEditor.knowledgePoints') }}</Label>
+                  <div v-if="!activeSubjectId" class="text-xs text-muted-foreground mb-1">{{ t('questionEditor.selectSubjectForKnowledgePoints') }}</div>
                   <KnowledgePointSelector
                     v-model="knowledgePointIds"
                     :knowledge-points="availableKnowledgePoints"
@@ -335,7 +336,7 @@ const toggleTag = (tagId: number) => {
 
                 <!-- Tags (db only) -->
                 <div v-if="!isImportMode" class="space-y-2">
-                  <Label>标签</Label>
+                  <Label>{{ t('questions.filters.tags') }}</Label>
                   <div class="flex flex-wrap gap-2 mb-2" v-if="selectedTags.length > 0">
                     <Badge
                       v-for="tag in selectedTags"
@@ -353,18 +354,18 @@ const toggleTag = (tagId: number) => {
                   <Popover v-model:open="openTagSelect">
                     <PopoverTrigger as-child>
                       <Button variant="outline" role="combobox" :aria-expanded="openTagSelect" class="w-full justify-between">
-                        选择标签...
+                        {{ t('tagFilter.placeholder') }}
                         <ChevronsUpDown class="ml-2 h-4 w-4 shrink-0 opacity-50" />
                       </Button>
                     </PopoverTrigger>
                     <PopoverContent class="w-[400px] p-0" align="start">
                       <Command>
-                        <CommandInput placeholder="搜索标签..." />
-                        <CommandEmpty>未找到标签</CommandEmpty>
+                        <CommandInput :placeholder="t('tagFilter.searchPlaceholder')" />
+                        <CommandEmpty>{{ t('tagFilter.empty') }}</CommandEmpty>
                         <CommandList>
                           <CommandGroup v-for="cat in tagCategories" :key="cat.id" :heading="cat.name">
                             <CommandItem
-                              v-for="tag in tags?.filter(t => t.category_id === cat.id)"
+                              v-for="tag in tags?.filter(item => item.category_id === cat.id)"
                               :key="tag.id"
                               :value="tag.name"
                               @select="toggleTag(tag.id)"
@@ -376,9 +377,9 @@ const toggleTag = (tagId: number) => {
                               </div>
                             </CommandItem>
                           </CommandGroup>
-                          <CommandGroup heading="其他">
+                          <CommandGroup :heading="t('questionEditor.otherTags')">
                             <CommandItem
-                              v-for="tag in tags?.filter(t => t.category_id == null || !tagCategories?.find(c => c.id === t.category_id))"
+                              v-for="tag in tags?.filter(item => item.category_id == null || !tagCategories?.find(c => c.id === item.category_id))"
                               :key="tag.id"
                               :value="tag.name"
                               @select="toggleTag(tag.id)"
@@ -407,42 +408,42 @@ const toggleTag = (tagId: number) => {
                 <!-- v2 preview: RichContent (all modes) -->
                 <template v-if="draft">
                   <div class="space-y-2">
-                    <h3 class="font-semibold text-sm text-muted-foreground">题目预览</h3>
+                    <h3 class="font-semibold text-sm text-muted-foreground">{{ t('questionEditor.preview.content') }}</h3>
                     <div class="bg-background p-4 rounded border border-border">
-                      <RichContent :content="draft.content" empty-text="（空）" />
+                      <RichContent :content="draft.content" :empty-text="t('questionItem.emptyContent')" />
                     </div>
                   </div>
                   <div v-if="hasOptionPool(qType) && draft.options.length > 0" class="space-y-2">
-                    <h3 class="font-semibold text-sm text-muted-foreground">选项预览</h3>
+                    <h3 class="font-semibold text-sm text-muted-foreground">{{ t('questionEditor.preview.options') }}</h3>
                     <div class="space-y-2 bg-background p-4 rounded border border-border">
                       <div v-for="opt in draft.options" :key="opt.id" class="flex gap-2">
                         <span class="font-bold text-muted-foreground shrink-0">{{ opt.label }}.</span>
                         <div class="flex-1 [&_.prose]:my-0 [&_.prose>p]:my-0">
-                          <RichContent :content="opt.content" empty-text="（空选项）" />
+                          <RichContent :content="opt.content" :empty-text="t('questionEditor.preview.emptyOption')" />
                         </div>
                       </div>
                     </div>
                   </div>
                   <div class="space-y-2">
-                    <h3 class="font-semibold text-sm text-muted-foreground">答案</h3>
+                    <h3 class="font-semibold text-sm text-muted-foreground">{{ t('questionItem.answer') }}</h3>
                     <div class="bg-background p-4 rounded border border-border">
-                      <AnswerDisplay :answer="draft.answer" :options="draft.options" empty-text="（未填写）" />
+                      <AnswerDisplay :answer="draft.answer" :options="draft.options" :empty-text="t('questionEditor.preview.notFilled')" />
                     </div>
                   </div>
                   <div v-if="draft.thinking" class="space-y-2">
-                    <h3 class="font-semibold text-sm text-muted-foreground">分析</h3>
+                    <h3 class="font-semibold text-sm text-muted-foreground">{{ t('questionItem.thinking') }}</h3>
                     <div class="bg-background p-4 rounded border border-border">
                       <RichContent :content="draft.thinking" />
                     </div>
                   </div>
                   <div v-if="draft.analysis" class="space-y-2">
-                    <h3 class="font-semibold text-sm text-muted-foreground">解析</h3>
+                    <h3 class="font-semibold text-sm text-muted-foreground">{{ t('questionItem.analysis') }}</h3>
                     <div class="bg-background p-4 rounded border border-border">
                       <RichContent :content="draft.analysis" />
                     </div>
                   </div>
                   <div v-if="draft.summary" class="space-y-2">
-                    <h3 class="font-semibold text-sm text-muted-foreground">总结</h3>
+                    <h3 class="font-semibold text-sm text-muted-foreground">{{ t('questionItem.summary') }}</h3>
                     <div class="bg-background p-4 rounded border border-border">
                       <RichContent :content="draft.summary" />
                     </div>

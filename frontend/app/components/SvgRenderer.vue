@@ -8,6 +8,7 @@ const props = defineProps<{
   code: string
 }>()
 
+const { t } = useI18n()
 const showCode = ref(false)
 const { copy, copied } = useClipboard()
 
@@ -35,17 +36,17 @@ const copyCode = () => {
 <template>
   <div class="my-4 border rounded-md overflow-hidden bg-background">
     <div class="flex items-center justify-between px-3 py-2 bg-muted/50 border-b">
-      <span class="text-xs font-medium text-muted-foreground">SVG Preview</span>
+      <span class="text-xs font-medium text-muted-foreground">{{ t('svgRenderer.title') }}</span>
       <div class="flex gap-1">
-        <Button variant="ghost" size="icon" class="h-6 w-6" @click="showCode = !showCode" :title="showCode ? '预览' : '查看代码'">
+        <Button variant="ghost" size="icon" class="h-6 w-6" @click="showCode = !showCode" :title="showCode ? t('svgRenderer.preview') : t('svgRenderer.viewCode')">
           <Eye v-if="showCode" class="w-3 h-3" />
           <Code v-else class="w-3 h-3" />
         </Button>
-        <Button variant="ghost" size="icon" class="h-6 w-6" @click="copyCode" title="复制 SVG 代码">
+        <Button variant="ghost" size="icon" class="h-6 w-6" @click="copyCode" :title="t('svgRenderer.copyCode')">
             <Check v-if="copied" class="w-3 h-3 text-green-500" />
             <Copy v-else class="w-3 h-3" />
         </Button>
-        <Button variant="ghost" size="icon" class="h-6 w-6" @click="downloadSvg" title="下载 SVG">
+        <Button variant="ghost" size="icon" class="h-6 w-6" @click="downloadSvg" :title="t('svgRenderer.download')">
           <Download class="w-3 h-3" />
         </Button>
       </div>

@@ -30,7 +30,13 @@
     "deleteFailed": "删除失败",
     "operationFailed": "操作失败",
     "loading": "加载中…",
-    "loadMore": "加载更多"
+    "loadMore": "加载更多",
+    "confirmDelete": "确认删除",
+    "done": "完成",
+    "add": "添加",
+    "download": "下载",
+    "confirm": "确定",
+    "close": "关闭"
   },
   "language": {
     "label": "语言",
@@ -106,6 +112,25 @@
       "noAccount": "还没有账户？",
       "register": "立即注册",
       "verifyFailed": "登录校验失败，请检查网络连接与设备时间后重试"
+    },
+    "register": {
+      "title": "注册账户",
+      "description": "创建一个新账户以使用系统",
+      "disabled": "注册功能未开放",
+      "usernameRequired": "请输入用户名",
+      "fullName": "姓名",
+      "fullNameRequired": "请输入姓名",
+      "passwordMin": "密码长度不能少于 {min} 位",
+      "confirmPassword": "确认密码",
+      "confirmRequired": "请再次输入密码",
+      "passwordMismatch": "两次输入的密码不一致",
+      "approvalHint": "注册后需要管理员审核通过才能登录。",
+      "submit": "注册",
+      "success": "注册成功，请登录",
+      "successPendingApproval": "注册成功，请等待管理员审核后登录",
+      "failed": "注册失败",
+      "hasAccount": "已有账户？",
+      "backToLogin": "返回登录"
     }
   },
   "subjectSelector": {
@@ -1009,6 +1034,1206 @@
       "slot": "第 {index} 空",
       "number": "题号",
       "scoreUnit": "分"
+    }
+  },
+  "users": {
+    "searchPlaceholder": "搜索用户名或姓名...",
+    "allRoles": "全部角色",
+    "roleAdmin": "管理员",
+    "roleNormal": "普通用户",
+    "batchImport": "批量导入",
+    "create": "新增用户",
+    "editUser": "编辑用户",
+    "deleteUser": "删除用户",
+    "resetPassword": "重置密码",
+    "columns": {
+      "avatar": "头像",
+      "username": "用户名",
+      "fullName": "姓名",
+      "status": "状态",
+      "role": "角色"
+    },
+    "empty": "暂无用户",
+    "noMatch": "没有匹配的用户",
+    "active": "启用",
+    "disabled": "禁用",
+    "total": "共 {count} 个用户",
+    "required": "必填",
+    "avatarUrl": "头像URL",
+    "password": "密码",
+    "hidePassword": "隐藏密码",
+    "showPassword": "显示密码",
+    "dialog": {
+      "editDescription": "修改用户信息，留空密码则不修改",
+      "createDescription": "创建一个新的用户账号"
+    },
+    "validation": {
+      "usernameRequired": "用户名不能为空",
+      "passwordRequired": "创建用户时密码不能为空",
+      "fullNameRequired": "姓名不能为空",
+      "newPasswordRequired": "请输入新密码",
+      "passwordMismatch": "两次输入的密码不一致"
+    },
+    "toast": {
+      "updated": "用户更新成功",
+      "created": "用户创建成功",
+      "deleted": "用户删除成功",
+      "usernameMismatch": "用户名输入不匹配",
+      "passwordReset": "密码重置成功",
+      "resetFailed": "重置失败"
+    },
+    "delete": {
+      "title": "确认删除用户？",
+      "warning": "警告：此操作不可逆！",
+      "warningDescription": "删除后用户的行为数据会丢失，非必要不要删除，可以使用禁用功能。",
+      "confirmLabel": "请输入用户名 {username} 以确认删除",
+      "inputPlaceholder": "请输入用户名"
+    },
+    "reset": {
+      "description": "为用户 {username} 设置新密码。",
+      "newPassword": "新密码",
+      "confirmPassword": "确认密码",
+      "confirm": "确认重置"
+    }
+  },
+  "userImport": {
+    "title": "批量导入用户",
+    "description": "通过 Excel 一次性创建多个用户账号",
+    "instructions": "使用说明",
+    "steps": {
+      "download": "下载 Excel 模板，查看格式示例",
+      "fill": "填写{username}、{fullName}、{password}（{admin}列可选）",
+      "upload": "上传填写好的文件"
+    },
+    "section": {
+      "template": "1. 下载并填写模板",
+      "upload": "2. 上传填写好的文件"
+    },
+    "templateColumns": "模板列：{username}(必填)、{fullName}(必填)、{password}(必填，≥6位)、{admin}(可选，填“{yes}”)",
+    "downloadTemplate": "下载 Excel 模板",
+    "dropHint": "点击选择文件 或 拖拽文件到此处",
+    "formatHint": "仅支持 .xlsx 格式，最大 5MB",
+    "invalidFormat": "文件格式不正确，请上传 .xlsx 文件",
+    "fileTooLarge": "文件过大，请确保文件小于 5MB",
+    "downloadTemplateFailed": "下载模板失败: {error}",
+    "importFailed": "导入失败",
+    "errorLine": "第 {row} 行: {message}",
+    "errorsCopied": "已复制错误信息",
+    "start": "开始导入",
+    "processing": "正在处理，请稍候…",
+    "importing": "正在导入用户…",
+    "resultTitle": "导入结果",
+    "resultSummary": "共 {total} 行，成功 {created} 个，失败 {failed} 个",
+    "status": {
+      "success": "全部导入成功",
+      "partial": "部分导入成功"
+    },
+    "createdCount": "成功创建 {count} 个用户",
+    "errorDetails": "失败明细（{count}）",
+    "rowLabel": "第 {row} 行",
+    "fileLabel": "文件",
+    "continue": "继续导入"
+  },
+  "subjects": {
+    "listTitle": "学科列表",
+    "create": "创建学科",
+    "edit": "编辑学科",
+    "editDescription": "修改学科信息",
+    "createDescription": "添加一个新的学科",
+    "slug": "标识",
+    "slugLabel": "标识 (Slug)",
+    "description": "描述",
+    "namePlaceholder": "例如：数学",
+    "slugPlaceholder": "例如：math",
+    "descriptionPlaceholder": "学科描述...",
+    "deleteConfirm": "确定要删除这个学科吗？",
+    "validation": {
+      "nameMin": "名称至少2个字符",
+      "nameMax": "名称最多50个字符",
+      "slugMin": "标识至少2个字符",
+      "slugMax": "标识最多50个字符"
+    },
+    "deleteConfirmWithImpact": "确定要删除这个学科吗？删除学科可能会影响关联的题目和目录。",
+    "createNew": "新建学科",
+    "requiredReviewCount": "所需审核次数",
+    "members": "成员管理",
+    "empty": "暂无学科",
+    "dialogDescription": "配置学科的基本信息。",
+    "namePlaceholderFull": "例如：高中数学",
+    "slugPlaceholderFull": "例如：math-hs",
+    "slugHint": "用于 URL 和系统内部标识，建议使用英文。",
+    "descriptionPlaceholderOptional": "可选：学科的详细描述",
+    "requiredReviewHint": "题目发布前需要经过的审核次数。"
+  },
+  "subjectMembers": {
+    "title": "成员管理 · {name}",
+    "description": "为老师授予本学科的角色：只读、可编辑或学科负责人。未在此的老师看不到本学科。",
+    "selectTeacher": "选择老师",
+    "role": "角色",
+    "teacher": "老师",
+    "empty": "暂无成员",
+    "userDisplay": "{name}（{username}）",
+    "roleUpdated": "已更新成员角色",
+    "removed": "已移除成员",
+    "roles": {
+      "viewer": "只读",
+      "editor": "可编辑",
+      "manager": "学科负责人"
+    }
+  },
+  "tagCategories": {
+    "navLabel": "标签分类",
+    "heading": "分类",
+    "whatIs": "什么是分类？",
+    "help": "分类用于给标签分组（如\"难度\"\"来源\"\"题型\"），标签必须归属一个分类，方便按维度筛选、在题目里快速找标签。",
+    "create": "新建分类",
+    "namePlaceholder": "分类名称",
+    "newNameLabel": "新分类名称",
+    "sortOrder": "排序",
+    "createTagIn": "在｜{name}｜下新建标签",
+    "createTagHere": "在此分类下新建标签",
+    "editNamed": "编辑分类 {name}",
+    "deleteNamed": "删除分类 {name}",
+    "empty": "暂无分类",
+    "deleteConfirm": "确定要删除这个分类吗？这将同时删除该分类下的所有标签！",
+    "toast": {
+      "updated": "分类更新成功",
+      "updateFailed": "更新分类失败",
+      "created": "分类创建成功",
+      "createFailed": "创建分类失败",
+      "deleted": "分类删除成功",
+      "deleteFailed": "删除分类失败"
+    }
+  },
+  "tagImport": {
+    "title": "批量导入标签",
+    "description": "通过 Excel 一次性为当前学科创建多个标签",
+    "instructions": "使用说明",
+    "steps": {
+      "download": "下载 Excel 模板，查看格式示例",
+      "fill": "填写{name}、{category}（可选，不存在会自动创建）、{color}（可选）",
+      "upload": "上传填写好的文件 —— 已存在的重名标签会被自动跳过（不影响其他标签导入），格式错误（如{name}为空）时才会整体拒绝，修正后重新上传即可"
+    },
+    "section": {
+      "template": "1. 下载并填写模板",
+      "upload": "2. 上传填写好的文件"
+    },
+    "templateColumns": "模板列：{name}(必填)、{category}(可选，不存在会自动创建)、{color}(可选，十六进制色值如 #4F81BD)",
+    "downloadTemplate": "下载 Excel 模板",
+    "dropHint": "点击选择文件 或 拖拽文件到此处",
+    "formatHint": "仅支持 .xlsx 格式，最大 5MB",
+    "invalidFormat": "文件格式不正确，请上传 .xlsx 文件",
+    "fileTooLarge": "文件过大，请确保文件小于 5MB",
+    "downloadTemplateFailed": "下载模板失败: {error}",
+    "importFailed": "导入失败",
+    "errorLine": "第 {row} 行: {message}",
+    "errorsCopied": "已复制错误信息",
+    "start": "开始导入",
+    "processing": "正在处理，请稍候…",
+    "importing": "正在导入标签…",
+    "resultTitle": "导入结果",
+    "resultSummary": "共 {total} 行，成功创建 {created} 个，跳过重复 {skipped} 个",
+    "status": {
+      "success": "导入完成",
+      "failed": "校验未通过，未创建任何标签"
+    },
+    "createdCount": "成功创建 {count} 个标签",
+    "skippedSuffix": "，跳过 {count} 个已存在的重名标签",
+    "fixAndRetry": "请按下方提示修正文件后重新上传",
+    "errorDetails": "错误明细（{count}）",
+    "rowLabel": "第 {row} 行",
+    "fileLabel": "文件",
+    "continue": "继续导入"
+  },
+  "kpImport": {
+    "title": "批量导入知识点",
+    "step1": "步骤 1 / 2：准备导入文件",
+    "step2": "步骤 2 / 2：确认导入设置",
+    "instructions": "使用说明",
+    "intro": "本功能用于批量创建知识点树，支持八级嵌套。请按以下步骤操作：",
+    "steps": {
+      "download": "下载 Excel 模板，查看格式示例",
+      "fill": "在模板中填写知识点数据",
+      "upload": "上传填写好的文件"
+    },
+    "section": {
+      "template": "1. 下载并填写模板",
+      "upload": "2. 上传填写好的文件"
+    },
+    "templateColumns": "模板列：{subject}(必填)、{level1}(必填)、{level2}~{level8}(可选)",
+    "downloadTemplate": "下载 Excel 模板",
+    "dropHint": "点击选择文件 或 拖拽文件到此处",
+    "formatHint": "仅支持 .xlsx 格式，最大 5MB",
+    "invalidFormat": "文件格式不正确，请上传 .xlsx 文件",
+    "fileTooLarge": "文件过大，请确保文件小于 5MB",
+    "downloadTemplateFailed": "下载模板失败: {error}",
+    "importFailed": "导入失败",
+    "errorLine": "第 {row} 行: {message}",
+    "errorsCopied": "已复制错误信息",
+    "next": "下一步",
+    "prev": "上一步",
+    "start": "开始导入",
+    "fileName": "导入文件：{name}",
+    "selectMode": "选择导入模式",
+    "mode": {
+      "incremental": "增量新增",
+      "rebuild": "清空重建"
+    },
+    "recommended": "推荐",
+    "useWithCaution": "谨慎使用",
+    "incremental": {
+      "skipExisting": "• 已存在的知识点（相同学科、父节点、名称）自动跳过",
+      "createNew": "• 新知识点正常创建，{em}",
+      "createNewEm": "不影响已有题目的知识点关联",
+      "useCase": "适用：日常新增、修正数据后重新导入"
+    },
+    "rebuild": {
+      "deleteAll": "• 先删除文件中涉及学科的{em}知识点，再导入新数据",
+      "deleteAllEm": "所有",
+      "loseLinks": "⚠️ 已关联的题目将失去知识点标签（题目本身保留）",
+      "irreversible": "⚠️ 此操作不可撤销",
+      "useCase": "适用：完全重构知识点体系"
+    },
+    "importingTitle": "正在导入知识点...",
+    "importingHint": "正在解析并写入知识点，请勿关闭此窗口",
+    "status": {
+      "success": "导入完成",
+      "partial": "导入完成（含警告）"
+    },
+    "result": {
+      "created": "成功创建：{count} 个知识点",
+      "skipped": "跳过重复：{count} 个",
+      "failed": "失败：{count} 个",
+      "meta": "模式：{mode} · 耗时 {duration}s",
+      "vectorSynced": "已同步向量索引",
+      "vectorNotConfigured": "未配置向量模型，可稍后手动重建"
+    },
+    "errorDetails": "失败详情",
+    "rowPrefix": "第 {row} 行: ",
+    "copyErrors": "复制错误信息",
+    "partialHint": "修正 Excel 中对应行的数据后重新上传即可，已成功的数据会被自动跳过。",
+    "backToEdit": "返回修改",
+    "danger": {
+      "title": "确认清空重建",
+      "description": "您即将执行不可撤销的危险操作，请仔细确认。",
+      "impact": "数据影响评估",
+      "existing": "• 学科「{subject}」现有 {count} 个知识点将被删除",
+      "affected": "• {count} 道题目将失去知识点标签",
+      "questionsKept": "• 题目内容本身不会被删除",
+      "noRollback": "• 此操作不可撤销，无法回滚",
+      "confirmLabel": "请输入学科名称「{name}」以确认：",
+      "confirm": "确认删除并导入"
+    }
+  },
+  "folders": {
+    "createChild": "新建子文件夹",
+    "rename": "重命名",
+    "move": "移动"
+  },
+  "kpManager": {
+    "addChild": "添加子目录",
+    "newChildName": "新目录名称",
+    "pageDescription": "管理各学科的知识点结构",
+    "noSubjects": "暂无学科，请先添加学科。",
+    "treeTitle": "知识点树",
+    "batchImport": "批量导入",
+    "addRoot": "添加根目录",
+    "rootNamePlaceholder": "根目录名称",
+    "empty": "该学科暂无知识点。",
+    "deleteConfirm": "确定要删除该知识点及其所有子知识点吗？",
+    "vector": {
+      "notConfigured": "{reason}，如果您需要在智能导入题目时自动匹配知识点，请先配置 Embedding 模型，否则可以忽略此提示。",
+      "goToSettings": "前往配置",
+      "needsReindex": "{reason}，建议重建向量索引以启用语义检索。",
+      "reindex": "重建向量索引"
+    },
+    "toast": {
+      "rootCreated": "根目录创建成功",
+      "childCreated": "子目录创建成功",
+      "createFailed": "创建失败: {error}",
+      "updated": "更新成功",
+      "updateFailed": "更新失败: {error}",
+      "deleted": "删除成功",
+      "deleteFailed": "删除失败: {error}",
+      "moved": "移动成功",
+      "moveFailed": "移动失败: {error}",
+      "reindexed": "向量索引已重建（{count} 个知识点，耗时 {duration}s）",
+      "reindexFailed": "重建失败: {error}"
+    }
+  },
+  "tags": {
+    "uncategorized": "未分类",
+    "batchImport": "批量导入",
+    "create": "新建标签",
+    "edit": "编辑标签",
+    "total": "共 {count} 个标签",
+    "batchDelete": "批量删除 ({count})",
+    "category": "分类",
+    "color": "颜色",
+    "empty": "暂无标签",
+    "dialogDescription": "配置标签的名称、分类和颜色。",
+    "namePlaceholder": "例如：2023, 高考, 易错题",
+    "selectCategory": "选择分类",
+    "categoryHint": "决定这个标签在筛选和选择时归到哪一组",
+    "deleteConfirm": "确定要删除这个标签吗？",
+    "batchDeleteConfirm": "确定要删除选中的 {count} 个标签吗？",
+    "selectSubjectFirst": "请先选择学科",
+    "toast": {
+      "updated": "标签更新成功",
+      "created": "标签创建成功",
+      "saveFailed": "保存标签失败",
+      "batchDeleted": "成功删除 {count} 个标签",
+      "batchDeleteFailed": "批量删除失败"
+    }
+  },
+  "activityLogs": {
+    "selectUser": "选择用户",
+    "allUsers": "所有用户",
+    "total": "共 {count} 条记录",
+    "empty": "暂无日志",
+    "columns": {
+      "user": "用户",
+      "action": "行为",
+      "resourceType": "资源类型",
+      "resourceId": "资源ID",
+      "ipAddress": "IP地址",
+      "time": "时间",
+      "details": "详情"
+    }
+  },
+  "media": {
+    "kind": {
+      "image": "图片",
+      "audio": "音频"
+    },
+    "usage": {
+      "used": "已使用",
+      "unused": "未使用"
+    },
+    "sort": {
+      "newest": "最近上传",
+      "oldest": "最早上传",
+      "size": "文件大小"
+    },
+    "batch": {
+      "delete": {
+        "done": "已删除 {affected} 张",
+        "partial": "已删除 {affected} 张，{skipped} 张仍被使用已保留",
+        "failed": "删除失败"
+      },
+      "update": {
+        "done": "已更新 {affected} 张",
+        "partial": "已更新 {affected} 张，{skipped} 张未更新",
+        "failed": "更新失败"
+      },
+      "deleteConfirm": "删除所选 {count} 个文件中未被使用的？仍被引用的会保留。",
+      "setSource": "设置来源",
+      "deleteUnused": "删除未使用",
+      "sourceDialogTitle": "设置来源 / 版权",
+      "sourceDialogHint": "应用到所选 {count} 个文件；留空则清除来源"
+    },
+    "uploadFileFailed": "{name}：{error}",
+    "uploaded": "已上传 {count} 个文件（与库中相同的文件会直接复用）",
+    "usageCount": "{count} 处使用",
+    "upload": "上传",
+    "pageDescription": "本学科题目、材料题与稿件中使用的图片和音频。编辑器里插入时可以直接从这里选择。",
+    "filters": {
+      "search": "搜索",
+      "searchPlaceholder": "文件名或替代文本",
+      "kind": "类型",
+      "usage": "使用情况",
+      "sort": "排序"
+    },
+    "view": {
+      "label": "视图",
+      "grid": "网格视图",
+      "list": "列表视图"
+    },
+    "selectSubjectFirst": "请先选择学科",
+    "loadFailed": "媒体库加载失败",
+    "noMatch": "没有符合条件的图片",
+    "clearFilters": "清除筛选",
+    "empty": "媒体库还是空的。题目中插入或导入文档时的图片会自动出现在这里。",
+    "uploadFiles": "上传文件",
+    "noPreview": "无法预览",
+    "missingAlt": "缺 alt",
+    "selectItem": "选择 {name}",
+    "selectPage": "全选本页",
+    "deselectAll": "取消全选",
+    "columns": {
+      "preview": "预览",
+      "format": "格式",
+      "dimension": "尺寸 / 时长",
+      "size": "大小",
+      "usage": "使用",
+      "uploadedAt": "上传时间"
+    },
+    "selectedCount": "已选 {count} 张",
+    "clearSelection": "清除选择",
+    "total": "共 {count} 个文件",
+    "pageIndicator": "第 {page} / {pages} 页",
+    "unnamedImage": "图片 #{id}",
+    "unnamedAudio": "音频 #{id}",
+    "owner": {
+      "question": "题目",
+      "stimulus": "材料题",
+      "composition": "稿件",
+      "compositionVersion": "定稿版本"
+    },
+    "replace": {
+      "summary": "已替换 {count} 处引用",
+      "summarySkipped": "，{count} 处无权修改未替换",
+      "summaryFrozen": "，{count} 个定稿版本保持原图",
+      "failed": "替换失败",
+      "title": "替换{noun}",
+      "description": "把所选内容里的这个{noun}换成新的。原文件仍保留在媒体库中。",
+      "originalAlt": "原图",
+      "newAlt": "新图片",
+      "scopeAll": "全部引用（{count} 处）",
+      "scopeSome": "只替换勾选的内容",
+      "frozenNote": "{count} 个已定稿版本不受影响，仍使用原文件。",
+      "hiddenNote": "另有 {count} 处你无权查看的内容不会被替换。",
+      "concurrentNote": "正在编辑这些内容的人保存时会提示内容已被修改。",
+      "confirm": "确认替换"
+    },
+    "detail": {
+      "pickAnother": "请选择另一个文件",
+      "copiedTo": "已加入「{name}」的媒体库",
+      "copyFailed": "加入失败",
+      "referencesLoadFailed": "引用信息加载失败",
+      "deleteConfirm": "确定删除「{name}」吗？",
+      "deleted": "图片已删除",
+      "description": "修改名称、替代文本与来源只影响资料信息，不改变文件本身。",
+      "unsupportedFormat": "浏览器无法显示此格式（{mime}），可下载原件查看",
+      "duration": "时长",
+      "dimension": "尺寸",
+      "alt": "替代文本（alt）",
+      "altPlaceholder": "描述图片内容，便于检索与无障碍阅读",
+      "source": "来源 / 版权",
+      "referencedIn": "被引用于",
+      "notReferenced": "未被任何内容使用",
+      "groupLabel": "{label}（{count}）",
+      "ownerDeleted": "已删除",
+      "frozenVersion": "v{version} · 已冻结",
+      "hiddenCount": "另有 {count} 处你无权查看的内容",
+      "downloadOriginal": "下载原件",
+      "noReplaceable": "没有可替换的引用",
+      "replace": "替换",
+      "copyToSubject": "加入其他学科",
+      "copyToSubjectHint": "复制到目标学科的媒体库",
+      "deleteBlocked": "仍被内容引用，需先从这些内容中移除后才能删除",
+      "deleteBlockedHint": "仍被内容引用的文件不能删除；可以先替换成其他文件。已冻结的定稿版本会一直保留其引用。"
+    }
+  },
+  "mediaPicker": {
+    "noun": {
+      "image": "图片",
+      "audio": "音频"
+    },
+    "selectAudioFile": "请选择音频文件",
+    "audioUploadFailed": "音频上传失败",
+    "selectImageFile": "请选择图片文件",
+    "title": "插入{noun}",
+    "description": "上传新{noun}，或从本学科媒体库中选择已有{noun}。",
+    "selectSubjectFirst": "请先选择学科再插入{noun}。",
+    "recent": "最近使用",
+    "uploading": "上传中…",
+    "dropHint": "点击选择或拖入{noun}",
+    "audioFormats": "支持 MP3、M4A、OGG、WAV，单个不超过 100 MB",
+    "imageFormats": "支持 PNG、JPEG、GIF、WebP，单张不超过 10 MB",
+    "searchPlaceholder": "按文件名或替代文本搜索",
+    "noMatch": "没有匹配的{noun}",
+    "empty": "媒体库里还没有{noun}，先上传一个吧",
+    "unsupportedFormat": "浏览器无法显示此格式",
+    "unnamed": "{noun} #{id}",
+    "noRecent": "还没有插入过{noun}"
+  },
+  "settings": {
+    "title": "设置",
+    "titleAdmin": "系统设置",
+    "nav": {
+      "general": "常规设置",
+      "globalAi": "全局 AI 模型",
+      "myAi": "我的 AI 模型",
+      "prompts": "提示词配置",
+      "registration": "注册设置"
+    },
+    "toast": {
+      "fetchFailed": "获取设置失败",
+      "saveSuccess": "保存成功",
+      "settingUpdated": "设置 {key} 已更新"
+    },
+    "general": {
+      "description": "管理系统的全局环境变量与基础配置。",
+      "valuePlaceholder": "值",
+      "save": "保存设置",
+      "emptyTitle": "暂无设置项",
+      "emptyDescription": "系统尚未注册任何开放配置项"
+    },
+    "globalAi": {
+      "description": "接入 AI 服务商，并设置各项功能默认使用的模型。"
+    },
+    "myAi": {
+      "description": "选择你自己使用的模型，或接入你自己的 AI 服务商账号。"
+    },
+    "prompts": {
+      "description": "如果您了解大语言工作原理，可在此微调它处理指令的方式。"
+    },
+    "registration": {
+      "description": "控制是否允许访客自助注册账户。",
+      "enabledLabel": "开放自助注册",
+      "enabledHint": "开启后，登录页将显示注册入口，访客可自行创建账户。",
+      "approvalLabel": "注册需管理员审核",
+      "approvalHint": "开启后，新注册用户默认停用，需管理员在用户管理中启用后方可登录。"
+    }
+  },
+  "setup": {
+    "title": "系统初始化",
+    "description": "首次使用，请完成数据库与管理员账号配置",
+    "descriptionDbReady": "数据库已就绪，请创建首个管理员账号",
+    "steps": {
+      "database": "数据库",
+      "admin": "管理员"
+    },
+    "sqliteHint": "单机 / 零配置，推荐个人使用",
+    "mysqlHint": "内网团队共享，多人协作",
+    "mysql": {
+      "host": "主机",
+      "port": "端口",
+      "database": "数据库名",
+      "user": "用户名",
+      "password": "密码",
+      "test": "测试连接"
+    },
+    "startNow": "直接开始",
+    "next": "下一步",
+    "admin": {
+      "username": "管理员用户名",
+      "password": "密码",
+      "passwordPlaceholder": "至少 {min} 位",
+      "confirm": "确认密码",
+      "confirmPlaceholder": "再次输入密码"
+    },
+    "finish": "完成初始化",
+    "toast": {
+      "dbConnected": "数据库连接成功",
+      "connectFailed": "连接失败",
+      "testMysqlFirst": "请先测试 MySQL 连接",
+      "dbReady": "数据库已就绪",
+      "dbInitFailed": "数据库初始化失败",
+      "usernameRequired": "请输入管理员用户名",
+      "passwordMin": "密码至少 {min} 位",
+      "passwordMismatch": "两次输入的密码不一致",
+      "done": "初始化完成，请登录",
+      "initFailed": "初始化失败"
+    }
+  },
+  "onboarding": {
+    "title": "创建你的第一个学科",
+    "description": "题库以学科为单位组织。先创建一个学科，之后可随时在「学科管理」中增删。",
+    "name": "学科名称",
+    "namePlaceholder": "例如：高中数学",
+    "slug": "标识 (Slug)",
+    "slugPlaceholder": "例如：math",
+    "slugHint": "用于 URL 与系统内部标识，建议使用英文小写；名称为中文时请手动填写。",
+    "descriptionLabel": "描述",
+    "optional": "（可选）",
+    "descriptionPlaceholder": "可选：学科的简要说明",
+    "start": "开始使用",
+    "toast": {
+      "nameRequired": "请输入学科名称",
+      "slugRequired": "请输入学科标识 (slug)",
+      "created": "学科已创建，开始使用吧",
+      "createFailed": "创建失败，请重试"
+    }
+  },
+  "about": {
+    "title": "关于",
+    "productName": "QuestionBank 题库系统",
+    "tagline": "AI 原生的题库系统",
+    "currentVersion": "当前版本 v{version}",
+    "checkUpdate": "检查更新",
+    "downloadNew": "下载新版本 v{version}",
+    "newVersionContactAdmin": "发现新版 v{version} · 请联系管理员更新",
+    "checking": "检查版本中...",
+    "upToDate": "已是最新版本",
+    "feedback": "反馈问题",
+    "thanksTitle": "特别鸣谢",
+    "thanksDescription": "感谢陪伴本项目成长并默默付出的每一位朋友",
+    "contributors": {
+      "xuemeiWang": "没有她就没有这个项目",
+      "xunmeng": "他以优质的反馈和建议鞭策项目不断完善"
+    },
+    "ossTitle": "开源基石",
+    "license": "本项目以 AGPL-3.0 许可开源，感谢开源社区的无私贡献。",
+    "toast": {
+      "checkFailed": "检查更新失败"
+    }
+  },
+  "preview": {
+    "defaultFileName": "源文件",
+    "noTask": "未指定导入任务",
+    "notFound": "源文件不存在或无权查看",
+    "loadFailed": "加载文件失败",
+    "title": "文件预览: {name}",
+    "download": "下载文件",
+    "loading": "正在加载文件...",
+    "unsupported": "该格式不支持在线预览，请下载后查看。"
+  },
+  "aiSettings": {
+    "current": {
+      "title": "当前在用",
+      "globalDescription": "各项功能默认使用的模型，对所有用户生效。用户也可以在“我的 AI 模型”里改用自己的服务商。"
+    },
+    "globalProviders": {
+      "title": "全局服务商",
+      "description": "由管理员维护，所有用户都可以使用。"
+    },
+    "userProviders": {
+      "title": "用户个人服务商",
+      "description": "用户自行接入、仅供本人使用。你可以查看和删除，但看不到 API Key。"
+    },
+    "empty": {
+      "title": "还没有接入 AI 服务商",
+      "description": "接入后即可使用 AI 对话、文档题目抽取、图片识别和知识点匹配。"
+    },
+    "changeEmbedding": {
+      "title": "更换向量模型",
+      "description": "不同向量模型生成的索引互不兼容。更换后需要重建知识点索引，否则相似题检索和知识点匹配会失效。\n重建会调用新模型处理所有知识点，可能需要一些时间。",
+      "confirm": "保存并重建索引",
+      "saveOnly": "仅保存"
+    },
+    "my": {
+      "defaultTitle": "我的默认模型",
+      "defaultDescription": "默认跟随管理员的全局设置。也可以改选其他全局模型，或你自己接入的模型。只影响你本人。",
+      "textDescription": "你的 AI 对话默认模型，以及你发起的文档导入、知识点匹配所用的模型。",
+      "visionDescription": "你上传图片识别题目时使用的模型。",
+      "embeddingNote": "相似题检索使用的向量模型由管理员统一设置。",
+      "providersTitle": "我的服务商",
+      "providersDescription": "使用你自己的 API Key，费用计入你自己的账户。",
+      "emptyTitle": "还没有自己的服务商",
+      "emptyDescription": "不添加也可以直接使用管理员配置的模型。如果想用自己的账号（例如自己购买的 DeepSeek 额度或更强的模型），可以在这里接入。",
+      "connect": "接入我的服务商"
+    },
+    "toast": {
+      "loadFailed": "加载配置失败",
+      "loadFailedShort": "加载失败",
+      "reindexing": "正在重建向量索引…",
+      "reindexed": "向量索引已重建（{count} 条，用时 {duration}s）",
+      "reindexFailed": "重建索引失败",
+      "reindexFailedDescription": "{error}。可稍后在“知识点”页面重试。",
+      "providerAdded": "已添加“{name}”",
+      "prefilled": "已为未配置的场景预选了模型，请在上方确认后保存",
+      "prefilledMine": "已预选为你的默认模型，请在上方确认后保存"
+    }
+  },
+  "aiModels": {
+    "scenes": {
+      "text": {
+        "label": "文本模型",
+        "description": "用于 AI 对话、文档题目抽取、知识点匹配。"
+      },
+      "vision": {
+        "label": "识图模型",
+        "description": "用于从图片、截图中识别题目。需要支持识图的模型。"
+      },
+      "embedding": {
+        "label": "向量模型",
+        "description": "用于相似题检索和知识点语义匹配，全站共用。"
+      }
+    },
+    "unset": "不设置",
+    "followGlobal": "跟随全局默认",
+    "status": {
+      "usingGlobal": "使用全局默认：{model}",
+      "globalUnset": "全局也未配置，该功能暂不可用",
+      "unset": "未配置，该功能暂不可用",
+      "ok": "可用",
+      "deleted": "所选模型已被删除，请重新选择",
+      "providerDisabled": "服务商“{name}”已停用",
+      "capabilityMismatch": "模型能力不符，请重新选择"
+    },
+    "deletedModel": "已删除的模型 #{id}",
+    "groups": {
+      "personal": "我的服务商",
+      "global": "全局服务商"
+    },
+    "unavailablePrefix": "（不可用）",
+    "noOptions": "没有可用的{scene}，请先在下方添加",
+    "unsaved": "有未保存的更改",
+    "revert": "撤销",
+    "capabilities": {
+      "vision": "识图",
+      "embedding": "向量"
+    },
+    "modelName": "模型名称",
+    "visionCapable": "支持识图（可用于图片识别题目）",
+    "embeddingModel": "向量模型（仅用于检索，不能对话）",
+    "picker": {
+      "search": "搜索模型",
+      "visionTitle": "是否支持识图",
+      "embeddingTitle": "是否为向量模型",
+      "noMatch": "没有匹配的模型",
+      "noCandidates": "没有可选的模型，请手动填写模型名称（与服务商文档中的 model 参数一致）。",
+      "manualPlaceholder": "手动添加，例如 {example}",
+      "add": "添加",
+      "summary": "已选 {count} 个。“识图”“向量”标记按模型名自动推断，可点击修改。"
+    }
+  },
+  "aiProviders": {
+    "add": "添加服务商",
+    "presets": {
+      "deepseek": {
+        "hint": "性价比高，适合题目抽取与对话"
+      },
+      "qwen": {
+        "name": "通义千问",
+        "hint": "含识图模型（qwen-vl）与向量模型"
+      },
+      "zhipu": {
+        "name": "智谱 GLM",
+        "hint": "含识图模型（glm-4v）"
+      },
+      "kimi": {
+        "hint": "长文档友好"
+      },
+      "openai": {
+        "hint": "需可访问海外网络"
+      },
+      "gemini": {
+        "hint": "需可访问海外网络，原生支持识图"
+      }
+    },
+    "interfaceTypes": {
+      "openai": "OpenAI 兼容接口",
+      "gemini": "Gemini 接口"
+    },
+    "interfaceType": "接口类型",
+    "baseUrl": "接口地址（Base URL）",
+    "baseUrlPlaceholder": "例如 {url}",
+    "baseUrlPlaceholderGemini": "留空使用官方地址",
+    "namePlaceholder": "便于自己识别，例如：我的 DeepSeek",
+    "keyHintPersonal": "Key 加密保存，仅用于你本人的 AI 请求，管理员也无法查看。",
+    "keyHintGlobal": "Key 加密保存，全站用户共用此服务商的额度。",
+    "connectFailed": "连接失败：{message}",
+    "testConnection": "测试连接",
+    "discoverFailed": "未能获取模型列表：{message}",
+    "disabled": "已停用",
+    "enable": "启用",
+    "keyNotSet": "未设置 Key",
+    "editConnection": "编辑连接信息",
+    "addModels": "添加模型",
+    "addModelsCount": "添加 {count} 个模型",
+    "noModels": "还没有模型。",
+    "editModelAria": "编辑 {name}",
+    "deleteModelAria": "删除 {name}",
+    "listSeparator": "、",
+    "wizard": {
+      "stepOf": "第 {current} / {total} 步：",
+      "steps": {
+        "preset": "选择服务商",
+        "credentials": "填写 API Key 并测试连接",
+        "models": "选择要使用的模型"
+      },
+      "custom": "其他 / 自定义",
+      "customHint": "任何兼容 OpenAI 接口的服务，或自建中转",
+      "hideAdvanced": "收起高级设置",
+      "showAdvanced": "高级设置（接口地址）",
+      "mostProviders": "（大多数服务商）",
+      "skipDiscover": "部分服务商不提供模型列表，确认无误可跳过，手动填写模型",
+      "prev": "上一步",
+      "testAndDiscover": "测试连接并获取模型",
+      "finish": "完成添加",
+      "selectAtLeastOne": "请至少选择一个模型",
+      "addFailed": "添加失败"
+    },
+    "inUse": {
+      "title": "仍在使用中",
+      "description": "{error}\n删除后对应场景将变为“未配置”，相关 AI 功能会暂停，直到重新选择模型。",
+      "confirm": "仍然删除"
+    },
+    "deleteProvider": {
+      "action": "删除服务商",
+      "title": "删除服务商“{name}”？",
+      "titleWithOwner": "删除服务商“{name}”（属于 {owner}）？",
+      "description": "将同时删除其下 {count} 个模型，此操作不可撤销。"
+    },
+    "deleteModel": {
+      "title": "删除模型“{name}”？"
+    },
+    "disable": {
+      "title": "停用“{name}”？",
+      "description": "它的模型正被用作{scenes}。停用后这些场景将不可用（个人设置会回落到全局默认）。",
+      "confirm": "停用"
+    },
+    "edit": {
+      "title": "编辑服务商",
+      "description": "修改连接信息。API Key 留空表示保持不变。",
+      "keySet": "已设置（留空则不修改）",
+      "keyRequired": "请填写"
+    },
+    "addModelsDialog": {
+      "title": "为“{name}”添加模型",
+      "description": "从服务商返回的列表中勾选，或手动填写。",
+      "loading": "正在获取模型列表…"
+    },
+    "editModel": {
+      "title": "编辑模型",
+      "description": "模型名称需与服务商的 model 参数完全一致。"
+    },
+    "toast": {
+      "providerDeleted": "服务商已删除",
+      "modelDeleted": "模型已删除",
+      "modelsAdded": "已添加 {count} 个模型",
+      "modelUpdated": "模型已更新"
+    }
+  },
+  "prompts": {
+    "subject": "配置学科",
+    "selectSubject": "选择学科",
+    "subjectHint": "提示词按学科独立配置；未定制的学科自动使用系统默认。",
+    "custom": "已自定义",
+    "usingDefault": "使用默认",
+    "placeholder": "留空并保存无效；如需恢复系统默认请点『重置为默认』。可点『填入默认模板』基于默认修改。",
+    "viewDefault": "查看系统默认模板",
+    "placeholdersHint": "支持 {name}、{description} 等占位符，运行时自动替换。",
+    "fillDefault": "填入默认模板",
+    "resetToDefault": "重置为默认",
+    "saveOverride": "保存覆盖",
+    "emptyTitle": "暂无可配置的提示词",
+    "emptyDescription": "请先选择一个学科",
+    "noSubjectsTitle": "暂无可管理的学科",
+    "noSubjectsDescription": "需要学科负责人权限才能配置提示词",
+    "toast": {
+      "fetchSubjectsFailed": "获取学科失败",
+      "fetchFailed": "获取提示词失败",
+      "empty": "内容为空",
+      "emptyDescription": "如需恢复默认，请使用“重置为默认”。",
+      "savedDescription": "{title} 已应用于当前学科",
+      "resetDone": "已重置为默认",
+      "resetDescription": "{title} 恢复使用系统默认",
+      "resetFailed": "重置失败"
+    },
+    "manager": {
+      "title": "常用指令",
+      "new": "新建指令",
+      "titleLabel": "标题",
+      "titlePlaceholder": "例如：翻译成中文",
+      "contentLabel": "指令内容",
+      "contentPlaceholder": "输入指令内容...",
+      "cancelEdit": "取消编辑",
+      "saveChanges": "保存修改",
+      "add": "添加指令",
+      "deleteConfirm": "确定要删除这个常用指令吗？"
+    }
+  },
+  "chat": {
+    "newSession": "新对话",
+    "untitled": "对话",
+    "copyMarkdown": "复制 Markdown",
+    "composer": {
+      "myModels": "我的模型",
+      "globalModels": "全局模型",
+      "selectModel": "选择模型",
+      "noModels": "暂无可用模型，请在“设置 → 我的 AI 模型”中配置",
+      "uploadImage": "上传图片",
+      "placeholder": "输入消息...",
+      "placeholderVision": "输入消息... (支持粘贴图片)"
+    },
+    "history": {
+      "rename": "重命名",
+      "empty": "暂无对话",
+      "deleteConfirm": "确定要删除这个对话吗？"
+    },
+    "messages": {
+      "loadMoreHistory": "加载更多历史消息",
+      "empty": "开始与 AI 对话吧...",
+      "scrollToLatest": "回到最新消息"
+    },
+    "selection": {
+      "count": "已选择 {count} 条"
+    },
+    "header": {
+      "backToChat": "返回聊天",
+      "history": "历史对话",
+      "multiSelect": "多选消息",
+      "resetLayout": "重置位置与大小",
+      "expand": "展开",
+      "minimize": "最小化"
+    },
+    "message": {
+      "deleteConfirm": "确定要删除这条消息吗？",
+      "viewQuestion": "查看题目 {id}",
+      "exportDocx": "导出 Docx"
+    },
+    "errors": {
+      "interrupted": "连接提前中断，请重试",
+      "toolInterrupted": "连接提前中断，未收到工具执行结果"
+    }
+  },
+  "questionEditor": {
+    "createTitle": "新增题目",
+    "editTitle": "编辑题目",
+    "importTitle": "编辑导入题目",
+    "update": "更新",
+    "discardConfirm": "本题有未保存的修改，继续将丢弃这些修改。确定继续吗？",
+    "joinStimulusHint": "把本题加入已有材料题，或新建一道材料题",
+    "sourcePlaceholder": "输入题目来源",
+    "visibilityPublic": "公开（学科内共享）",
+    "visibilityPrivate": "私有（仅自己可见）",
+    "knowledgePoints": "所属知识点",
+    "selectSubjectForKnowledgePoints": "请先选择学科以加载知识点",
+    "otherTags": "其他",
+    "type": "题目类型",
+    "stem": "题干",
+    "options": "选项",
+    "optionPool": "选项池（各空位共用）",
+    "optionPlaceholder": "输入选项内容…",
+    "removeOption": "删除选项",
+    "addOption": "添加选项",
+    "preview": {
+      "content": "题目预览",
+      "options": "选项预览",
+      "emptyOption": "（空选项）",
+      "notFilled": "（未填写）"
+    },
+    "structure": {
+      "title": "题目派生关系",
+      "description": "查看来源题、派生题及涉及的知识点",
+      "source": "来源题",
+      "current": "当前题目",
+      "derived": "派生题",
+      "view": "查看此题",
+      "noDerived": "暂无派生题"
+    }
+  },
+  "answerEditor": {
+    "clear": "暂不填写",
+    "refill": "重新填写答案",
+    "addOptionsFirst": "请先添加选项",
+    "blank": {
+      "stemDrivenHint": "填空数量与顺序由题干中的填空占位符决定，可为每空设置多个可接受答案。",
+      "title": "第 {index} 空（可接受答案）",
+      "placeholder": "输入参考答案…",
+      "addAccept": "添加备选答案",
+      "addBlank": "添加填空项"
+    },
+    "freeResponse": {
+      "placeholder": "输入参考答案 / 解答…"
+    },
+    "matching": {
+      "stemDrivenHint": "空位数量与顺序由题干中的空位占位符决定，为每个空位从选项池中选择正确项。",
+      "manualHint": "可在题干中插入空位占位符，或在此手动增减空位。",
+      "allowReuse": "允许同一选项用于多个空位",
+      "slot": "第 {index} 空",
+      "unset": "（未选择）",
+      "duplicated": "有选项被多个空位重复选用；如确需复用请勾选上方开关。",
+      "addSlot": "添加空位"
+    }
+  },
+  "answerDisplay": {
+    "or": "或",
+    "legacyTitle": "旧格式答案（未解析）",
+    "legacyEmpty": "（无内容）",
+    "true": "正确",
+    "false": "错误",
+    "choiceSeparator": "、"
+  },
+  "questionModel": {
+    "validation": {
+      "contentRequired": "题干不能为空",
+      "answerRequired": "提交审核或发布前请填写答案",
+      "legacyAnswer": "该题为旧格式未解析答案，请重新填写答案后再保存",
+      "answerTypeMismatch": "答案类型与题目类型不一致",
+      "minOptions": "选择题至少需要 {min} 个选项",
+      "unknownOption": "答案引用了不存在的选项",
+      "selectCorrect": "请选择正确答案",
+      "selectAtLeastOne": "请至少选择一个正确答案",
+      "referenceRequired": "提交审核或发布前请填写参考答案",
+      "duplicateMatching": "未允许重复选用时，各空位答案必须互不相同",
+      "slotMismatch": "题干空位与答案数量/顺序不一致",
+      "slotRequired": "选项匹配题至少需要一个空位，请在题干中插入空位",
+      "slotUnanswered": "第 {index} 空尚未选择答案",
+      "blankRequired": "填空题至少需要一个空",
+      "blankAcceptRequired": "第 {index} 空至少需要一个参考答案",
+      "blankMismatch": "题干填空与答案数量/顺序不一致"
+    }
+  },
+  "mathEditor": {
+    "keyboard": "虚拟键盘",
+    "keyboardHint": "提示：点击上方按钮可打开/关闭虚拟键盘。"
+  },
+  "svgRenderer": {
+    "title": "SVG 预览",
+    "preview": "预览",
+    "viewCode": "查看代码",
+    "copyCode": "复制 SVG 代码",
+    "download": "下载 SVG"
+  },
+  "richEditor": {
+    "placeholder": "输入内容，或输入 “/” 唤起命令菜单…",
+    "blockActions": "块操作",
+    "insert": "插入",
+    "toolbar": {
+      "insertBlank": "插入填空",
+      "undo": "撤销",
+      "redo": "重做"
+    },
+    "format": {
+      "bold": "加粗",
+      "italic": "斜体",
+      "underline": "下划线",
+      "superscript": "上标",
+      "subscript": "下标",
+      "clear": "清除格式"
+    },
+    "align": {
+      "title": "对齐方式",
+      "left": "左对齐",
+      "center": "居中",
+      "right": "右对齐",
+      "justify": "两端对齐"
+    },
+    "imageAlign": {
+      "left": "图片左对齐",
+      "center": "图片居中",
+      "right": "图片右对齐"
+    },
+    "heading": {
+      "title": "段落样式",
+      "level": "标题 {level}"
+    },
+    "table": {
+      "insert": "插入表格",
+      "rows": "行数",
+      "cols": "列数",
+      "withHeaderRow": "含表头行",
+      "addRowBefore": "上方插入行",
+      "addRowAfter": "下方插入行",
+      "deleteRow": "删除行",
+      "addColumnBefore": "左侧插入列",
+      "addColumnAfter": "右侧插入列",
+      "deleteColumn": "删除列",
+      "mergeCells": "合并单元格",
+      "splitCell": "拆分单元格",
+      "toggleHeaderRow": "切换表头行",
+      "toggleHeaderColumn": "切换表头列",
+      "deleteTable": "删除表格"
+    },
+    "blank": {
+      "label": "填空",
+      "width": "填空长度",
+      "presets": {
+        "short": "短",
+        "medium": "中",
+        "long": "长"
+      }
+    },
+    "math": {
+      "placeholder": "点击输入公式",
+      "done": "完成"
+    },
+    "image": {
+      "selectSubjectFirst": "请先选择学科再插入图片",
+      "uploadFailed": "图片上传失败"
+    },
+    "slash": {
+      "noResults": "无匹配结果",
+      "items": {
+        "paragraph": "正文",
+        "bulletList": "无序列表",
+        "orderedList": "有序列表",
+        "image": "图片",
+        "audio": "音频",
+        "inlineMath": "行内公式",
+        "blockMath": "块公式"
+      }
+    }
+  },
+  "stimuli": {
+    "emptyMaterial": "（空材料）",
+    "questionCount": "{count} 道小题",
+    "memberError": "第 {index} 小题：{error}",
+    "form": {
+      "editTitle": "编辑材料题",
+      "backToList": "返回材料题列表",
+      "saveFirst": "请先保存修改",
+      "addToComposition": "加入稿件",
+      "addToCompositionHint": "把材料和全部小题作为一道材料题加入稿件",
+      "cannotEdit": "无法编辑",
+      "selectSubjectFirstSentence": "请先选择学科。",
+      "noPermission": "你没有编辑该学科材料题的权限",
+      "noPermissionSentence": "你没有编辑该学科材料题的权限。",
+      "switchBackSubjectFirst": "请先切回草稿所属学科",
+      "contentRequired": "请填写材料内容",
+      "subjectSwitched": "当前学科已切换",
+      "subjectSwitchedDescription": "本地草稿仍属于学科 #{id}，未被重新加载或覆盖。请切回原学科后继续保存，或返回列表放弃草稿。",
+      "restoreSubject": "切回原学科",
+      "conflictTitle": "材料题已被其他人修改",
+      "conflictDescription": "你的本地内容与小题顺序仍然保留。可以加载服务器最新版本，或继续编辑本地草稿后再决定。",
+      "loadLatest": "加载最新并放弃本地",
+      "keepLocal": "继续编辑本地",
+      "incompatibleTitle": "私有材料题下有公开小题",
+      "incompatibleMessage": "私有材料题下不能包含公开小题（第 {items} 小题）。请移出这些小题，或在“设置”中把材料题改为公开。",
+      "incompatibleBadge": "公开小题不能放在私有材料题下",
+      "listSeparator": "、",
+      "clauseSeparator": "，",
+      "impactHint": "保存后{parts}。",
+      "impactSyncMembers": "状态和可见性会同步到 {count} 道小题",
+      "impactCompositions": "{count} 份稿件会提示同步更新",
+      "questionInOtherStimulus": "题目 #{id} 已属于材料题 #{stimulusId}，需先从原材料题移出。",
+      "questionLoadFailed": "题目加载失败",
+      "questionAppended": "已把题目 #{id} 加到末尾，保存后生效",
+      "leaveConfirm": "材料题有未保存的修改，确定要离开吗？",
+      "deleteNewConfirm": "删除这道未保存的小题？",
+      "removeDirtyConfirm": "这道小题的未保存修改将丢失，确定移出吗？",
+      "saved": "材料题已保存",
+      "created": "材料题已创建",
+      "saveFailed": "保存材料题失败",
+      "material": "材料",
+      "materialHint": "文章、图表或背景内容，小题围绕它作答。可以先只写材料，稍后再出题。",
+      "membersTitle": "小题（{count}）",
+      "membersHint": "按此顺序出现在稿件中；移出后保留为单题。小题与材料一起保存。",
+      "newMember": "新建小题",
+      "addExisting": "从题库添加已有单题…",
+      "dragToSort": "拖动排序",
+      "newBadge": "新",
+      "modified": "已修改",
+      "emptyStem": "（未填写题干）",
+      "collapse": "收起",
+      "moveUp": "上移",
+      "moveDown": "下移",
+      "deleteMember": "删除此小题",
+      "detachMember": "移出（保留为单题）",
+      "emptyMembers": "还没有小题。点击“新建小题”开始出题；也可以先保存材料，稍后再出题。",
+      "settings": "设置",
+      "source": "来源",
+      "optional": "可选"
+    },
+    "questionPicker": {
+      "title": "从题库添加小题",
+      "description": "只列出尚未归属任何材料题的单题；私有材料题下不能添加公开题目。",
+      "searchPlaceholder": "搜索题干",
+      "added": "已添加",
+      "empty": "没有可添加的单题",
+      "confirm": "添加 {count} 道题"
+    },
+    "row": {
+      "questionsLoadFailed": "小题加载失败",
+      "usedByCompositions": "被 {count} 份稿件使用",
+      "emptyStem": "（空题干）",
+      "addToComposition": "整道材料题加入稿件",
+      "restore": "恢复材料题",
+      "delete": "删除材料题"
+    },
+    "targetPicker": {
+      "title": "加入材料题",
+      "description": "选择本题要加入的材料题；本题会成为其中的一道小题，保存后生效。",
+      "createHint": "补充一段材料，本题作为第 1 小题",
+      "searchPlaceholder": "搜索已有材料题的材料内容或来源",
+      "incompatible": "公开题不能加入私有材料题",
+      "noMatch": "没有匹配的材料题",
+      "empty": "还没有材料题"
     }
   }
 }

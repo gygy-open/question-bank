@@ -3,6 +3,7 @@ import { Bot, History, MessageSquarePlus, CheckSquare, Minus, Maximize2, X, Rota
 import { Button } from '@/components/ui/button'
 import { useGlobalChat } from '@/composables/useGlobalChat'
 
+const { t } = useI18n()
 const chat = useGlobalChat()
 </script>
 
@@ -12,11 +13,11 @@ const chat = useGlobalChat()
     class="flex h-11 shrink-0 cursor-move select-none items-center gap-1.5 border-b bg-muted/40 px-2"
   >
     <template v-if="chat.view.value === 'history'">
-      <Button variant="ghost" size="icon" class="h-7 w-7 cursor-pointer" title="返回聊天"
+      <Button variant="ghost" size="icon" class="h-7 w-7 cursor-pointer" :title="t('chat.header.backToChat')"
         @click="chat.view.value = 'chat'">
         <ArrowLeft class="h-4 w-4" />
       </Button>
-      <span class="text-sm font-medium">历史对话</span>
+      <span class="text-sm font-medium">{{ t('chat.header.history') }}</span>
     </template>
     <template v-else>
       <Bot class="ml-1 h-4 w-4 shrink-0 text-primary" />
@@ -29,20 +30,20 @@ const chat = useGlobalChat()
 
     <div class="ml-auto flex items-center gap-0.5">
       <Button v-if="chat.view.value === 'chat' && !chat.isMinimized.value" variant="ghost" size="icon" class="h-7 w-7 cursor-pointer"
-        title="新对话" @click="chat.createNewSession()">
+        :title="t('chat.newSession')" @click="chat.createNewSession()">
         <MessageSquarePlus class="h-4 w-4" />
       </Button>
       <Button v-if="chat.view.value === 'chat' && !chat.isMinimized.value" variant="ghost" size="icon"
-        class="h-7 w-7 cursor-pointer" title="历史对话"
+        class="h-7 w-7 cursor-pointer" :title="t('chat.header.history')"
         @click="chat.view.value = 'history'">
         <History class="h-4 w-4" />
       </Button>
       <Button v-if="chat.view.value === 'chat' && !chat.isMinimized.value && chat.messages.value.length > 0" variant="ghost" size="icon" class="h-7 w-7 cursor-pointer"
-        :class="chat.isSelectionMode.value ? 'bg-accent' : ''" title="多选消息"
+        :class="chat.isSelectionMode.value ? 'bg-accent' : ''" :title="t('chat.header.multiSelect')"
         @click="chat.toggleSelectionMode()">
         <CheckSquare class="h-4 w-4" />
       </Button>
-      <Button v-if="!chat.isMinimized.value" variant="ghost" size="icon" class="h-7 w-7 cursor-pointer" title="重置位置与大小"
+      <Button v-if="!chat.isMinimized.value" variant="ghost" size="icon" class="h-7 w-7 cursor-pointer" :title="t('chat.header.resetLayout')"
         @click="chat.resetGeometry()">
         <RotateCcw class="h-4 w-4" />
       </Button>
@@ -50,13 +51,13 @@ const chat = useGlobalChat()
         variant="ghost"
         size="icon"
         class="h-7 w-7 cursor-pointer"
-        :title="chat.isMinimized.value ? '展开' : '最小化'"
+        :title="chat.isMinimized.value ? t('chat.header.expand') : t('chat.header.minimize')"
         @click="chat.isMinimized.value ? chat.restore() : chat.minimize()"
       >
         <Maximize2 v-if="chat.isMinimized.value" class="h-4 w-4" />
         <Minus v-else class="h-4 w-4" />
       </Button>
-      <Button variant="ghost" size="icon" class="h-7 w-7 cursor-pointer" title="关闭" @click="chat.close()">
+      <Button variant="ghost" size="icon" class="h-7 w-7 cursor-pointer" :title="t('common.close')" @click="chat.close()">
         <X class="h-4 w-4" />
       </Button>
     </div>

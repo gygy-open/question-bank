@@ -1,3 +1,5 @@
+import { translate } from '@/lib/locale'
+
 export interface ChatAction {
   tool: string
   toolCallId?: string
@@ -46,7 +48,7 @@ export const completeChatAction = (
 
 export const failRunningChatActions = (
   actions: ChatAction[],
-  output = '连接提前中断，未收到工具执行结果',
+  output = translate('chat.errors.toolInterrupted'),
 ): void => {
   for (const action of actions) {
     if (action.status !== 'running') continue

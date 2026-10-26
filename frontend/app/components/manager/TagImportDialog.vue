@@ -24,6 +24,7 @@ const emit = defineEmits<{
   (e: 'imported'): void
 }>()
 
+const { t } = useI18n()
 const { $api } = useNuxtApp()
 
 type Step = 'upload' | 'importing' | 'result'
@@ -51,11 +52,11 @@ const formatFileSize = (bytes: number): string => {
 
 const validateAndSet = (f: File): boolean => {
   if (!f.name.toLowerCase().endsWith('.xlsx')) {
-    toast.error('文件格式不正确，请上传 .xlsx 文件')
+    toast.error(t('tagImport.invalidFormat'))
     return false
   }
   if (f.size > 5 * 1024 * 1024) {
-    toast.error('文件过大，请确保文件小于 5MB')
+    toast.error(t('tagImport.fileTooLarge'))
     return false
   }
   selectedFile.value = f
@@ -88,7 +89,7 @@ const downloadTemplate = async () => {
     a.click()
     window.URL.revokeObjectURL(url)
   } catch (e: any) {
-    toast.error('下载模板失败: ' + (e.data?.detail || e.message))
+    toast.error(t('tagImport.downloadTemplateFailed', { error: e.data?.detail || e.message }))
   }
 }
 
@@ -110,7 +111,7 @@ const runImport = async () => {
   } catch (e: any) {
     result.value = {
       status: 'failed', created: 0, failed: 0, skipped: 0, total: 0,
-      errors: [{ row: 0, message: e.data?.detail || e.message || '导入失败' }],
+      errors: [{ row: 0, message: e.data?.detail || e.message || t('tagImport.importFailed') }],
     }
     step.value = 'result'
   }
@@ -118,9 +119,9 @@ const runImport = async () => {
 
 const copyErrors = () => {
   if (!result.value) return
-  const text = result.value.errors.map(err => `第 ${err.row} 行: ${err.message}`).join('\n')
+  const text = result.value.errors.map(err => t('tagImport.errorLine', { row: err.row, message: err.message })).join('\n')
   navigator.clipboard.writeText(text)
-  toast.success('已复制错误信息')
+  toast.success(t('tagImport.errorsCopied'))
 }
 
 const backToUpload = () => { step.value = 'upload' }
@@ -132,43 +133,43 @@ const backToUpload = () => { step.value = 'upload' }
       <!-- ===== Step 1: Upload ===== -->
       <template v-if="step === 'upload'">
         <DialogHeader>
-          <DialogTitle>批量导入标签</DialogTitle>
-          <DialogDescription>通过 Excel 一次性为当前学科创建多个标签</DialogDescription>
+          <DialogTitle>{{ t('tagImport.title') }}</DialogTitle>
+          <DialogDescription>{{ t('tagImport.description') }}</DialogDescription>
         </DialogHeader>
 
         <Alert>
           <BookOpen class="h-4 w-4" />
-          <AlertTitle>使用说明</AlertTitle>
+          <AlertTitle>{{ t('tagImport.instructions') }}</AlertTitle>
           <AlertDescription>
             <ol class="list-decimal list-inside space-y-0.5 text-sm">
-              <li>下载 Excel 模板，查看格式示例</li>
-              <li>填写名称、分类（可选，不存在会自动创建）、颜色（可选）</li>
-              <li>上传填写好的文件 —— 已存在的重名标签会被自动跳过（不影响其他标签导入），格式错误（如名称为空）时才会整体拒绝，修正后重新上传即可</li>
+              <li>{{ t('tagImport.steps.download') }}</li>
+              <li>{{ t('tagImport.steps.fill', { name: '名称', category: '分类', color: '颜色' }) }}</li>
+              <li>{{ t('tagImport.steps.upload', { name: '名称' }) }}</li>
             </ol>
           </AlertDescription>
         </Alert>
 
         <div class="space-y-4">
           <div>
-            <Label class="text-sm font-medium">1. 下载并填写模板</Label>
+            <Label class="text-sm font-medium">{{ t('tagImport.section.template') }}</Label>
             <Card class="mt-2 bg-muted/30">
               <CardContent class="pt-4">
                 <div class="flex items-start gap-3">
                   <FileSpreadsheet class="w-9 h-9 text-green-600 shrink-0" />
                   <div class="flex-1 text-sm">
                     <p class="font-medium">tags_template.xlsx</p>
-                    <p class="text-muted-foreground mt-1">模板列：名称(必填)、分类(可选，不存在会自动创建)、颜色(可选，十六进制色值如 #4F81BD)</p>
+                    <p class="text-muted-foreground mt-1">{{ t('tagImport.templateColumns', { name: '名称', category: '分类', color: '颜色' }) }}</p>
                   </div>
                 </div>
                 <Button variant="outline" class="mt-3 w-full" @click="downloadTemplate">
-                  <Download class="w-4 h-4 mr-2" />下载 Excel 模板
+                  <Download class="w-4 h-4 mr-2" />{{ t('tagImport.downloadTemplate') }}
                 </Button>
               </CardContent>
             </Card>
           </div>
 
           <div>
-            <Label class="text-sm font-medium">2. 上传填写好的文件</Label>
+            <Label class="text-sm font-medium">{{ t('tagImport.section.upload') }}</Label>
             <div
               class="mt-2 border-2 border-dashed rounded-lg p-6 text-center cursor-pointer transition-colors"
               :class="isDragging ? 'border-primary bg-primary/5' : 'hover:border-primary/50'"
@@ -181,8 +182,8 @@ const backToUpload = () => { step.value = 'upload' }
               @drop.prevent="handleDrop"
             >
               <Upload class="w-7 h-7 mx-auto text-muted-foreground mb-2" />
-              <p class="text-sm font-medium">点击选择文件 或 拖拽文件到此处</p>
-              <p class="text-xs text-muted-foreground mt-1">仅支持 .xlsx 格式，最大 5MB</p>
+              <p class="text-sm font-medium">{{ t('tagImport.dropHint') }}</p>
+              <p class="text-xs text-muted-foreground mt-1">{{ t('tagImport.formatHint') }}</p>
               <input ref="fileInput" type="file" accept=".xlsx" class="hidden" @change="handleFileChange" />
             </div>
 
@@ -198,29 +199,29 @@ const backToUpload = () => { step.value = 'upload' }
         </div>
 
         <DialogFooter class="flex-col sm:flex-row gap-2">
-          <Button variant="outline" @click="close">取消</Button>
-          <Button :disabled="!selectedFile || !subjectId" @click="runImport">开始导入</Button>
+          <Button variant="outline" @click="close">{{ t('common.cancel') }}</Button>
+          <Button :disabled="!selectedFile || !subjectId" @click="runImport">{{ t('tagImport.start') }}</Button>
         </DialogFooter>
       </template>
 
       <!-- ===== Step 2: Importing ===== -->
       <template v-else-if="step === 'importing'">
         <DialogHeader>
-          <DialogTitle>批量导入标签</DialogTitle>
-          <DialogDescription>正在处理，请稍候…</DialogDescription>
+          <DialogTitle>{{ t('tagImport.title') }}</DialogTitle>
+          <DialogDescription>{{ t('tagImport.processing') }}</DialogDescription>
         </DialogHeader>
         <div class="flex flex-col items-center justify-center py-12 gap-3">
           <Loader2 class="w-8 h-8 animate-spin text-primary" />
-          <p class="text-sm text-muted-foreground">正在导入标签…</p>
+          <p class="text-sm text-muted-foreground">{{ t('tagImport.importing') }}</p>
         </div>
       </template>
 
       <!-- ===== Step 3: Result ===== -->
       <template v-else>
         <DialogHeader>
-          <DialogTitle>导入结果</DialogTitle>
+          <DialogTitle>{{ t('tagImport.resultTitle') }}</DialogTitle>
           <DialogDescription>
-            共 {{ result?.total ?? 0 }} 行，成功创建 {{ result?.created ?? 0 }} 个，跳过重复 {{ result?.skipped ?? 0 }} 个
+            {{ t('tagImport.resultSummary', { total: result?.total ?? 0, created: result?.created ?? 0, skipped: result?.skipped ?? 0 }) }}
           </DialogDescription>
         </DialogHeader>
 
@@ -230,27 +231,27 @@ const backToUpload = () => { step.value = 'upload' }
             <XCircle v-else class="w-8 h-8 text-destructive" />
             <div class="text-sm">
               <p class="font-medium">
-                {{ result?.status === 'success' ? '导入完成' : '校验未通过，未创建任何标签' }}
+                {{ result?.status === 'success' ? t('tagImport.status.success') : t('tagImport.status.failed') }}
               </p>
               <p class="text-muted-foreground">
                 <template v-if="result?.status === 'success'">
-                  成功创建 {{ result?.created ?? 0 }} 个标签<template v-if="(result?.skipped ?? 0) > 0">，跳过 {{ result?.skipped }} 个已存在的重名标签</template>
+                  {{ t('tagImport.createdCount', { count: result?.created ?? 0 }) }}<template v-if="(result?.skipped ?? 0) > 0">{{ t('tagImport.skippedSuffix', { count: result?.skipped }) }}</template>
                 </template>
-                <template v-else>请按下方提示修正文件后重新上传</template>
+                <template v-else>{{ t('tagImport.fixAndRetry') }}</template>
               </p>
             </div>
           </div>
 
           <div v-if="result?.errors?.length" class="border rounded-md">
             <div class="flex items-center justify-between px-3 py-2 border-b bg-muted/40">
-              <span class="text-sm font-medium">错误明细（{{ result.errors.length }}）</span>
+              <span class="text-sm font-medium">{{ t('tagImport.errorDetails', { count: result.errors.length }) }}</span>
               <Button variant="ghost" size="sm" @click="copyErrors">
-                <Copy class="w-4 h-4 mr-1" />复制
+                <Copy class="w-4 h-4 mr-1" />{{ t('common.copy') }}
               </Button>
             </div>
             <div class="max-h-60 overflow-y-auto divide-y">
               <div v-for="(err, i) in result.errors" :key="i" class="flex gap-3 px-3 py-2 text-sm">
-                <span class="text-muted-foreground shrink-0">{{ err.row > 0 ? `第 ${err.row} 行` : '文件' }}</span>
+                <span class="text-muted-foreground shrink-0">{{ err.row > 0 ? t('tagImport.rowLabel', { row: err.row }) : t('tagImport.fileLabel') }}</span>
                 <span class="text-destructive">{{ err.message }}</span>
               </div>
             </div>
@@ -258,8 +259,8 @@ const backToUpload = () => { step.value = 'upload' }
         </div>
 
         <DialogFooter class="flex-col sm:flex-row gap-2">
-          <Button variant="outline" @click="backToUpload">继续导入</Button>
-          <Button @click="close">完成</Button>
+          <Button variant="outline" @click="backToUpload">{{ t('tagImport.continue') }}</Button>
+          <Button @click="close">{{ t('common.done') }}</Button>
         </DialogFooter>
       </template>
     </DialogContent>

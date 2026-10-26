@@ -8,6 +8,8 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 
 const emit = defineEmits<{ insert: [{ rows: number; cols: number; withHeaderRow: boolean }] }>()
 
+const { t } = useI18n()
+
 const open = ref(false)
 const rows = ref(3)
 const cols = ref(3)
@@ -30,26 +32,26 @@ function confirm() {
 <template>
     <Popover :open="open" @update:open="(v) => (open = v)">
         <PopoverTrigger as-child>
-            <Button type="button" size="icon" class="size-8" variant="ghost" title="插入表格" @mousedown.prevent>
+            <Button type="button" size="icon" class="size-8" variant="ghost" :title="t('richEditor.table.insert')" @mousedown.prevent>
                 <TableIcon class="size-4" />
             </Button>
         </PopoverTrigger>
         <PopoverContent class="w-56 space-y-3" align="start">
             <div class="grid grid-cols-2 gap-2">
                 <label class="space-y-1 text-xs text-muted-foreground">
-                    行数
+                    {{ t('richEditor.table.rows') }}
                     <Input v-model="rows" type="number" min="1" max="20" />
                 </label>
                 <label class="space-y-1 text-xs text-muted-foreground">
-                    列数
+                    {{ t('richEditor.table.cols') }}
                     <Input v-model="cols" type="number" min="1" max="20" />
                 </label>
             </div>
             <label class="flex items-center gap-2 text-sm">
                 <Checkbox v-model="withHeaderRow" />
-                含表头行
+                {{ t('richEditor.table.withHeaderRow') }}
             </label>
-            <Button type="button" size="sm" class="w-full" @click="confirm">插入</Button>
+            <Button type="button" size="sm" class="w-full" @click="confirm">{{ t('richEditor.insert') }}</Button>
         </PopoverContent>
     </Popover>
 </template>

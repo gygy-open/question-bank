@@ -43,7 +43,7 @@ describe('sceneState', () => {
 
 describe('usageMap', () => {
   it('collects every scene a model is used in', () => {
-    expect(usageMap({ text: 2, vision: 2, embedding: null }).get(2)).toEqual(['文本模型', '识图模型'])
+    expect(usageMap({ text: 2, vision: 2, embedding: null }).get(2)).toEqual(['aiModels.scenes.text.label', 'aiModels.scenes.vision.label'])
   })
 })
 

@@ -18,6 +18,7 @@ import {
 } from '@/lib/questionModel'
 
 const draft = defineModel<QuestionDraft>({ required: true })
+const { t } = useI18n()
 provideMediaSubject(() => draft.value.subject_id)
 
 const qType = computed<QuestionType>({
@@ -53,26 +54,26 @@ const removeOption = (index: number) => {
   <div class="space-y-6">
     <div class="grid grid-cols-2 gap-4">
       <div class="space-y-2">
-        <Label>题目类型</Label>
+        <Label>{{ t('questionEditor.type') }}</Label>
         <Select v-model="qType">
           <SelectTrigger><SelectValue /></SelectTrigger>
           <SelectContent>
-            <SelectItem value="single_choice">单选题</SelectItem>
-            <SelectItem value="multiple_choice">多选题</SelectItem>
-            <SelectItem value="true_false">判断题</SelectItem>
-            <SelectItem value="fill_in_the_blank">填空题</SelectItem>
-            <SelectItem value="free_response">解答题</SelectItem>
-            <SelectItem value="option_matching">选项匹配</SelectItem>
+            <SelectItem value="single_choice">{{ t('questions.types.singleChoice') }}</SelectItem>
+            <SelectItem value="multiple_choice">{{ t('questions.types.multipleChoice') }}</SelectItem>
+            <SelectItem value="true_false">{{ t('questions.types.trueFalse') }}</SelectItem>
+            <SelectItem value="fill_in_the_blank">{{ t('questions.types.fillInTheBlank') }}</SelectItem>
+            <SelectItem value="free_response">{{ t('questions.types.freeResponse') }}</SelectItem>
+            <SelectItem value="option_matching">{{ t('questions.types.optionMatching') }}</SelectItem>
           </SelectContent>
         </Select>
       </div>
       <slot name="meta" />
       <div class="space-y-2">
-        <Label>难度</Label>
+        <Label>{{ t('questionItem.difficulty') }}</Label>
         <Select v-model="draft.difficulty">
           <SelectTrigger><SelectValue /></SelectTrigger>
           <SelectContent>
-            <SelectItem v-for="level in 5" :key="level" :value="level">难度 {{ level }}</SelectItem>
+            <SelectItem v-for="level in 5" :key="level" :value="level">{{ t('questionItem.difficultyValue', { level }) }}</SelectItem>
           </SelectContent>
         </Select>
       </div>
@@ -81,24 +82,24 @@ const removeOption = (index: number) => {
     <slot name="fields" />
 
     <div class="space-y-2">
-      <Label>题干</Label>
+      <Label>{{ t('questionEditor.stem') }}</Label>
       <RichEditor v-model="draft.content" :allow-blank="qType === 'fill_in_the_blank' || qType === 'option_matching'" />
     </div>
 
     <div v-if="hasOptionPool(qType)" class="space-y-2">
-      <Label>{{ qType === 'option_matching' ? '选项池（各空位共用）' : '选项' }}</Label>
+      <Label>{{ qType === 'option_matching' ? t('questionEditor.optionPool') : t('questionEditor.options') }}</Label>
       <div class="grid grid-cols-1 gap-4">
         <div v-for="(opt, optIndex) in draft.options" :key="opt.id" class="flex items-start gap-2">
           <div class="mt-0.5 flex h-9 w-8 shrink-0 items-center justify-center rounded bg-muted font-medium">{{ opt.label }}</div>
           <div class="flex-1">
-            <RichEditor v-model="opt.content" placeholder="输入选项内容…" />
+            <RichEditor v-model="opt.content" :placeholder="t('questionEditor.optionPlaceholder')" />
           </div>
-          <Button variant="ghost" size="icon" class="mt-0.5 h-8 w-8" title="删除选项" aria-label="删除选项" @click="removeOption(optIndex)">
+          <Button variant="ghost" size="icon" class="mt-0.5 h-8 w-8" :title="t('questionEditor.removeOption')" :aria-label="t('questionEditor.removeOption')" @click="removeOption(optIndex)">
             <Trash2 class="h-3 w-3" />
           </Button>
         </div>
         <Button variant="outline" class="w-full border-dashed" @click="addOption">
-          <Plus class="mr-2 h-4 w-4" /> 添加选项
+          <Plus class="mr-2 h-4 w-4" /> {{ t('questionEditor.addOption') }}
         </Button>
       </div>
     </div>
@@ -111,15 +112,15 @@ const removeOption = (index: number) => {
     />
 
     <div class="space-y-2">
-      <Label>分析</Label>
+      <Label>{{ t('questionItem.thinking') }}</Label>
       <RichEditor v-model="draft.thinking" />
     </div>
     <div class="space-y-2">
-      <Label>解析</Label>
+      <Label>{{ t('questionItem.analysis') }}</Label>
       <RichEditor v-model="draft.analysis" />
     </div>
     <div class="space-y-2">
-      <Label>总结</Label>
+      <Label>{{ t('questionItem.summary') }}</Label>
       <RichEditor v-model="draft.summary" />
     </div>
   </div>

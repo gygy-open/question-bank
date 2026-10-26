@@ -16,6 +16,8 @@ export interface AssignmentRow {
   description?: string
 }
 
+const { t } = useI18n()
+
 const props = defineProps<{
   rows: AssignmentRow[]
   allModels: FlatModel[]
@@ -43,30 +45,30 @@ type Status = { tone: 'ok' | 'warn' | 'error', text: string }
 const statusOf = (row: AssignmentRow): Status => {
   const id = value.value[row.scene] ?? null
   if (id == null) {
-    if (row.fallbackLabel) return { tone: 'ok', text: `使用全局默认：${row.fallbackLabel}` }
-    if (row.fallbackLabel === null) return { tone: 'warn', text: '全局也未配置，该功能暂不可用' }
-    return { tone: 'warn', text: '未配置，该功能暂不可用' }
+    if (row.fallbackLabel) return { tone: 'ok', text: t('aiModels.status.usingGlobal', { model: row.fallbackLabel }) }
+    if (row.fallbackLabel === null) return { tone: 'warn', text: t('aiModels.status.globalUnset') }
+    return { tone: 'warn', text: t('aiModels.status.unset') }
   }
   const state = sceneState(props.allModels, row.scene, id)
-  if (state === 'ok') return { tone: 'ok', text: '可用' }
+  if (state === 'ok') return { tone: 'ok', text: t('aiModels.status.ok') }
   const m = findModel(id)
-  if (!m) return { tone: 'error', text: '所选模型已被删除，请重新选择' }
-  if (!m.providerActive) return { tone: 'error', text: `服务商“${m.providerName}”已停用` }
-  return { tone: 'error', text: '模型能力不符，请重新选择' }
+  if (!m) return { tone: 'error', text: t('aiModels.status.deleted') }
+  if (!m.providerActive) return { tone: 'error', text: t('aiModels.status.providerDisabled', { name: m.providerName }) }
+  return { tone: 'error', text: t('aiModels.status.capabilityMismatch') }
 }
 
 /** 当前值不在可选项里（被停用/能力变化）时，仍要显示出来，否则下拉框是空白的。 */
 const orphan = (row: AssignmentRow) => {
   const id = value.value[row.scene]
   if (id == null || row.options.some(o => o.id === id)) return null
-  return findModel(id) ?? { id, label: `已删除的模型 #${id}` }
+  return findModel(id) ?? { id, label: t('aiModels.deletedModel', { id }) }
 }
 
 const grouped = (options: FlatModel[]) => {
   const personal = options.filter(o => o.isPersonal)
   const global = options.filter(o => !o.isPersonal)
   return personal.length && global.length
-    ? [{ label: '我的服务商', items: personal }, { label: '全局服务商', items: global }]
+    ? [{ label: t('aiModels.groups.personal'), items: personal }, { label: t('aiModels.groups.global'), items: global }]
     : [{ label: '', items: options }]
 }
 </script>
@@ -83,8 +85,8 @@ const grouped = (options: FlatModel[]) => {
           <component :is="ICONS[row.scene]" class="h-4 w-4" />
         </div>
         <div class="min-w-0">
-          <div class="font-medium">{{ SCENES[row.scene].label }}</div>
-          <p class="text-sm text-muted-foreground">{{ row.description ?? SCENES[row.scene].description }}</p>
+          <div class="font-medium">{{ t(SCENES[row.scene].labelKey) }}</div>
+          <p class="text-sm text-muted-foreground">{{ row.description ?? t(SCENES[row.scene].descriptionKey) }}</p>
           <p
             class="mt-1 flex items-center gap-1 text-xs"
             :class="{
@@ -112,24 +114,24 @@ const grouped = (options: FlatModel[]) => {
         <SelectContent>
           <SelectItem :value="NULL">{{ row.emptyLabel }}</SelectItem>
           <SelectItem v-if="orphan(row)" :value="String(orphan(row)!.id)" disabled>
-            （不可用）{{ orphan(row)!.label }}
+            {{ t('aiModels.unavailablePrefix') }}{{ orphan(row)!.label }}
           </SelectItem>
           <SelectGroup v-for="g in grouped(row.options)" :key="g.label">
             <SelectLabel v-if="g.label">{{ g.label }}</SelectLabel>
             <SelectItem v-for="m in g.items" :key="m.id" :value="String(m.id)">{{ m.label }}</SelectItem>
           </SelectGroup>
           <div v-if="!row.options.length" class="px-2 py-1.5 text-xs text-muted-foreground">
-            没有可用的{{ SCENES[row.scene].label }}，请先在下方添加
+            {{ t('aiModels.noOptions', { scene: t(SCENES[row.scene].labelKey) }) }}
           </div>
         </SelectContent>
       </Select>
     </div>
 
     <div v-if="dirty" class="flex items-center justify-end gap-2 rounded-b-xl border-t bg-amber-50/60 px-4 py-2.5 dark:bg-amber-950/20">
-      <span class="mr-auto text-sm text-amber-700 dark:text-amber-400">有未保存的更改</span>
-      <Button variant="ghost" size="sm" :disabled="saving" @click="emit('reset')">撤销</Button>
+      <span class="mr-auto text-sm text-amber-700 dark:text-amber-400">{{ t('aiModels.unsaved') }}</span>
+      <Button variant="ghost" size="sm" :disabled="saving" @click="emit('reset')">{{ t('aiModels.revert') }}</Button>
       <Button size="sm" :disabled="saving" @click="emit('save')">
-        <Loader2 v-if="saving" class="mr-2 h-4 w-4 animate-spin" />保存
+        <Loader2 v-if="saving" class="mr-2 h-4 w-4 animate-spin" />{{ t('common.save') }}
       </Button>
     </div>
   </div>

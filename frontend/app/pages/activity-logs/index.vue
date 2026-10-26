@@ -29,6 +29,7 @@ import { X } from '@lucide/vue'
 import { format } from 'date-fns'
 import PageHeader from '~/components/PageHeader.vue'
 
+const { t } = useI18n()
 const { user } = useAuth()
 const router = useRouter()
 
@@ -79,15 +80,15 @@ const formatDetails = (details: any) => {
 </script>
 
 <template>
-  <PageHeader title="行为日志">
+  <PageHeader :title="t('nav.activityLogs')">
     <template #actions>
       <div class="flex items-center gap-2">
         <Select v-model="selectedUserId">
           <SelectTrigger class="w-[180px]">
-            <SelectValue placeholder="选择用户" />
+            <SelectValue :placeholder="t('activityLogs.selectUser')" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">所有用户</SelectItem>
+            <SelectItem value="all">{{ t('activityLogs.allUsers') }}</SelectItem>
             <SelectItem v-for="u in usersData" :key="u.id" :value="String(u.id)">
               {{ u.full_name || u.username }}
             </SelectItem>
@@ -98,7 +99,7 @@ const formatDetails = (details: any) => {
         </Button>
       </div>
       <div class="text-sm text-muted-foreground">
-        共 {{ total }} 条记录
+        {{ t('activityLogs.total', { count: total }) }}
       </div>
     </template>
   </PageHeader>
@@ -109,24 +110,24 @@ const formatDetails = (details: any) => {
         <TableHeader>
           <TableRow>
             <TableHead class="w-[80px]">ID</TableHead>
-            <TableHead>用户</TableHead>
-            <TableHead>行为</TableHead>
-            <TableHead>资源类型</TableHead>
-            <TableHead>资源ID</TableHead>
-            <TableHead>IP地址</TableHead>
-            <TableHead>时间</TableHead>
-            <TableHead>详情</TableHead>
+            <TableHead>{{ t('activityLogs.columns.user') }}</TableHead>
+            <TableHead>{{ t('activityLogs.columns.action') }}</TableHead>
+            <TableHead>{{ t('activityLogs.columns.resourceType') }}</TableHead>
+            <TableHead>{{ t('activityLogs.columns.resourceId') }}</TableHead>
+            <TableHead>{{ t('activityLogs.columns.ipAddress') }}</TableHead>
+            <TableHead>{{ t('activityLogs.columns.time') }}</TableHead>
+            <TableHead>{{ t('activityLogs.columns.details') }}</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
           <TableRow v-if="pending">
             <TableCell colspan="8" class="text-center py-10">
-              加载中...
+              {{ t('common.loading') }}
             </TableCell>
           </TableRow>
           <TableRow v-else-if="!logs || logs.length === 0">
             <TableCell colspan="8" class="text-center py-10">
-              暂无日志
+              {{ t('activityLogs.empty') }}
             </TableCell>
           </TableRow>
           <TableRow v-else v-for="log in logs" :key="log.id">

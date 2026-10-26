@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, beforeAll, afterAll } from 'vitest'
 import type { AnswerSpec, OptionSpec, RichDoc } from '@/types'
 import { collectBlankIds, richDocToPlainText } from '@/components/rich-editor/richDoc'
 import {
@@ -14,6 +14,15 @@ import {
     createEmptyDraft,
 } from '@/lib/questionModel'
 import { answerToPlainText, matchingAnswerEntries, optionLabelsForAnswer } from '@/lib/answerFormat'
+import { setTranslator } from '@/lib/locale'
+
+// 校验错误是界面文案（走 i18n）：测试里把 key 与参数原样拼出来，断言结构而不依赖具体语言。
+beforeAll(() => {
+    setTranslator((key, params) => (params ? `${key}(${Object.values(params).join('|')})` : key))
+})
+afterAll(() => {
+    setTranslator((key) => key)
+})
 
 function doc(text: string): RichDoc {
     return { type: 'doc', content: [{ type: 'paragraph', content: [{ type: 'text', text }] }] }
@@ -139,7 +148,7 @@ describe('answer formatter', () => {
 describe('validateQuestionDraft', () => {
     it('题干为空报错', () => {
         const d = createEmptyDraft()
-        expect(validateQuestionDraft(d)).toBe('题干不能为空')
+        expect(validateQuestionDraft(d)).toBe('questionModel.validation.contentRequired')
     })
 
     it('草稿允许答案为空或未完成', () => {
@@ -164,7 +173,7 @@ describe('validateQuestionDraft', () => {
         d.q_type = 'multiple_choice'
         d.answer = { kind: 'multiple_choice', correct: [] }
         d.status = 'pending'
-        expect(validateQuestionDraft(d)).toBe('请至少选择一个正确答案')
+        expect(validateQuestionDraft(d)).toBe('questionModel.validation.selectAtLeastOne')
     })
 
     it('legacy_unresolved 被拒绝', () => {
@@ -172,7 +181,7 @@ describe('validateQuestionDraft', () => {
         d.content = doc('题干')
         d.q_type = 'free_response'
         d.answer = { kind: 'legacy_unresolved', expected_kind: 'free_response', raw: doc('旧答案') }
-        expect(validateQuestionDraft(d)).toContain('旧格式')
+        expect(validateQuestionDraft(d)).toBe('questionModel.validation.legacyAnswer')
     })
 
     it('published 填空缺参考答案报错，且题干填空数量需匹配', () => {
@@ -187,13 +196,13 @@ describe('validateQuestionDraft', () => {
             ],
         }
         d.status = 'published'
-        expect(validateQuestionDraft(d)).toBe('第 1 空至少需要一个参考答案')
+        expect(validateQuestionDraft(d)).toBe('questionModel.validation.blankAcceptRequired(1)')
 
         d.answer = {
             kind: 'fill_in_the_blank',
             blanks: [{ id: 'b1', accept: [doc('x')] }],
         }
-        expect(validateQuestionDraft(d)).toBe('题干填空与答案数量/顺序不一致')
+        expect(validateQuestionDraft(d)).toBe('questionModel.validation.blankMismatch')
     })
 })
 
@@ -266,13 +275,13 @@ describe('option_matching', () => {
 
     it('重复选用需开启 allow_reuse；发布前每空必须作答', () => {
         expect(validateQuestionDraft(matchingDraft([{ id: 'b1', correct: 'opt_a' }, { id: 'b2', correct: 'opt_a' }])))
-            .toContain('互不相同')
+            .toBe('questionModel.validation.duplicateMatching')
         expect(validateQuestionDraft(matchingDraft([{ id: 'b1', correct: 'opt_a' }, { id: 'b2', correct: 'opt_a' }], true)))
             .toBeNull()
         const pending = matchingDraft([{ id: 'b1', correct: 'opt_a' }, { id: 'b2', correct: '' }])
         expect(validateQuestionDraft(pending)).toBeNull()
         pending.status = 'pending'
-        expect(validateQuestionDraft(pending)).toBe('第 2 空尚未选择答案')
+        expect(validateQuestionDraft(pending)).toBe('questionModel.validation.slotUnanswered(2)')
     })
 
     it('删除选项时清空引用它的空位', () => {

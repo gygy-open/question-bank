@@ -3,7 +3,8 @@ import type { Editor } from '@tiptap/vue-3'
 import { Bold, Italic, Underline, Superscript, Subscript, RemoveFormatting } from '@lucide/vue'
 
 export interface ToolbarItem {
-    label: string
+    /** i18n key，渲染时再翻译 */
+    labelKey: string
     icon: Component
     action: () => void
     isActive?: () => boolean
@@ -14,37 +15,37 @@ export interface ToolbarItem {
 export function getInlineFormatItems(editor: Editor): ToolbarItem[] {
     return [
         {
-            label: '加粗',
+            labelKey: 'richEditor.format.bold',
             icon: Bold,
             action: () => editor.chain().focus().toggleBold().run(),
             isActive: () => editor.isActive('bold'),
         },
         {
-            label: '斜体',
+            labelKey: 'richEditor.format.italic',
             icon: Italic,
             action: () => editor.chain().focus().toggleItalic().run(),
             isActive: () => editor.isActive('italic'),
         },
         {
-            label: '下划线',
+            labelKey: 'richEditor.format.underline',
             icon: Underline,
             action: () => editor.chain().focus().toggleUnderline().run(),
             isActive: () => editor.isActive('underline'),
         },
         {
-            label: '上标',
+            labelKey: 'richEditor.format.superscript',
             icon: Superscript,
             action: () => editor.chain().focus().toggleSuperscript().run(),
             isActive: () => editor.isActive('superscript'),
         },
         {
-            label: '下标',
+            labelKey: 'richEditor.format.subscript',
             icon: Subscript,
             action: () => editor.chain().focus().toggleSubscript().run(),
             isActive: () => editor.isActive('subscript'),
         },
         {
-            label: '清除格式',
+            labelKey: 'richEditor.format.clear',
             icon: RemoveFormatting,
             action: () => editor.chain().focus().unsetAllMarks().clearNodes().run(),
         },

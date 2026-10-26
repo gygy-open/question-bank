@@ -17,6 +17,8 @@ const props = defineProps<{
     canDelete: boolean
 }>()
 
+const { t } = useI18n()
+
 const emit = defineEmits<{
     submit: [string]
     cancel: []
@@ -106,7 +108,7 @@ watch(
                     @pointerdown.prevent
                     @click="emit('delete')"
                 >
-                    删除
+                    {{ t('common.delete') }}
                 </Button>
                 <span v-else />
                 <div class="flex gap-2">
@@ -117,10 +119,10 @@ watch(
                         @pointerdown.prevent
                         @click="emit('cancel')"
                     >
-                        取消
+                        {{ t('common.cancel') }}
                     </Button>
                     <Button type="button" size="sm" @pointerdown.prevent @click="emit('submit', currentValue())">
-                        完成
+                        {{ t('richEditor.math.done') }}
                     </Button>
                 </div>
             </div>

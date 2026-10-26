@@ -8,6 +8,7 @@ import { Table, TableRow, TableHeader, TableCell } from '@tiptap/extension-table
 import { InlineMath, BlockMath } from '@tiptap/extension-mathematics'
 import type { NodeViewRenderer } from '@tiptap/core'
 import { generateBlankId } from './richDoc'
+import { translate } from '@/lib/locale'
 
 export interface SchemaExtensionOptions {
     /** 公式节点的自定义 nodeView（编辑器传入 MathLive 就地编辑；只读渲染不传，走库自带 KaTeX 渲染）。 */
@@ -144,7 +145,7 @@ export const Blank = Node.create({
                 'data-type': 'blank',
                 class: 'rich-blank',
                 role: 'img',
-                'aria-label': '填空',
+                'aria-label': translate('richEditor.blank.label'),
             }),
         ]
     },

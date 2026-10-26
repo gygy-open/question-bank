@@ -16,12 +16,14 @@ const open = defineModel<boolean>('open', { required: true })
 const props = withDefaults(defineProps<{ kind?: MediaKind }>(), { kind: 'image' })
 const emit = defineEmits<{ select: [attrs: MediaPickResult] }>()
 
+const { t } = useI18n()
+
 const PAGE_SIZE = 30
 const ACCEPT: Record<MediaKind, string> = {
     image: 'image/png,image/jpeg,image/gif,image/webp',
     audio: 'audio/mpeg,audio/mp4,audio/x-m4a,audio/ogg,audio/wav,audio/x-wav,.mp3,.m4a,.ogg,.wav',
 }
-const noun = computed(() => (props.kind === 'audio' ? '音频' : '图片'))
+const noun = computed(() => t(props.kind === 'audio' ? 'mediaPicker.noun.audio' : 'mediaPicker.noun.image'))
 
 const subjectId = useMediaSubject()
 const { uploadImage } = useImageUpload()
@@ -51,7 +53,7 @@ async function fetchLibrary(reset: boolean) {
         total.value = res.total
         page.value = nextPage
     } catch {
-        toast.error('媒体库加载失败')
+        toast.error(t('media.loadFailed'))
     } finally {
         loading.value = false
     }
@@ -87,19 +89,19 @@ async function uploadAudio(file: File) {
     try {
         const asset = await uploadContentImage(sid, file)
         if (asset.kind !== 'audio') {
-            toast.error('请选择音频文件')
+            toast.error(t('mediaPicker.selectAudioFile'))
             return
         }
         choose({ id: asset.id, url: asset.url, name: asset.original_filename })
     } catch (error) {
-        toast.error(getApiErrorDetail(error, '音频上传失败'))
+        toast.error(getApiErrorDetail(error, t('mediaPicker.audioUploadFailed')))
     }
 }
 
 async function uploadFile(file: File | undefined) {
     if (!file || uploading.value) return
     if (props.kind === 'image' && !file.type.startsWith('image/')) {
-        toast.error('请选择图片文件')
+        toast.error(t('mediaPicker.selectImageFile'))
         return
     }
     uploading.value = true
@@ -130,7 +132,7 @@ function onDrop(event: DragEvent) {
 }
 
 function usageLabel(count: number) {
-    return count > 0 ? `${count} 处使用` : '未使用'
+    return count > 0 ? t('media.usageCount', { count }) : t('media.usage.unused')
 }
 </script>
 
@@ -138,17 +140,17 @@ function usageLabel(count: number) {
     <Dialog v-model:open="open">
         <DialogContent class="w-[95vw] sm:max-w-[760px]">
             <DialogHeader>
-                <DialogTitle>插入{{ noun }}</DialogTitle>
-                <DialogDescription>上传新{{ noun }}，或从本学科媒体库中选择已有{{ noun }}。</DialogDescription>
+                <DialogTitle>{{ t('mediaPicker.title', { noun }) }}</DialogTitle>
+                <DialogDescription>{{ t('mediaPicker.description', { noun }) }}</DialogDescription>
             </DialogHeader>
 
-            <p v-if="!subjectId" class="py-8 text-center text-sm text-muted-foreground">请先选择学科再插入{{ noun }}。</p>
+            <p v-if="!subjectId" class="py-8 text-center text-sm text-muted-foreground">{{ t('mediaPicker.selectSubjectFirst', { noun }) }}</p>
 
             <Tabs v-else v-model="tab" class="mt-2">
                 <TabsList class="grid w-full grid-cols-3">
-                    <TabsTrigger value="upload">上传</TabsTrigger>
-                    <TabsTrigger value="library">媒体库</TabsTrigger>
-                    <TabsTrigger value="recent">最近使用</TabsTrigger>
+                    <TabsTrigger value="upload">{{ t('media.upload') }}</TabsTrigger>
+                    <TabsTrigger value="library">{{ t('nav.media') }}</TabsTrigger>
+                    <TabsTrigger value="recent">{{ t('mediaPicker.recent') }}</TabsTrigger>
                 </TabsList>
 
                 <TabsContent value="upload" class="mt-3">
@@ -164,8 +166,8 @@ function usageLabel(count: number) {
                     >
                         <Loader2 v-if="uploading" class="size-6 animate-spin" />
                         <Upload v-else class="size-6" />
-                        <span>{{ uploading ? '上传中…' : `点击选择或拖入${noun}` }}</span>
-                        <span class="text-xs">{{ kind === 'audio' ? '支持 MP3、M4A、OGG、WAV，单个不超过 100 MB' : '支持 PNG、JPEG、GIF、WebP，单张不超过 10 MB' }}</span>
+                        <span>{{ uploading ? t('mediaPicker.uploading') : t('mediaPicker.dropHint', { noun }) }}</span>
+                        <span class="text-xs">{{ kind === 'audio' ? t('mediaPicker.audioFormats') : t('mediaPicker.imageFormats') }}</span>
                     </button>
                     <input ref="fileInputRef" type="file" :accept="ACCEPT[kind]" class="hidden" @change="onFileChange" />
                 </TabsContent>
@@ -173,11 +175,11 @@ function usageLabel(count: number) {
                 <TabsContent value="library" class="mt-3 space-y-3">
                     <div class="relative">
                         <Search class="absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-                        <Input v-model="query" placeholder="按文件名或替代文本搜索" class="pl-8" />
+                        <Input v-model="query" :placeholder="t('mediaPicker.searchPlaceholder')" class="pl-8" />
                     </div>
                     <div class="max-h-[55vh] overflow-y-auto">
                         <p v-if="!loading && items.length === 0" class="py-12 text-center text-sm text-muted-foreground">
-                            {{ query ? `没有匹配的${noun}` : `媒体库里还没有${noun}，先上传一个吧` }}
+                            {{ query ? t('mediaPicker.noMatch', { noun }) : t('mediaPicker.empty', { noun }) }}
                         </p>
                         <div class="grid grid-cols-3 gap-3 sm:grid-cols-5">
                             <button
@@ -186,7 +188,7 @@ function usageLabel(count: number) {
                                 type="button"
                                 class="group flex flex-col gap-1 rounded-md border p-1.5 text-left transition-colors hover:border-primary disabled:cursor-not-allowed disabled:opacity-60"
                                 :disabled="!item.displayable"
-                                :title="item.displayable ? item.original_filename ?? '' : '浏览器无法显示此格式'"
+                                :title="item.displayable ? item.original_filename ?? '' : t('mediaPicker.unsupportedFormat')"
                                 @click="choose({ id: item.id, url: item.url, name: item.original_filename })"
                             >
                                 <div class="flex aspect-square flex-col items-center justify-center gap-1 overflow-hidden rounded bg-muted">
@@ -197,19 +199,19 @@ function usageLabel(count: number) {
                                     <img v-else-if="item.displayable" :src="item.url" :alt="item.original_filename ?? ''" loading="lazy" class="max-h-full max-w-full object-contain" />
                                     <ImageOff v-else class="size-6 text-muted-foreground" />
                                 </div>
-                                <span class="truncate text-xs">{{ item.original_filename || `${noun} #${item.id}` }}</span>
+                                <span class="truncate text-xs">{{ item.original_filename || t('mediaPicker.unnamed', { noun, id: item.id }) }}</span>
                                 <span class="text-[11px]" :class="item.usage_count ? 'text-muted-foreground' : 'text-muted-foreground/60'">{{ usageLabel(item.usage_count) }}</span>
                             </button>
                         </div>
                         <div v-if="loading" class="flex justify-center py-4"><Loader2 class="size-5 animate-spin text-muted-foreground" /></div>
                         <div v-else-if="hasMore" class="flex justify-center pt-3">
-                            <Button variant="outline" size="sm" @click="fetchLibrary(false)">加载更多</Button>
+                            <Button variant="outline" size="sm" @click="fetchLibrary(false)">{{ t('common.loadMore') }}</Button>
                         </div>
                     </div>
                 </TabsContent>
 
                 <TabsContent value="recent" class="mt-3">
-                    <p v-if="recent.length === 0" class="py-12 text-center text-sm text-muted-foreground">还没有插入过{{ noun }}</p>
+                    <p v-if="recent.length === 0" class="py-12 text-center text-sm text-muted-foreground">{{ t('mediaPicker.noRecent', { noun }) }}</p>
                     <div v-else class="grid max-h-[55vh] grid-cols-3 gap-3 overflow-y-auto sm:grid-cols-5">
                         <button
                             v-for="entry in recent"
@@ -222,7 +224,7 @@ function usageLabel(count: number) {
                                 <Music v-if="kind === 'audio'" class="size-6 text-muted-foreground" />
                                 <img v-else :src="entry.url" :alt="entry.name ?? ''" loading="lazy" class="max-h-full max-w-full object-contain" />
                             </div>
-                            <span class="truncate text-xs">{{ entry.name || `${noun} #${entry.id}` }}</span>
+                            <span class="truncate text-xs">{{ entry.name || t('mediaPicker.unnamed', { noun, id: entry.id }) }}</span>
                         </button>
                     </div>
                 </TabsContent>

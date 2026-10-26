@@ -9,6 +9,7 @@ import ChatComposer from '@/components/chat/ChatComposer.vue'
 import ChatSelectionBar from '@/components/chat/ChatSelectionBar.vue'
 import { useGlobalChat } from '@/composables/useGlobalChat'
 
+const { t } = useI18n()
 const chat = useGlobalChat()
 const isMobile = useMediaQuery('(max-width: 767px)')
 
@@ -112,7 +113,7 @@ const onKeydown = (e: KeyboardEvent) => {
       class="fixed z-40 flex flex-col overflow-hidden rounded-lg border bg-background shadow-2xl"
       :style="panelStyle"
       role="dialog"
-      aria-label="AI 助手"
+      :aria-label="t('nav.aiAssistant')"
       @keydown="onKeydown"
       @pointerdown="onDragStart"
     >

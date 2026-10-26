@@ -10,6 +10,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert'
 import KnowledgePointImportDialog from '@/components/manager/KnowledgePointImportDialog.vue'
 import { toast } from 'vue-sonner'
 
+const { t } = useI18n()
 const { $api } = useNuxtApp()
 
 // --- Types ---
@@ -93,7 +94,7 @@ const handleCreateRoot = async () => {
         parent_id: null
       }
     })
-    toast.success('根目录创建成功')
+    toast.success(t('kpManager.toast.rootCreated'))
     
     if (knowledgePoints.value) {
       knowledgePoints.value = [...knowledgePoints.value, newKp]
@@ -105,7 +106,7 @@ const handleCreateRoot = async () => {
     newRootSlug.value = ''
     isCreatingRoot.value = false
   } catch (e: any) {
-    toast.error('创建失败: ' + (e.data?.detail || e.message))
+    toast.error(t('kpManager.toast.createFailed', { error: e.data?.detail || e.message }))
   }
 }
 
@@ -120,7 +121,7 @@ const handleCreateChild = async (parentId: number, data: { name: string, slug: s
         parent_id: parentId
       }
     })
-    toast.success('子目录创建成功')
+    toast.success(t('kpManager.toast.childCreated'))
     
     if (knowledgePoints.value) {
       knowledgePoints.value = [...knowledgePoints.value, newKp]
@@ -128,7 +129,7 @@ const handleCreateChild = async (parentId: number, data: { name: string, slug: s
       knowledgePoints.value = [newKp]
     }
   } catch (e: any) {
-    toast.error('创建失败: ' + (e.data?.detail || e.message))
+    toast.error(t('kpManager.toast.createFailed', { error: e.data?.detail || e.message }))
   }
 }
 
@@ -141,7 +142,7 @@ const handleUpdate = async (id: number, data: { name: string, slug: string }) =>
         slug: data.slug
       }
     })
-    toast.success('更新成功')
+    toast.success(t('kpManager.toast.updated'))
     
     if (knowledgePoints.value) {
       const index = knowledgePoints.value.findIndex(k => k.id === id)
@@ -152,18 +153,18 @@ const handleUpdate = async (id: number, data: { name: string, slug: string }) =>
       }
     }
   } catch (e: any) {
-    toast.error('更新失败: ' + (e.data?.detail || e.message))
+    toast.error(t('kpManager.toast.updateFailed', { error: e.data?.detail || e.message }))
   }
 }
 
 const handleDelete = async (id: number) => {
-  if (!confirm('确定要删除该知识点及其所有子知识点吗？')) return
+  if (!confirm(t('kpManager.deleteConfirm'))) return
 
   try {
     await $api(`/knowledge-points/${id}`, {
       method: 'DELETE'
     })
-    toast.success('删除成功')
+    toast.success(t('kpManager.toast.deleted'))
     
     if (knowledgePoints.value) {
       // Recursive deletion logic might be needed if the backend deletes children but we only remove the parent from the flat list.
@@ -195,7 +196,7 @@ const handleDelete = async (id: number) => {
       knowledgePoints.value = knowledgePoints.value.filter(k => !toDelete.has(k.id))
     }
   } catch (e: any) {
-    toast.error('删除失败: ' + (e.data?.detail || e.message))
+    toast.error(t('kpManager.toast.deleteFailed', { error: e.data?.detail || e.message }))
   }
 }
 
@@ -209,7 +210,7 @@ const handleMove = async (draggedId: number, targetId: number) => {
         parent_id: targetId
       }
     })
-    toast.success('移动成功')
+    toast.success(t('kpManager.toast.moved'))
     
     if (knowledgePoints.value) {
       const index = knowledgePoints.value.findIndex(k => k.id === draggedId)
@@ -220,7 +221,7 @@ const handleMove = async (draggedId: number, targetId: number) => {
       }
     }
   } catch (e: any) {
-    toast.error('移动失败: ' + (e.data?.detail || e.message))
+    toast.error(t('kpManager.toast.moveFailed', { error: e.data?.detail || e.message }))
   }
 }
 
@@ -253,10 +254,10 @@ const handleReindex = async () => {
   isReindexing.value = true
   try {
     const res = await $api<ReindexResult>('/knowledge-points/reindex-vectors', { method: 'POST' })
-    toast.success(`向量索引已重建（${res.reindexed} 个知识点，耗时 ${res.duration}s）`)
+    toast.success(t('kpManager.toast.reindexed', { count: res.reindexed, duration: res.duration }))
     await fetchVectorStatus()
   } catch (e: any) {
-    toast.error('重建失败: ' + (e.data?.detail || e.message))
+    toast.error(t('kpManager.toast.reindexFailed', { error: e.data?.detail || e.message }))
   } finally {
     isReindexing.value = false
   }
@@ -266,27 +267,27 @@ onMounted(fetchVectorStatus)
 </script>
 
 <template>
-  <PageHeader title="知识点管理" description="管理各学科的知识点结构" />
+  <PageHeader :title="t('nav.knowledgePoints')" :description="t('kpManager.pageDescription')" />
 
   <div class="flex flex-1 flex-col">
     <div class="@container/main flex flex-1 flex-col px-4 space-y-6 py-6">
       <div v-if="!subjects || subjects.length === 0" class="text-center py-10 text-muted-foreground">
-        暂无学科，请先添加学科。
+        {{ t('kpManager.noSubjects') }}
       </div>
 
       <Tabs v-else v-model="selectedSubjectId" class="w-full">
         <div class="mt-4 border rounded-lg p-4 min-h-[500px] bg-card">
           <div class="flex justify-between items-center mb-4 gap-2 flex-wrap">
-            <h3 class="text-lg font-medium">知识点树</h3>
+            <h3 class="text-lg font-medium">{{ t('kpManager.treeTitle') }}</h3>
             <div class="flex items-center gap-2">
               <template v-if="isSuperuser">
                 <Button variant="outline" size="sm" @click="showImportDialog = true">
-                  <Upload class="w-4 h-4 mr-2" />批量导入
+                  <Upload class="w-4 h-4 mr-2" />{{ t('kpManager.batchImport') }}
                 </Button>
               </template>
               <Button v-if="canManage && !isCreatingRoot" size="sm" @click="isCreatingRoot = true">
                 <Plus class="w-4 h-4 mr-2" />
-                添加根目录
+                {{ t('kpManager.addRoot') }}
               </Button>
             </div>
           </div>
@@ -295,19 +296,19 @@ onMounted(fetchVectorStatus)
           <Alert v-if="isSuperuser && vectorStatus && !vectorStatus.embedding_configured" class="mb-4 items-center [&>svg]:translate-y-0">
             <Database class="h-4 w-4" />
             <AlertDescription class="flex items-center justify-between gap-2">
-              <span class="text-sm">{{ vectorStatus.reason }}，如果您需要在智能导入题目时自动匹配知识点，请先配置 Embedding 模型，否则可以忽略此提示。</span>
+              <span class="text-sm">{{ t('kpManager.vector.notConfigured', { reason: vectorStatus.reason }) }}</span>
               <Button size="sm" variant="outline" as-child>
-                <NuxtLink to="/settings">前往配置</NuxtLink>
+                <NuxtLink to="/settings">{{ t('kpManager.vector.goToSettings') }}</NuxtLink>
               </Button>
             </AlertDescription>
           </Alert>
           <Alert v-else-if="isSuperuser && vectorStatus?.needs_reindex" class="mb-4 items-center [&>svg]:translate-y-0">
             <Database class="h-4 w-4" />
             <AlertDescription class="flex items-center justify-between gap-2">
-              <span class="text-sm">{{ vectorStatus.reason }}，建议重建向量索引以启用语义检索。</span>
+              <span class="text-sm">{{ t('kpManager.vector.needsReindex', { reason: vectorStatus.reason }) }}</span>
               <Button size="sm" variant="outline" :disabled="isReindexing" @click="handleReindex">
                 <RefreshCw class="w-4 h-4 mr-2" :class="{ 'animate-spin': isReindexing }" />
-                重建向量索引
+                {{ t('kpManager.vector.reindex') }}
               </Button>
             </AlertDescription>
           </Alert>
@@ -317,10 +318,10 @@ onMounted(fetchVectorStatus)
             <div class="mr-2 text-muted-foreground">
               <Folder class="w-4 h-4" />
             </div>
-            <Input v-model="newRootName" class="h-8 text-sm w-64" placeholder="根目录名称" />
+            <Input v-model="newRootName" class="h-8 text-sm w-64" :placeholder="t('kpManager.rootNamePlaceholder')" />
             <Input v-model="newRootSlug" class="h-8 text-sm w-32" placeholder="Slug" />
             <Button size="sm" class="h-8" @click="handleCreateRoot">
-              <Save class="w-4 h-4 mr-2" /> 保存
+              <Save class="w-4 h-4 mr-2" /> {{ t('common.save') }}
             </Button>
             <Button size="sm" variant="ghost" class="h-8" @click="isCreatingRoot = false">
               <X class="w-4 h-4" />
@@ -335,7 +336,7 @@ onMounted(fetchVectorStatus)
           <!-- Tree View -->
           <div v-else class="space-y-1">
             <div v-if="knowledgePointTree.length === 0" class="text-center py-10 text-muted-foreground">
-              该学科暂无知识点。
+              {{ t('kpManager.empty') }}
             </div>
 
             <ManagerKnowledgePointTreeItem v-for="node in knowledgePointTree" :key="node.id" :knowledge-point="node" :editable="canManage"

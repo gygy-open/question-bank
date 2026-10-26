@@ -12,28 +12,29 @@ import {
 import { Heading, Check } from '@lucide/vue'
 
 const props = defineProps<{ editor: Editor }>()
+const { t } = useI18n()
 
 const LEVELS = [1, 2, 3, 4] as const
 
 const items = computed(() => [
     {
-        label: '正文',
+        label: t('richEditor.slash.items.paragraph'),
         isActive: () => props.editor.isActive('paragraph'),
         action: () => props.editor.chain().focus().setParagraph().run(),
     },
     ...LEVELS.map((level) => ({
-        label: `标题 ${level}`,
+        label: t('richEditor.heading.level', { level }),
         isActive: () => props.editor.isActive('heading', { level }),
         action: () => props.editor.chain().focus().toggleHeading({ level }).run(),
     })),
 ])
-const activeLabel = computed(() => items.value.find((i) => i.isActive())?.label ?? '正文')
+const activeLabel = computed(() => items.value.find((i) => i.isActive())?.label ?? t('richEditor.slash.items.paragraph'))
 </script>
 
 <template>
     <DropdownMenu>
         <DropdownMenuTrigger as-child>
-            <Button type="button" size="sm" class="h-8 gap-1 px-2" variant="ghost" title="段落样式">
+            <Button type="button" size="sm" class="h-8 gap-1 px-2" variant="ghost" :title="t('richEditor.heading.title')">
                 <Heading class="size-4" />
                 <span class="text-xs">{{ activeLabel }}</span>
             </Button>

@@ -14,6 +14,7 @@ import {
     SquareSigma,
 } from '@lucide/vue'
 import SlashCommandList from './SlashCommandList.vue'
+import { translate } from '@/lib/locale'
 
 export interface SlashCommandOptions {
     /** Called when the "image" item is picked, so the host can open a file picker. */
@@ -32,9 +33,14 @@ export interface SlashCommandItem {
     command: (opts: { editor: Editor; range: Range; options: SlashCommandOptions }) => void
 }
 
-const ITEMS: SlashCommandItem[] = [
+// 定义里只存 i18n key，查询时再翻译，保证切换语言后菜单文案随之更新。
+interface SlashCommandItemDef extends Omit<SlashCommandItem, 'title'> {
+    titleKey: string
+}
+
+const ITEMS: SlashCommandItemDef[] = [
     {
-        title: '正文',
+        titleKey: 'richEditor.slash.items.paragraph',
         icon: Type,
         aliases: ['paragraph', 'text', 'zhengwen', 'p'],
         command: ({ editor, range }) => {
@@ -42,7 +48,7 @@ const ITEMS: SlashCommandItem[] = [
         },
     },
     {
-        title: '无序列表',
+        titleKey: 'richEditor.slash.items.bulletList',
         icon: List,
         aliases: ['bullet', 'ul', 'list', 'liebiao'],
         command: ({ editor, range }) => {
@@ -50,7 +56,7 @@ const ITEMS: SlashCommandItem[] = [
         },
     },
     {
-        title: '有序列表',
+        titleKey: 'richEditor.slash.items.orderedList',
         icon: ListOrdered,
         aliases: ['ordered', 'ol', 'number', 'liebiao'],
         command: ({ editor, range }) => {
@@ -58,7 +64,7 @@ const ITEMS: SlashCommandItem[] = [
         },
     },
     {
-        title: '图片',
+        titleKey: 'richEditor.slash.items.image',
         icon: ImageIcon,
         aliases: ['image', 'img', 'picture', 'tupian'],
         command: ({ editor, range, options }) => {
@@ -67,7 +73,7 @@ const ITEMS: SlashCommandItem[] = [
         },
     },
     {
-        title: '音频',
+        titleKey: 'richEditor.slash.items.audio',
         icon: Music,
         aliases: ['audio', 'sound', 'mp3', 'yinpin', 'tingli'],
         command: ({ editor, range, options }) => {
@@ -76,7 +82,7 @@ const ITEMS: SlashCommandItem[] = [
         },
     },
     {
-        title: '行内公式',
+        titleKey: 'richEditor.slash.items.inlineMath',
         icon: Sigma,
         aliases: ['inline math', 'formula', 'gongshi', 'latex'],
         command: ({ editor, range, options }) => {
@@ -85,7 +91,7 @@ const ITEMS: SlashCommandItem[] = [
         },
     },
     {
-        title: '块公式',
+        titleKey: 'richEditor.slash.items.blockMath',
         icon: SquareSigma,
         aliases: ['block math', 'formula', 'gongshi', 'latex'],
         command: ({ editor, range, options }) => {
@@ -96,11 +102,12 @@ const ITEMS: SlashCommandItem[] = [
 ]
 
 function getSuggestionItems(query: string): SlashCommandItem[] {
+    const items = ITEMS.map(({ titleKey, ...rest }) => ({ ...rest, title: translate(titleKey) }))
     const q = query.trim().toLowerCase()
     if (!q) {
-        return ITEMS
+        return items
     }
-    return ITEMS.filter((item) => {
+    return items.filter((item) => {
         if (item.title.toLowerCase().includes(q)) {
             return true
         }

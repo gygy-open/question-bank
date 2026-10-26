@@ -23,6 +23,7 @@ interface Props {
     proposal?: Proposal
 }
 
+const { t } = useI18n()
 const props = defineProps<Props>()
 const emit = defineEmits(['preview-image', 'update', 'delete'])
 
@@ -51,7 +52,7 @@ const saveEdit = () => {
 }
 
 const deleteMessage = () => {
-    if (confirm('确定要删除这条消息吗？')) {
+    if (confirm(t('chat.message.deleteConfirm'))) {
         emit('delete', props.id)
     }
 }
@@ -228,10 +229,10 @@ const copyContent = () => {
             <Textarea v-model="editContent" class="min-h-[100px] mb-2 bg-background text-foreground" />
             <div class="flex justify-end gap-2">
                 <Button size="sm" variant="ghost" @click="cancelEditing">
-                    <X class="w-4 h-4 mr-1" /> 取消
+                    <X class="w-4 h-4 mr-1" /> {{ t('common.cancel') }}
                 </Button>
                 <Button size="sm" @click="saveEdit">
-                    <Save class="w-4 h-4 mr-1" /> 保存
+                    <Save class="w-4 h-4 mr-1" /> {{ t('common.save') }}
                 </Button>
             </div>
         </div>
@@ -249,7 +250,7 @@ const copyContent = () => {
                 <Button v-for="qid in parsedContent.questionIds" :key="qid" variant="outline" size="sm" as-child>
                     <NuxtLink :to="`/questions?id=${qid}`" target="_blank">
                         <ExternalLink class="w-4 h-4 mr-2" />
-                        查看题目 {{ qid }}
+                        {{ t('chat.message.viewQuestion', { id: qid }) }}
                     </NuxtLink>
                 </Button>
             </div>
@@ -278,21 +279,21 @@ const copyContent = () => {
         <!-- Actions (Copy, Edit, Delete) -->
         <div v-if="!loading && !isEditing" class="absolute -bottom-6 right-0 opacity-0 group-hover:opacity-100 transition-opacity flex gap-1">
             <template v-if="role === 'assistant'">
-                <Button variant="ghost" size="icon" class="h-6 w-6" @click="exportDocx" title="导出 Docx" :disabled="exporting">
+                <Button variant="ghost" size="icon" class="h-6 w-6" @click="exportDocx" :title="t('chat.message.exportDocx')" :disabled="exporting">
                     <Loader2 v-if="exporting" class="w-3 h-3 animate-spin" />
                     <FileDown v-else class="w-3 h-3 text-muted-foreground" />
                 </Button>
             </template>
-            <Button variant="ghost" size="icon" class="h-6 w-6" @click="copyContent" title="复制 Markdown">
+            <Button variant="ghost" size="icon" class="h-6 w-6" @click="copyContent" :title="t('chat.copyMarkdown')">
                     <Check v-if="copied" class="w-3 h-3 text-green-500" />
                     <Copy v-else class="w-3 h-3 text-muted-foreground" />
                 </Button>
             
             <!-- Edit/Delete for both user and assistant -->
-            <Button v-if="id" variant="ghost" size="icon" class="h-6 w-6" @click="startEditing" title="编辑">
+            <Button v-if="id" variant="ghost" size="icon" class="h-6 w-6" @click="startEditing" :title="t('common.edit')">
                 <Pencil class="w-3 h-3 text-muted-foreground" />
             </Button>
-            <Button v-if="id" variant="ghost" size="icon" class="h-6 w-6" @click="deleteMessage" title="删除">
+            <Button v-if="id" variant="ghost" size="icon" class="h-6 w-6" @click="deleteMessage" :title="t('common.delete')">
                 <Trash2 class="w-3 h-3 text-muted-foreground hover:text-destructive" />
             </Button>
         </div>

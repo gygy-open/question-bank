@@ -1,33 +1,39 @@
 import type { AIModel, AIProvider, InterfaceType } from '@/types/ai-config'
+import { translate } from '@/lib/locale'
 
+/** 展示文案存 i18n key（nameKey / hintKey），使用处再 t()。 */
 export interface ProviderPreset {
   id: string
+  /** 品牌名；有 nameKey 时以翻译为准 */
   name: string
+  nameKey?: string
   interface_type: InterfaceType
   base_url: string
-  hint: string
+  hintKey: string
 }
 
 export const PROVIDER_PRESETS: ProviderPreset[] = [
-  { id: 'deepseek', name: 'DeepSeek', interface_type: 'openai', base_url: 'https://api.deepseek.com/v1', hint: '性价比高，适合题目抽取与对话' },
-  { id: 'qwen', name: '通义千问', interface_type: 'openai', base_url: 'https://dashscope.aliyuncs.com/compatible-mode/v1', hint: '含识图模型（qwen-vl）与向量模型' },
-  { id: 'zhipu', name: '智谱 GLM', interface_type: 'openai', base_url: 'https://open.bigmodel.cn/api/paas/v4', hint: '含识图模型（glm-4v）' },
-  { id: 'kimi', name: 'Kimi', interface_type: 'openai', base_url: 'https://api.moonshot.cn/v1', hint: '长文档友好' },
-  { id: 'openai', name: 'OpenAI', interface_type: 'openai', base_url: 'https://api.openai.com/v1', hint: '需可访问海外网络' },
-  { id: 'gemini', name: 'Google Gemini', interface_type: 'gemini', base_url: '', hint: '需可访问海外网络，原生支持识图' },
+  { id: 'deepseek', name: 'DeepSeek', interface_type: 'openai', base_url: 'https://api.deepseek.com/v1', hintKey: 'aiProviders.presets.deepseek.hint' },
+  { id: 'qwen', name: 'Qwen', nameKey: 'aiProviders.presets.qwen.name', interface_type: 'openai', base_url: 'https://dashscope.aliyuncs.com/compatible-mode/v1', hintKey: 'aiProviders.presets.qwen.hint' },
+  { id: 'zhipu', name: 'Zhipu GLM', nameKey: 'aiProviders.presets.zhipu.name', interface_type: 'openai', base_url: 'https://open.bigmodel.cn/api/paas/v4', hintKey: 'aiProviders.presets.zhipu.hint' },
+  { id: 'kimi', name: 'Kimi', interface_type: 'openai', base_url: 'https://api.moonshot.cn/v1', hintKey: 'aiProviders.presets.kimi.hint' },
+  { id: 'openai', name: 'OpenAI', interface_type: 'openai', base_url: 'https://api.openai.com/v1', hintKey: 'aiProviders.presets.openai.hint' },
+  { id: 'gemini', name: 'Google Gemini', interface_type: 'gemini', base_url: '', hintKey: 'aiProviders.presets.gemini.hint' },
 ]
 
-export const INTERFACE_LABELS: Record<string, string> = {
-  openai: 'OpenAI 兼容接口',
-  gemini: 'Gemini 接口',
+/** interface_type → 显示名的 i18n key */
+export const INTERFACE_LABEL_KEYS: Record<string, string> = {
+  openai: 'aiProviders.interfaceTypes.openai',
+  gemini: 'aiProviders.interfaceTypes.gemini',
 }
 
 export type Scene = 'text' | 'vision' | 'embedding'
 
-export const SCENES: Record<Scene, { label: string, description: string }> = {
-  text: { label: '文本模型', description: '用于 AI 对话、文档题目抽取、知识点匹配。' },
-  vision: { label: '识图模型', description: '用于从图片、截图中识别题目。需要支持识图的模型。' },
-  embedding: { label: '向量模型', description: '用于相似题检索和知识点语义匹配，全站共用。' },
+/** 场景 → 显示名 / 说明的 i18n key */
+export const SCENES: Record<Scene, { labelKey: string, descriptionKey: string }> = {
+  text: { labelKey: 'aiModels.scenes.text.label', descriptionKey: 'aiModels.scenes.text.description' },
+  vision: { labelKey: 'aiModels.scenes.vision.label', descriptionKey: 'aiModels.scenes.vision.description' },
+  embedding: { labelKey: 'aiModels.scenes.embedding.label', descriptionKey: 'aiModels.scenes.embedding.description' },
 }
 
 export interface FlatModel extends AIModel {
@@ -67,7 +73,7 @@ export const usageMap = (assignments: Partial<Record<Scene, number | null>>): Ma
   const map = new Map<number, string[]>()
   for (const [scene, id] of Object.entries(assignments) as [Scene, number | null][]) {
     if (id == null) continue
-    map.set(id, [...(map.get(id) ?? []), SCENES[scene].label])
+    map.set(id, [...(map.get(id) ?? []), translate(SCENES[scene].labelKey)])
   }
   return map
 }

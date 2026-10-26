@@ -5,6 +5,7 @@ import { BLANK_EDITOR_KEY } from './blankEditorKey'
 import { clampBlankWidthEm } from './schemaExtensions'
 
 const props = defineProps(nodeViewProps)
+const { t } = useI18n()
 
 const openBlankEditor = inject(BLANK_EDITOR_KEY, null)
 
@@ -33,7 +34,7 @@ function requestEdit(event: MouseEvent) {
         class="rich-blank rich-blank--editable"
         :style="{ width: `${widthEm}em` }"
         role="img"
-        aria-label="填空"
+        :aria-label="t('richEditor.blank.label')"
         @click="requestEdit"
     />
 </template>

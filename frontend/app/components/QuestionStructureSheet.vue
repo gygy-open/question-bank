@@ -22,6 +22,7 @@ const emit = defineEmits<{
   (e: 'update:open', value: boolean): void
 }>()
 
+const { t } = useI18n()
 const { $api } = useNuxtApp()
 const loading = ref(false)
 const question = ref<Question | null>(null)
@@ -65,14 +66,14 @@ const isOpen = computed({
   <Sheet v-model:open="isOpen">
     <SheetContent class="w-[600px] sm:w-[800px] overflow-y-auto">
       <SheetHeader>
-        <SheetTitle>题目派生关系</SheetTitle>
+        <SheetTitle>{{ t('questionEditor.structure.title') }}</SheetTitle>
         <SheetDescription>
-          查看来源题、派生题及涉及的知识点
+          {{ t('questionEditor.structure.description') }}
         </SheetDescription>
       </SheetHeader>
       
       <div v-if="loading" class="py-8 text-center text-muted-foreground">
-        加载中...
+        {{ t('common.loading') }}
       </div>
       
       <div v-else-if="question" class="mt-6 space-y-6 px-4">
@@ -80,10 +81,10 @@ const isOpen = computed({
         <div v-for="source in relations?.sources" :key="source.relation_id" class="relative">
           <div class="border rounded-lg p-4 bg-muted/40 border-dashed relative z-10">
             <div class="flex items-center gap-2 mb-2">
-              <Badge variant="outline" class="bg-background">来源题</Badge>
+              <Badge variant="outline" class="bg-background">{{ t('questionEditor.structure.source') }}</Badge>
               <span class="text-sm text-muted-foreground">ID: {{ source.question.id }}</span>
               <Button variant="link" size="sm" class="h-auto p-0 ml-auto text-xs" @click="fetchQuestion(source.question.id)">
-                查看此题
+                {{ t('questionEditor.structure.view') }}
               </Button>
             </div>
             <RichContent :content="source.question.content" class="text-sm opacity-80" />
@@ -94,7 +95,7 @@ const isOpen = computed({
         <div class="relative">
           <div class="border rounded-lg p-4 bg-card shadow-sm relative z-10 ring-2 ring-primary/10">
             <div class="flex items-center gap-2 mb-2">
-              <Badge variant="default">当前题目</Badge>
+              <Badge variant="default">{{ t('questionEditor.structure.current') }}</Badge>
               <span class="text-sm text-muted-foreground">ID: {{ question.id }}</span>
             </div>
             <RichContent :content="question.content" class="text-sm" />
@@ -113,10 +114,10 @@ const isOpen = computed({
             <div v-for="target in relations.targets" :key="target.relation_id" class="relative">
               <div class="border rounded-lg p-4 bg-muted/30">
                 <div class="flex items-center gap-2 mb-2">
-                  <Badge variant="outline">派生题</Badge>
+                  <Badge variant="outline">{{ t('questionEditor.structure.derived') }}</Badge>
                   <span class="text-sm text-muted-foreground">ID: {{ target.question.id }}</span>
                   <Button variant="link" size="sm" class="h-auto p-0 ml-auto text-xs" @click="fetchQuestion(target.question.id)">
-                    查看此题
+                    {{ t('questionEditor.structure.view') }}
                   </Button>
                 </div>
                 <RichContent :content="target.question.content" class="text-sm" />
@@ -132,7 +133,7 @@ const isOpen = computed({
           </div>
           
           <div v-else class="mt-4 text-sm text-muted-foreground italic pl-4">
-            暂无派生题
+            {{ t('questionEditor.structure.noDerived') }}
           </div>
         </div>
       </div>

@@ -14,7 +14,7 @@ import RichContent from '@/components/rich-editor/RichContent.vue'
 import KnowledgePointTreeSelector from '@/components/KnowledgePointTreeSelector.vue'
 import TagFilter from '@/components/TagFilter.vue'
 import ClearableSelect from '@/components/ClearableSelect.vue'
-import { questionTypeLabel } from '@/lib/answerFormat'
+import { questionTypeDisplayLabel } from '@/lib/answerFormat'
 import type { Question, KnowledgePoint, Tag, TagCategory, TagPage } from '@/types'
 
 const props = defineProps<{
@@ -287,7 +287,7 @@ function confirmInsert() {
             <div class="min-w-0 flex-1">
               <div class="mb-1 flex flex-wrap items-center gap-1.5">
                 <Badge variant="outline" class="text-xs text-muted-foreground">#{{ q.id }}</Badge>
-                <Badge variant="secondary" class="text-xs">{{ questionTypeLabel(q.q_type) }}</Badge>
+                <Badge variant="secondary" class="text-xs">{{ questionTypeDisplayLabel(q.q_type) }}</Badge>
                 <Badge variant="outline" class="text-xs">{{ t('questionItem.difficultyValue', { level: q.difficulty }) }}</Badge>
                 <Badge v-for="kp in q.knowledge_points" :key="`kp-${kp.id}`" variant="outline" class="text-xs">
                   {{ kp.name }}

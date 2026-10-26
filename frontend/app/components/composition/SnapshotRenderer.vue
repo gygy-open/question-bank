@@ -7,7 +7,7 @@ import RichContent from '@/components/rich-editor/RichContent.vue'
 import AnswerDisplay from '@/components/AnswerDisplay.vue'
 import { Badge } from '@/components/ui/badge'
 import { FileQuestion, Files, ListChecks, AlertTriangle } from '@lucide/vue'
-import { questionTypeLabel } from '@/lib/answerFormat'
+import { questionTypeDisplayLabel } from '@/lib/answerFormat'
 import {
   buildSnapshotTree, effectiveAnswerFields, effectiveQuestionDisplay,
   resolvedQuestionNumber, resolvedQuestionScore, resolvedSlotNumbers, resolvedSlotScoreText,
@@ -106,7 +106,7 @@ function groupChildSnapshot(node: SnapshotTreeNode): CompositionSnapshot {
           <div class="flex items-center gap-2">
             <FileQuestion class="h-3.5 w-3.5 text-muted-foreground" />
             <span v-if="resolvedQuestionNumber(node, props.snapshot)" class="text-xs font-medium">{{ resolvedQuestionNumber(node, props.snapshot) }}.</span>
-            <Badge variant="secondary" class="text-xs">{{ questionTypeLabel(node.question.q_type) }}</Badge>
+            <Badge variant="secondary" class="text-xs">{{ questionTypeDisplayLabel(node.question.q_type) }}</Badge>
             <span class="text-xs text-muted-foreground">#{{ node.question.id }} · {{ t('compositionNodes.questionRevision', { revision: node.question_revision }) }}</span>
             <span v-if="resolvedQuestionScore(node, props.snapshot) != null" class="ml-auto text-xs text-muted-foreground">（{{ resolvedQuestionScore(node, props.snapshot) }} 分）</span>
             <span v-else-if="resolvedSlotScoreText(node, props.snapshot)" class="ml-auto text-xs text-muted-foreground">（{{ resolvedSlotScoreText(node, props.snapshot) }}）</span>

@@ -17,6 +17,7 @@ const emit = defineEmits<{
   'update:open': [value: boolean]
   select: [stimulusId: number | null]
 }>()
+const { t } = useI18n()
 const { listStimuli } = useStimuli()
 const keyword = ref('')
 const page = ref(1)
@@ -57,19 +58,19 @@ const choose = (stimulusId: number | null) => {
   <Dialog :open="open" @update:open="emit('update:open', $event)">
     <DialogContent class="max-w-2xl">
       <DialogHeader>
-        <DialogTitle>加入材料题</DialogTitle>
-        <DialogDescription>选择本题要加入的材料题；本题会成为其中的一道小题，保存后生效。</DialogDescription>
+        <DialogTitle>{{ t('stimuli.targetPicker.title') }}</DialogTitle>
+        <DialogDescription>{{ t('stimuli.targetPicker.description') }}</DialogDescription>
       </DialogHeader>
       <button type="button" class="flex w-full items-center gap-3 border border-dashed p-3 text-left hover:bg-muted/50" @click="choose(null)">
         <Plus class="size-4 shrink-0 text-muted-foreground" />
         <div>
-          <div class="text-sm font-medium">新建材料题</div>
-          <div class="text-xs text-muted-foreground">补充一段材料，本题作为第 1 小题</div>
+          <div class="text-sm font-medium">{{ t('materials.create') }}</div>
+          <div class="text-xs text-muted-foreground">{{ t('stimuli.targetPicker.createHint') }}</div>
         </div>
       </button>
       <div class="relative">
         <Search class="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-        <Input v-model="keyword" class="pl-9" placeholder="搜索已有材料题的材料内容或来源" />
+        <Input v-model="keyword" class="pl-9" :placeholder="t('stimuli.targetPicker.searchPlaceholder')" />
       </div>
       <div v-if="loading" class="flex h-72 items-center justify-center"><Loader2 class="size-6 animate-spin" /></div>
       <div v-else class="h-72 space-y-2 overflow-y-auto">
@@ -84,20 +85,20 @@ const choose = (stimulusId: number | null) => {
           <div class="min-w-0 flex-1">
             <div class="mb-1 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
               <span class="font-mono">#{{ stimulus.id }}</span>
-              <span class="flex items-center gap-1"><Layers3 class="size-3.5" />{{ stimulus.question_count }} 道小题</span>
-              <Badge v-if="stimulus.visibility === 'private'" variant="outline" class="gap-1"><Lock class="size-3" />私有</Badge>
-              <span v-if="isIncompatible(stimulus)">公开题不能加入私有材料题</span>
+              <span class="flex items-center gap-1"><Layers3 class="size-3.5" />{{ t('stimuli.questionCount', { count: stimulus.question_count }) }}</span>
+              <Badge v-if="stimulus.visibility === 'private'" variant="outline" class="gap-1"><Lock class="size-3" />{{ t('materials.filters.private') }}</Badge>
+              <span v-if="isIncompatible(stimulus)">{{ t('stimuli.targetPicker.incompatible') }}</span>
               <span v-if="stimulus.source" class="truncate">{{ stimulus.source }}</span>
             </div>
-            <RichContent :content="stimulus.content" empty-text="（空材料）" class="line-clamp-3 text-sm" />
+            <RichContent :content="stimulus.content" :empty-text="t('stimuli.emptyMaterial')" class="line-clamp-3 text-sm" />
           </div>
         </button>
-        <p v-if="results.length === 0" class="py-16 text-center text-sm text-muted-foreground">{{ keyword.trim() ? '没有匹配的材料题' : '还没有材料题' }}</p>
+        <p v-if="results.length === 0" class="py-16 text-center text-sm text-muted-foreground">{{ keyword.trim() ? t('stimuli.targetPicker.noMatch') : t('stimuli.targetPicker.empty') }}</p>
       </div>
       <div v-if="pages > 1" class="flex items-center justify-end gap-2 text-sm text-muted-foreground">
-        <Button variant="outline" size="icon" :disabled="page <= 1" title="上一页" aria-label="上一页" @click="page--"><ChevronLeft class="size-4" /></Button>
-        <span>第 {{ page }} / {{ pages }} 页</span>
-        <Button variant="outline" size="icon" :disabled="page >= pages" title="下一页" aria-label="下一页" @click="page++"><ChevronRight class="size-4" /></Button>
+        <Button variant="outline" size="icon" :disabled="page <= 1" :title="t('common.prevPage')" :aria-label="t('common.prevPage')" @click="page--"><ChevronLeft class="size-4" /></Button>
+        <span>{{ t('materials.pageInfo', { page, pages }) }}</span>
+        <Button variant="outline" size="icon" :disabled="page >= pages" :title="t('common.nextPage')" :aria-label="t('common.nextPage')" @click="page++"><ChevronRight class="size-4" /></Button>
       </div>
     </DialogContent>
   </Dialog>

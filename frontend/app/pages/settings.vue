@@ -19,6 +19,7 @@ import { Button } from '@/components/ui/button'
 import { Switch } from '@/components/ui/switch'
 import { Label } from '@/components/ui/label'
 
+const { t } = useI18n()
 const { $api } = useNuxtApp()
 const { user } = useAuth()
 const { permissions, isAdmin, isManagerSomewhere } = usePermissions()
@@ -72,7 +73,7 @@ const fetchSettings = async () => {
     registrationEnabled.value = data.find(s => s.key === REGISTRATION_ENABLED_KEY)?.value === 'true'
     registrationRequiresApproval.value = data.find(s => s.key === REGISTRATION_APPROVAL_KEY)?.value === 'true'
   } catch (error) {
-    toast.error('获取设置失败', {
+    toast.error(t('settings.toast.fetchFailed'), {
       description: (error as any).message,
     })
   } finally {
@@ -87,9 +88,9 @@ const saveRegistrationSetting = async (key: string, value: boolean, description:
       method: 'PUT',
       body: { value: value ? 'true' : 'false', description },
     })
-    toast.success('保存成功')
+    toast.success(t('settings.toast.saveSuccess'))
   } catch (error) {
-    toast.error('保存失败', { description: (error as any).message })
+    toast.error(t('common.saveFailed'), { description: (error as any).message })
     await fetchSettings()
   } finally {
     registrationSaving.value = false
@@ -115,11 +116,11 @@ const updateSetting = async (setting: SystemSetting) => {
         description: setting.description,
       }
     })
-    toast.success('保存成功', {
-      description: `设置 ${setting.key} 已更新`,
+    toast.success(t('settings.toast.saveSuccess'), {
+      description: t('settings.toast.settingUpdated', { key: setting.key }),
     })
   } catch (error) {
-    toast.error('保存失败', {
+    toast.error(t('common.saveFailed'), {
       description: (error as any).message,
     })
   }
@@ -133,7 +134,7 @@ onMounted(() => {
 </script>
 
 <template>
-  <PageHeader :title="isAdmin ? '系统设置' : '设置'" />
+  <PageHeader :title="isAdmin ? t('settings.titleAdmin') : t('settings.title')" />
   
   <div class="flex flex-col md:flex-row max-w-7xl mx-auto w-full items-stretch min-h-[calc(100vh-4rem)]">
     <!-- Left Sidebar Navigation -->
@@ -146,7 +147,7 @@ onMounted(() => {
           @click="updateActiveTab('general')"
         >
           <Settings class="w-4 h-4" />
-          常规设置
+          {{ t('settings.nav.general') }}
         </Button>
         <Button
           v-if="isAdmin"
@@ -155,7 +156,7 @@ onMounted(() => {
           @click="updateActiveTab('ai')"
         >
           <Cpu class="w-4 h-4" />
-          全局 AI 模型
+          {{ t('settings.nav.globalAi') }}
         </Button>
         <Button
           :variant="activeTab === 'my-ai' ? 'secondary' : 'ghost'" 
@@ -163,7 +164,7 @@ onMounted(() => {
           @click="updateActiveTab('my-ai')"
         >
           <Sparkles class="w-4 h-4" />
-          我的 AI 模型
+          {{ t('settings.nav.myAi') }}
         </Button>
         <Button
           v-if="canEditPrompts"
@@ -172,7 +173,7 @@ onMounted(() => {
           @click="updateActiveTab('prompts')"
         >
           <MessageSquareText class="w-4 h-4" />
-          提示词配置
+          {{ t('settings.nav.prompts') }}
         </Button>
         <Button
           v-if="isAdmin"
@@ -181,7 +182,7 @@ onMounted(() => {
           @click="updateActiveTab('registration')"
         >
           <UserPlus class="w-4 h-4" />
-          注册设置
+          {{ t('settings.nav.registration') }}
         </Button>
       </nav>
     </aside>
@@ -191,8 +192,8 @@ onMounted(() => {
       <!-- General Settings -->
       <div v-show="activeTab === 'general'" class="space-y-6">
         <div class="mb-4">
-          <h2 class="text-2xl font-bold tracking-tight">常规设置</h2>
-          <p class="text-sm text-muted-foreground">管理系统的全局环境变量与基础配置。</p>
+          <h2 class="text-2xl font-bold tracking-tight">{{ t('settings.nav.general') }}</h2>
+          <p class="text-sm text-muted-foreground">{{ t('settings.general.description') }}</p>
         </div>
 
         <div v-if="loading" class="flex justify-center py-8">
@@ -211,18 +212,18 @@ onMounted(() => {
                   <Textarea
                     v-if="setting.key === 'AI_EXTRACT_PROMPT' || setting.value.length > 100"
                     v-model="setting.value"
-                    placeholder="Value"
+                    :placeholder="t('settings.general.valuePlaceholder')"
                     class="min-h-[200px] font-mono text-sm"
                   />
                   <Input 
                     v-else
                     v-model="setting.value" 
                     :type="setting.key.includes('KEY') || setting.key.includes('SECRET') ? 'password' : 'text'" 
-                    placeholder="Value" 
+                    :placeholder="t('settings.general.valuePlaceholder')"
                   />
                 </div>
                 <div class="flex justify-end">
-                  <Button @click="updateSetting(setting)">保存设置</Button>
+                  <Button @click="updateSetting(setting)">{{ t('settings.general.save') }}</Button>
                 </div>
               </div>
             </CardContent>
@@ -230,8 +231,8 @@ onMounted(() => {
           
           <div v-if="settings.length === 0" class="flex flex-col items-center justify-center p-12 text-center border rounded-xl bg-card border-dashed">
             <Settings class="w-8 h-8 text-muted-foreground/50 mb-4" />
-            <h3 class="text-lg font-medium">暂无设置项</h3>
-            <p class="text-sm text-muted-foreground mt-1">系统尚未注册任何开放配置项</p>
+            <h3 class="text-lg font-medium">{{ t('settings.general.emptyTitle') }}</h3>
+            <p class="text-sm text-muted-foreground mt-1">{{ t('settings.general.emptyDescription') }}</p>
           </div>
         </div>
       </div>
@@ -239,8 +240,8 @@ onMounted(() => {
       <!-- AI Settings -->
       <div v-if="isAdmin && activeTab === 'ai'">
         <div class="mb-6">
-          <h2 class="text-2xl font-bold tracking-tight">全局 AI 模型</h2>
-          <p class="text-sm text-muted-foreground">接入 AI 服务商，并设置各项功能默认使用的模型。</p>
+          <h2 class="text-2xl font-bold tracking-tight">{{ t('settings.nav.globalAi') }}</h2>
+          <p class="text-sm text-muted-foreground">{{ t('settings.globalAi.description') }}</p>
         </div>
         <AiSettings />
       </div>
@@ -248,8 +249,8 @@ onMounted(() => {
       <!-- My AI Settings -->
       <div v-if="activeTab === 'my-ai'">
         <div class="mb-6">
-          <h2 class="text-2xl font-bold tracking-tight">我的 AI 模型</h2>
-          <p class="text-sm text-muted-foreground">选择你自己使用的模型，或接入你自己的 AI 服务商账号。</p>
+          <h2 class="text-2xl font-bold tracking-tight">{{ t('settings.nav.myAi') }}</h2>
+          <p class="text-sm text-muted-foreground">{{ t('settings.myAi.description') }}</p>
         </div>
         <MyAiSettings />
       </div>
@@ -257,8 +258,8 @@ onMounted(() => {
       <!-- AI Prompts -->
       <div v-if="canEditPrompts" v-show="activeTab === 'prompts'">
         <div class="mb-6">
-          <h2 class="text-2xl font-bold tracking-tight">提示词配置</h2>
-          <p class="text-sm text-muted-foreground">如果您了解大语言工作原理，可在此微调它处理指令的方式。</p>
+          <h2 class="text-2xl font-bold tracking-tight">{{ t('settings.nav.prompts') }}</h2>
+          <p class="text-sm text-muted-foreground">{{ t('settings.prompts.description') }}</p>
         </div>
         <AiPromptsConfig />
       </div>
@@ -266,16 +267,16 @@ onMounted(() => {
       <!-- Registration Settings -->
       <div v-show="activeTab === 'registration'" class="space-y-6">
         <div class="mb-4">
-          <h2 class="text-2xl font-bold tracking-tight">注册设置</h2>
-          <p class="text-sm text-muted-foreground">控制是否允许访客自助注册账户。</p>
+          <h2 class="text-2xl font-bold tracking-tight">{{ t('settings.nav.registration') }}</h2>
+          <p class="text-sm text-muted-foreground">{{ t('settings.registration.description') }}</p>
         </div>
 
         <Card>
           <CardContent class="pt-6 space-y-6">
             <div class="flex items-center justify-between gap-4">
               <div class="space-y-0.5">
-                <Label class="text-base">开放自助注册</Label>
-                <p class="text-sm text-muted-foreground">开启后，登录页将显示注册入口，访客可自行创建账户。</p>
+                <Label class="text-base">{{ t('settings.registration.enabledLabel') }}</Label>
+                <p class="text-sm text-muted-foreground">{{ t('settings.registration.enabledHint') }}</p>
               </div>
               <Switch
                 :model-value="registrationEnabled"
@@ -286,8 +287,8 @@ onMounted(() => {
 
             <div class="flex items-center justify-between gap-4">
               <div class="space-y-0.5">
-                <Label class="text-base">注册需管理员审核</Label>
-                <p class="text-sm text-muted-foreground">开启后，新注册用户默认停用，需管理员在用户管理中启用后方可登录。</p>
+                <Label class="text-base">{{ t('settings.registration.approvalLabel') }}</Label>
+                <p class="text-sm text-muted-foreground">{{ t('settings.registration.approvalHint') }}</p>
               </div>
               <Switch
                 :model-value="registrationRequiresApproval"

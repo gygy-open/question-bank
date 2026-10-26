@@ -13,6 +13,7 @@ import {
 import { applyChatMessageMeta, nextChatMessageUiId } from '@/lib/chatMessages'
 import type { AIProvider, UserAIPreference } from '@/types/ai-config'
 import { pickChatModel } from '@/lib/ai-config'
+import { translate } from '@/lib/locale'
 
 export interface ChatMessage {
     // Stable client-side identity, assigned at creation and never changed — used
@@ -95,8 +96,8 @@ const currentModel = computed(() =>
 const isVisionCapable = computed(() => currentModel.value?.is_vision_capable ?? false)
 
 const currentTitle = computed(() => {
-    if (!currentSessionId.value) return '新对话'
-    return sessions.value.find(s => s.id === currentSessionId.value)?.title || '对话'
+    if (!currentSessionId.value) return translate('chat.newSession')
+    return sessions.value.find(s => s.id === currentSessionId.value)?.title || translate('chat.untitled')
 })
 
 // Clearing images when switching to a non-vision model.
@@ -195,7 +196,7 @@ const createNewSession = () => {
 const startEditing = (session: ChatSession, event: Event) => {
     event.stopPropagation()
     editingSessionId.value = session.id
-    editTitle.value = session.title || '新对话'
+    editTitle.value = session.title || translate('chat.newSession')
 }
 
 const saveTitle = async () => {
@@ -226,7 +227,7 @@ const cancelEditing = () => {
 const deleteSession = async (sessionId: string, event: Event) => {
     const { $api } = useNuxtApp()
     event.stopPropagation()
-    if (!confirm('确定要删除这个对话吗？')) return
+    if (!confirm(translate('chat.history.deleteConfirm'))) return
     try {
         await $api(`/chat/sessions/${sessionId}`, { method: 'DELETE' })
         sessions.value = sessions.value.filter(s => s.id !== sessionId)
@@ -340,7 +341,7 @@ const sendMessage = async () => {
         if (!currentSessionId.value) {
             const session = await $api<ChatSession>('/chat/sessions', {
                 method: 'POST',
-                body: { title: '新对话' },
+                body: { title: translate('chat.newSession') },
             })
             currentSessionId.value = session.id
             await fetchSessions()
@@ -452,7 +453,7 @@ const sendMessage = async () => {
         if (messages.value.length > 0) {
             const last = messages.value[messages.value.length - 1]
             if (last.actions) failRunningChatActions(last.actions)
-            const interruption = '[Error: 连接提前中断，请重试]'
+            const interruption = `[Error: ${translate('chat.errors.interrupted')}]`
             if (!last.content.includes(interruption)) last.content += `\n${interruption}`
         }
     } finally {

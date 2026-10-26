@@ -19,6 +19,7 @@ import {
 } from '@/lib/questionModel'
 
 const model = defineModel<AnswerSpec | null>({ default: null })
+const { t } = useI18n()
 
 const props = defineProps<{
     qType: QuestionType
@@ -164,7 +165,7 @@ function clearAnswer() {
 <template>
     <div class="space-y-2">
         <div class="flex items-center justify-between gap-2">
-            <Label>答案</Label>
+            <Label>{{ t('questionItem.answer') }}</Label>
             <Button
                 v-if="model && model.kind !== 'legacy_unresolved'"
                 variant="ghost"
@@ -172,7 +173,7 @@ function clearAnswer() {
                 class="h-7 text-muted-foreground"
                 @click="clearAnswer"
             >
-                <Eraser class="mr-1 h-3.5 w-3.5" /> 暂不填写
+                <Eraser class="mr-1 h-3.5 w-3.5" /> {{ t('answerEditor.clear') }}
             </Button>
         </div>
 
@@ -180,7 +181,7 @@ function clearAnswer() {
         <div v-if="model && model.kind === 'legacy_unresolved'" class="space-y-2">
             <AnswerDisplay :answer="model" :options="options" />
             <Button variant="outline" size="sm" @click="refillFromLegacy">
-                <RotateCcw class="mr-1 h-3.5 w-3.5" /> 重新填写答案
+                <RotateCcw class="mr-1 h-3.5 w-3.5" /> {{ t('answerEditor.refill') }}
             </Button>
         </div>
 
@@ -194,10 +195,10 @@ function clearAnswer() {
                 <RadioGroupItem :value="opt.id" :id="`ans-${opt.id}`" class="mt-1" />
                 <Label :for="`ans-${opt.id}`" class="flex flex-1 cursor-pointer items-start gap-2 font-normal">
                     <span class="font-semibold text-muted-foreground">{{ opt.label }}.</span>
-                    <RichContent :content="opt.content" empty-text="（空选项）" class="[&_.prose]:my-0 [&_.prose>p]:my-0" />
+                    <RichContent :content="opt.content" :empty-text="t('questionEditor.preview.emptyOption')" class="[&_.prose]:my-0 [&_.prose>p]:my-0" />
                 </Label>
             </div>
-            <p v-if="options.length === 0" class="text-xs text-muted-foreground">请先添加选项</p>
+            <p v-if="options.length === 0" class="text-xs text-muted-foreground">{{ t('answerEditor.addOptionsFirst') }}</p>
         </RadioGroup>
 
         <!-- 多选 -->
@@ -215,28 +216,28 @@ function clearAnswer() {
                 />
                 <Label :for="`ans-${opt.id}`" class="flex flex-1 cursor-pointer items-start gap-2 font-normal">
                     <span class="font-semibold text-muted-foreground">{{ opt.label }}.</span>
-                    <RichContent :content="opt.content" empty-text="（空选项）" class="[&_.prose]:my-0 [&_.prose>p]:my-0" />
+                    <RichContent :content="opt.content" :empty-text="t('questionEditor.preview.emptyOption')" class="[&_.prose]:my-0 [&_.prose>p]:my-0" />
                 </Label>
             </div>
-            <p v-if="options.length === 0" class="text-xs text-muted-foreground">请先添加选项</p>
+            <p v-if="options.length === 0" class="text-xs text-muted-foreground">{{ t('answerEditor.addOptionsFirst') }}</p>
         </div>
 
         <!-- 判断 -->
         <RadioGroup v-else-if="qType === 'true_false'" v-model="trueFalseValue" class="flex gap-6">
             <div class="flex items-center gap-2">
                 <RadioGroupItem value="true" id="ans-tf-true" />
-                <Label for="ans-tf-true" class="cursor-pointer font-normal">正确</Label>
+                <Label for="ans-tf-true" class="cursor-pointer font-normal">{{ t('answerDisplay.true') }}</Label>
             </div>
             <div class="flex items-center gap-2">
                 <RadioGroupItem value="false" id="ans-tf-false" />
-                <Label for="ans-tf-false" class="cursor-pointer font-normal">错误</Label>
+                <Label for="ans-tf-false" class="cursor-pointer font-normal">{{ t('answerDisplay.false') }}</Label>
             </div>
         </RadioGroup>
 
         <!-- 填空 -->
         <div v-else-if="qType === 'fill_in_the_blank'" class="space-y-3">
             <p v-if="stemDriven" class="text-xs text-muted-foreground">
-                填空数量与顺序由题干中的填空占位符决定，可为每空设置多个可接受答案。
+                {{ t('answerEditor.blank.stemDrivenHint') }}
             </p>
             <div
                 v-for="(blank, bIdx) in blanks"
@@ -244,7 +245,7 @@ function clearAnswer() {
                 class="rounded-md border bg-muted/20 p-3"
             >
                 <div class="mb-2 flex items-center justify-between">
-                    <Label class="text-sm">第 {{ bIdx + 1 }} 空（可接受答案）</Label>
+                    <Label class="text-sm">{{ t('answerEditor.blank.title', { index: bIdx + 1 }) }}</Label>
                     <Button
                         v-if="!stemDriven"
                         variant="ghost"
@@ -261,7 +262,7 @@ function clearAnswer() {
                         <div class="flex-1">
                             <RichEditor
                                 :model-value="acc"
-                                placeholder="输入参考答案…"
+                                :placeholder="t('answerEditor.blank.placeholder')"
                                 @update:model-value="(v) => setAccept(bIdx, aIdx, v)"
                             />
                         </div>
@@ -276,26 +277,26 @@ function clearAnswer() {
                         </Button>
                     </div>
                     <Button variant="outline" size="sm" class="h-8 w-full border-dashed" @click="addAccept(bIdx)">
-                        <Plus class="mr-1 h-3 w-3" /> 添加备选答案
+                        <Plus class="mr-1 h-3 w-3" /> {{ t('answerEditor.blank.addAccept') }}
                     </Button>
                 </div>
             </div>
             <Button v-if="!stemDriven" variant="outline" class="w-full border-dashed" @click="addBlank">
-                <Plus class="mr-2 h-4 w-4" /> 添加填空项
+                <Plus class="mr-2 h-4 w-4" /> {{ t('answerEditor.blank.addBlank') }}
             </Button>
         </div>
 
         <!-- 解答 -->
         <div v-else-if="qType === 'free_response'">
-            <RichEditor v-model="freeReference" placeholder="输入参考答案 / 解答…" />
+            <RichEditor v-model="freeReference" :placeholder="t('answerEditor.freeResponse.placeholder')" />
         </div>
 
         <!-- 选项匹配 -->
         <div v-else-if="qType === 'option_matching'" class="space-y-3">
             <p class="text-xs text-muted-foreground">
                 {{ stemDriven
-                    ? '空位数量与顺序由题干中的空位占位符决定，为每个空位从选项池中选择正确项。'
-                    : '可在题干中插入空位占位符，或在此手动增减空位。' }}
+                    ? t('answerEditor.matching.stemDrivenHint')
+                    : t('answerEditor.matching.manualHint') }}
             </p>
             <div class="flex items-center gap-2">
                 <Checkbox
@@ -303,10 +304,10 @@ function clearAnswer() {
                     :model-value="matching.allow_reuse"
                     @update:model-value="(v) => commitMatching(matching.slots, v === true)"
                 />
-                <Label for="ans-matching-reuse" class="cursor-pointer font-normal">允许同一选项用于多个空位</Label>
+                <Label for="ans-matching-reuse" class="cursor-pointer font-normal">{{ t('answerEditor.matching.allowReuse') }}</Label>
             </div>
             <div v-for="(slot, sIdx) in matching.slots" :key="slot.id" class="flex items-center gap-2">
-                <span class="w-14 shrink-0 text-sm text-muted-foreground">第 {{ sIdx + 1 }} 空</span>
+                <span class="w-14 shrink-0 text-sm text-muted-foreground">{{ t('answerEditor.matching.slot', { index: sIdx + 1 }) }}</span>
                 <Select
                     :model-value="slot.correct || UNSET"
                     @update:model-value="(v) => setSlotCorrect(sIdx, v)"
@@ -318,7 +319,7 @@ function clearAnswer() {
                         <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                        <SelectItem :value="UNSET">（未选择）</SelectItem>
+                        <SelectItem :value="UNSET">{{ t('answerEditor.matching.unset') }}</SelectItem>
                         <SelectItem v-for="opt in options" :key="opt.id" :value="opt.id">
                             {{ opt.label }}. {{ optionPreview(opt) }}
                         </SelectItem>
@@ -335,11 +336,11 @@ function clearAnswer() {
                 </Button>
             </div>
             <p v-if="duplicatedOptions.size > 0" class="text-xs text-destructive">
-                有选项被多个空位重复选用；如确需复用请勾选上方开关。
+                {{ t('answerEditor.matching.duplicated') }}
             </p>
-            <p v-if="options.length === 0" class="text-xs text-muted-foreground">请先添加选项</p>
+            <p v-if="options.length === 0" class="text-xs text-muted-foreground">{{ t('answerEditor.addOptionsFirst') }}</p>
             <Button v-if="!stemDriven" variant="outline" class="w-full border-dashed" @click="addSlot">
-                <Plus class="mr-2 h-4 w-4" /> 添加空位
+                <Plus class="mr-2 h-4 w-4" /> {{ t('answerEditor.matching.addSlot') }}
             </Button>
         </div>
     </div>

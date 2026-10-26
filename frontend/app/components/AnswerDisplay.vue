@@ -13,6 +13,8 @@ const props = defineProps<{
     slotNumbers?: Record<string, string | undefined>
 }>()
 
+const { t } = useI18n()
+
 const choiceLabels = computed(() => optionLabelsForAnswer(props.answer, props.options))
 const matchingEntries = computed(() => matchingAnswerEntries(props.answer, props.options, props.slotNumbers))
 </script>
@@ -20,18 +22,18 @@ const matchingEntries = computed(() => matchingAnswerEntries(props.answer, props
 <template>
     <div class="text-sm">
         <template v-if="!answer">
-            <span class="text-muted-foreground">{{ emptyText || '未填写' }}</span>
+            <span class="text-muted-foreground">{{ emptyText || t('questionItem.notFilled') }}</span>
         </template>
 
         <!-- 单选 / 多选：展示 label，附带选项富文本 -->
         <template v-else-if="answer.kind === 'single_choice' || answer.kind === 'multiple_choice'">
-            <span v-if="choiceLabels.length === 0" class="text-muted-foreground">{{ emptyText || '未填写' }}</span>
-            <span v-else class="font-semibold text-foreground">{{ choiceLabels.join('、') }}</span>
+            <span v-if="choiceLabels.length === 0" class="text-muted-foreground">{{ emptyText || t('questionItem.notFilled') }}</span>
+            <span v-else class="font-semibold text-foreground">{{ choiceLabels.join(t('answerDisplay.choiceSeparator')) }}</span>
         </template>
 
         <!-- 判断题 -->
         <template v-else-if="answer.kind === 'true_false'">
-            <span class="font-semibold text-foreground">{{ answer.correct ? '正确' : '错误' }}</span>
+            <span class="font-semibold text-foreground">{{ answer.correct ? t('answerDisplay.true') : t('answerDisplay.false') }}</span>
         </template>
 
         <!-- 填空题 -->
@@ -44,7 +46,7 @@ const matchingEntries = computed(() => matchingAnswerEntries(props.answer, props
                             <span v-if="!isEmptyRichDoc(acc)" class="rounded border bg-background px-2 py-0.5 [&_.prose]:my-0 [&_.prose>p]:my-0 [&_.prose]:text-xs">
                                 <RichContent :content="acc" />
                             </span>
-                            <span v-if="aIdx < blank.accept.length - 1 && !isEmptyRichDoc(blank.accept[aIdx + 1])" class="text-xs text-muted-foreground">或</span>
+                            <span v-if="aIdx < blank.accept.length - 1 && !isEmptyRichDoc(blank.accept[aIdx + 1])" class="text-xs text-muted-foreground">{{ t('answerDisplay.or') }}</span>
                         </template>
                     </div>
                 </div>
@@ -53,12 +55,12 @@ const matchingEntries = computed(() => matchingAnswerEntries(props.answer, props
 
         <!-- 解答题 -->
         <template v-else-if="answer.kind === 'free_response'">
-            <RichContent :content="answer.reference" :empty-text="emptyText || '未填写'" class="[&_.prose]:my-0" />
+            <RichContent :content="answer.reference" :empty-text="emptyText || t('questionItem.notFilled')" class="[&_.prose]:my-0" />
         </template>
 
         <!-- 选项匹配 -->
         <template v-else-if="answer.kind === 'option_matching'">
-            <span v-if="matchingEntries.length === 0" class="text-muted-foreground">{{ emptyText || '未填写' }}</span>
+            <span v-if="matchingEntries.length === 0" class="text-muted-foreground">{{ emptyText || t('questionItem.notFilled') }}</span>
             <span v-else class="flex flex-wrap gap-x-3 gap-y-1">
                 <span v-for="(entry, i) in matchingEntries" :key="i">
                     <span class="font-mono text-muted-foreground">{{ entry.number }}.</span>
@@ -70,8 +72,8 @@ const matchingEntries = computed(() => matchingAnswerEntries(props.answer, props
         <!-- 旧格式未解析：只读展示原文 -->
         <template v-else-if="answer.kind === 'legacy_unresolved'">
             <div class="rounded-md border border-amber-300 bg-amber-50 px-3 py-2 dark:border-amber-700 dark:bg-amber-900/20">
-                <div class="mb-1 text-xs font-medium text-amber-700 dark:text-amber-400">旧格式答案（未解析）</div>
-                <RichContent :content="answer.raw" empty-text="（无内容）" class="[&_.prose]:my-0" />
+                <div class="mb-1 text-xs font-medium text-amber-700 dark:text-amber-400">{{ t('answerDisplay.legacyTitle') }}</div>
+                <RichContent :content="answer.raw" :empty-text="t('answerDisplay.legacyEmpty')" class="[&_.prose]:my-0" />
             </div>
         </template>
     </div>

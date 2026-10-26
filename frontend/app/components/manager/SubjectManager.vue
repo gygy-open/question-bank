@@ -6,6 +6,7 @@ import type { Subject } from '~/types'
 import { useAPI } from '~/composables/useAPI'
 import { Loader2, Edit, Trash2 } from '@lucide/vue'
 
+const { t } = useI18n()
 const { $api } = useNuxtApp()
 
 // --- State ---
@@ -17,11 +18,11 @@ const currentId = ref<number | null>(null)
 const { data: subjects, refresh, status } = await useAPI<Subject[]>('/subjects')
 
 // --- Form Validation ---
-const formSchema = toTypedSchema(z.object({
-  name: z.string().min(2, '名称至少2个字符').max(50, '名称最多50个字符'),
-  slug: z.string().min(2, '标识至少2个字符').max(50, '标识最多50个字符'),
+const formSchema = computed(() => toTypedSchema(z.object({
+  name: z.string().min(2, t('subjects.validation.nameMin')).max(50, t('subjects.validation.nameMax')),
+  slug: z.string().min(2, t('subjects.validation.slugMin')).max(50, t('subjects.validation.slugMax')),
   description: z.string().optional(),
-}))
+})))
 
 const form = useForm({
   validationSchema: formSchema,
@@ -68,7 +69,7 @@ const openEditDialog = (subject: Subject) => {
 }
 
 const deleteSubject = async (id: number) => {
-  if (!confirm('确定要删除这个学科吗？')) return
+  if (!confirm(t('subjects.deleteConfirm'))) return
   try {
     await $api(`/subjects/${id}`, {
       method: 'DELETE',
@@ -83,18 +84,18 @@ const deleteSubject = async (id: number) => {
 <template>
   <div class="space-y-4">
     <div class="flex items-center justify-between">
-      <h3 class="text-lg font-medium">学科列表</h3>
-      <Button @click="openCreateDialog" size="sm">创建学科</Button>
+      <h3 class="text-lg font-medium">{{ t('subjects.listTitle') }}</h3>
+      <Button @click="openCreateDialog" size="sm">{{ t('subjects.create') }}</Button>
     </div>
 
     <div class="rounded-md border">
       <Table>
         <TableHeader>
           <TableRow>
-            <TableHead>名称</TableHead>
-            <TableHead>标识</TableHead>
-            <TableHead>描述</TableHead>
-            <TableHead class="text-right">操作</TableHead>
+            <TableHead>{{ t('common.name') }}</TableHead>
+            <TableHead>{{ t('subjects.slug') }}</TableHead>
+            <TableHead>{{ t('subjects.description') }}</TableHead>
+            <TableHead class="text-right">{{ t('common.actions') }}</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -105,7 +106,7 @@ const deleteSubject = async (id: number) => {
           </TableRow>
           <TableRow v-else-if="subjects?.length === 0">
             <TableCell colspan="4" class="h-24 text-center">
-              暂无数据
+              {{ t('common.noData') }}
             </TableCell>
           </TableRow>
           <TableRow v-for="subject in subjects" :key="subject.id">
@@ -128,17 +129,17 @@ const deleteSubject = async (id: number) => {
     <Dialog :open="isDialogOpen" @update:open="isDialogOpen = $event">
       <DialogContent class="sm:max-w-[425px]">
         <DialogHeader>
-          <DialogTitle>{{ isEditing ? '编辑学科' : '创建学科' }}</DialogTitle>
+          <DialogTitle>{{ isEditing ? t('subjects.edit') : t('subjects.create') }}</DialogTitle>
           <DialogDescription>
-            {{ isEditing ? '修改学科信息' : '添加一个新的学科' }}
+            {{ isEditing ? t('subjects.editDescription') : t('subjects.createDescription') }}
           </DialogDescription>
         </DialogHeader>
         <form @submit="onSubmit" class="space-y-4">
           <FormField v-slot="{ componentField }" name="name">
             <FormItem>
-              <FormLabel>名称</FormLabel>
+              <FormLabel>{{ t('common.name') }}</FormLabel>
               <FormControl>
-                <Input type="text" placeholder="例如：数学" v-bind="componentField" />
+                <Input type="text" :placeholder="t('subjects.namePlaceholder')" v-bind="componentField" />
               </FormControl>
               <FormMessage />
             </FormItem>
@@ -146,9 +147,9 @@ const deleteSubject = async (id: number) => {
 
           <FormField v-slot="{ componentField }" name="slug">
             <FormItem>
-              <FormLabel>标识 (Slug)</FormLabel>
+              <FormLabel>{{ t('subjects.slugLabel') }}</FormLabel>
               <FormControl>
-                <Input type="text" placeholder="例如：math" v-bind="componentField" />
+                <Input type="text" :placeholder="t('subjects.slugPlaceholder')" v-bind="componentField" />
               </FormControl>
               <FormMessage />
             </FormItem>
@@ -156,16 +157,16 @@ const deleteSubject = async (id: number) => {
 
           <FormField v-slot="{ componentField }" name="description">
             <FormItem>
-              <FormLabel>描述</FormLabel>
+              <FormLabel>{{ t('subjects.description') }}</FormLabel>
               <FormControl>
-                <Textarea placeholder="学科描述..." v-bind="componentField" />
+                <Textarea :placeholder="t('subjects.descriptionPlaceholder')" v-bind="componentField" />
               </FormControl>
               <FormMessage />
             </FormItem>
           </FormField>
 
           <DialogFooter>
-            <Button type="submit">保存</Button>
+            <Button type="submit">{{ t('common.save') }}</Button>
           </DialogFooter>
         </form>
       </DialogContent>

@@ -2,7 +2,7 @@
 import { ArrowLeft, CheckCircle2, KeyRound, Loader2, Settings2, XCircle } from '@lucide/vue'
 import { toast } from 'vue-sonner'
 import type { AIConfigScope, AIModelInput, AIProvider, InterfaceType } from '~/types/ai-config'
-import { PROVIDER_PRESETS, INTERFACE_LABELS, type ProviderPreset } from '~/lib/ai-config'
+import { PROVIDER_PRESETS, INTERFACE_LABEL_KEYS, type ProviderPreset } from '~/lib/ai-config'
 import ModelPicker from '~/components/ai/ModelPicker.vue'
 import {
   Dialog,
@@ -16,6 +16,8 @@ import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+
+const { t } = useI18n()
 
 const props = defineProps<{ scope: AIConfigScope }>()
 const open = defineModel<boolean>('open', { required: true })
@@ -46,10 +48,12 @@ const reset = () => {
 
 watch(open, (v) => { if (v) reset() })
 
+const presetName = (preset: ProviderPreset) => (preset.nameKey ? t(preset.nameKey) : preset.name)
+
 const choosePreset = (preset: ProviderPreset | null) => {
   isCustom.value = !preset
   showAdvanced.value = !preset
-  form.value.name = preset?.name ?? ''
+  form.value.name = preset ? presetName(preset) : ''
   form.value.interface_type = preset?.interface_type ?? 'openai'
   form.value.base_url = preset?.base_url ?? ''
   step.value = 'credentials'
@@ -85,7 +89,7 @@ const continueManually = () => {
 
 const finish = async () => {
   if (!selectedModels.value.length) {
-    toast.error('请至少选择一个模型')
+    toast.error(t('aiProviders.wizard.selectAtLeastOne'))
     return
   }
   saving.value = true
@@ -101,7 +105,7 @@ const finish = async () => {
     open.value = false
     emit('created', provider)
   } catch (e) {
-    toast.error('添加失败', { description: apiErrorMessage(e) })
+    toast.error(t('aiProviders.wizard.addFailed'), { description: apiErrorMessage(e) })
   } finally {
     saving.value = false
   }
@@ -114,10 +118,10 @@ const stepIndex = computed(() => ({ preset: 1, credentials: 2, models: 3 }[step.
   <Dialog v-model:open="open">
     <DialogContent class="sm:max-w-xl">
       <DialogHeader>
-        <DialogTitle>添加服务商</DialogTitle>
+        <DialogTitle>{{ t('aiProviders.add') }}</DialogTitle>
         <DialogDescription>
-          第 {{ stepIndex }} / 3 步：
-          {{ step === 'preset' ? '选择服务商' : step === 'credentials' ? '填写 API Key 并测试连接' : '选择要使用的模型' }}
+          {{ t('aiProviders.wizard.stepOf', { current: stepIndex, total: 3 }) }}
+          {{ step === 'preset' ? t('aiProviders.wizard.steps.preset') : step === 'credentials' ? t('aiProviders.wizard.steps.credentials') : t('aiProviders.wizard.steps.models') }}
         </DialogDescription>
       </DialogHeader>
 
@@ -130,24 +134,24 @@ const stepIndex = computed(() => ({ preset: 1, credentials: 2, models: 3 }[step.
           class="rounded-lg border p-3 text-left transition-colors hover:border-primary hover:bg-muted/40"
           @click="choosePreset(preset)"
         >
-          <div class="font-medium">{{ preset.name }}</div>
-          <div class="mt-0.5 text-xs text-muted-foreground">{{ preset.hint }}</div>
+          <div class="font-medium">{{ presetName(preset) }}</div>
+          <div class="mt-0.5 text-xs text-muted-foreground">{{ t(preset.hintKey) }}</div>
         </button>
         <button
           type="button"
           class="rounded-lg border border-dashed p-3 text-left transition-colors hover:border-primary hover:bg-muted/40"
           @click="choosePreset(null)"
         >
-          <div class="font-medium">其他 / 自定义</div>
-          <div class="mt-0.5 text-xs text-muted-foreground">任何兼容 OpenAI 接口的服务，或自建中转</div>
+          <div class="font-medium">{{ t('aiProviders.wizard.custom') }}</div>
+          <div class="mt-0.5 text-xs text-muted-foreground">{{ t('aiProviders.wizard.customHint') }}</div>
         </button>
       </div>
 
       <!-- Step 2: credentials -->
       <form v-else-if="step === 'credentials'" class="grid gap-4" @submit.prevent="canTest && testAndDiscover()">
         <div class="grid gap-2">
-          <Label for="wiz-name">名称</Label>
-          <Input id="wiz-name" v-model="form.name" placeholder="便于自己识别，例如：我的 DeepSeek" />
+          <Label for="wiz-name">{{ t('common.name') }}</Label>
+          <Input id="wiz-name" v-model="form.name" :placeholder="t('aiProviders.namePlaceholder')" />
         </div>
         <div class="grid gap-2">
           <Label for="wiz-key">API Key</Label>
@@ -155,8 +159,8 @@ const stepIndex = computed(() => ({ preset: 1, credentials: 2, models: 3 }[step.
             <KeyRound class="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
             <Input id="wiz-key" v-model="form.api_key" type="password" autocomplete="off" placeholder="sk-..." class="pl-9" />
           </div>
-          <p v-if="scope === 'personal'" class="text-xs text-muted-foreground">Key 加密保存，仅用于你本人的 AI 请求，管理员也无法查看。</p>
-          <p v-else class="text-xs text-muted-foreground">Key 加密保存，全站用户共用此服务商的额度。</p>
+          <p v-if="scope === 'personal'" class="text-xs text-muted-foreground">{{ t('aiProviders.keyHintPersonal') }}</p>
+          <p v-else class="text-xs text-muted-foreground">{{ t('aiProviders.keyHintGlobal') }}</p>
         </div>
 
         <button
@@ -165,22 +169,22 @@ const stepIndex = computed(() => ({ preset: 1, credentials: 2, models: 3 }[step.
           class="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
           @click="showAdvanced = !showAdvanced"
         >
-          <Settings2 class="h-3.5 w-3.5" />{{ showAdvanced ? '收起高级设置' : '高级设置（接口地址）' }}
+          <Settings2 class="h-3.5 w-3.5" />{{ showAdvanced ? t('aiProviders.wizard.hideAdvanced') : t('aiProviders.wizard.showAdvanced') }}
         </button>
         <template v-if="showAdvanced">
           <div class="grid gap-2">
-            <Label>接口类型</Label>
+            <Label>{{ t('aiProviders.interfaceType') }}</Label>
             <Select v-model="form.interface_type">
               <SelectTrigger><SelectValue /></SelectTrigger>
               <SelectContent>
-                <SelectItem value="openai">{{ INTERFACE_LABELS.openai }}（大多数服务商）</SelectItem>
-                <SelectItem value="gemini">{{ INTERFACE_LABELS.gemini }}</SelectItem>
+                <SelectItem value="openai">{{ t(INTERFACE_LABEL_KEYS.openai!) }}{{ t('aiProviders.wizard.mostProviders') }}</SelectItem>
+                <SelectItem value="gemini">{{ t(INTERFACE_LABEL_KEYS.gemini!) }}</SelectItem>
               </SelectContent>
             </Select>
           </div>
           <div class="grid gap-2">
-            <Label for="wiz-url">接口地址（Base URL）</Label>
-            <Input id="wiz-url" v-model="form.base_url" :placeholder="form.interface_type === 'gemini' ? '留空使用官方地址' : '例如 https://api.deepseek.com/v1'" />
+            <Label for="wiz-url">{{ t('aiProviders.baseUrl') }}</Label>
+            <Input id="wiz-url" v-model="form.base_url" :placeholder="form.interface_type === 'gemini' ? t('aiProviders.baseUrlPlaceholderGemini') : t('aiProviders.baseUrlPlaceholder', { url: 'https://api.deepseek.com/v1' })" />
           </div>
         </template>
 
@@ -190,9 +194,9 @@ const stepIndex = computed(() => ({ preset: 1, credentials: 2, models: 3 }[step.
         >
           <XCircle class="mt-0.5 h-4 w-4 shrink-0" />
           <div class="flex-1">
-            <div>连接失败：{{ testResult.message }}</div>
+            <div>{{ t('aiProviders.connectFailed', { message: testResult.message }) }}</div>
             <button type="button" class="mt-1 text-xs underline text-muted-foreground" @click="continueManually">
-              部分服务商不提供模型列表，确认无误可跳过，手动填写模型
+              {{ t('aiProviders.wizard.skipDiscover') }}
             </button>
           </div>
         </div>
@@ -212,16 +216,16 @@ const stepIndex = computed(() => ({ preset: 1, credentials: 2, models: 3 }[step.
           variant="ghost"
           @click="step = step === 'models' ? 'credentials' : 'preset'"
         >
-          <ArrowLeft class="mr-1 h-4 w-4" />上一步
+          <ArrowLeft class="mr-1 h-4 w-4" />{{ t('aiProviders.wizard.prev') }}
         </Button>
         <span v-else />
         <Button v-if="step === 'credentials'" :disabled="!canTest || testing" @click="testAndDiscover">
           <Loader2 v-if="testing" class="mr-2 h-4 w-4 animate-spin" />
-          测试连接并获取模型
+          {{ t('aiProviders.wizard.testAndDiscover') }}
         </Button>
         <Button v-else-if="step === 'models'" :disabled="saving || !selectedModels.length" @click="finish">
           <Loader2 v-if="saving" class="mr-2 h-4 w-4 animate-spin" />
-          完成添加
+          {{ t('aiProviders.wizard.finish') }}
         </Button>
       </DialogFooter>
     </DialogContent>

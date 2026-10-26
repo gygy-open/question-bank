@@ -6,25 +6,25 @@ import type { ToolbarItem } from './inlineFormatItems'
 export function getAlignFormatItems(editor: Editor): ToolbarItem[] {
     return [
         {
-            label: '左对齐',
+            labelKey: 'richEditor.align.left',
             icon: AlignLeft,
             action: () => editor.chain().focus().setTextAlign('left').run(),
             isActive: () => editor.isActive({ textAlign: 'left' }),
         },
         {
-            label: '居中',
+            labelKey: 'richEditor.align.center',
             icon: AlignCenter,
             action: () => editor.chain().focus().setTextAlign('center').run(),
             isActive: () => editor.isActive({ textAlign: 'center' }),
         },
         {
-            label: '右对齐',
+            labelKey: 'richEditor.align.right',
             icon: AlignRight,
             action: () => editor.chain().focus().setTextAlign('right').run(),
             isActive: () => editor.isActive({ textAlign: 'right' }),
         },
         {
-            label: '两端对齐',
+            labelKey: 'richEditor.align.justify',
             icon: AlignJustify,
             action: () => editor.chain().focus().setTextAlign('justify').run(),
             isActive: () => editor.isActive({ textAlign: 'justify' }),

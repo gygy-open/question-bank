@@ -8,6 +8,8 @@ const props = defineProps<{
     command: (item: SlashCommandItem) => void
 }>()
 
+const { t } = useI18n()
+
 const selectedIndex = ref(0)
 const itemRefs = ref<HTMLButtonElement[]>([])
 
@@ -81,6 +83,6 @@ defineExpose({ onKeyDown })
                 </button>
             </template>
         </template>
-        <div v-else class="px-2 py-1.5 text-sm text-muted-foreground">无匹配结果</div>
+        <div v-else class="px-2 py-1.5 text-sm text-muted-foreground">{{ t('richEditor.slash.noResults') }}</div>
     </div>
 </template>

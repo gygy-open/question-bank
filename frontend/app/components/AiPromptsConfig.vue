@@ -16,6 +16,7 @@ import {
 import type { Subject } from '~/types'
 import { filterPromptManageableSubjects } from '@/lib/subjectPromptAccess'
 
+const { t } = useI18n()
 const { $api } = useNuxtApp()
 const { permissions } = usePermissions()
 
@@ -51,7 +52,7 @@ const fetchSubjects = async () => {
       selectedSubjectId.value = String(subjects.value[0].id)
     }
   } catch (error) {
-    toast.error('获取学科失败', { description: (error as any).message })
+    toast.error(t('prompts.toast.fetchSubjectsFailed'), { description: (error as any).message })
   }
 }
 
@@ -66,7 +67,7 @@ const fetchPrompts = async () => {
     prompts.value = data
     for (const p of data) drafts[p.key] = p.value ?? ''
   } catch (error) {
-    toast.error('获取提示词失败', { description: (error as any).message })
+    toast.error(t('prompts.toast.fetchFailed'), { description: (error as any).message })
   } finally {
     loading.value = false
   }
@@ -79,7 +80,7 @@ const fillWithDefault = (p: SubjectPrompt) => {
 const save = async (p: SubjectPrompt) => {
   const value = (drafts[p.key] ?? '').trim()
   if (!value) {
-    toast.error('内容为空', { description: '如需恢复默认，请使用"重置为默认"。' })
+    toast.error(t('prompts.toast.empty'), { description: t('prompts.toast.emptyDescription') })
     return
   }
   saving[p.key] = true
@@ -88,10 +89,10 @@ const save = async (p: SubjectPrompt) => {
       method: 'PUT',
       body: { value: drafts[p.key] },
     })
-    toast.success('已保存', { description: `${p.title} 已应用于当前学科` })
+    toast.success(t('common.saved'), { description: t('prompts.toast.savedDescription', { title: p.title }) })
     await fetchPrompts()
   } catch (error) {
-    toast.error('保存失败', { description: (error as any).message })
+    toast.error(t('common.saveFailed'), { description: (error as any).message })
   } finally {
     saving[p.key] = false
   }
@@ -101,10 +102,10 @@ const reset = async (p: SubjectPrompt) => {
   saving[p.key] = true
   try {
     await $api(`/subjects/${selectedSubjectId.value}/prompts/${p.key}`, { method: 'DELETE' })
-    toast.success('已重置为默认', { description: `${p.title} 恢复使用系统默认` })
+    toast.success(t('prompts.toast.resetDone'), { description: t('prompts.toast.resetDescription', { title: p.title }) })
     await fetchPrompts()
   } catch (error) {
-    toast.error('重置失败', { description: (error as any).message })
+    toast.error(t('prompts.toast.resetFailed'), { description: (error as any).message })
   } finally {
     saving[p.key] = false
   }
@@ -127,10 +128,10 @@ onMounted(async () => {
   <div class="space-y-6">
     <!-- 学科选择 -->
     <div v-if="subjects.length" class="flex items-center gap-3 max-w-4xl">
-      <span class="text-sm font-medium shrink-0">配置学科</span>
+      <span class="text-sm font-medium shrink-0">{{ t('prompts.subject') }}</span>
       <Select v-model="selectedSubjectId">
         <SelectTrigger class="w-64">
-          <SelectValue placeholder="选择学科" />
+          <SelectValue :placeholder="t('prompts.selectSubject')" />
         </SelectTrigger>
         <SelectContent>
           <SelectItem v-for="s in subjects" :key="s.id" :value="String(s.id)">
@@ -139,7 +140,7 @@ onMounted(async () => {
         </SelectContent>
       </Select>
       <p class="text-xs text-muted-foreground">
-        提示词按学科独立配置；未定制的学科自动使用系统默认。
+        {{ t('prompts.subjectHint') }}
       </p>
     </div>
 
@@ -168,7 +169,7 @@ onMounted(async () => {
                     :variant="p.is_custom ? 'default' : 'secondary'"
                     class="text-[10px] py-0 h-4"
                   >
-                    {{ p.is_custom ? '已自定义' : '使用默认' }}
+                    {{ p.is_custom ? t('prompts.custom') : t('prompts.usingDefault') }}
                   </Badge>
                 </div>
                 <p class="text-xs text-muted-foreground mt-0.5 line-clamp-1 font-normal">
@@ -181,25 +182,28 @@ onMounted(async () => {
             <div class="flex flex-col gap-3 pl-[3.25rem]">
               <Textarea
                 v-model="drafts[p.key]"
-                placeholder="留空并保存无效；如需恢复系统默认请点『重置为默认』。可点『填入默认模板』基于默认修改。"
+                :placeholder="t('prompts.placeholder')"
                 class="min-h-[300px] font-mono text-[13px] leading-relaxed resize-y bg-muted/30 focus:bg-background"
               />
 
               <details class="text-xs">
                 <summary class="cursor-pointer text-muted-foreground hover:text-foreground select-none">
-                  查看系统默认模板
+                  {{ t('prompts.viewDefault') }}
                 </summary>
                 <pre class="mt-2 p-3 rounded-lg bg-muted/50 whitespace-pre-wrap font-mono text-[12px] leading-relaxed max-h-64 overflow-auto">{{ p.default }}</pre>
               </details>
 
               <div class="flex items-center justify-between gap-2 mt-1">
                 <p class="text-xs text-muted-foreground flex-1">
-                  支持 <code>{subject_name}</code>、<code>{subject_description}</code> 等占位符，运行时自动替换。
+                  <i18n-t scope="global" keypath="prompts.placeholdersHint" tag="span">
+                    <template #name><code>{subject_name}</code></template>
+                    <template #description><code>{subject_description}</code></template>
+                  </i18n-t>
                 </p>
                 <div class="flex items-center gap-2 shrink-0">
                   <Button variant="ghost" size="sm" @click="fillWithDefault(p)">
                     <ClipboardCopy class="w-4 h-4 mr-1.5" />
-                    填入默认模板
+                    {{ t('prompts.fillDefault') }}
                   </Button>
                   <Button
                     v-if="p.is_custom"
@@ -209,11 +213,11 @@ onMounted(async () => {
                     @click="reset(p)"
                   >
                     <RotateCcw class="w-4 h-4 mr-1.5" />
-                    重置为默认
+                    {{ t('prompts.resetToDefault') }}
                   </Button>
                   <Button size="sm" :disabled="saving[p.key]" @click="save(p)">
                     <Save class="w-4 h-4 mr-1.5" />
-                    保存覆盖
+                    {{ t('prompts.saveOverride') }}
                   </Button>
                 </div>
               </div>
@@ -224,15 +228,15 @@ onMounted(async () => {
 
       <div v-if="!loading && prompts.length === 0" class="flex flex-col items-center justify-center p-12 text-center border rounded-xl bg-card border-dashed">
         <MessageSquareText class="w-8 h-8 text-muted-foreground/50 mb-4" />
-        <h3 class="text-lg font-medium">暂无可配置的提示词</h3>
-        <p class="text-sm text-muted-foreground mt-1">请先选择一个学科</p>
+        <h3 class="text-lg font-medium">{{ t('prompts.emptyTitle') }}</h3>
+        <p class="text-sm text-muted-foreground mt-1">{{ t('prompts.emptyDescription') }}</p>
       </div>
     </div>
 
     <div v-else class="flex max-w-4xl flex-col items-center justify-center rounded-lg border border-dashed p-12 text-center">
       <MessageSquareText class="mb-4 h-8 w-8 text-muted-foreground/50" />
-      <h3 class="text-lg font-medium">暂无可管理的学科</h3>
-      <p class="mt-1 text-sm text-muted-foreground">需要学科负责人权限才能配置提示词</p>
+      <h3 class="text-lg font-medium">{{ t('prompts.noSubjectsTitle') }}</h3>
+      <p class="mt-1 text-sm text-muted-foreground">{{ t('prompts.noSubjectsDescription') }}</p>
     </div>
   </div>
 </template>

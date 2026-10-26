@@ -1,6 +1,7 @@
 import { toast } from 'vue-sonner'
 import { useMedia, useMediaSubject } from '@/composables/useMedia'
 import { rememberRecentMedia } from '@/lib/recentMedia'
+import { translate } from '@/lib/locale'
 
 export interface UploadedImageAttrs {
     src: string
@@ -15,7 +16,7 @@ export function useImageUpload() {
     async function uploadImage(file: File): Promise<UploadedImageAttrs | null> {
         const subjectId = mediaSubject.value
         if (!subjectId) {
-            toast.error('请先选择学科再插入图片')
+            toast.error(translate('richEditor.image.selectSubjectFirst'))
             return null
         }
         try {
@@ -24,7 +25,7 @@ export function useImageUpload() {
             return { src: asset.url, assetId: asset.id }
         } catch (error: any) {
             // 403 已由 api 插件统一提示。
-            if (error?.response?.status !== 403) toast.error(error?.data?.detail || '图片上传失败')
+            if (error?.response?.status !== 403) toast.error(error?.data?.detail || translate('richEditor.image.uploadFailed'))
             return null
         }
     }

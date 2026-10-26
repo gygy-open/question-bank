@@ -11,6 +11,8 @@ interface KnowledgePointNode extends KnowledgePoint {
   children?: KnowledgePointNode[]
 }
 
+const { t } = useI18n()
+
 const props = defineProps<{
   knowledgePoint: KnowledgePointNode
   level?: number
@@ -165,7 +167,7 @@ watch(newName, (val) => {
 
       <!-- Content: Display or Edit Mode -->
       <div v-if="isEditing" class="flex-1 flex items-center gap-2 mr-2">
-        <Input ref="editInputRef" v-model="editName" class="h-7 text-sm" placeholder="名称" @keyup.enter="saveEdit" @keyup.esc="cancelEdit" />
+        <Input ref="editInputRef" v-model="editName" class="h-7 text-sm" :placeholder="t('common.name')" @keyup.enter="saveEdit" @keyup.esc="cancelEdit" />
         <Input v-model="editSlug" class="h-7 text-sm w-24" placeholder="Slug" @keyup.enter="saveEdit" @keyup.esc="cancelEdit" />
         <Button size="icon" variant="ghost" class="h-7 w-7 text-green-600" @click.stop="saveEdit">
           <Save class="w-4 h-4" />
@@ -189,7 +191,7 @@ watch(newName, (val) => {
           size="icon" 
           class="h-7 w-7" 
           @click.stop="startCreate"
-          title="添加子目录"
+          :title="t('kpManager.addChild')"
         >
           <Plus class="w-3.5 h-3.5" />
         </Button>
@@ -198,7 +200,7 @@ watch(newName, (val) => {
           size="icon" 
           class="h-7 w-7" 
           @click.stop="startEdit"
-          title="编辑"
+          :title="t('common.edit')"
         >
           <Pencil class="w-3.5 h-3.5" />
         </Button>
@@ -207,7 +209,7 @@ watch(newName, (val) => {
           size="icon" 
           class="h-7 w-7 text-destructive hover:text-destructive" 
           @click.stop="$emit('delete', knowledgePoint.id)"
-          title="删除"
+          :title="t('common.delete')"
         >
           <Trash2 class="w-3.5 h-3.5" />
         </Button>
@@ -240,7 +242,7 @@ watch(newName, (val) => {
           <Folder class="w-4 h-4" />
         </div>
         <div class="flex-1 flex items-center gap-2">
-          <Input ref="createInputRef" v-model="newName" class="h-7 text-sm" placeholder="新目录名称" @keyup.enter="saveCreate" @keyup.esc="cancelCreate" />
+          <Input ref="createInputRef" v-model="newName" class="h-7 text-sm" :placeholder="t('kpManager.newChildName')" @keyup.enter="saveCreate" @keyup.esc="cancelCreate" />
           <Input v-model="newSlug" class="h-7 text-sm w-24" placeholder="Slug" @keyup.enter="saveCreate" @keyup.esc="cancelCreate" />
           <Button size="icon" variant="ghost" class="h-7 w-7 text-green-600" @click="saveCreate">
             <Save class="w-4 h-4" />

@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { useGlobalChat } from '@/composables/useGlobalChat'
 
+const { t } = useI18n()
 const chat = useGlobalChat()
 
 const selectSession = (id: string) => {
@@ -16,7 +17,7 @@ const selectSession = (id: string) => {
     <div class="border-b p-2">
       <Button class="w-full justify-start gap-2" size="sm" @click="chat.createNewSession()">
         <Plus class="h-4 w-4" />
-        新对话
+        {{ t('chat.newSession') }}
       </Button>
     </div>
     <ScrollArea class="min-h-0 flex-1">
@@ -42,7 +43,7 @@ const selectSession = (id: string) => {
             @keydown.esc.stop="chat.cancelEditing()"
             @blur="chat.saveTitle()"
           />
-          <span v-else class="flex-1 truncate">{{ session.title || '新对话' }}</span>
+          <span v-else class="flex-1 truncate">{{ session.title || t('chat.newSession') }}</span>
 
           <div
             v-if="chat.editingSessionId.value !== session.id"
@@ -50,14 +51,14 @@ const selectSession = (id: string) => {
           >
             <button
               class="rounded-md p-1.5 transition-colors hover:bg-background hover:text-foreground"
-              title="重命名"
+              :title="t('chat.history.rename')"
               @click="(e) => chat.startEditing(session, e)"
             >
               <Pencil class="h-3 w-3" />
             </button>
             <button
               class="rounded-md p-1.5 transition-colors hover:bg-destructive/10 hover:text-destructive"
-              title="删除"
+              :title="t('common.delete')"
               @click="(e) => chat.deleteSession(session.id, e)"
             >
               <Trash2 class="h-3 w-3" />
@@ -66,7 +67,7 @@ const selectSession = (id: string) => {
         </div>
 
         <div v-if="chat.sessions.value.length === 0" class="py-8 text-center text-sm text-muted-foreground">
-          暂无对话
+          {{ t('chat.history.empty') }}
         </div>
 
         <Button
@@ -78,7 +79,7 @@ const selectSession = (id: string) => {
           @click="chat.fetchSessions(true)"
         >
           <Loader2 v-if="chat.isLoadingMoreSessions.value" class="mr-2 h-3 w-3 animate-spin" />
-          {{ chat.isLoadingMoreSessions.value ? '加载中...' : '加载更多' }}
+          {{ chat.isLoadingMoreSessions.value ? t('common.loading') : t('common.loadMore') }}
         </Button>
       </div>
     </ScrollArea>

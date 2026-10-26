@@ -19,6 +19,7 @@ definePageMeta({
   layout: 'empty',
 })
 
+const { t } = useI18n()
 const { $api } = useNuxtApp()
 const { refreshSubjects, setSubject, init, hasSubjects } = useSubjectContext()
 
@@ -44,11 +45,11 @@ onMounted(async () => {
 
 const submit = async () => {
   if (!name.value.trim()) {
-    toast.error('请输入学科名称')
+    toast.error(t('onboarding.toast.nameRequired'))
     return
   }
   if (!slug.value.trim()) {
-    toast.error('请输入学科标识 (slug)')
+    toast.error(t('onboarding.toast.slugRequired'))
     return
   }
   submitting.value = true
@@ -64,10 +65,10 @@ const submit = async () => {
     })
     await refreshSubjects()
     await setSubject(created.id)
-    toast.success('学科已创建，开始使用吧')
+    toast.success(t('onboarding.toast.created'))
     await navigateTo('/')
   } catch (e: any) {
-    toast.error(e?.data?.detail || '创建失败，请重试')
+    toast.error(e?.data?.detail || t('onboarding.toast.createFailed'))
   } finally {
     submitting.value = false
   }
@@ -83,34 +84,34 @@ const submit = async () => {
             <Sparkles class="h-7 w-7" />
           </div>
         </div>
-        <CardTitle class="text-2xl text-center">创建你的第一个学科</CardTitle>
+        <CardTitle class="text-2xl text-center">{{ t('onboarding.title') }}</CardTitle>
         <CardDescription class="text-center">
-          题库以学科为单位组织。先创建一个学科，之后可随时在「学科管理」中增删。
+          {{ t('onboarding.description') }}
         </CardDescription>
       </CardHeader>
 
       <CardContent class="grid gap-4">
         <div class="grid gap-1.5">
-          <Label>学科名称</Label>
-          <Input v-model="name" placeholder="例如：高中数学" @keyup.enter="submit" />
+          <Label>{{ t('onboarding.name') }}</Label>
+          <Input v-model="name" :placeholder="t('onboarding.namePlaceholder')" @keyup.enter="submit" />
         </div>
 
         <div class="grid gap-1.5">
-          <Label>标识 (Slug)</Label>
+          <Label>{{ t('onboarding.slug') }}</Label>
           <Input
             v-model="slug"
-            placeholder="例如：math"
+            :placeholder="t('onboarding.slugPlaceholder')"
             @input="slugTouched = true"
             @keyup.enter="submit"
           />
           <p class="text-xs text-muted-foreground">
-            用于 URL 与系统内部标识，建议使用英文小写；名称为中文时请手动填写。
+            {{ t('onboarding.slugHint') }}
           </p>
         </div>
 
         <div class="grid gap-1.5">
-          <Label>描述<span class="text-muted-foreground font-normal">（可选）</span></Label>
-          <Input v-model="description" placeholder="可选：学科的简要说明" @keyup.enter="submit" />
+          <Label>{{ t('onboarding.descriptionLabel') }}<span class="text-muted-foreground font-normal">{{ t('onboarding.optional') }}</span></Label>
+          <Input v-model="description" :placeholder="t('onboarding.descriptionPlaceholder')" @keyup.enter="submit" />
         </div>
       </CardContent>
 
@@ -118,7 +119,7 @@ const submit = async () => {
         <Button class="w-full" :disabled="submitting" @click="submit">
           <Loader2 v-if="submitting" class="mr-2 h-4 w-4 animate-spin" />
           <template v-else>
-            开始使用
+            {{ t('onboarding.start') }}
             <ArrowRight class="ml-2 h-4 w-4" />
           </template>
         </Button>

@@ -13,6 +13,7 @@ import type {
     Tag,
 } from '@/types'
 import { collectBlankIds, generateBlankId } from '@/components/rich-editor/richDoc'
+import { translate } from '@/lib/locale'
 
 /** 生成稳定唯一的 option id；优先 crypto.randomUUID，回退到时间戳+随机。 */
 export function generateOptionId(): string {
@@ -343,38 +344,38 @@ function isRichEmpty(doc: RichDoc): boolean {
  */
 export function validateQuestionDraft(draft: QuestionDraft): string | null {
     if (isRichEmpty(draft.content)) {
-        return '题干不能为空'
+        return translate('questionModel.validation.contentRequired')
     }
     const answer = draft.answer
     if (!answer) {
         return draft.status === 'pending' || draft.status === 'published'
-            ? '提交审核或发布前请填写答案'
+            ? translate('questionModel.validation.answerRequired')
             : null
     }
     if (answer.kind === 'legacy_unresolved') {
-        return '该题为旧格式未解析答案，请重新填写答案后再保存'
+        return translate('questionModel.validation.legacyAnswer')
     }
     if (answer.kind !== draft.q_type) {
-        return '答案类型与题目类型不一致'
+        return translate('questionModel.validation.answerTypeMismatch')
     }
     if (isChoiceType(draft.q_type)) {
         if (draft.options.length < 2) {
-            return '选择题至少需要 2 个选项'
+            return translate('questionModel.validation.minOptions', { min: 2 })
         }
         const ids = new Set(draft.options.map((o) => o.id))
         if (answer.kind === 'single_choice') {
             if (answer.correct && !ids.has(answer.correct)) {
-                return '答案引用了不存在的选项'
+                return translate('questionModel.validation.unknownOption')
             }
             if ((draft.status === 'pending' || draft.status === 'published') && !answer.correct) {
-                return '请选择正确答案'
+                return translate('questionModel.validation.selectCorrect')
             }
         } else if (answer.kind === 'multiple_choice') {
             if ((draft.status === 'pending' || draft.status === 'published') && answer.correct.length === 0) {
-                return '请至少选择一个正确答案'
+                return translate('questionModel.validation.selectAtLeastOne')
             }
             if (answer.correct.some((id) => !ids.has(id))) {
-                return '答案引用了不存在的选项'
+                return translate('questionModel.validation.unknownOption')
             }
         }
     }
@@ -399,7 +400,7 @@ export function validateQuestionDraft(draft: QuestionDraft): string | null {
         && (draft.status === 'pending' || draft.status === 'published')
         && isRichEmpty(answer.reference)
     ) {
-        return '提交审核或发布前请填写参考答案'
+        return translate('questionModel.validation.referenceRequired')
     }
     return null
 }
@@ -411,10 +412,10 @@ function validateMatching(
 ): string | null {
     const optionIds = new Set(draft.options.map((o) => o.id))
     if (answer.slots.some((slot) => slot.correct && !optionIds.has(slot.correct))) {
-        return '答案引用了不存在的选项'
+        return translate('questionModel.validation.unknownOption')
     }
     if (duplicatedMatchingOptions(answer).size > 0) {
-        return '未允许重复选用时，各空位答案必须互不相同'
+        return translate('questionModel.validation.duplicateMatching')
     }
     const stemIds = collectBlankIds(draft.content)
     const slotIds = answer.slots.map((slot) => slot.id)
@@ -423,25 +424,25 @@ function validateMatching(
         && (requireComplete || slotIds.length > 0)
         && (stemIds.length !== slotIds.length || stemIds.some((id, i) => id !== slotIds[i]))
     ) {
-        return '题干空位与答案数量/顺序不一致'
+        return translate('questionModel.validation.slotMismatch')
     }
     if (requireComplete) {
-        if (answer.slots.length === 0) return '选项匹配题至少需要一个空位，请在题干中插入空位'
+        if (answer.slots.length === 0) return translate('questionModel.validation.slotRequired')
         const missing = answer.slots.findIndex((slot) => !slot.correct)
-        if (missing >= 0) return `第 ${missing + 1} 空尚未选择答案`
+        if (missing >= 0) return translate('questionModel.validation.slotUnanswered', { index: missing + 1 })
     }
     return null
 }
 
 function validateFillBlanks(answer: FillBlankAnswer, stem: RichDoc, requireComplete: boolean): string | null {
     if (requireComplete && answer.blanks.length === 0) {
-        return '填空题至少需要一个空'
+        return translate('questionModel.validation.blankRequired')
     }
     if (requireComplete) {
         for (let i = 0; i < answer.blanks.length; i++) {
             const accept = answer.blanks[i].accept.filter((a) => !isRichEmpty(a))
             if (accept.length === 0) {
-                return `第 ${i + 1} 空至少需要一个参考答案`
+                return translate('questionModel.validation.blankAcceptRequired', { index: i + 1 })
             }
         }
     }
@@ -449,7 +450,7 @@ function validateFillBlanks(answer: FillBlankAnswer, stem: RichDoc, requireCompl
     if (stemIds.length > 0 && (requireComplete || answer.blanks.length > 0)) {
         const answerIds = answer.blanks.map((b) => b.id)
         if (stemIds.length !== answerIds.length || stemIds.some((id, i) => id !== answerIds[i])) {
-            return '题干填空与答案数量/顺序不一致'
+            return translate('questionModel.validation.blankMismatch')
         }
     }
     return null

@@ -2,7 +2,7 @@
 import { Image as ImageIcon, KeyRound, Link2, Loader2, MoreHorizontal, Pencil, Plus, Search, Trash2, User } from '@lucide/vue'
 import { toast } from 'vue-sonner'
 import type { AIConfigScope, AIModel, AIModelInput, AIProvider, InterfaceType } from '~/types/ai-config'
-import { INTERFACE_LABELS } from '~/lib/ai-config'
+import { INTERFACE_LABEL_KEYS } from '~/lib/ai-config'
 import ConfirmDialog from '~/components/ai/ConfirmDialog.vue'
 import ModelPicker from '~/components/ai/ModelPicker.vue'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -28,6 +28,8 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
+
+const { t } = useI18n()
 
 const props = withDefaults(defineProps<{
   providers: AIProvider[]
@@ -56,9 +58,9 @@ const deleteWithForce = async (run: (force: boolean) => Promise<unknown>) => {
   } catch (e) {
     if (apiErrorStatus(e) !== 409) throw e
     const r = await ask({
-      title: '仍在使用中',
-      description: `${apiErrorMessage(e)}\n删除后对应场景将变为“未配置”，相关 AI 功能会暂停，直到重新选择模型。`,
-      confirmLabel: '仍然删除',
+      title: t('aiProviders.inUse.title'),
+      description: t('aiProviders.inUse.description', { error: apiErrorMessage(e) }),
+      confirmLabel: t('aiProviders.inUse.confirm'),
       destructive: true,
     })
     if (r !== 'confirm') return false
@@ -68,34 +70,35 @@ const deleteWithForce = async (run: (force: boolean) => Promise<unknown>) => {
 }
 
 const removeProvider = async (p: AIProvider) => {
-  const owner = props.review && p.owner_name ? `（属于 ${p.owner_name}）` : ''
   const r = await ask({
-    title: `删除服务商“${p.name}”${owner}？`,
-    description: `将同时删除其下 ${p.models.length} 个模型，此操作不可撤销。`,
-    confirmLabel: '删除',
+    title: props.review && p.owner_name
+      ? t('aiProviders.deleteProvider.titleWithOwner', { name: p.name, owner: p.owner_name })
+      : t('aiProviders.deleteProvider.title', { name: p.name }),
+    description: t('aiProviders.deleteProvider.description', { count: p.models.length }),
+    confirmLabel: t('common.delete'),
     destructive: true,
   })
   if (r !== 'confirm') return
   try {
     if (await deleteWithForce(force => api.deleteProvider(p.id, force))) {
-      toast.success('服务商已删除')
+      toast.success(t('aiProviders.toast.providerDeleted'))
       emit('changed')
     }
   } catch (e) {
-    toast.error('删除失败', { description: apiErrorMessage(e) })
+    toast.error(t('common.deleteFailed'), { description: apiErrorMessage(e) })
   }
 }
 
 const removeModel = async (m: AIModel) => {
-  const r = await ask({ title: `删除模型“${m.name}”？`, confirmLabel: '删除', destructive: true })
+  const r = await ask({ title: t('aiProviders.deleteModel.title', { name: m.name }), confirmLabel: t('common.delete'), destructive: true })
   if (r !== 'confirm') return
   try {
     if (await deleteWithForce(force => api.deleteModel(m.id, force))) {
-      toast.success('模型已删除')
+      toast.success(t('aiProviders.toast.modelDeleted'))
       emit('changed')
     }
   } catch (e) {
-    toast.error('删除失败', { description: apiErrorMessage(e) })
+    toast.error(t('common.deleteFailed'), { description: apiErrorMessage(e) })
   }
 }
 
@@ -104,9 +107,9 @@ const toggling = ref<number | null>(null)
 const toggleActive = async (p: AIProvider, value: boolean) => {
   if (!value && providerUsage(p).length) {
     const r = await ask({
-      title: `停用“${p.name}”？`,
-      description: `它的模型正被用作${providerUsage(p).join('、')}。停用后这些场景将不可用（个人设置会回落到全局默认）。`,
-      confirmLabel: '停用',
+      title: t('aiProviders.disable.title', { name: p.name }),
+      description: t('aiProviders.disable.description', { scenes: providerUsage(p).join(t('aiProviders.listSeparator')) }),
+      confirmLabel: t('aiProviders.disable.confirm'),
       destructive: true,
     })
     if (r !== 'confirm') return
@@ -116,7 +119,7 @@ const toggleActive = async (p: AIProvider, value: boolean) => {
     await api.updateProvider(p.id, { is_active: value })
     emit('changed')
   } catch (e) {
-    toast.error('操作失败', { description: apiErrorMessage(e) })
+    toast.error(t('common.operationFailed'), { description: apiErrorMessage(e) })
   } finally {
     toggling.value = null
   }
@@ -166,11 +169,11 @@ const saveEdit = async () => {
       base_url: editForm.value.base_url,
       ...(editForm.value.api_key ? { api_key: editForm.value.api_key } : {}),
     })
-    toast.success('已保存')
+    toast.success(t('common.saved'))
     editOpen.value = false
     emit('changed')
   } catch (e) {
-    toast.error('保存失败', { description: apiErrorMessage(e) })
+    toast.error(t('common.saveFailed'), { description: apiErrorMessage(e) })
   } finally {
     editSaving.value = false
   }
@@ -195,9 +198,9 @@ const openAddModels = async (p: AIProvider) => {
   try {
     const res = await api.discover({ provider_id: p.id })
     addCandidates.value = res.models
-    addMessage.value = res.ok ? '' : `未能获取模型列表：${res.message}`
+    addMessage.value = res.ok ? '' : t('aiProviders.discoverFailed', { message: res.message })
   } catch (e) {
-    addMessage.value = `未能获取模型列表：${apiErrorMessage(e)}`
+    addMessage.value = t('aiProviders.discoverFailed', { message: apiErrorMessage(e) })
   } finally {
     addLoading.value = false
   }
@@ -208,11 +211,11 @@ const saveAddModels = async () => {
   addSaving.value = true
   try {
     for (const m of addSelected.value) await api.addModel(addTarget.value.id, m)
-    toast.success(`已添加 ${addSelected.value.length} 个模型`)
+    toast.success(t('aiProviders.toast.modelsAdded', { count: addSelected.value.length }))
     addOpen.value = false
     emit('changed')
   } catch (e) {
-    toast.error('添加失败', { description: apiErrorMessage(e) })
+    toast.error(t('aiProviders.wizard.addFailed'), { description: apiErrorMessage(e) })
     emit('changed')
   } finally {
     addSaving.value = false
@@ -234,11 +237,11 @@ const saveModel = async () => {
   if (!modelEditing.value) return
   try {
     await api.updateModel(modelEditing.value.id, modelForm.value)
-    toast.success('模型已更新')
+    toast.success(t('aiProviders.toast.modelUpdated'))
     modelOpen.value = false
     emit('changed')
   } catch (e) {
-    toast.error('保存失败', { description: apiErrorMessage(e) })
+    toast.error(t('common.saveFailed'), { description: apiErrorMessage(e) })
   }
 }
 </script>
@@ -250,15 +253,15 @@ const saveModel = async () => {
         <div class="min-w-0">
           <CardTitle class="flex items-center gap-2 text-base">
             <span class="truncate">{{ p.name }}</span>
-            <Badge v-if="!p.is_active" variant="secondary" class="font-normal">已停用</Badge>
+            <Badge v-if="!p.is_active" variant="secondary" class="font-normal">{{ t('aiProviders.disabled') }}</Badge>
           </CardTitle>
           <div class="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
             <span v-if="review && p.owner_name" class="flex items-center gap-1"><User class="h-3 w-3" />{{ p.owner_name }}</span>
-            <span>{{ INTERFACE_LABELS[p.interface_type] ?? p.interface_type }}</span>
+            <span>{{ INTERFACE_LABEL_KEYS[p.interface_type] ? t(INTERFACE_LABEL_KEYS[p.interface_type]!) : p.interface_type }}</span>
             <span v-if="p.base_url" class="flex min-w-0 items-center gap-1" :title="p.base_url">
               <Link2 class="h-3 w-3 shrink-0" /><span class="truncate max-w-48">{{ p.base_url }}</span>
             </span>
-            <span v-if="!p.api_key_set" class="flex items-center gap-1 text-destructive"><KeyRound class="h-3 w-3" />未设置 Key</span>
+            <span v-if="!p.api_key_set" class="flex items-center gap-1 text-destructive"><KeyRound class="h-3 w-3" />{{ t('aiProviders.keyNotSet') }}</span>
           </div>
         </div>
 
@@ -267,27 +270,27 @@ const saveModel = async () => {
             <Switch
               :model-value="p.is_active"
               :disabled="toggling === p.id"
-              :aria-label="p.is_active ? '停用' : '启用'"
+              :aria-label="p.is_active ? t('aiProviders.disable.confirm') : t('aiProviders.enable')"
               @update:model-value="v => toggleActive(p, !!v)"
             />
             <DropdownMenu>
               <DropdownMenuTrigger as-child>
-                <Button variant="ghost" size="icon" class="h-8 w-8" aria-label="更多操作">
+                <Button variant="ghost" size="icon" class="h-8 w-8" :aria-label="t('common.moreActions')">
                   <MoreHorizontal class="h-4 w-4" />
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
-                <DropdownMenuItem @click="openEdit(p)"><Pencil class="mr-2 h-4 w-4" />编辑连接信息</DropdownMenuItem>
-                <DropdownMenuItem @click="openAddModels(p)"><Plus class="mr-2 h-4 w-4" />添加模型</DropdownMenuItem>
+                <DropdownMenuItem @click="openEdit(p)"><Pencil class="mr-2 h-4 w-4" />{{ t('aiProviders.editConnection') }}</DropdownMenuItem>
+                <DropdownMenuItem @click="openAddModels(p)"><Plus class="mr-2 h-4 w-4" />{{ t('aiProviders.addModels') }}</DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem class="text-destructive focus:text-destructive" @click="removeProvider(p)">
-                  <Trash2 class="mr-2 h-4 w-4" />删除服务商
+                  <Trash2 class="mr-2 h-4 w-4" />{{ t('aiProviders.deleteProvider.action') }}
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
           </template>
           <Button v-else variant="ghost" size="sm" class="text-destructive" @click="removeProvider(p)">
-            <Trash2 class="mr-1 h-4 w-4" />删除
+            <Trash2 class="mr-1 h-4 w-4" />{{ t('common.delete') }}
           </Button>
         </div>
       </CardHeader>
@@ -297,30 +300,30 @@ const saveModel = async () => {
           <li v-for="m in p.models" :key="m.id" class="flex items-center gap-2 px-2 py-1.5 text-sm">
             <span class="min-w-0 flex-1 truncate font-mono text-xs" :title="m.name">{{ m.name }}</span>
             <Badge v-if="m.is_vision_capable" variant="outline" class="h-5 gap-1 border-blue-200 bg-blue-50 px-1.5 text-[11px] font-normal text-blue-700">
-              <ImageIcon class="h-3 w-3" />识图
+              <ImageIcon class="h-3 w-3" />{{ t('aiModels.capabilities.vision') }}
             </Badge>
             <Badge v-if="m.is_embedding_model" variant="outline" class="h-5 gap-1 border-purple-200 bg-purple-50 px-1.5 text-[11px] font-normal text-purple-700">
-              <Search class="h-3 w-3" />向量
+              <Search class="h-3 w-3" />{{ t('aiModels.capabilities.embedding') }}
             </Badge>
             <Badge v-for="u in usage.get(m.id) ?? []" :key="u" class="h-5 px-1.5 text-[11px] font-normal">
               {{ u }}
             </Badge>
             <template v-if="!review">
-              <Button variant="ghost" size="icon" class="h-7 w-7" :aria-label="`编辑 ${m.name}`" @click="openModelEdit(m)">
+              <Button variant="ghost" size="icon" class="h-7 w-7" :aria-label="t('aiProviders.editModelAria', { name: m.name })" @click="openModelEdit(m)">
                 <Pencil class="h-3.5 w-3.5 text-muted-foreground" />
               </Button>
-              <Button variant="ghost" size="icon" class="h-7 w-7" :aria-label="`删除 ${m.name}`" @click="removeModel(m)">
+              <Button variant="ghost" size="icon" class="h-7 w-7" :aria-label="t('aiProviders.deleteModelAria', { name: m.name })" @click="removeModel(m)">
                 <Trash2 class="h-3.5 w-3.5 text-muted-foreground" />
               </Button>
             </template>
           </li>
         </ul>
         <div v-if="!p.models.length" class="px-2 py-3 text-center text-xs text-muted-foreground">
-          还没有模型。
-          <button v-if="!review" type="button" class="underline" @click="openAddModels(p)">添加模型</button>
+          {{ t('aiProviders.noModels') }}
+          <button v-if="!review" type="button" class="underline" @click="openAddModels(p)">{{ t('aiProviders.addModels') }}</button>
         </div>
         <Button v-else-if="!review" variant="ghost" size="sm" class="mt-1 w-full text-muted-foreground" @click="openAddModels(p)">
-          <Plus class="mr-1 h-4 w-4" />添加模型
+          <Plus class="mr-1 h-4 w-4" />{{ t('aiProviders.addModels') }}
         </Button>
       </CardContent>
     </Card>
@@ -330,27 +333,27 @@ const saveModel = async () => {
   <Dialog v-model:open="editOpen">
     <DialogContent>
       <DialogHeader>
-        <DialogTitle>编辑服务商</DialogTitle>
-        <DialogDescription>修改连接信息。API Key 留空表示保持不变。</DialogDescription>
+        <DialogTitle>{{ t('aiProviders.edit.title') }}</DialogTitle>
+        <DialogDescription>{{ t('aiProviders.edit.description') }}</DialogDescription>
       </DialogHeader>
       <form class="grid gap-4" @submit.prevent="saveEdit">
         <div class="grid gap-2">
-          <Label for="pe-name">名称</Label>
+          <Label for="pe-name">{{ t('common.name') }}</Label>
           <Input id="pe-name" v-model="editForm.name" />
         </div>
         <div class="grid gap-2">
-          <Label>接口类型</Label>
+          <Label>{{ t('aiProviders.interfaceType') }}</Label>
           <Select v-model="editForm.interface_type">
             <SelectTrigger><SelectValue /></SelectTrigger>
             <SelectContent>
-              <SelectItem value="openai">{{ INTERFACE_LABELS.openai }}</SelectItem>
-              <SelectItem value="gemini">{{ INTERFACE_LABELS.gemini }}</SelectItem>
+              <SelectItem value="openai">{{ t(INTERFACE_LABEL_KEYS.openai!) }}</SelectItem>
+              <SelectItem value="gemini">{{ t(INTERFACE_LABEL_KEYS.gemini!) }}</SelectItem>
             </SelectContent>
           </Select>
         </div>
         <div class="grid gap-2">
-          <Label for="pe-url">接口地址（Base URL）</Label>
-          <Input id="pe-url" v-model="editForm.base_url" placeholder="留空使用官方地址" />
+          <Label for="pe-url">{{ t('aiProviders.baseUrl') }}</Label>
+          <Input id="pe-url" v-model="editForm.base_url" :placeholder="t('aiProviders.baseUrlPlaceholderGemini')" />
         </div>
         <div class="grid gap-2">
           <Label for="pe-key">API Key</Label>
@@ -359,17 +362,17 @@ const saveModel = async () => {
             v-model="editForm.api_key"
             type="password"
             autocomplete="off"
-            :placeholder="editing?.api_key_set ? '已设置（留空则不修改）' : '请填写'"
+            :placeholder="editing?.api_key_set ? t('aiProviders.edit.keySet') : t('aiProviders.edit.keyRequired')"
           />
         </div>
         <div class="flex items-center gap-3 text-sm">
           <Button type="button" variant="outline" size="sm" :disabled="editTesting" @click="testEdit">
-            <Loader2 v-if="editTesting" class="mr-2 h-4 w-4 animate-spin" />测试连接
+            <Loader2 v-if="editTesting" class="mr-2 h-4 w-4 animate-spin" />{{ t('aiProviders.testConnection') }}
           </Button>
           <span v-if="editTest" :class="editTest.ok ? 'text-green-600' : 'text-destructive'">{{ editTest.message }}</span>
         </div>
         <DialogFooter>
-          <Button type="submit" :disabled="editSaving || !editForm.name.trim()">保存</Button>
+          <Button type="submit" :disabled="editSaving || !editForm.name.trim()">{{ t('common.save') }}</Button>
         </DialogFooter>
       </form>
     </DialogContent>
@@ -379,11 +382,11 @@ const saveModel = async () => {
   <Dialog v-model:open="addOpen">
     <DialogContent class="sm:max-w-xl">
       <DialogHeader>
-        <DialogTitle>为“{{ addTarget?.name }}”添加模型</DialogTitle>
-        <DialogDescription>从服务商返回的列表中勾选，或手动填写。</DialogDescription>
+        <DialogTitle>{{ t('aiProviders.addModelsDialog.title', { name: addTarget?.name ?? '' }) }}</DialogTitle>
+        <DialogDescription>{{ t('aiProviders.addModelsDialog.description') }}</DialogDescription>
       </DialogHeader>
       <div v-if="addLoading" class="flex items-center justify-center gap-2 py-8 text-sm text-muted-foreground">
-        <Loader2 class="h-4 w-4 animate-spin" />正在获取模型列表…
+        <Loader2 class="h-4 w-4 animate-spin" />{{ t('aiProviders.addModelsDialog.loading') }}
       </div>
       <template v-else>
         <p v-if="addMessage" class="text-sm text-amber-600">{{ addMessage }}</p>
@@ -395,7 +398,7 @@ const saveModel = async () => {
       </template>
       <DialogFooter>
         <Button :disabled="addSaving || !addSelected.length" @click="saveAddModels">
-          <Loader2 v-if="addSaving" class="mr-2 h-4 w-4 animate-spin" />添加 {{ addSelected.length || '' }} 个模型
+          <Loader2 v-if="addSaving" class="mr-2 h-4 w-4 animate-spin" />{{ addSelected.length ? t('aiProviders.addModelsCount', { count: addSelected.length }) : t('aiProviders.addModels') }}
         </Button>
       </DialogFooter>
     </DialogContent>
@@ -405,12 +408,12 @@ const saveModel = async () => {
   <Dialog v-model:open="modelOpen">
     <DialogContent>
       <DialogHeader>
-        <DialogTitle>编辑模型</DialogTitle>
-        <DialogDescription>模型名称需与服务商的 model 参数完全一致。</DialogDescription>
+        <DialogTitle>{{ t('aiProviders.editModel.title') }}</DialogTitle>
+        <DialogDescription>{{ t('aiProviders.editModel.description') }}</DialogDescription>
       </DialogHeader>
       <form class="grid gap-4" @submit.prevent="saveModel">
         <div class="grid gap-2">
-          <Label for="me-name">模型名称</Label>
+          <Label for="me-name">{{ t('aiModels.modelName') }}</Label>
           <Input id="me-name" v-model="modelForm.name" class="font-mono" />
         </div>
         <div class="flex items-center gap-2">
@@ -420,7 +423,7 @@ const saveModel = async () => {
             :disabled="modelForm.is_embedding_model"
             @update:model-value="v => modelForm.is_vision_capable = !!v"
           />
-          <Label for="me-vision">支持识图（可用于图片识别题目）</Label>
+          <Label for="me-vision">{{ t('aiModels.visionCapable') }}</Label>
         </div>
         <div class="flex items-center gap-2">
           <Checkbox
@@ -428,10 +431,10 @@ const saveModel = async () => {
             :model-value="modelForm.is_embedding_model"
             @update:model-value="v => { modelForm.is_embedding_model = !!v; if (v) modelForm.is_vision_capable = false }"
           />
-          <Label for="me-embedding">向量模型（仅用于检索，不能对话）</Label>
+          <Label for="me-embedding">{{ t('aiModels.embeddingModel') }}</Label>
         </div>
         <DialogFooter>
-          <Button type="submit" :disabled="!modelForm.name.trim()">保存</Button>
+          <Button type="submit" :disabled="!modelForm.name.trim()">{{ t('common.save') }}</Button>
         </DialogFooter>
       </form>
     </DialogContent>

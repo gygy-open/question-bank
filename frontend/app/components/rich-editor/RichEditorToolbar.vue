@@ -23,18 +23,20 @@ const emit = defineEmits<{
     table: [{ rows: number; cols: number; withHeaderRow: boolean }]
 }>()
 
+const { t } = useI18n()
+
 const inlineItems = getInlineFormatItems(props.editor)
 
 // 段落：列表（对齐菜单在模板里单独渲染）。
 const paragraphItems: ToolbarItem[] = [
     {
-        label: '无序列表',
+        labelKey: 'richEditor.slash.items.bulletList',
         icon: List,
         action: () => props.editor.chain().focus().toggleBulletList().run(),
         isActive: () => props.editor.isActive('bulletList'),
     },
     {
-        label: '有序列表',
+        labelKey: 'richEditor.slash.items.orderedList',
         icon: ListOrdered,
         action: () => props.editor.chain().focus().toggleOrderedList().run(),
         isActive: () => props.editor.isActive('orderedList'),
@@ -44,28 +46,28 @@ const paragraphItems: ToolbarItem[] = [
 // 插入：公式 / 图片 /（表格单独渲染，需要弹出行列选择）/（填空）。
 const insertItems = computed<ToolbarItem[]>(() => {
     const items: ToolbarItem[] = [
-        { label: '行内公式', icon: Sigma, action: () => emit('math', false) },
-        { label: '块公式', icon: SquareSigma, action: () => emit('math', true) },
-        { label: '图片', icon: ImageIcon, action: () => emit('image') },
+        { labelKey: 'richEditor.slash.items.inlineMath', icon: Sigma, action: () => emit('math', false) },
+        { labelKey: 'richEditor.slash.items.blockMath', icon: SquareSigma, action: () => emit('math', true) },
+        { labelKey: 'richEditor.slash.items.image', icon: ImageIcon, action: () => emit('image') },
     ]
     if (props.allowAudio) {
-        items.push({ label: '音频', icon: Music, action: () => emit('audio') })
+        items.push({ labelKey: 'richEditor.slash.items.audio', icon: Music, action: () => emit('audio') })
     }
     if (props.allowBlank) {
-        items.push({ label: '插入填空', icon: SquareDashed, action: () => emit('blank') })
+        items.push({ labelKey: 'richEditor.toolbar.insertBlank', icon: SquareDashed, action: () => emit('blank') })
     }
     return items
 })
 
 const historyGroup: ToolbarItem[] = [
     {
-        label: '撤销',
+        labelKey: 'richEditor.toolbar.undo',
         icon: Undo2,
         action: () => props.editor.chain().focus().undo().run(),
         disabled: () => !props.editor.can().undo(),
     },
     {
-        label: '重做',
+        labelKey: 'richEditor.toolbar.redo',
         icon: Redo2,
         action: () => props.editor.chain().focus().redo().run(),
         disabled: () => !props.editor.can().redo(),
@@ -82,7 +84,7 @@ const historyGroup: ToolbarItem[] = [
                 <div aria-hidden="true" class="mx-1 h-6 w-px shrink-0 bg-border" />
             </template>
             <!-- 文本 -->
-            <Tooltip v-for="item in inlineItems" :key="item.label">
+            <Tooltip v-for="item in inlineItems" :key="item.labelKey">
                 <TooltipTrigger as-child>
                     <Button
                         type="button"
@@ -95,13 +97,13 @@ const historyGroup: ToolbarItem[] = [
                         <component :is="item.icon" class="size-4" />
                     </Button>
                 </TooltipTrigger>
-                <TooltipContent>{{ item.label }}</TooltipContent>
+                <TooltipContent>{{ t(item.labelKey) }}</TooltipContent>
             </Tooltip>
 
             <div aria-hidden="true" class="mx-1 h-6 w-px shrink-0 bg-border" />
             <!-- 段落 -->
             <RichEditorAlignMenu :editor="editor" />
-            <Tooltip v-for="item in paragraphItems" :key="item.label">
+            <Tooltip v-for="item in paragraphItems" :key="item.labelKey">
                 <TooltipTrigger as-child>
                     <Button
                         type="button"
@@ -113,12 +115,12 @@ const historyGroup: ToolbarItem[] = [
                         <component :is="item.icon" class="size-4" />
                     </Button>
                 </TooltipTrigger>
-                <TooltipContent>{{ item.label }}</TooltipContent>
+                <TooltipContent>{{ t(item.labelKey) }}</TooltipContent>
             </Tooltip>
 
             <div aria-hidden="true" class="mx-1 h-6 w-px shrink-0 bg-border" />
             <!-- 插入 -->
-            <Tooltip v-for="item in insertItems" :key="item.label">
+            <Tooltip v-for="item in insertItems" :key="item.labelKey">
                 <TooltipTrigger as-child>
                     <Button
                         type="button"
@@ -131,7 +133,7 @@ const historyGroup: ToolbarItem[] = [
                         <component :is="item.icon" class="size-4" />
                     </Button>
                 </TooltipTrigger>
-                <TooltipContent>{{ item.label }}</TooltipContent>
+                <TooltipContent>{{ t(item.labelKey) }}</TooltipContent>
             </Tooltip>
             <RichEditorTableMenu @insert="(options) => emit('table', options)" />
 
@@ -141,7 +143,7 @@ const historyGroup: ToolbarItem[] = [
             </template>
 
             <div class="ml-auto flex items-center gap-0.5">
-                <Tooltip v-for="item in historyGroup" :key="item.label">
+                <Tooltip v-for="item in historyGroup" :key="item.labelKey">
                     <TooltipTrigger as-child>
                         <Button
                             type="button"
@@ -154,7 +156,7 @@ const historyGroup: ToolbarItem[] = [
                             <component :is="item.icon" class="size-4" />
                         </Button>
                     </TooltipTrigger>
-                    <TooltipContent>{{ item.label }}</TooltipContent>
+                    <TooltipContent>{{ t(item.labelKey) }}</TooltipContent>
                 </Tooltip>
             </div>
         </div>

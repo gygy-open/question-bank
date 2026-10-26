@@ -9,6 +9,7 @@ definePageMeta({
   layout: 'empty'
 })
 
+const { t } = useI18n()
 const router = useRouter()
 const { $api } = useNuxtApp()
 
@@ -20,7 +21,7 @@ onMounted(async () => {
   try {
     const res = await $api<{ enabled: boolean; requires_approval: boolean }>('/register/config')
     if (!res.enabled) {
-      toast.error('注册功能未开放')
+      toast.error(t('auth.register.disabled'))
       router.replace('/login')
       return
     }
@@ -33,15 +34,16 @@ onMounted(async () => {
   }
 })
 
-const formSchema = toTypedSchema(z.object({
-  username: z.string().min(1, '请输入用户名'),
-  full_name: z.string().min(1, '请输入姓名'),
-  password: z.string().min(6, '密码长度不能少于 6 位'),
-  confirm_password: z.string().min(1, '请再次输入密码'),
+// schema 放在 computed 里，切换语言后校验文案随之更新（页面会被 keepalive 缓存）。
+const formSchema = computed(() => toTypedSchema(z.object({
+  username: z.string({ required_error: t('auth.register.usernameRequired') }).min(1, t('auth.register.usernameRequired')),
+  full_name: z.string({ required_error: t('auth.register.fullNameRequired') }).min(1, t('auth.register.fullNameRequired')),
+  password: z.string({ required_error: t('auth.register.passwordMin', { min: 6 }) }).min(6, t('auth.register.passwordMin', { min: 6 })),
+  confirm_password: z.string({ required_error: t('auth.register.confirmRequired') }).min(1, t('auth.register.confirmRequired')),
 }).refine((v) => v.password === v.confirm_password, {
-  message: '两次输入的密码不一致',
+  message: t('auth.register.passwordMismatch'),
   path: ['confirm_password'],
-}))
+})))
 
 const form = useForm({
   validationSchema: formSchema,
@@ -59,13 +61,13 @@ const onSubmit = form.handleSubmit(async (values) => {
       },
     })
     if (res.requires_approval) {
-      toast.success('注册成功，请等待管理员审核后登录')
+      toast.success(t('auth.register.successPendingApproval'))
     } else {
-      toast.success('注册成功，请登录')
+      toast.success(t('auth.register.success'))
     }
     router.push('/login')
   } catch (error: any) {
-    toast.error(error.data?.detail || error.message || '注册失败')
+    toast.error(error.data?.detail || error.message || t('auth.register.failed'))
   } finally {
     isLoading.value = false
   }
@@ -79,9 +81,9 @@ const onSubmit = form.handleSubmit(async (values) => {
         <div class="flex justify-center mb-4">
           <img src="/logo.svg" alt="Logo" class="h-16 w-auto" />
         </div>
-        <CardTitle class="text-2xl text-center">注册账户</CardTitle>
+        <CardTitle class="text-2xl text-center">{{ t('auth.register.title') }}</CardTitle>
         <CardDescription class="text-center">
-          创建一个新账户以使用系统
+          {{ t('auth.register.description') }}
         </CardDescription>
       </CardHeader>
       <CardContent>
@@ -92,9 +94,9 @@ const onSubmit = form.handleSubmit(async (values) => {
           <div class="grid gap-4">
             <FormField v-slot="{ componentField }" name="username">
               <FormItem>
-                <FormLabel>用户名</FormLabel>
+                <FormLabel>{{ t('auth.login.username') }}</FormLabel>
                 <FormControl>
-                  <Input type="text" placeholder="请输入用户名" v-bind="componentField" />
+                  <Input type="text" :placeholder="t('auth.register.usernameRequired')" v-bind="componentField" />
                 </FormControl>
                 <FormMessage />
               </FormItem>
@@ -102,9 +104,9 @@ const onSubmit = form.handleSubmit(async (values) => {
 
             <FormField v-slot="{ componentField }" name="full_name">
               <FormItem>
-                <FormLabel>姓名</FormLabel>
+                <FormLabel>{{ t('auth.register.fullName') }}</FormLabel>
                 <FormControl>
-                  <Input type="text" placeholder="请输入姓名" v-bind="componentField" />
+                  <Input type="text" :placeholder="t('auth.register.fullNameRequired')" v-bind="componentField" />
                 </FormControl>
                 <FormMessage />
               </FormItem>
@@ -112,7 +114,7 @@ const onSubmit = form.handleSubmit(async (values) => {
 
             <FormField v-slot="{ componentField }" name="password">
               <FormItem>
-                <FormLabel>密码</FormLabel>
+                <FormLabel>{{ t('auth.login.password') }}</FormLabel>
                 <FormControl>
                   <Input type="password" placeholder="******" v-bind="componentField" />
                 </FormControl>
@@ -122,7 +124,7 @@ const onSubmit = form.handleSubmit(async (values) => {
 
             <FormField v-slot="{ componentField }" name="confirm_password">
               <FormItem>
-                <FormLabel>确认密码</FormLabel>
+                <FormLabel>{{ t('auth.register.confirmPassword') }}</FormLabel>
                 <FormControl>
                   <Input type="password" placeholder="******" v-bind="componentField" />
                 </FormControl>
@@ -131,17 +133,17 @@ const onSubmit = form.handleSubmit(async (values) => {
             </FormField>
 
             <p v-if="requiresApproval" class="text-xs text-muted-foreground">
-              注册后需要管理员审核通过才能登录。
+              {{ t('auth.register.approvalHint') }}
             </p>
 
             <Button type="submit" :disabled="isLoading" class="w-full">
               <Loader2 v-if="isLoading" class="mr-2 h-4 w-4 animate-spin" />
-              注册
+              {{ t('auth.register.submit') }}
             </Button>
 
             <div class="text-center text-sm text-muted-foreground">
-              已有账户？
-              <NuxtLink to="/login" class="text-primary hover:underline">返回登录</NuxtLink>
+              {{ t('auth.register.hasAccount') }}
+              <NuxtLink to="/login" class="text-primary hover:underline">{{ t('auth.register.backToLogin') }}</NuxtLink>
             </div>
           </div>
         </form>

@@ -11,6 +11,7 @@ const props = defineProps<{
 
 const emit = defineEmits(['update:modelValue', 'confirm'])
 
+const { t } = useI18n()
 const mathfieldRef = ref<HTMLElement | null>(null)
 const keyboardContainerRef = ref<HTMLElement | null>(null)
 
@@ -68,7 +69,7 @@ watch(() => props.modelValue, (newVal) => {
     <div class="flex justify-end">
       <Button variant="outline" size="sm" @click="toggleKeyboard">
         <Keyboard class="w-4 h-4 mr-2" />
-        虚拟键盘
+        {{ t('mathEditor.keyboard') }}
       </Button>
     </div>
 
@@ -80,7 +81,7 @@ watch(() => props.modelValue, (newVal) => {
     </math-field>
 
     <div class="text-xs text-muted-foreground">
-      提示：点击上方按钮可打开/关闭虚拟键盘。
+      {{ t('mathEditor.keyboardHint') }}
     </div>
 
     <div ref="keyboardContainerRef"></div>
