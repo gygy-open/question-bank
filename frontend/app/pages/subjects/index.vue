@@ -106,7 +106,7 @@ const deleteSubject = async (id: number) => {
   <div class="flex-1 overflow-auto">
     <div class="max-w-7xl mx-auto p-6">
       <!-- 表格卡片 -->
-      <div class="bg-white rounded-lg shadow-sm border">
+      <div class="bg-card text-card-foreground rounded-lg shadow-sm border">
         <Table>
           <TableHeader>
             <TableRow>
