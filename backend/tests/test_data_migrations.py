@@ -174,3 +174,30 @@ async def test_mysql_lock_lets_only_one_process_run():
             assert again is True
     finally:
         await asyncio.gather(engine_a.dispose(), engine_b.dispose())
+
+
+async def test_flags_are_hidden_from_settings_api_and_read_only(client, db_session):
+    from app.core.security import create_access_token
+    from app.models.user import User
+
+    admin = User(username="dm_admin", hashed_password="x", is_active=True, is_superuser=True)
+    db_session.add(admin)
+    db_session.add(SystemSetting(key="data_migration.legacy_media_assets", value="2026-01-01T00:00:00+00:00"))
+    # 下划线在 LIKE 中是通配符,确认没有误伤形似的普通键。
+    db_session.add(SystemSetting(key="dataXmigration.lookalike", value="v"))
+    await db_session.commit()
+    headers = {"Authorization": "Bearer " + create_access_token(admin.id)}
+
+    listed = await client.get("/api/v1/settings", headers=headers)
+    assert listed.status_code == 200
+    keys = {s["key"] for s in listed.json()}
+    assert "data_migration.legacy_media_assets" not in keys
+    assert "dataXmigration.lookalike" in keys
+
+    put = await client.put(
+        "/api/v1/settings/data_migration.legacy_media_assets", headers=headers, json={"value": "x"}
+    )
+    assert put.status_code == 403
+    flag = await db_session.get(SystemSetting, "data_migration.legacy_media_assets")
+    await db_session.refresh(flag)
+    assert flag.value.startswith("2026")

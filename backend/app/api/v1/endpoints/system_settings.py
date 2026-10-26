@@ -2,6 +2,7 @@ from typing import Any, List
 from fastapi import APIRouter, Depends, HTTPException
 from app import crud, models, schemas
 from app.api import deps
+from app.models.system_setting import is_internal_key
 from app.services.embedding import reload_embedding_function
 from app.services.ai_config_service import validate_active_model
 
@@ -17,7 +18,7 @@ async def read_system_settings(
     """
     Retrieve system settings. Only for superusers.
     """
-    settings = await crud.system_setting.get_multi(db, skip=skip, limit=limit)
+    settings = await crud.system_setting.get_multi_public(db, skip=skip, limit=limit)
     return settings
 
 @router.put("/{key}", response_model=schemas.SystemSetting)
@@ -31,6 +32,8 @@ async def update_system_setting(
     """
     Update a system setting. Only for superusers.
     """
+    if is_internal_key(key):
+        raise HTTPException(status_code=403, detail="This setting is managed by the system")
     await validate_active_model(db, key=key, value=setting_in.value)
     setting = await crud.system_setting.get_by_key(db, key=key)
     if not setting:

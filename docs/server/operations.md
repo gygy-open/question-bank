@@ -54,7 +54,7 @@ docker compose run --rm migrate
 
 ### 升级后的数据整理
 
-表结构迁移完成后，worker 会在后台执行一次性的数据整理（例如把旧版上传在题目中的图片转入媒体库），完成后记入 `system_settings` 表中以 `data_migration.` 开头的键，之后不再执行。可在 worker 日志中查看进度与报告：
+表结构迁移完成后，worker 会在后台执行一次性的数据整理（例如把旧版上传在题目中的图片转入媒体库），完成后记入 `system_settings` 表中以 `data_migration.` 开头的键（系统内部记录，不在设置页显示，也不能经 API 修改），之后不再执行。可在 worker 日志中查看进度与报告：
 
 ```bash
 docker compose logs worker | grep -i "data migration"

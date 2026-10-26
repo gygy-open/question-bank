@@ -20,11 +20,11 @@ from typing import AsyncIterator, Awaitable, Callable, List, Optional, Sequence
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncConnection, AsyncEngine, AsyncSession
 
-from app.models.system_setting import SystemSetting
+from app.models.system_setting import DATA_MIGRATION_KEY_PREFIX, SystemSetting
 
 logger = logging.getLogger(__name__)
 
-KEY_PREFIX = "data_migration."
+KEY_PREFIX = DATA_MIGRATION_KEY_PREFIX
 _LOCK_NAME = "qb_data_migrations"
 _KEY_MAX_LEN = 50
 _DESCRIPTION_MAX_LEN = 255
