@@ -1,3 +1,4 @@
+import { computed, ref } from 'vue'
 import { useLocalStorage } from '@vueuse/core'
 
 /**
@@ -5,8 +6,11 @@ import { useLocalStorage } from '@vueuse/core'
  *
  * Compares the running app version (from the backend `/system/version`) against
  * the latest published GitHub Release and exposes whether an update is
- * available. The result is shared app-wide via `useState` so both the sidebar
- * entry and the startup toast read the same data.
+ * available. State is module-level, so the layout toast and the about page share it.
+ *
+ * Only the GitHub result is cached in localStorage (6h, keyed by the version it was
+ * computed for). The running version is always fetched from the backend, so an
+ * upgrade is reflected immediately, and the in-flight flag is never persisted.
  */
 
 interface VersionInfo {
@@ -102,47 +106,79 @@ async function fetchLatestRelease(repo: string, includePrerelease: boolean): Pro
   return releases.find((r) => !r.draft) ?? null
 }
 
-export function useUpdateCheck() {
-  const state = useLocalStorage<UpdateState>('update-check', {
-    current: '',
-    latest: '',
-    hasUpdate: false,
-    releaseUrl: '',
-    checkedAt: 0,
-    checking: false,
-    error: null,
-  })
+const SIX_HOURS = 6 * 60 * 60 * 1000
+const CACHE_KEY = 'update-check-v2'
+// v1 persisted `current` and `checking`; a stale `checking: true` blocked every later check.
+const LEGACY_CACHE_KEY = 'update-check'
 
+interface ReleaseCache {
+  /** Installed version the cached GitHub result was fetched for. */
+  checkedFor: string
+  latest: string
+  releaseUrl: string
+  checkedAt: number
+}
+
+const current = ref('')
+const checking = ref(false)
+const error = ref<string | null>(null)
+let inflight: Promise<void> | null = null
+
+function useReleaseCache() {
+  if (typeof localStorage !== 'undefined') localStorage.removeItem(LEGACY_CACHE_KEY)
+  return useLocalStorage<ReleaseCache>(CACHE_KEY, { checkedFor: '', latest: '', releaseUrl: '', checkedAt: 0 })
+}
+
+export function useUpdateCheck() {
+  const cache = useReleaseCache()
   const { $api } = useNuxtApp()
 
-  async function check(force = false): Promise<void> {
-    // Skip if checked within the last 6 hours, unless forced.
-    const sixHours = 6 * 60 * 60 * 1000
-    if (!force && state.value.checkedAt && Date.now() - state.value.checkedAt < sixHours) {
-      return
-    }
-    if (state.value.checking) return
+  const state = computed<UpdateState>(() => ({
+    current: current.value,
+    latest: cache.value.latest,
+    hasUpdate: current.value !== '' && cache.value.latest !== '' && isNewer(cache.value.latest, current.value),
+    releaseUrl: cache.value.releaseUrl,
+    checkedAt: cache.value.checkedAt,
+    checking: checking.value,
+    error: error.value,
+  }))
 
-    state.value.checking = true
-    state.value.error = null
+  async function run(force: boolean): Promise<void> {
+    checking.value = true
+    error.value = null
     try {
-      // Current version + release repo from our own backend.
       const info = await $api<VersionInfo>('/system/version')
-      state.value.current = info.version
+      current.value = info.version
 
-      // Latest release from GitHub (public API, CORS-enabled).
+      const fresh = cache.value.checkedFor === info.version && Date.now() - cache.value.checkedAt < SIX_HOURS
+      if (!force && fresh) return
+
+      // Pre-release installs also consider pre-releases (see fetchLatestRelease).
       const isCurrentPrerelease = parseVersion(info.version).prerelease !== null
       const release = await fetchLatestRelease(info.repo, isCurrentPrerelease)
-      const latest = release?.tag_name?.replace(/^v/, '') ?? ''
-      state.value.latest = latest
-      state.value.releaseUrl = release?.html_url || info.releases_url
-      state.value.hasUpdate = latest !== '' && isNewer(latest, info.version)
+      cache.value = {
+        checkedFor: info.version,
+        latest: release?.tag_name?.replace(/^v/, '') ?? '',
+        releaseUrl: release?.html_url || info.releases_url,
+        checkedAt: Date.now(),
+      }
     } catch (e: unknown) {
-      state.value.error = e instanceof Error ? e.message : 'update check failed'
+      error.value = e instanceof Error ? e.message : 'update check failed'
     } finally {
-      state.value.checking = false
-      state.value.checkedAt = Date.now()
+      checking.value = false
     }
+  }
+
+  /** Refreshes the running version, and the GitHub result when stale or `force`d. */
+  async function check(force = false): Promise<void> {
+    if (inflight) {
+      await inflight
+      if (!force) return
+    }
+    inflight = run(force).finally(() => {
+      inflight = null
+    })
+    await inflight
   }
 
   return { state, check }
