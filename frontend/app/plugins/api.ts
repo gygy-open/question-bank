@@ -4,15 +4,17 @@ export default defineNuxtPlugin((nuxtApp) => {
   const api = $fetch.create({
     baseURL: '/api/v1',
     onRequest({ options }) {
+      const headers = new Headers(options.headers)
+      // 供后端按界面语言返回本地化内容（错误信息等），后端未处理时无副作用。
+      headers.set('Accept-Language', nuxtApp.$i18n.locale.value)
       // 每次请求都重新读取 cookie，而不是复用插件初始化时捕获的 ref。
       // 否则首次登录时（尤其手机端全新浏览器无历史 cookie），插件旧 ref
       // 仍为 null，导致带鉴权的请求缺少 Authorization 头而 401。
       const token = nuxtApp.runWithContext(() => useCookie('token').value) as string | null
       if (token) {
-        const headers = new Headers(options.headers)
         headers.set('Authorization', `Bearer ${token}`)
-        options.headers = headers
       }
+      options.headers = headers
     },
     onResponseError({ response }) {
       // 后端尚未完成首次初始化（数据库或首个管理员）：跳转到安装向导
@@ -28,7 +30,7 @@ export default defineNuxtPlugin((nuxtApp) => {
         })
       }
       if (response.status === 403) {
-        toast.error('您没有权限执行此操作')
+        toast.error(nuxtApp.$i18n.t('errors.forbidden'))
       }
     }
   })

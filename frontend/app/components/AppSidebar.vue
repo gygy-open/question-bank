@@ -19,6 +19,9 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuSeparator,
+  DropdownMenuSub,
+  DropdownMenuSubContent,
+  DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import CustomSidebarTrigger from '~/components/CustomSidebarTrigger.vue'
@@ -26,13 +29,14 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import UserProfileDialog from '~/components/UserProfileDialog.vue'
 import ChangePasswordDialog from '~/components/ChangePasswordDialog.vue'
 import { useColorMode } from '@vueuse/core'
-import { BookOpen, ChevronsUpDown, Images, ListTree, LogOut, Settings, Sparkles, User, Users, Tags, Library, KeyRound, Activity, Layers, Info, Moon, Sun, Bot, Lock } from '@lucide/vue'
+import { BookOpen, ChevronsUpDown, Images, ListTree, LogOut, Settings, Sparkles, User, Users, Tags, Library, KeyRound, Activity, Layers, Info, Moon, Sun, Bot, Lock, Languages, Check } from '@lucide/vue'
 
 const props = withDefaults(defineProps<SidebarProps>(), {
   collapsible: "icon",
 })
 
 const route = useRoute()
+const { t, locale, locales, setLocale } = useI18n()
 const { user, logout } = useAuth()
 const { isAdmin, isManagerSomewhere } = usePermissions()
 const router = useRouter()
@@ -77,12 +81,12 @@ const navActiveClass = 'border-l-2 border-transparent data-[active=true]:border-
               <SidebarMenuButton
                 :is-active="chat.isOpen.value && !chat.isMinimized.value"
                 :aria-pressed="chat.isOpen.value"
-                tooltip="AI 助手"
+                :tooltip="t('nav.aiAssistant')"
                 class="relative min-w-8 border border-primary text-primary duration-200 ease-linear hover:bg-primary hover:text-primary-foreground data-[active=true]:bg-primary data-[active=true]:text-primary-foreground"
                 @click="chat.toggle()"
               >
                 <Bot />
-                <span>AI 助手</span>
+                <span>{{ t('nav.aiAssistant') }}</span>
                 <span
                   v-if="chat.hasUnread.value && !(chat.isOpen.value && !chat.isMinimized.value)"
                   class="absolute right-2 top-1.5 h-2 w-2 rounded-full bg-destructive"
@@ -106,7 +110,7 @@ const navActiveClass = 'border-l-2 border-transparent data-[active=true]:border-
                 >
                   <NuxtLink to="/questions">
                     <BookOpen />
-                    <span>题库</span>
+                    <span>{{ t('nav.questionBank') }}</span>
                   </NuxtLink>
                 </SidebarMenuButton>
               </SidebarMenuItem>
@@ -114,7 +118,7 @@ const navActiveClass = 'border-l-2 border-transparent data-[active=true]:border-
           </div>
 
           <div>
-            <SidebarGroupLabel>组稿工作台</SidebarGroupLabel>
+            <SidebarGroupLabel>{{ t('nav.compositionWorkbench') }}</SidebarGroupLabel>
             <SidebarMenu>
               <SidebarMenuItem>
                 <SidebarMenuButton
@@ -124,7 +128,7 @@ const navActiveClass = 'border-l-2 border-transparent data-[active=true]:border-
                 >
                   <NuxtLink to="/compositions/shared">
                     <Users />
-                    <span>共享空间</span>
+                    <span>{{ t('nav.sharedSpace') }}</span>
                   </NuxtLink>
                 </SidebarMenuButton>
               </SidebarMenuItem>
@@ -136,7 +140,7 @@ const navActiveClass = 'border-l-2 border-transparent data-[active=true]:border-
                 >
                   <NuxtLink to="/compositions/personal">
                     <Lock />
-                    <span>个人空间</span>
+                    <span>{{ t('nav.personalSpace') }}</span>
                   </NuxtLink>
                 </SidebarMenuButton>
               </SidebarMenuItem>
@@ -144,13 +148,13 @@ const navActiveClass = 'border-l-2 border-transparent data-[active=true]:border-
           </div>
 
           <div>
-            <SidebarGroupLabel>导入</SidebarGroupLabel>
+            <SidebarGroupLabel>{{ t('nav.import') }}</SidebarGroupLabel>
             <SidebarMenu>
               <SidebarMenuItem>
                 <SidebarMenuButton as-child :is-active="route.path === '/import/smart'" :class="navActiveClass">
                   <NuxtLink to="/import/smart">
                     <Sparkles />
-                    <span>智能导入</span>
+                    <span>{{ t('nav.smartImport') }}</span>
                   </NuxtLink>
                 </SidebarMenuButton>
               </SidebarMenuItem>
@@ -158,7 +162,7 @@ const navActiveClass = 'border-l-2 border-transparent data-[active=true]:border-
                 <SidebarMenuButton as-child :is-active="route.path === '/imports'" :class="navActiveClass">
                   <NuxtLink to="/imports">
                     <Layers />
-                    <span>批量智能导入</span>
+                    <span>{{ t('nav.batchImport') }}</span>
                   </NuxtLink>
                 </SidebarMenuButton>
               </SidebarMenuItem>
@@ -166,13 +170,13 @@ const navActiveClass = 'border-l-2 border-transparent data-[active=true]:border-
           </div>
 
           <div>
-            <SidebarGroupLabel>学科资源</SidebarGroupLabel>
+            <SidebarGroupLabel>{{ t('nav.subjectResources') }}</SidebarGroupLabel>
             <SidebarMenu>
               <SidebarMenuItem>
                 <SidebarMenuButton as-child :is-active="route.path === '/knowledge-points'" :class="navActiveClass">
                   <NuxtLink to="/knowledge-points">
                     <ListTree />
-                    <span>知识点管理</span>
+                    <span>{{ t('nav.knowledgePoints') }}</span>
                   </NuxtLink>
                 </SidebarMenuButton>
               </SidebarMenuItem>
@@ -180,7 +184,7 @@ const navActiveClass = 'border-l-2 border-transparent data-[active=true]:border-
                 <SidebarMenuButton as-child :is-active="route.path === '/tags'" :class="navActiveClass">
                   <NuxtLink to="/tags">
                     <Tags />
-                    <span>标签管理</span>
+                    <span>{{ t('nav.tags') }}</span>
                   </NuxtLink>
                 </SidebarMenuButton>
               </SidebarMenuItem>
@@ -188,7 +192,7 @@ const navActiveClass = 'border-l-2 border-transparent data-[active=true]:border-
                 <SidebarMenuButton as-child :is-active="route.path === '/media'" :class="navActiveClass">
                   <NuxtLink to="/media">
                     <Images />
-                    <span>媒体库</span>
+                    <span>{{ t('nav.media') }}</span>
                   </NuxtLink>
                 </SidebarMenuButton>
               </SidebarMenuItem>
@@ -201,7 +205,7 @@ const navActiveClass = 'border-l-2 border-transparent data-[active=true]:border-
 
       <!-- 系统：LAN 共享与超管入口归为同一簇 -->
       <div>
-        <SidebarGroupLabel>系统</SidebarGroupLabel>
+        <SidebarGroupLabel>{{ t('nav.system') }}</SidebarGroupLabel>
         <SidebarMenu>
           <LanShareDialog />
           <template v-if="user?.is_superuser">
@@ -209,7 +213,7 @@ const navActiveClass = 'border-l-2 border-transparent data-[active=true]:border-
               <SidebarMenuButton as-child :is-active="route.path === '/users'" :class="navActiveClass">
                 <NuxtLink to="/users">
                   <Users />
-                  <span>用户管理</span>
+                  <span>{{ t('nav.users') }}</span>
                 </NuxtLink>
               </SidebarMenuButton>
             </SidebarMenuItem>
@@ -217,7 +221,7 @@ const navActiveClass = 'border-l-2 border-transparent data-[active=true]:border-
               <SidebarMenuButton as-child :is-active="route.path === '/activity-logs'" :class="navActiveClass">
                 <NuxtLink to="/activity-logs">
                   <Activity />
-                  <span>行为日志</span>
+                  <span>{{ t('nav.activityLogs') }}</span>
                 </NuxtLink>
               </SidebarMenuButton>
             </SidebarMenuItem>
@@ -226,7 +230,7 @@ const navActiveClass = 'border-l-2 border-transparent data-[active=true]:border-
             <SidebarMenuButton as-child :is-active="route.path === '/subjects'" :class="navActiveClass">
               <NuxtLink to="/subjects">
                 <Library />
-                <span>学科管理</span>
+                <span>{{ t('nav.subjects') }}</span>
               </NuxtLink>
             </SidebarMenuButton>
           </SidebarMenuItem>
@@ -234,7 +238,7 @@ const navActiveClass = 'border-l-2 border-transparent data-[active=true]:border-
             <SidebarMenuButton as-child :is-active="route.path === '/settings'" :class="navActiveClass">
               <NuxtLink to="/settings">
                 <Settings />
-                <span>{{ isAdmin ? '系统设置' : '设置' }}</span>
+                <span>{{ isAdmin ? t('nav.systemSettings') : t('nav.settings') }}</span>
               </NuxtLink>
             </SidebarMenuButton>
           </SidebarMenuItem>
@@ -264,25 +268,37 @@ const navActiveClass = 'border-l-2 border-transparent data-[active=true]:border-
               align="end" :side-offset="4">
               <DropdownMenuItem @click="isProfileOpen = true">
                 <User class="mr-2 size-4" />
-                个人资料
+                {{ t('userMenu.profile') }}
               </DropdownMenuItem>
               <DropdownMenuItem @click="isChangePasswordOpen = true">
                 <KeyRound class="mr-2 size-4" />
-                修改密码
+                {{ t('userMenu.changePassword') }}
               </DropdownMenuItem>
               <DropdownMenuSeparator />
               <DropdownMenuItem @click="toggleColorMode">
                 <component :is="colorMode === 'dark' ? Sun : Moon" class="mr-2 size-4" />
-                {{ colorMode === 'dark' ? '浅色模式' : '深色模式' }}
+                {{ colorMode === 'dark' ? t('userMenu.lightMode') : t('userMenu.darkMode') }}
               </DropdownMenuItem>
+              <DropdownMenuSub>
+                <DropdownMenuSubTrigger>
+                  <Languages class="mr-2 size-4" />
+                  {{ t('language.label') }}
+                </DropdownMenuSubTrigger>
+                <DropdownMenuSubContent>
+                  <DropdownMenuItem v-for="l in locales" :key="l.code" @click="setLocale(l.code)">
+                    <Check class="mr-2 size-4" :class="l.code === locale ? 'opacity-100' : 'opacity-0'" />
+                    {{ l.name }}
+                  </DropdownMenuItem>
+                </DropdownMenuSubContent>
+              </DropdownMenuSub>
               <DropdownMenuItem @click="router.push('/about')">
                 <Info class="mr-2 size-4" />
-                关于系统
+                {{ t('userMenu.about') }}
               </DropdownMenuItem>
               <DropdownMenuSeparator />
               <DropdownMenuItem @click="handleLogout">
                 <LogOut class="mr-2 size-4" />
-                退出登录
+                {{ t('userMenu.logout') }}
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>

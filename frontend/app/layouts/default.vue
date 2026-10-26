@@ -5,6 +5,7 @@ import FloatingChatWidget from '~/components/chat/FloatingChatWidget.vue'
 import { toast } from 'vue-sonner'
 import { useLocalStorage, useSessionStorage } from '@vueuse/core'
 
+const { t } = useI18n()
 const { fetchUser, token, user } = useAuth()
 const { hasSubjects } = useSubjectContext()
 const { state: updateState, check: checkUpdate } = useUpdateCheck()
@@ -30,14 +31,14 @@ onMounted(async () => {
     
     if (user.value?.is_superuser) {
       // 管理员提示更新步骤与下载
-      toast.info(`发现新版本 v${latest}`, {
-        description: `当前 v${updateState.value.current} · 请在服务器上运行新版安装程序更新`,
+      toast.info(t('layout.update.adminTitle', { version: latest }), {
+        description: t('layout.update.adminDescription', { current: updateState.value.current }),
         action: {
-          label: '下载新版',
+          label: t('layout.update.download'),
           onClick: () => window.open(updateState.value.releaseUrl, '_blank'),
         },
         cancel: {
-          label: '忽略此版',
+          label: t('layout.update.ignore'),
           onClick: () => {
             ignoredVersion.value = latest
           }
@@ -45,10 +46,10 @@ onMounted(async () => {
       })
     } else {
       // 普通用户仅提示联系管理员
-      toast.info(`发现系统新版本 v${latest}`, {
-        description: `当前 v${updateState.value.current} · 为了获得更好的体验，请联系管理员进行升级，或忽略此版本。`,
+      toast.info(t('layout.update.userTitle', { version: latest }), {
+        description: t('layout.update.userDescription', { current: updateState.value.current }),
         cancel: {
-          label: '我知道了',
+          label: t('layout.update.acknowledge'),
           onClick: () => {
             ignoredVersion.value = latest
           }
@@ -67,7 +68,7 @@ onMounted(async () => {
         v-if="showNoSubjectHint"
         class="m-4 rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-300"
       >
-        您还没有被分配任何学科，暂时看不到题库内容。请联系管理员在“学科管理 → 成员管理”中为您开通。
+        {{ t('layout.noSubjectHint') }}
       </div>
       <slot />
     </SidebarInset>

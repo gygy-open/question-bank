@@ -72,6 +72,12 @@
 - **Validation**: Use `zod` schemas with `vee-validate`.
 - **Styling**: Utility-first Tailwind v4. Avoid scoped CSS where possible.
 - **Imports**: Use `@/` alias for `app/` root in frontend.
+- **i18n** (`@nuxtjs/i18n`, `no_prefix` strategy):
+  - Locale files: `frontend/i18n/locales/{zh-CN,en-US}.json`. `zh-CN` is the baseline and fallback; every key must exist in all locale files (enforced by `app/lib/__tests__/i18n.test.ts`).
+  - New UI text MUST NOT be hardcoded: use `const { t } = useI18n()` / `t('ns.key')` (or `$t` in templates). Group keys by feature (`nav.*`, `auth.login.*`, ...).
+  - Because pages are kept alive, never cache translated strings in module scope or plain `const`; use `t()` in templates or inside `computed` (e.g. zod schemas: `computed(() => toTypedSchema(...))`).
+  - Dates/numbers: use `formatRelativeTime` (`@/lib/utils`) and `formatDateTime` / `formatDate` / `formatNumber` (`@/lib/locale`) instead of bare `toLocaleString()`.
+  - Escape `@` and `|` in messages as `{'@'}` / `{'|'}` (vue-i18n syntax).
 
 ## Key Files
 - `backend/run.py`: Unified desktop/server launcher (tray/server roles).

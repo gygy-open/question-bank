@@ -10,6 +10,7 @@ definePageMeta({
   layout: 'empty'
 })
 
+const { t } = useI18n()
 const { login } = useAuth()
 const router = useRouter()
 const { $api } = useNuxtApp()
@@ -35,10 +36,11 @@ onMounted(async () => {
   }
 })
 
-const formSchema = toTypedSchema(z.object({
-  username: z.string().min(1, '请输入用户名'),
-  password: z.string().min(1, '请输入密码'),
-}))
+// schema 放在 computed 里，切换语言后校验文案随之更新（页面会被 keepalive 缓存）。
+const formSchema = computed(() => toTypedSchema(z.object({
+  username: z.string({ required_error: t('auth.login.usernameRequired') }).min(1, t('auth.login.usernameRequired')),
+  password: z.string({ required_error: t('auth.login.passwordRequired') }).min(1, t('auth.login.passwordRequired')),
+})))
 
 const form = useForm({
   validationSchema: formSchema,
@@ -48,16 +50,16 @@ const onSubmit = form.handleSubmit(async (values) => {
   isLoading.value = true
   try {
     await login({ username: values.username, password: values.password })
-    toast.success('登录成功')
+    toast.success(t('auth.login.success'))
     router.push('/')
   } catch (error: any) {
     const status = error.statusCode ?? error.status ?? error.response?.status
     if (status === 403) {
-      toast.error('账号未激活，正在等待管理员审核，请联系管理员')
+      toast.error(t('auth.login.inactive'))
     } else if (status === 400) {
-      toast.error('用户名或密码错误')
+      toast.error(t('auth.login.invalidCredentials'))
     } else {
-      toast.error(error.message || '登录失败')
+      toast.error(error.message || t('auth.login.failed'))
     }
   } finally {
     isLoading.value = false
@@ -66,15 +68,16 @@ const onSubmit = form.handleSubmit(async (values) => {
 </script>
 
 <template>
-  <div class="flex h-screen w-full items-center justify-center bg-muted/40 px-4">
+  <div class="relative flex h-screen w-full items-center justify-center bg-muted/40 px-4">
+    <LanguageSwitcher class="absolute right-4 top-4" />
     <Card class="w-full sm:w-[400px]">
       <CardHeader class="space-y-1">
         <div class="flex justify-center mb-4">
           <img src="/logo.svg" alt="Logo" class="h-16 w-auto" />
         </div>
-        <CardTitle class="text-2xl text-center">登录账户</CardTitle>
+        <CardTitle class="text-2xl text-center">{{ t('auth.login.title') }}</CardTitle>
         <CardDescription class="text-center">
-          输入您的用户名和密码进行登录
+          {{ t('auth.login.description') }}
         </CardDescription>
       </CardHeader>
       <CardContent>
@@ -82,7 +85,7 @@ const onSubmit = form.handleSubmit(async (values) => {
           <div class="grid gap-4">
             <FormField v-slot="{ componentField }" name="username">
               <FormItem>
-                <FormLabel>用户名</FormLabel>
+                <FormLabel>{{ t('auth.login.username') }}</FormLabel>
                 <FormControl>
                   <Input type="text" placeholder="admin" v-bind="componentField" />
                 </FormControl>
@@ -92,7 +95,7 @@ const onSubmit = form.handleSubmit(async (values) => {
             
             <FormField v-slot="{ componentField }" name="password">
               <FormItem>
-                <FormLabel>密码</FormLabel>
+                <FormLabel>{{ t('auth.login.password') }}</FormLabel>
                 <FormControl>
                   <Input type="password" placeholder="******" v-bind="componentField" />
                 </FormControl>
@@ -102,12 +105,12 @@ const onSubmit = form.handleSubmit(async (values) => {
             
             <Button type="submit" :disabled="isLoading" class="w-full">
               <Loader2 v-if="isLoading" class="mr-2 h-4 w-4 animate-spin" />
-              登录
+              {{ t('auth.login.submit') }}
             </Button>
 
             <div v-if="registrationEnabled" class="text-center text-sm text-muted-foreground">
-              还没有账户？
-              <NuxtLink to="/register" class="text-primary hover:underline">立即注册</NuxtLink>
+              {{ t('auth.login.noAccount') }}
+              <NuxtLink to="/register" class="text-primary hover:underline">{{ t('auth.login.register') }}</NuxtLink>
             </div>
           </div>
         </form>

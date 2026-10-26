@@ -1,0 +1,77 @@
+{
+  "language": {
+    "label": "Language",
+    "switch": "Switch language"
+  },
+  "errors": {
+    "forbidden": "You do not have permission to perform this action"
+  },
+  "validation": {
+    "required": "This field is required",
+    "minLength": "Must be at least {min} characters",
+    "maxLength": "Must be at most {max} characters",
+    "min": "Must be at least {min}",
+    "max": "Must be at most {max}",
+    "minItems": "Select at least {min} items",
+    "maxItems": "Select at most {max} items",
+    "email": "Please enter a valid email address",
+    "url": "Please enter a valid URL"
+  },
+  "nav": {
+    "aiAssistant": "AI Assistant",
+    "questionBank": "Question Bank",
+    "compositionWorkbench": "Compositions",
+    "sharedSpace": "Shared",
+    "personalSpace": "Personal",
+    "import": "Import",
+    "smartImport": "Smart Import",
+    "batchImport": "Batch Import",
+    "subjectResources": "Subject Resources",
+    "knowledgePoints": "Knowledge Points",
+    "tags": "Tags",
+    "media": "Media Library",
+    "system": "System",
+    "users": "Users",
+    "activityLogs": "Activity Logs",
+    "subjects": "Subjects",
+    "systemSettings": "System Settings",
+    "settings": "Settings"
+  },
+  "userMenu": {
+    "profile": "Profile",
+    "changePassword": "Change Password",
+    "lightMode": "Light Mode",
+    "darkMode": "Dark Mode",
+    "about": "About",
+    "logout": "Log Out"
+  },
+  "layout": {
+    "noSubjectHint": "You have not been assigned to any subject yet, so no questions are visible. Ask an administrator to add you under \"Subjects → Members\".",
+    "update": {
+      "adminTitle": "New version v{version} available",
+      "adminDescription": "Current v{current} · Run the new installer on the server to update",
+      "download": "Download",
+      "ignore": "Skip this version",
+      "userTitle": "New system version v{version} available",
+      "userDescription": "Current v{current} · For a better experience, ask your administrator to upgrade, or skip this version.",
+      "acknowledge": "Got it"
+    }
+  },
+  "auth": {
+    "login": {
+      "title": "Sign In",
+      "description": "Enter your username and password to sign in",
+      "username": "Username",
+      "password": "Password",
+      "usernameRequired": "Please enter your username",
+      "passwordRequired": "Please enter your password",
+      "submit": "Sign In",
+      "success": "Signed in successfully",
+      "inactive": "Your account is pending administrator approval. Please contact an administrator.",
+      "invalidCredentials": "Incorrect username or password",
+      "failed": "Sign in failed",
+      "noAccount": "Don't have an account?",
+      "register": "Sign up"
+    }
+  }
+}
