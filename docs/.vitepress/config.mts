@@ -140,6 +140,7 @@ export default defineConfig({
             { text: '本地开发', link: '/development/local-setup' },
             { text: '后端约定', link: '/development/backend' },
             { text: '前端约定', link: '/development/frontend' },
+            { text: '国际化（i18n）', link: '/development/i18n' },
             { text: '贡献指南', link: '/development/contributing' }
           ]
         }

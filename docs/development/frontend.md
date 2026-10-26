@@ -46,6 +46,10 @@ const { data } = await useAPI('/endpoint')
 - 渲染：`katex`
 - 公式输入：`mathlive`
 
+## 国际化
+
+界面文案不要硬编码，统一用 `t()` 引用 `frontend/i18n/locales/zh-CN.json` 中的 key，翻译通过 `pnpm i18n:*` 脚本维护。详见 [国际化（i18n）](./i18n)。
+
 ## 路径别名
 
 使用 `@/` 指向前端 `app/` 根目录。
