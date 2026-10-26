@@ -220,6 +220,34 @@ async def test_extract_recovers_when_ai_writes_wrong_placeholder_number(monkeypa
     assert result.questions[1]["content"] == f"第二题：见图 {image_b}"
 
 
+async def test_extract_restores_image_placeholders_in_stimuli(monkeypatch, db_session):
+    """材料题复现:材料 markdown 里的图片占位符也必须还原，不能以 @@IMGn@@ 原样落库。"""
+    image_a = '![](/static/media/t1/a.png){width="2in"}'
+    image_b = "![](/static/media/t1/b.png)"
+    doc_content = f"阅读材料：{image_a}\n\n1. 小题：见图 {image_b}\n"
+
+    payload = QuestionList(
+        questions=[AIQuestion(id="q1", q_type="free_response", content="小题：见图 @@IMG1@@")],
+        stimuli=[AIStimulus(temp_id="s1", markdown="阅读材料：@@IMG0@@")],
+        question_groups=[
+            AIQuestionGroup(temp_id="g1", stimulus_temp_id="s1", question_temp_ids=["q1"])
+        ],
+    )
+    stub_provider = _StubProvider(payload)
+
+    async def _stub_resolve_active_provider(db, *, is_vision=False, user_id=None):
+        return "gemini", {}
+
+    monkeypatch.setattr(extract_module, "resolve_active_provider", _stub_resolve_active_provider)
+    monkeypatch.setattr(extract_module, "get_ai_provider", lambda name: stub_provider)
+
+    extractor = AIExtractor(prompt_builder=_StubPromptBuilder(), enricher=_StubEnricher())
+    result = await extractor.extract(doc_content, db_session, mode="extract", subject_id=None)
+
+    assert result.stimuli[0]["markdown"] == f"阅读材料：{image_a}"
+    assert result.questions[0]["content"] == f"小题：见图 {image_b}"
+
+
 async def test_extract_without_images_is_a_no_op_for_masking(monkeypatch, db_session):
     stub_provider = _StubProvider([AIQuestion(q_type="single_choice", content="没有图片的题目")])
 

@@ -111,7 +111,9 @@ class AIExtractor:
                 paper = None
             # 文本路径无论是否遮罩到图片都跑还原,以清掉 AI 凭空写出的裸露占位符;视觉路径不涉及。
             if not image_data:
-                questions = self._restore_images(questions, image_map)
+                questions, stimuli, paper = self._restore_images(
+                    questions, stimuli, paper, image_map
+                )
             await self.enricher.enrich(
                 questions, subject_id=subject_id, provider=provider, config=config
             )
@@ -128,11 +130,22 @@ class AIExtractor:
 
     @staticmethod
     def _restore_images(
-        questions: list[AIQuestion], image_map: dict[str, str]
-    ) -> list[AIQuestion]:
-        """把 AI 返回题目里的 @@IMGn@@ 占位符换回真实图片 token(容忍编号写错)，并记录异常。"""
-        dumped = [q.model_dump() for q in questions]
-        restored, dropped, unresolved = restore_images(dumped, image_map)
+        questions: list[AIQuestion],
+        stimuli: list[dict],
+        paper: Optional[dict],
+        image_map: dict[str, str],
+    ) -> tuple[list[AIQuestion], list[dict], Optional[dict]]:
+        """把 AI 返回的题目、材料、整卷结构里的 @@IMGn@@ 占位符换回真实图片 token。
+
+        三者一起还原，编号写错时的按序补配才能看到全部引用;材料在原卷中位于小题之前，
+        所以排在前面。
+        """
+        combined = {
+            "stimuli": stimuli,
+            "questions": [q.model_dump() for q in questions],
+            "paper": paper,
+        }
+        restored, dropped, unresolved = restore_images(combined, image_map)
         if dropped:
             logger.warning(
                 "AI extraction referenced %d more image placeholder(s) than exist; extras stripped",
@@ -143,7 +156,11 @@ class AIExtractor:
                 "AI extraction result is missing %d/%d image placeholder(s)",
                 unresolved, len(image_map),
             )
-        return [AIQuestion(**item) for item in restored]
+        return (
+            [AIQuestion(**item) for item in restored["questions"]],
+            restored["stimuli"],
+            restored["paper"],
+        )
 
 
 class TemplateExtractor:
