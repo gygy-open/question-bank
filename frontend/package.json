@@ -12,7 +12,10 @@
     "preview": "nuxt preview",
     "postinstall": "nuxt prepare",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "i18n:sync": "node scripts/i18n.mts sync",
+    "i18n:apply": "node scripts/i18n.mts apply",
+    "i18n:check": "node scripts/i18n.mts check"
   },
   "dependencies": {
     "@floating-ui/dom": "^1.8.0",

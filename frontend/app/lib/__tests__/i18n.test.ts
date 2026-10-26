@@ -1,54 +1,16 @@
 import { describe, expect, it } from 'vitest'
 import { z } from 'zod'
-import zhCN from '../../../i18n/locales/zh-CN.json'
-import enUS from '../../../i18n/locales/en-US.json'
+import { resolve } from 'node:path'
+import { check, resolvePaths } from '../../../scripts/i18n-core.mts'
 import { createZodErrorMap } from '@/lib/zodErrorMap'
 import { currentLocale, formatDate, setCurrentLocale } from '@/lib/locale'
 import { formatRelativeTime } from '@/lib/utils'
 
-type Messages = { [key: string]: string | Messages }
-
-function flattenKeys(obj: Messages, prefix = ''): string[] {
-  return Object.entries(obj).flatMap(([k, v]) =>
-    typeof v === 'string' ? [`${prefix}${k}`] : flattenKeys(v, `${prefix}${k}.`),
-  )
-}
-
-function placeholders(obj: Messages): Record<string, string[]> {
-  const out: Record<string, string[]> = {}
-  const walk = (o: Messages, prefix: string) => {
-    for (const [k, v] of Object.entries(o)) {
-      if (typeof v === 'string') out[`${prefix}${k}`] = [...v.matchAll(/\{(\w+)\}/g)].map(m => m[1]!).sort()
-      else walk(v, `${prefix}${k}.`)
-    }
-  }
-  walk(obj, '')
-  return out
-}
-
 describe('locale files', () => {
-  it('en-US has exactly the same keys as the zh-CN baseline', () => {
-    const base = flattenKeys(zhCN as Messages).sort()
-    const en = flattenKeys(enUS as Messages).sort()
-    expect(en.filter(k => !base.includes(k))).toEqual([])
-    expect(base.filter(k => !en.includes(k))).toEqual([])
-  })
-
-  it('translations keep the same interpolation placeholders', () => {
-    const base = placeholders(zhCN as Messages)
-    const en = placeholders(enUS as Messages)
-    for (const key of Object.keys(base)) expect(en[key], key).toEqual(base[key])
-  })
-
-  it('messages contain no unescaped vue-i18n special characters', () => {
-    const get = (o: Messages, path: string) => path.split('.').reduce<any>((acc, p) => acc?.[p], o) as string
-    for (const msgs of [zhCN, enUS] as Messages[]) {
-      for (const key of flattenKeys(msgs)) {
-        const v = get(msgs, key)
-        // '@' 与 '|' 在 vue-i18n 中分别表示链接消息和复数分隔，需要写成 {'@'} / {'|'}
-        expect(/(^|[^'])[@|]/.test(v), `${key}: ${v}`).toBe(false)
-      }
-    }
+  // 与 `pnpm i18n:check` 相同：key 集合/顺序、过期译文、占位符、vue-i18n 语法
+  it('pass i18n:check', () => {
+    const paths = resolvePaths(resolve(process.cwd(), 'i18n'))
+    expect(check(paths)).toEqual([])
   })
 })
 

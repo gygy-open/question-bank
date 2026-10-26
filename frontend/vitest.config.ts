@@ -4,7 +4,7 @@ import { fileURLToPath } from 'node:url'
 export default defineConfig({
     test: {
         environment: 'happy-dom',
-        include: ['app/**/*.{test,spec}.ts'],
+        include: ['app/**/*.{test,spec}.ts', 'scripts/**/*.{test,spec}.ts'],
     },
     resolve: {
         alias: {

@@ -9,6 +9,9 @@ dist
 # Node dependencies
 node_modules
 
+# i18n translation work files (see scripts/i18n.mts)
+i18n/.pending
+
 # Logs
 logs
 *.log

@@ -73,7 +73,12 @@
 - **Styling**: Utility-first Tailwind v4. Avoid scoped CSS where possible.
 - **Imports**: Use `@/` alias for `app/` root in frontend.
 - **i18n** (`@nuxtjs/i18n`, `no_prefix` strategy):
-  - Locale files: `frontend/i18n/locales/{zh-CN,en-US}.json`. `zh-CN` is the baseline and fallback; every key must exist in all locale files (enforced by `app/lib/__tests__/i18n.test.ts`).
+  - Locale files: `frontend/i18n/locales/{zh-CN,en-US}.json`. `zh-CN` is the single source of truth and fallback. **Only edit `zh-CN.json` by hand**; other locales are maintained by the translation workflow below.
+  - Translation workflow (run in `frontend/`):
+    1. Add/change keys in `zh-CN.json`, then `pnpm i18n:sync` — rebuilds other locales in zh-CN key order, prunes removed keys, and exports missing/stale entries to `i18n/.pending/<locale>.json` (staleness is tracked by source hashes in `i18n/.translation-lock.json`, which must be committed).
+    2. Delegate to the `翻译` agent (`.github/agents/translator.agent.md`) per locale; it only writes `i18n/.pending/<locale>.out.json`, following `i18n/glossary.json`.
+    3. `pnpm i18n:apply` — validates (keys, `{placeholders}`, vue-i18n syntax, no leftover Chinese) and merges; rejected entries stay pending for another round.
+    4. `pnpm i18n:check` must pass (also enforced by `app/lib/__tests__/i18n.test.ts`).
   - New UI text MUST NOT be hardcoded: use `const { t } = useI18n()` / `t('ns.key')` (or `$t` in templates). Group keys by feature (`nav.*`, `auth.login.*`, ...).
   - Because pages are kept alive, never cache translated strings in module scope or plain `const`; use `t()` in templates or inside `computed` (e.g. zod schemas: `computed(() => toTypedSchema(...))`).
   - Dates/numbers: use `formatRelativeTime` (`@/lib/utils`) and `formatDateTime` / `formatDate` / `formatNumber` (`@/lib/locale`) instead of bare `toLocaleString()`.
