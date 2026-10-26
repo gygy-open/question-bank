@@ -11,6 +11,8 @@ import {
     type ChatAction,
 } from '@/lib/chatStream'
 import { applyChatMessageMeta, nextChatMessageUiId } from '@/lib/chatMessages'
+import type { AIProvider, UserAIPreference } from '@/types/ai-config'
+import { pickChatModel } from '@/lib/ai-config'
 
 export interface ChatMessage {
     // Stable client-side identity, assigned at creation and never changed — used
@@ -29,18 +31,6 @@ export interface ChatSession {
     id: string
     title: string
     updated_at: string
-}
-
-interface AIModel {
-    id: number
-    name: string
-    is_vision_capable?: boolean
-}
-
-interface AIProvider {
-    id: number
-    name: string
-    models: AIModel[]
 }
 
 const SESSION_LIMIT = 20
@@ -81,14 +71,21 @@ const selectedModelId = ref<string>('')
 const isInitialized = ref(false)
 
 // --- Computed ---
+// 只列可对话的模型：排除向量模型和已停用的服务商；个人服务商排在前面。
 const allModels = computed(() =>
-    providers.value.flatMap(p =>
-        p.models.map(m => ({
-            ...m,
-            providerName: p.name,
-            displayName: `${p.name} - ${m.name}`,
-        }))
-    )
+    providers.value
+        .filter(p => p.is_active)
+        .flatMap(p =>
+            p.models
+                .filter(m => !m.is_embedding_model)
+                .map(m => ({
+                    ...m,
+                    providerName: p.name,
+                    isPersonal: p.is_personal,
+                    displayName: `${p.name} - ${m.name}`,
+                }))
+        )
+        .sort((a, b) => Number(b.isPersonal) - Number(a.isPersonal))
 )
 
 const currentModel = computed(() =>
@@ -464,28 +461,56 @@ const sendMessage = async () => {
 }
 
 // --- Widget controls ---
+// 上次应用的默认模型。默认模型变了（用户在设置里改了偏好或管理员改了全局）就跟着切换；
+// 没变时保留用户在聊天框里的手动选择。
+let appliedDefaultId: number | null | undefined
+
+/** 重新拉取可用模型与默认模型。每次打开助手、以及 AI 设置变更后调用。 */
+const refreshModels = async () => {
+    const { $api } = useNuxtApp()
+    const [data, pref] = await Promise.all([
+        $api<AIProvider[]>('/ai-config/providers'),
+        $api<UserAIPreference>('/ai-config/me/preferences').catch(() => null),
+    ])
+    providers.value = data
+
+    const defaultId = pref?.effective_text.model_id ?? null
+    const next = pickChatModel(
+        allModels.value.map(m => m.id),
+        selectedModelId.value ? Number(selectedModelId.value) : null,
+        defaultId,
+        appliedDefaultId,
+    )
+    appliedDefaultId = defaultId
+    selectedModelId.value = next == null ? '' : next.toString()
+}
+
 const initialize = async () => {
     if (isInitialized.value) return
     isInitialized.value = true
-    const { $api } = useNuxtApp()
     try {
-        const data = await $api<AIProvider[]>('/ai-config/providers')
-        providers.value = data
-        if (allModels.value.length > 0 && !selectedModelId.value) {
-            selectedModelId.value = allModels.value[0].id.toString()
-        }
-        await fetchSessions()
+        await Promise.all([refreshModels(), fetchSessions()])
     } catch (e) {
         console.error('Failed to initialize chat', e)
         isInitialized.value = false
     }
 }
 
+/** AI 设置（服务商、模型、默认模型）变更后调用；助手未加载过则等下次打开时再取。 */
+const notifyAIConfigChanged = () => {
+    if (!isInitialized.value) return
+    refreshModels().catch(e => console.error('Failed to refresh chat models', e))
+}
+
 const open = () => {
     isOpen.value = true
     isMinimized.value = false
     hasUnread.value = false
-    initialize()
+    if (isInitialized.value) {
+        refreshModels().catch(e => console.error('Failed to refresh chat models', e))
+    } else {
+        initialize()
+    }
 }
 
 const close = () => {
@@ -568,6 +593,8 @@ export const useGlobalChat = () => ({
     handlePromptSelect,
     sendMessage,
     initialize,
+    refreshModels,
+    notifyAIConfigChanged,
     open,
     close,
     toggle,

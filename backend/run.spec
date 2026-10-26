@@ -63,6 +63,8 @@ datas += [
     ("alembic", "alembic"),
     ("alembic.ini", "."),
     ("../frontend/.output/public", "frontend"),
+    # Vendored MathType MTEF→MathML parser loads its XSLT/fontmaps from disk.
+    ("app/services/importing/mathtype/xslt", "app/services/importing/mathtype/xslt"),
 ]
 
 # App modules are frequently referenced dynamically (CRUD, models, endpoints).

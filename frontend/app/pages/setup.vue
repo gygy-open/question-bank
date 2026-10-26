@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { Loader2, Database, HardDrive, Server, Check } from '@lucide/vue'
 import { toast } from 'vue-sonner'
+import type { SetupStatus } from '@/types'
 
 definePageMeta({
   layout: 'empty',
@@ -31,16 +32,26 @@ const admin = reactive({
 const testing = ref(false)
 const testPassed = ref(false)
 const submitting = ref(false)
+// 首次探测完成前不渲染步骤，避免 Docker 场景下第 1 步一闪而过
+const ready = ref(false)
+// 数据库在进入本页前已就绪（Docker / 环境变量 DB_URL，或上次只完成了第 1 步）
+const dbPreconfigured = ref(false)
 
-// 已配置则不应停留在安装页
 onMounted(async () => {
   try {
-    const res = await $api<{ configured: boolean }>('/setup/status')
-    if (res.configured) {
+    const res = await $api<SetupStatus>('/setup/status')
+    if (res.db_configured && res.admin_initialized) {
       router.replace('/login')
+      return
+    }
+    if (res.db_configured) {
+      dbPreconfigured.value = true
+      step.value = 2
     }
   } catch {
     // 忽略，保持在安装页
+  } finally {
+    ready.value = true
   }
 })
 
@@ -69,15 +80,24 @@ async function testConnection() {
   }
 }
 
-function goToAdmin() {
+async function configureDatabase() {
   if (dbType.value === 'mysql' && !testPassed.value) {
     toast.error('请先测试 MySQL 连接')
     return
   }
-  step.value = 2
+  submitting.value = true
+  try {
+    await $api('/setup/database', { method: 'POST', body: dbPayload() })
+    toast.success('数据库已就绪')
+    step.value = 2
+  } catch (e: any) {
+    toast.error(e?.data?.detail || '数据库初始化失败')
+  } finally {
+    submitting.value = false
+  }
 }
 
-async function complete() {
+async function createAdmin() {
   if (admin.username.trim().length < 1) {
     toast.error('请输入管理员用户名')
     return
@@ -92,12 +112,11 @@ async function complete() {
   }
   submitting.value = true
   try {
-    await $api('/setup/complete', {
+    await $api('/setup/admin', {
       method: 'POST',
       body: {
-        ...dbPayload(),
-        admin_username: admin.username,
-        admin_password: admin.password,
+        username: admin.username.trim(),
+        password: admin.password,
       },
     })
     toast.success('初始化完成，请登录')
@@ -119,7 +138,7 @@ async function complete() {
         </div>
         <CardTitle class="text-2xl text-center">系统初始化</CardTitle>
         <CardDescription class="text-center">
-          首次使用，请完成数据库与管理员账号配置
+          {{ dbPreconfigured ? '数据库已就绪，请创建首个管理员账号' : '首次使用，请完成数据库与管理员账号配置' }}
         </CardDescription>
 
         <!-- 步骤指示 -->
@@ -128,7 +147,10 @@ async function complete() {
             <span
               class="flex h-7 w-7 items-center justify-center rounded-full text-sm"
               :class="step >= 1 ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground'"
-            >1</span>
+            >
+              <Check v-if="step > 1" class="h-4 w-4" />
+              <template v-else>1</template>
+            </span>
             <span class="text-sm" :class="step >= 1 ? 'font-medium' : 'text-muted-foreground'">数据库</span>
           </div>
           <Separator class="w-8 shrink-0 data-[orientation=horizontal]:w-8" />
@@ -143,8 +165,12 @@ async function complete() {
       </CardHeader>
 
       <CardContent>
+        <div v-if="!ready" class="flex justify-center py-8">
+          <Loader2 class="h-6 w-6 animate-spin text-muted-foreground" />
+        </div>
+
         <!-- 步骤 1：数据库 -->
-        <div v-if="step === 1" class="grid gap-4">
+        <div v-else-if="step === 1" class="grid gap-4">
           <div class="grid grid-cols-2 gap-3">
             <button
               type="button"
@@ -202,7 +228,8 @@ async function complete() {
             </Button>
           </div>
 
-          <Button type="button" class="w-full" @click="goToAdmin">
+          <Button type="button" class="w-full" :disabled="submitting" @click="configureDatabase">
+            <Loader2 v-if="submitting" class="mr-2 h-4 w-4 animate-spin" />
             {{ dbType === 'sqlite' ? '直接开始' : '下一步' }}
           </Button>
         </div>
@@ -221,15 +248,10 @@ async function complete() {
             <Label>确认密码</Label>
             <Input v-model="admin.confirm" type="password" placeholder="再次输入密码" />
           </div>
-          <div class="flex gap-3">
-            <Button type="button" variant="outline" class="flex-1" :disabled="submitting" @click="step = 1">
-              上一步
-            </Button>
-            <Button type="button" class="flex-1" :disabled="submitting" @click="complete">
-              <Loader2 v-if="submitting" class="mr-2 h-4 w-4 animate-spin" />
-              完成初始化
-            </Button>
-          </div>
+          <Button type="button" class="w-full" :disabled="submitting" @click="createAdmin">
+            <Loader2 v-if="submitting" class="mr-2 h-4 w-4 animate-spin" />
+            完成初始化
+          </Button>
         </div>
       </CardContent>
     </Card>

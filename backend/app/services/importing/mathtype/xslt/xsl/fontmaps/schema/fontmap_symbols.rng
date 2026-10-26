@@ -1,0 +1,74 @@
+<?xml version="1.0"?>
+<grammar
+  xmlns="http://relaxng.org/ns/structure/1.0"
+  xmlns:s="http://purl.oclc.org/dsdl/schematron"
+  xmlns:a="http://relaxng.org/ns/compatibility/annotations/1.0"
+  xmlns:html="http://www.w3.org/1999/xhtml"
+  xmlns:xsl="http://www.w3.org/1999/XSL/Transform"
+  xmlns:css="http://www.w3.org/1996/css"
+  datatypeLibrary="http://www.w3.org/2001/XMLSchema-datatypes"
+  >
+
+  <start combine="choice">
+    <ref name="symbols"/>
+  </start>
+
+  <define name="symbols">
+    <element name="symbols">
+      <optional>
+        <attribute name="docx-name">
+          <a:documentation>
+            If you need to match a specific docx font name that is not identical with the base name of the base URI`s file name part, 
+            you can set the correct font name in attribute 'docx-name'.</a:documentation>
+        </attribute>
+      </optional>
+      <optional>
+        <attribute name="mathtype-name">
+          <a:documentation>
+            If the base name of the base URI`s file name part is not identical with the font name as encoded in MTEF,
+            you need to give the converter a hint by adding the attribute 'mathtype-name'.</a:documentation>
+        </attribute>
+      </optional>
+      <ref name="symbol"/>
+    </element>
+  </define>
+  
+  <define name="symbol">
+    <element name="symbol">
+      <attribute name="number">
+        <a:documentation>The font-position with 4 digits, left-padded with zero's (Example: "006A" for phi).</a:documentation>
+        <data type="string">
+          <param name="length">4</param>
+        </data>
+      </attribute>
+      <attribute name="entity">
+        <a:documentation>Value of attribute 'number' as entity (Example: number="006a" entity="&#x006a;").</a:documentation>
+        <data type="string">
+          <param name="length">1</param>
+        </data>
+      </attribute>
+      <attribute name="char">
+        <a:documentation>The 'map to' character as a numeric entity (Example: "&#x3c6;").</a:documentation>
+        <data type="string">
+          <param name="length">1</param>
+        </data>
+      </attribute>
+      <optional>
+        <attribute name="font">
+          <a:documentation>'Map to' font name.</a:documentation>
+        </attribute>
+      </optional>
+      <optional>
+        <attribute name="css:font-style">
+          <a:documentation>Uncommon directive to display the mapped character in a specific font style, i.e. 'italic'.</a:documentation>
+        </attribute>
+      </optional>
+      <!--<optional>
+        <attribute name="char-msoffice">
+          <a:documentation>Examples: ◊ ✋ ← → ↑ ↓ ↖ ↗ ↙ ↘ ⬅ ⮕ ⬆ ⬇ ⬉ ⬈ ⬋ ⬊</a:documentation>
+        </attribute>
+      </optional>-->
+    </element>
+  </define>
+
+</grammar>

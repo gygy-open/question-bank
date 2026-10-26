@@ -1,0 +1,80 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<symbols>
+  <!--  *
+        * ZWAdobeF
+        * -->
+  <!-- SPACE -->
+  <symbol number="0020" entity="&#x0020;" char=""/>
+  <!-- DIGIT ZERO -->
+  <symbol number="0030" entity="&#x0030;" char=""/>
+  <!-- DIGIT ONE -->
+  <symbol number="0031" entity="&#x0031;" char=""/>
+  <!-- DIGIT TWO -->
+  <symbol number="0032" entity="&#x0032;" char=""/>
+  <!-- DIGIT THREE -->
+  <symbol number="0033" entity="&#x0033;" char=""/>
+  <!-- DIGIT FOUR -->
+  <symbol number="0034" entity="&#x0034;" char=""/>
+  <!-- DIGIT FIVE -->
+  <symbol number="0035" entity="&#x0035;" char=""/>
+  <!-- DIGIT SIX -->
+  <symbol number="0036" entity="&#x0036;" char=""/>
+  <!-- DIGIT SEVEN -->
+  <symbol number="0037" entity="&#x0037;" char=""/>
+  <!-- DIGIT EIGHT -->
+  <symbol number="0038" entity="&#x0038;" char=""/>
+  <!-- DIGIT NINE -->
+  <symbol number="0039" entity="&#x0039;" char=""/>
+  <!-- COMMERCIAL AT -->
+  <symbol number="0040" entity="&#x0040;" char=""/>
+  <!-- LATIN CAPITAL LETTER A -->
+  <symbol number="0041" entity="&#x0041;" char=""/>
+  <!-- LATIN CAPITAL LETTER B -->
+  <symbol number="0042" entity="&#x0042;" char=""/>
+  <!-- LATIN CAPITAL LETTER C -->
+  <symbol number="0043" entity="&#x0043;" char=""/>
+  <!-- LATIN CAPITAL LETTER D -->
+  <symbol number="0044" entity="&#x0044;" char=""/>
+  <!-- LATIN CAPITAL LETTER E -->
+  <symbol number="0045" entity="&#x0045;" char=""/>
+  <!-- LATIN CAPITAL LETTER F -->
+  <symbol number="0046" entity="&#x0046;" char=""/>
+  <!-- LATIN CAPITAL LETTER G -->
+  <symbol number="0047" entity="&#x0047;" char=""/>
+  <!-- LATIN CAPITAL LETTER H -->
+  <symbol number="0048" entity="&#x0048;" char=""/>
+  <!-- LATIN CAPITAL LETTER I -->
+  <symbol number="0049" entity="&#x0049;" char=""/>
+  <!-- LATIN CAPITAL LETTER J -->
+  <symbol number="004A" entity="&#x004A;" char=""/>
+  <!-- LATIN CAPITAL LETTER K -->
+  <symbol number="004B" entity="&#x004B;" char=""/>
+  <!-- LATIN CAPITAL LETTER L -->
+  <symbol number="004C" entity="&#x004C;" char=""/>
+  <!-- LATIN CAPITAL LETTER M -->
+  <symbol number="004D" entity="&#x004D;" char=""/>
+  <!-- LATIN CAPITAL LETTER N -->
+  <symbol number="004E" entity="&#x004E;" char=""/>
+  <!-- LATIN CAPITAL LETTER O -->
+  <symbol number="004F" entity="&#x004F;" char=""/>
+  <!-- LATIN CAPITAL LETTER P -->
+  <symbol number="0050" entity="&#x0050;" char=""/>
+  <!-- LATIN CAPITAL LETTER Q -->
+  <symbol number="0051" entity="&#x0051;" char=""/>
+  <!-- LATIN CAPITAL LETTER R -->
+  <symbol number="0052" entity="&#x0052;" char=""/>
+  <!-- LATIN CAPITAL LETTER S -->
+  <symbol number="0053" entity="&#x0053;" char=""/>
+  <!-- LATIN CAPITAL LETTER T -->
+  <symbol number="0054" entity="&#x0054;" char=""/>
+  <!-- LATIN CAPITAL LETTER U -->
+  <symbol number="0055" entity="&#x0055;" char=""/>
+  <!-- LATIN CAPITAL LETTER V -->
+  <symbol number="0056" entity="&#x0056;" char=""/>
+  <!-- LATIN CAPITAL LETTER X -->
+  <symbol number="0057" entity="&#x0057;" char=""/>
+  <!-- LATIN CAPITAL LETTER Y -->
+  <symbol number="0058" entity="&#x0058;" char=""/>
+  <!-- LATIN CAPITAL LETTER Z -->
+  <symbol number="0059" entity="&#x0059;" char=""/>
+</symbols>

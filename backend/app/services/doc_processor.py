@@ -21,7 +21,7 @@ class DocProcessor:
     def _extractor_for(self, method: str) -> ExtractionStrategy:
         return self._template_extractor if method == "structured" else self._ai_extractor
 
-    async def process_markdown(self, content: str, db: AsyncSession, filename: str = None, task_id: str = None, mode: str = "extract", method: str = "ai", subject_id: Optional[int] = None) -> dict:
+    async def process_markdown(self, content: str, db: AsyncSession, filename: str = None, task_id: str = None, mode: str = "extract", method: str = "ai", subject_id: Optional[int] = None, user_id: Optional[int] = None) -> dict:
         """
         Process markdown content directly and extract questions.
         
@@ -38,7 +38,7 @@ class DocProcessor:
         """
         doc = await self._markdown_ingestor.ingest(content, task_id=task_id, filename=filename)
         extraction = await self._extractor_for(method).extract(
-            doc.markdown, db, filename=doc.filename, mode=mode, subject_id=subject_id
+            doc.markdown, db, filename=doc.filename, mode=mode, subject_id=subject_id, user_id=user_id
         )
         return {
             "task_id": doc.task_id,
@@ -49,7 +49,7 @@ class DocProcessor:
             "question_groups": extraction.question_groups,
         }
 
-    async def process_markdown_archive(self, file_path: Path, db: AsyncSession, task_id: str = None, mode: str = "extract", method: str = "ai", subject_id: Optional[int] = None, actor_id: Optional[int] = None, filename: Optional[str] = None) -> dict:
+    async def process_markdown_archive(self, file_path: Path, db: AsyncSession, task_id: str = None, mode: str = "extract", method: str = "ai", subject_id: Optional[int] = None, actor_id: Optional[int] = None, user_id: Optional[int] = None, filename: Optional[str] = None) -> dict:
         """Extract a markdown archive (zip with local images) and parse questions.
 
         Local images become subject content assets and their refs are rewritten to asset URLs
@@ -58,7 +58,7 @@ class DocProcessor:
         sink = ImportImageSink(db, subject_id=subject_id, actor_id=actor_id)
         doc = await self._markdown_archive_ingestor.ingest(file_path, store=sink.store, task_id=task_id, filename=filename)
         extraction = await self._extractor_for(method).extract(
-            doc.markdown, db, filename=doc.filename, mode=mode, subject_id=subject_id
+            doc.markdown, db, filename=doc.filename, mode=mode, subject_id=subject_id, user_id=user_id
         )
         return {
             "task_id": doc.task_id,
@@ -69,7 +69,7 @@ class DocProcessor:
             "question_groups": extraction.question_groups,
         }
 
-    async def process_image(self, image_file: BinaryIO, db: AsyncSession, task_id: str = None, mode: str = "extract", subject_id: Optional[int] = None) -> dict:
+    async def process_image(self, image_file: BinaryIO, db: AsyncSession, task_id: str = None, mode: str = "extract", subject_id: Optional[int] = None, user_id: Optional[int] = None) -> dict:
         """
         Process image file and extract questions using Gemini Vision.
         
@@ -84,7 +84,7 @@ class DocProcessor:
         """
         doc = await self._image_ingestor.ingest(image_file, task_id=task_id)
         extraction = await self._ai_extractor.extract(
-            "", db, image_data=doc.image_data, mode=mode, subject_id=subject_id
+            "", db, image_data=doc.image_data, mode=mode, subject_id=subject_id, user_id=user_id
         )
         return {
             "task_id": doc.task_id,
@@ -94,14 +94,14 @@ class DocProcessor:
             "question_groups": extraction.question_groups,
         }
 
-    async def process_docx(self, file_path: Path, db: AsyncSession = None, task_id: str = None, mode: str = "extract", method: str = "ai", subject_id: Optional[int] = None, actor_id: Optional[int] = None, filename: Optional[str] = None) -> dict:
+    async def process_docx(self, file_path: Path, db: AsyncSession = None, task_id: str = None, mode: str = "extract", method: str = "ai", subject_id: Optional[int] = None, actor_id: Optional[int] = None, user_id: Optional[int] = None, filename: Optional[str] = None) -> dict:
         """
         Convert docx to markdown, store embedded images as assets, and parse questions.
         """
         sink = ImportImageSink(db, subject_id=subject_id, actor_id=actor_id)
         doc = await self._docx_ingestor.ingest(file_path, store=sink.store, task_id=task_id, filename=filename)
         extraction = await self._extractor_for(method).extract(
-            doc.markdown, db, filename=doc.filename, mode=mode, subject_id=subject_id
+            doc.markdown, db, filename=doc.filename, mode=mode, subject_id=subject_id, user_id=user_id
         )
         return {
             "task_id": doc.task_id,
@@ -110,6 +110,7 @@ class DocProcessor:
             "paper": extraction.paper,
             "stimuli": extraction.stimuli,
             "question_groups": extraction.question_groups,
+            "warnings": doc.warnings,
         }
 
 doc_processor = DocProcessor()

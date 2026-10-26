@@ -4,6 +4,7 @@ import { toTypedSchema } from '@vee-validate/zod'
 import * as z from 'zod'
 import { Loader2 } from '@lucide/vue'
 import { toast } from 'vue-sonner'
+import type { SetupStatus } from '@/types'
 
 definePageMeta({
   layout: 'empty'
@@ -19,8 +20,8 @@ const registrationEnabled = ref(false)
 // 若系统尚未完成首次初始化，引导至安装向导
 onMounted(async () => {
   try {
-    const res = await $api<{ configured: boolean }>('/setup/status')
-    if (!res.configured) {
+    const res = await $api<SetupStatus>('/setup/status')
+    if (!res.db_configured || !res.admin_initialized) {
       router.replace('/setup')
     }
   } catch {

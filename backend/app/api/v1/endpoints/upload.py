@@ -110,6 +110,7 @@ async def upload_docx(
             method=method,
             subject_id=subject_id,
             actor_id=current_user.id,
+            user_id=current_user.id,
             filename=file.filename,
         )
         _as_review(result, subject_id)
@@ -151,7 +152,7 @@ async def upload_markdown(
     markdown_content = markdown_content_bytes.decode('utf-8')
     
     try:
-        result = await doc_processor.process_markdown(markdown_content, db=db, filename=file.filename, mode=mode, method=method, subject_id=subject_id)
+        result = await doc_processor.process_markdown(markdown_content, db=db, filename=file.filename, mode=mode, method=method, subject_id=subject_id, user_id=current_user.id)
         _as_review(result, subject_id)
         _attach_source_ref(result, sha256, current_user)
         await _attach_duplicate_hint(result, db, markdown_content_bytes)
@@ -169,11 +170,12 @@ async def upload_markdown(
 @router.post("/markdown-text")
 async def upload_markdown_text(
     db: deps.SessionDep,
-    request: MarkdownContentRequest
+    request: MarkdownContentRequest,
+    current_user: models.User = Depends(deps.get_current_active_user),
 ):
     """Process markdown content from text input."""
     try:
-        result = await doc_processor.process_markdown(request.content, db=db, filename=request.filename, mode=request.mode, method=request.method, subject_id=request.subject_id)
+        result = await doc_processor.process_markdown(request.content, db=db, filename=request.filename, mode=request.mode, method=request.method, subject_id=request.subject_id, user_id=current_user.id)
         _as_review(result, request.subject_id)
         return result
     except Exception as e:
@@ -211,6 +213,7 @@ async def upload_markdown_archive(
             method=method,
             subject_id=subject_id,
             actor_id=current_user.id,
+            user_id=current_user.id,
             filename=file.filename,
         )
         _as_review(result, subject_id)
@@ -237,13 +240,14 @@ async def upload_image_recognition(
     file: UploadFile = File(...),
     mode: str = "extract",
     subject_id: int = None,
+    current_user: models.User = Depends(deps.get_current_active_user),
 ):
     """Upload and process an image file to extract questions using AI vision."""
     if not file.content_type.startswith('image/'):
         raise HTTPException(status_code=400, detail="Only image files are supported")
     
     try:
-        result = await doc_processor.process_image(file.file, db=db, mode=mode, subject_id=subject_id)
+        result = await doc_processor.process_image(file.file, db=db, mode=mode, subject_id=subject_id, user_id=current_user.id)
         _as_review(result, subject_id)
         return result
     except Exception as e:

@@ -62,11 +62,12 @@ async def process_task(db: AsyncSession, task: ImportTask):
                 mode=task.mode or "extract",
                 subject_id=subject_id,
                 actor_id=actor_id,
+                user_id=task.user_id,
                 filename=task.original_filename,
             )
         elif task.file_type == 'markdown':
             content = file_path.read_text(encoding='utf-8')
-            result = await doc_processor.process_markdown(content, db=db, filename=task.original_filename, mode=task.mode or "extract", subject_id=subject_id)
+            result = await doc_processor.process_markdown(content, db=db, filename=task.original_filename, mode=task.mode or "extract", subject_id=subject_id, user_id=task.user_id)
             
         if result and user and subject_id:
             report = await commit_extracted_paper_import(

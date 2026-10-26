@@ -1,0 +1,149 @@
+<?xml version="1.0" encoding="US-ASCII"?>
+<symbols>
+  <!--GREEK CAPITAL LETTER ALPHA (U+0391)-->
+  <symbol number="0391" entity="&#x0391;" char="&#x0391;"/>
+  <!--GREEK CAPITAL LETTER BETA (U+0392)-->
+  <symbol number="0392" entity="&#x0392;" char="&#x0392;"/>
+  <!--GREEK CAPITAL LETTER GAMMA (U+0393)-->
+  <symbol number="0393" entity="&#x0393;" char="&#x0393;"/>
+  <!--GREEK CAPITAL LETTER DELTA (U+0394)-->
+  <symbol number="0394" entity="&#x0394;" char="&#x0394;"/>
+  <!--GREEK CAPITAL LETTER EPSILON (U+0395)-->
+  <symbol number="0395" entity="&#x0395;" char="&#x0395;"/>
+  <!--GREEK CAPITAL LETTER ZETA (U+0396)-->
+  <symbol number="0396" entity="&#x0396;" char="&#x0396;"/>
+  <!--GREEK CAPITAL LETTER ETA (U+0397)-->
+  <symbol number="0397" entity="&#x0397;" char="&#x0397;"/>
+  <!--GREEK CAPITAL LETTER THETA (U+0398)-->
+  <symbol number="0398" entity="&#x0398;" char="&#x0398;"/>
+  <!--GREEK CAPITAL LETTER IOTA (U+0399)-->
+  <symbol number="0399" entity="&#x0399;" char="&#x0399;"/>
+  <!--GREEK CAPITAL LETTER KAPPA (U+039A)-->
+  <symbol number="039A" entity="&#x039A;" char="&#x039A;"/>
+  <!--GREEK CAPITAL LETTER LAMDA (U+039B)-->
+  <symbol number="039B" entity="&#x039B;" char="&#x039B;"/>
+  <!--GREEK CAPITAL LETTER MU (U+039C)-->
+  <symbol number="039C" entity="&#x039C;" char="&#x039C;"/>
+  <!--GREEK CAPITAL LETTER NU (U+039D)-->
+  <symbol number="039D" entity="&#x039D;" char="&#x039D;"/>
+  <!--GREEK CAPITAL LETTER XI (U+039E)-->
+  <symbol number="039E" entity="&#x039E;" char="&#x039E;"/>
+  <!--GREEK CAPITAL LETTER OMICRON (U+039F)-->
+  <symbol number="039F" entity="&#x039F;" char="&#x039F;"/>
+  <!--GREEK CAPITAL LETTER PI (U+03A0)-->
+  <symbol number="03A0" entity="&#x03A0;" char="&#x03A0;"/>
+  <!--GREEK CAPITAL LETTER RHO (U+03A1)-->
+  <symbol number="03A1" entity="&#x03A1;" char="&#x03A1;"/>
+  <!--GREEK CAPITAL LETTER SIGMA (U+03A3)-->
+  <symbol number="03A3" entity="&#x03A3;" char="&#x03A3;"/>
+  <!--GREEK CAPITAL LETTER TAU (U+03A4)-->
+  <symbol number="03A4" entity="&#x03A4;" char="&#x03A4;"/>
+  <!--GREEK CAPITAL LETTER UPSILON (U+03A5)-->
+  <symbol number="03A5" entity="&#x03A5;" char="&#x03A5;"/>
+  <!--GREEK CAPITAL LETTER PHI (U+03A6)-->
+  <symbol number="03A6" entity="&#x03A6;" char="&#x03A6;"/>
+  <!--GREEK CAPITAL LETTER CHI (U+03A7)-->
+  <symbol number="03A7" entity="&#x03A7;" char="&#x03A7;"/>
+  <!--GREEK CAPITAL LETTER PSI (U+03A8)-->
+  <symbol number="03A8" entity="&#x03A8;" char="&#x03A8;"/>
+  <!--GREEK CAPITAL LETTER OMEGA (U+03A9)-->
+  <symbol number="03A9" entity="&#x03A9;" char="&#x03A9;"/>
+  <!--GREEK SMALL LETTER ALPHA (U+03B1)-->
+  <symbol number="03B1" entity="&#x03B1;" char="&#x03B1;"/>
+  <!--GREEK SMALL LETTER BETA (U+03B2)-->
+  <symbol number="03B2" entity="&#x03B2;" char="&#x03B2;"/>
+  <!--GREEK SMALL LETTER GAMMA (U+03B3)-->
+  <symbol number="03B3" entity="&#x03B3;" char="&#x03B3;"/>
+  <!--GREEK SMALL LETTER DELTA (U+03B4)-->
+  <symbol number="03B4" entity="&#x03B4;" char="&#x03B4;"/>
+  <!--GREEK SMALL LETTER EPSILON (U+03B5)-->
+  <symbol number="03B5" entity="&#x03B5;" char="&#x03B5;"/>
+  <!--GREEK SMALL LETTER ZETA (U+03B6)-->
+  <symbol number="03B6" entity="&#x03B6;" char="&#x03B6;"/>
+  <!--GREEK SMALL LETTER ETA (U+03B7)-->
+  <symbol number="03B7" entity="&#x03B7;" char="&#x03B7;"/>
+  <!--GREEK SMALL LETTER THETA (U+03B8)-->
+  <symbol number="03B8" entity="&#x03B8;" char="&#x03B8;"/>
+  <!--GREEK SMALL LETTER IOTA (U+03B9)-->
+  <symbol number="03B9" entity="&#x03B9;" char="&#x03B9;"/>
+  <!--GREEK SMALL LETTER KAPPA (U+03BA)-->
+  <symbol number="03BA" entity="&#x03BA;" char="&#x03BA;"/>
+  <!--GREEK SMALL LETTER LAMDA (U+03BB)-->
+  <symbol number="03BB" entity="&#x03BB;" char="&#x03BB;"/>
+  <!--GREEK SMALL LETTER MU (U+03BC)-->
+  <symbol number="03BC" entity="&#x03BC;" char="&#x03BC;"/>
+  <!--GREEK SMALL LETTER NU (U+03BD)-->
+  <symbol number="03BD" entity="&#x03BD;" char="&#x03BD;"/>
+  <!--GREEK SMALL LETTER XI (U+03BE)-->
+  <symbol number="03BE" entity="&#x03BE;" char="&#x03BE;"/>
+  <!--GREEK SMALL LETTER OMICRON (U+03BF)-->
+  <symbol number="03BF" entity="&#x03BF;" char="&#x03BF;"/>
+  <!--GREEK SMALL LETTER PI (U+03C0)-->
+  <symbol number="03C0" entity="&#x03C0;" char="&#x03C0;"/>
+  <!--GREEK SMALL LETTER RHO (U+03C1)-->
+  <symbol number="03C1" entity="&#x03C1;" char="&#x03C1;"/>
+  <!--GREEK SMALL LETTER FINAL SIGMA (U+03C2)-->
+  <symbol number="03C2" entity="&#x03C2;" char="&#x03C2;"/>
+  <!--GREEK SMALL LETTER SIGMA (U+03C3)-->
+  <symbol number="03C3" entity="&#x03C3;" char="&#x03C3;"/>
+  <!--GREEK SMALL LETTER TAU (U+03C4)-->
+  <symbol number="03C4" entity="&#x03C4;" char="&#x03C4;"/>
+  <!--GREEK SMALL LETTER UPSILON (U+03C5)-->
+  <symbol number="03C5" entity="&#x03C5;" char="&#x03C5;"/>
+  <!--GREEK SMALL LETTER PHI (U+03C6)-->
+  <symbol number="03C6" entity="&#x03C6;" char="&#x03C6;"/>
+  <!--GREEK SMALL LETTER CHI (U+03C7)-->
+  <symbol number="03C7" entity="&#x03C7;" char="&#x03C7;"/>
+  <!--GREEK SMALL LETTER PSI (U+03C8)-->
+  <symbol number="03C8" entity="&#x03C8;" char="&#x03C8;"/>
+  <!--GREEK SMALL LETTER OMEGA (U+03C9)-->
+  <symbol number="03C9" entity="&#x03C9;" char="&#x03C9;"/>
+  <!--GREEK SMALL LETTER BETA (U+03B2)-->
+  <symbol number="03B2" entity="&#x03B2;" char="&#x03B2;"/>
+  <!--GREEK SMALL LETTER GAMMA (U+03B3)-->
+  <symbol number="03B3" entity="&#x03B3;" char="&#x03B3;"/>
+  <!--GREEK SMALL LETTER DELTA (U+03B4)-->
+  <symbol number="03B4" entity="&#x03B4;" char="&#x03B4;"/>
+  <!--GREEK SMALL LETTER EPSILON (U+03B5)-->
+  <symbol number="03B5" entity="&#x03B5;" char="&#x03B5;"/>
+  <!--GREEK SMALL LETTER ZETA (U+03B6)-->
+  <symbol number="03B6" entity="&#x03B6;" char="&#x03B6;"/>
+  <!--GREEK SMALL LETTER ETA (U+03B7)-->
+  <symbol number="03B7" entity="&#x03B7;" char="&#x03B7;"/>
+  <!--GREEK SMALL LETTER THETA (U+03B8)-->
+  <symbol number="03B8" entity="&#x03B8;" char="&#x03B8;"/>
+  <!--GREEK SMALL LETTER IOTA (U+03B9)-->
+  <symbol number="03B9" entity="&#x03B9;" char="&#x03B9;"/>
+  <!--GREEK SMALL LETTER KAPPA (U+03BA)-->
+  <symbol number="03BA" entity="&#x03BA;" char="&#x03BA;"/>
+  <!--GREEK SMALL LETTER LAMDA (U+03BB)-->
+  <symbol number="03BB" entity="&#x03BB;" char="&#x03BB;"/>
+  <!--GREEK SMALL LETTER MU (U+03BC)-->
+  <symbol number="03BC" entity="&#x03BC;" char="&#x03BC;"/>
+  <!--GREEK SMALL LETTER NU (U+03BD)-->
+  <symbol number="03BD" entity="&#x03BD;" char="&#x03BD;"/>
+  <!--GREEK SMALL LETTER XI (U+03BE)-->
+  <symbol number="03BE" entity="&#x03BE;" char="&#x03BE;"/>
+  <!--GREEK SMALL LETTER OMICRON (U+03BF)-->
+  <symbol number="03BF" entity="&#x03BF;" char="&#x03BF;"/>
+  <!--GREEK SMALL LETTER PI (U+03C0)-->
+  <symbol number="03C0" entity="&#x03C0;" char="&#x03C0;"/>
+  <!--GREEK SMALL LETTER RHO (U+03C1)-->
+  <symbol number="03C1" entity="&#x03C1;" char="&#x03C1;"/>
+  <!--GREEK SMALL LETTER FINAL SIGMA (U+03C2)-->
+  <symbol number="03C2" entity="&#x03C2;" char="&#x03C2;"/>
+  <!--GREEK SMALL LETTER SIGMA (U+03C3)-->
+  <symbol number="03C3" entity="&#x03C3;" char="&#x03C3;"/>
+  <!--GREEK SMALL LETTER TAU (U+03C4)-->
+  <symbol number="03C4" entity="&#x03C4;" char="&#x03C4;"/>
+  <!--GREEK SMALL LETTER UPSILON (U+03C5)-->
+  <symbol number="03C5" entity="&#x03C5;" char="&#x03C5;"/>
+  <!--GREEK SMALL LETTER PHI (U+03C6)-->
+  <symbol number="03C6" entity="&#x03C6;" char="&#x03C6;"/>
+  <!--GREEK SMALL LETTER CHI (U+03C7)-->
+  <symbol number="03C7" entity="&#x03C7;" char="&#x03C7;"/>
+  <!--GREEK SMALL LETTER PSI (U+03C8)-->
+  <symbol number="03C8" entity="&#x03C8;" char="&#x03C8;"/>
+  <!--GREEK SMALL LETTER OMEGA (U+03C9)-->
+  <symbol number="03C9" entity="&#x03C9;" char="&#x03C9;"/>
+</symbols>

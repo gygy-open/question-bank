@@ -7,6 +7,13 @@ make_migration msg:
 test:
     uv run pytest
 
+# Sync the vendored MathType parser (app/services/importing/mathtype) from upstream.
+# Usage: just sync-mathtype            (latest)   |   just sync-mathtype <sha|tag>
+sync-mathtype ref="HEAD":
+    uv run python scripts/sync_mathtype.py --ref {{ref}}
+    git diff --stat -- app/services/importing/mathtype tests/fixtures/mathtype
+    uv run pytest tests/test_importing_docx_math.py tests/test_importing_ingest.py -q
+
 # --- Desktop packaging ---------------------------------------------------
 
 # Build the frontend SPA so it can be bundled into the desktop executable.

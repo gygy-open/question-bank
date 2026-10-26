@@ -36,10 +36,19 @@ cp .env.example .env
 # 2. 拉取镜像并启动全部服务
 docker compose pull
 docker compose up -d
-
-# 3. 创建超级管理员
-docker compose exec backend python scripts/create_superuser.py
 ```
+
+3. 浏览器打开题库，首次访问会进入初始化向导，直接创建首个超级管理员（数据库已由 `DB_URL` 配置，无需再选）。
+
+   也可以改用命令行（创建 `admin` / `password`，登录后请立即修改密码）：
+
+   ```bash
+   docker compose exec backend python scripts/create_superuser.py
+   ```
+
+::: warning
+首个打开页面的人即可创建超级管理员。部署完成后请尽快完成初始化。
+:::
 
 ::: tip 想本地构建 / 二次开发？
 克隆完整仓库后，把 `.env` 中的 `IMAGE_TAG` 留空或忽略，改用 `docker compose up -d --build` 即可基于本地源码构建镜像（`docker-compose.yml` 同时声明了 `image` 与 `build`，加 `--build` 会本地构建并覆盖同名 tag）。适合贡献者或需要自定义 Dockerfile 的场景。

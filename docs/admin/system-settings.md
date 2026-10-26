@@ -10,7 +10,7 @@
 | `AI_VISION_MODEL_ID` | 激活的视觉模型 |
 | `AI_EMBEDDING_MODEL_ID` | 激活的向量嵌入模型 |
 
-每个参数含键、值与描述。模型类参数通常在 [AI 供应商与模型](/admin/ai-config) 页面间接设置。
+每个参数含键、值与描述。模型类参数通常在 [AI 服务商与模型](/admin/ai-config) 页面间接设置。
 
 ## 注册设置
 

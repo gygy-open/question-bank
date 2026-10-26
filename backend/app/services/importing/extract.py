@@ -35,6 +35,7 @@ class ExtractionStrategy(Protocol):
         filename: str | None = None,
         mode: str = "extract",
         subject_id: Optional[int] = None,
+        user_id: Optional[int] = None,
     ) -> ExtractionResult: ...
 
 
@@ -71,8 +72,11 @@ class AIExtractor:
         filename: str | None = None,
         mode: str = "extract",
         subject_id: Optional[int] = None,
+        user_id: Optional[int] = None,
     ) -> ExtractionResult:
-        provider_name, config = await resolve_active_provider(db, is_vision=bool(image_data))
+        provider_name, config = await resolve_active_provider(
+            db, is_vision=bool(image_data), user_id=user_id
+        )
         if provider_name is None:
             logger.warning("No active AI provider configuration found.")
             return ExtractionResult()
@@ -154,6 +158,7 @@ class TemplateExtractor:
         filename: str | None = None,
         mode: str = "extract",
         subject_id: Optional[int] = None,
+        user_id: Optional[int] = None,
     ) -> ExtractionResult:
         return parse_structured(content)
 

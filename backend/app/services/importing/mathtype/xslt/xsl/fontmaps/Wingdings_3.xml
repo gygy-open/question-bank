@@ -1,0 +1,634 @@
+<?xml version="1.0" encoding="US-ASCII"?><symbols>
+  <!--  *
+        * Thanks to Alan Wood for providing a comprehensive list with 
+        * Wingdings 3 character set and equivalent Unicode characters
+        * and allowing us to use it here.
+        *
+        * http://www.alanwood.net/demos/wingdings-3.html
+        * 
+        * -->
+  <!--SPACE-->
+  <symbol number="F020" entity="&#xf020;" char=" "/>
+  <symbol number="0020" entity="&#x0020;" char=" "/>
+  <!--LEFTWARDS TRIANGLE-HEADED ARROW-->
+  <symbol number="F021" entity="&#xf021;" char="&#x2b60;" font="Segoe UI Symbol"/>
+  <symbol number="0021" entity="&#x0021;" char="&#x2b60;" font="Segoe UI Symbol"/>
+  <!--RIGHTWARDS TRIANGLE-HEADED ARROW-->
+  <symbol number="F022" entity="&#xf022;" char="&#x2b62;" font="Segoe UI Symbol"/>
+  <symbol number="0022" entity="&#x0022;" char="&#x2b62;" font="Segoe UI Symbol"/>
+  <!--UPWARDS TRIANGLE-HEADED ARROW-->
+  <symbol number="F023" entity="&#xf023;" char="&#x2b61;" font="Segoe UI Symbol"/>
+  <symbol number="0023" entity="&#x0023;" char="&#x2b61;" font="Segoe UI Symbol"/>
+  <!--DOWNWARDS TRIANGLE-HEADED ARROW-->
+  <symbol number="F024" entity="&#xf024;" char="&#x2b63;" font="Segoe UI Symbol"/>
+  <symbol number="0024" entity="&#x0024;" char="&#x2b63;" font="Segoe UI Symbol"/>
+  <!--NORTH WEST TRIANGLE-HEADED ARROW-->
+  <symbol number="F025" entity="&#xf025;" char="&#x2b66;" font="Segoe UI Symbol"/>
+  <symbol number="0025" entity="&#x0025;" char="&#x2b66;" font="Segoe UI Symbol"/>
+  <!--NORTH EAST TRIANGLE-HEADED ARROW-->
+  <symbol number="F026" entity="&#xf026;" char="&#x2b67;" font="Segoe UI Symbol"/>
+  <symbol number="0026" entity="&#x0026;" char="&#x2b67;" font="Segoe UI Symbol"/>
+  <!--SOUTH WEST TRIANGLE-HEADED ARROW-->
+  <symbol number="F027" entity="&#xf027;" char="&#x2b69;" font="Segoe UI Symbol"/>
+  <symbol number="0027" entity="&#x0027;" char="&#x2b69;" font="Segoe UI Symbol"/>
+  <!--SOUTH EAST TRIANGLE-HEADED ARROW-->
+  <symbol number="F028" entity="&#xf028;" char="&#x2b68;" font="Segoe UI Symbol"/>
+  <symbol number="0028" entity="&#x0028;" char="&#x2b68;" font="Segoe UI Symbol"/>
+  <!--LEFTWARDS TRIANGLE-HEADED ARROW TO BAR-->
+  <symbol number="F029" entity="&#xf029;" char="&#x2b70;" font="Segoe UI Symbol"/>
+  <symbol number="0029" entity="&#x0029;" char="&#x2b70;" font="Segoe UI Symbol"/>
+  <!--RIGHTWARDS TRIANGLE-HEADED ARROW TO BAR-->
+  <symbol number="F02A" entity="&#xf02a;" char="&#x2b72;" font="Segoe UI Symbol"/>
+  <symbol number="002A" entity="&#x002a;" char="&#x2b72;" font="Segoe UI Symbol"/>
+  <!--UPWARDS TRIANGLE-HEADED ARROW TO BAR-->
+  <symbol number="F02B" entity="&#xf02b;" char="&#x2b71;" font="Segoe UI Symbol"/>
+  <symbol number="002B" entity="&#x002b;" char="&#x2b71;" font="Segoe UI Symbol"/>
+  <!--DOWNWARDS TRIANGLE-HEADED ARROW TO BAR-->
+  <symbol number="F02C" entity="&#xf02c;" char="&#x2b73;" font="Segoe UI Symbol"/>
+  <symbol number="002C" entity="&#x002c;" char="&#x2b73;" font="Segoe UI Symbol"/>
+  <!--NORTH WEST TRIANGLE-HEADED ARROW TO BAR-->
+  <symbol number="F02D" entity="&#xf02d;" char="&#x2b76;" font="Segoe UI Symbol"/>
+  <symbol number="002D" entity="&#x002d;" char="&#x2b76;" font="Segoe UI Symbol"/>
+  <!--SOUTH EAST TRIANGLE-HEADED ARROW TO BAR-->
+  <symbol number="F02E" entity="&#xf02e;" char="&#x2b78;" font="Segoe UI Symbol"/>
+  <symbol number="002E" entity="&#x002e;" char="&#x2b78;" font="Segoe UI Symbol"/>
+  <!--UPWARDS TRIANGLE-HEADED ARROW WITH DOUBLE HORIZONTAL STROKE-->
+  <symbol number="F02F" entity="&#xf02f;" char="&#x2b7b;" font="Segoe UI Symbol"/>
+  <symbol number="002F" entity="&#x002f;" char="&#x2b7b;" font="Segoe UI Symbol"/>
+  <!--DOWNWARDS TRIANGLE-HEADED ARROW WITH DOUBLE HORIZONTAL STROKE-->
+  <symbol number="F030" entity="&#xf030;" char="&#x2b7d;" font="Segoe UI Symbol"/>
+  <symbol number="0030" entity="&#x0030;" char="&#x2b7d;" font="Segoe UI Symbol"/>
+  <!--LEFT RIGHT TRIANGLE-HEADED ARROW-->
+  <symbol number="F031" entity="&#xf031;" char="&#x2b64;" font="Segoe UI Symbol"/>
+  <symbol number="0031" entity="&#x0031;" char="&#x2b64;" font="Segoe UI Symbol"/>
+  <!--UP DOWN TRIANGLE-HEADED ARROW-->
+  <symbol number="F032" entity="&#xf032;" char="&#x2b65;" font="Segoe UI Symbol"/>
+  <symbol number="0032" entity="&#x0032;" char="&#x2b65;" font="Segoe UI Symbol"/>
+  <!--LEFTWARDS TRIANGLE-HEADED DASHED ARROW-->
+  <symbol number="F033" entity="&#xf033;" char="&#x2b6a;" font="Segoe UI Symbol"/>
+  <symbol number="0033" entity="&#x0033;" char="&#x2b6a;" font="Segoe UI Symbol"/>
+  <!--RIGHTWARDS TRIANGLE-HEADED DASHED ARROW-->
+  <symbol number="F034" entity="&#xf034;" char="&#x2b6c;" font="Segoe UI Symbol"/>
+  <symbol number="0034" entity="&#x0034;" char="&#x2b6c;" font="Segoe UI Symbol"/>
+  <!--UPWARDS TRIANGLE-HEADED DASHED ARROW-->
+  <symbol number="F035" entity="&#xf035;" char="&#x2b6b;" font="Segoe UI Symbol"/>
+  <symbol number="0035" entity="&#x0035;" char="&#x2b6b;" font="Segoe UI Symbol"/>
+  <!--DOWNWARDS TRIANGLE-HEADED DASHED ARROW-->
+  <symbol number="F036" entity="&#xf036;" char="&#x2b6d;" font="Segoe UI Symbol"/>
+  <symbol number="0036" entity="&#x0036;" char="&#x2b6d;" font="Segoe UI Symbol"/>
+  <!--DOWNWARDS TRIANGLE-HEADED ZIGZAG ARROW-->
+  <symbol number="F037" entity="&#xf037;" char="&#x2b4d;" font="Segoe UI Symbol"/>
+  <symbol number="0037" entity="&#x0037;" char="&#x2b4d;" font="Segoe UI Symbol"/>
+  <!--DOWNWARDS TRIANGLE-HEADED ARROW WITH LONG TIP LEFTWARDS-->
+  <symbol number="F038" entity="&#xf038;" char="&#x2ba0;" font="Segoe UI Symbol"/>
+  <symbol number="0038" entity="&#x0038;" char="&#x2ba0;" font="Segoe UI Symbol"/>
+  <!--DOWNWARDS TRIANGLE-HEADED ARROW WITH LONG TIP RIGHTWARDS-->
+  <symbol number="F039" entity="&#xf039;" char="&#x2ba1;" font="Segoe UI Symbol"/>
+  <symbol number="0039" entity="&#x0039;" char="&#x2ba1;" font="Segoe UI Symbol"/>
+  <!--UPWARDS TRIANGLE-HEADED ARROW WITH LONG TIP LEFTWARDS-->
+  <symbol number="F03A" entity="&#xf03a;" char="&#x2ba2;" font="Segoe UI Symbol"/>
+  <symbol number="003A" entity="&#x003a;" char="&#x2ba2;" font="Segoe UI Symbol"/>
+  <!--UPWARDS TRIANGLE-HEADED ARROW WITH LONG TIP RIGHTWARDS-->
+  <symbol number="F03B" entity="&#xf03b;" char="&#x2ba3;" font="Segoe UI Symbol"/>
+  <symbol number="003B" entity="&#x003b;" char="&#x2ba3;" font="Segoe UI Symbol"/>
+  <!--LEFTWARDS TRIANGLE-HEADED ARROW WITH LONG TIP UPWARDS-->
+  <symbol number="F03C" entity="&#xf03c;" char="&#x2ba4;" font="Segoe UI Symbol"/>
+  <symbol number="003C" entity="&#x003c;" char="&#x2ba4;" font="Segoe UI Symbol"/>
+  <!--RIGHTWARDS TRIANGLE-HEADED ARROW WITH LONG TIP UPWARDS-->
+  <symbol number="F03D" entity="&#xf03d;" char="&#x2ba5;" font="Segoe UI Symbol"/>
+  <symbol number="003D" entity="&#x003d;" char="&#x2ba5;" font="Segoe UI Symbol"/>
+  <!--LEFTWARDS TRIANGLE-HEADED ARROW WITH LONG TIP DOWNWARDS-->
+  <symbol number="F03E" entity="&#xf03e;" char="&#x2ba6;" font="Segoe UI Symbol"/>
+  <symbol number="003E" entity="&#x003e;" char="&#x2ba6;" font="Segoe UI Symbol"/>
+  <!--RIGHTWARDS TRIANGLE-HEADED ARROW WITH LONG TIP DOWNWARDS-->
+  <symbol number="F03F" entity="&#xf03f;" char="&#x2ba7;" font="Segoe UI Symbol"/>
+  <symbol number="003F" entity="&#x003f;" char="&#x2ba7;" font="Segoe UI Symbol"/>
+  <!--RETURN LEFT-->
+  <symbol number="F040" entity="&#xf040;" char="&#x2b90;" font="Segoe UI Symbol"/>
+  <symbol number="0040" entity="&#x0040;" char="&#x2b90;" font="Segoe UI Symbol"/>
+  <!--RETURN RIGHT-->
+  <symbol number="F041" entity="&#xf041;" char="&#x2b91;" font="Segoe UI Symbol"/>
+  <symbol number="0041" entity="&#x0041;" char="&#x2b91;" font="Segoe UI Symbol"/>
+  <!--NEW LINE LEFT-->
+  <symbol number="F042" entity="&#xf042;" char="&#x2b92;" font="Segoe UI Symbol"/>
+  <symbol number="0042" entity="&#x0042;" char="&#x2b92;" font="Segoe UI Symbol"/>
+  <!--NEW LINE RIGHT-->
+  <symbol number="F043" entity="&#xf043;" char="&#x2b93;" font="Segoe UI Symbol"/>
+  <symbol number="0043" entity="&#x0043;" char="&#x2b93;" font="Segoe UI Symbol"/>
+  <!--LEFTWARDS TRIANGLE-HEADED ARROW OVER RIGHTWARDS TRIANGLE-HEADED ARROW-->
+  <symbol number="F044" entity="&#xf044;" char="&#x2b80;" font="Segoe UI Symbol"/>
+  <symbol number="0044" entity="&#x0044;" char="&#x2b80;" font="Segoe UI Symbol"/>
+  <!--DOWNWARDS TRIANGLE-HEADED ARROW LEFTWARDS OF UPWARDS TRIANGLE-HEADED ARROW-->
+  <symbol number="F045" entity="&#xf045;" char="&#x2b83;" font="Segoe UI Symbol"/>
+  <symbol number="0045" entity="&#x0045;" char="&#x2b83;" font="Segoe UI Symbol"/>
+  <!--HORIZONTAL TAB KEY-->
+  <symbol number="F046" entity="&#xf046;" char="&#x2b7e;" font="Segoe UI Symbol"/>
+  <symbol number="0046" entity="&#x0046;" char="&#x2b7e;" font="Segoe UI Symbol"/>
+  <!--VERTICAL TAB KEY-->
+  <symbol number="F047" entity="&#xf047;" char="&#x2b7f;" font="Segoe UI Symbol"/>
+  <symbol number="0047" entity="&#x0047;" char="&#x2b7f;" font="Segoe UI Symbol"/>
+  <!--LEFTWARDS TRIANGLE-HEADED PAIRED ARROWS-->
+  <symbol number="F048" entity="&#xf048;" char="&#x2b84;" font="Segoe UI Symbol"/>
+  <symbol number="0048" entity="&#x0048;" char="&#x2b84;" font="Segoe UI Symbol"/>
+  <!--RIGHTWARDS TRIANGLE-HEADED PAIRED ARROWS-->
+  <symbol number="F049" entity="&#xf049;" char="&#x2b86;" font="Segoe UI Symbol"/>
+  <symbol number="0049" entity="&#x0049;" char="&#x2b86;" font="Segoe UI Symbol"/>
+  <!--UPWARDS TRIANGLE-HEADED PAIRED ARROWS-->
+  <symbol number="F04A" entity="&#xf04a;" char="&#x2b85;" font="Segoe UI Symbol"/>
+  <symbol number="004A" entity="&#x004a;" char="&#x2b85;" font="Segoe UI Symbol"/>
+  <!--DOWNWARDS TRIANGLE-HEADED PAIRED ARROWS-->
+  <symbol number="F04B" entity="&#xf04b;" char="&#x2b87;" font="Segoe UI Symbol"/>
+  <symbol number="004B" entity="&#x004b;" char="&#x2b87;" font="Segoe UI Symbol"/>
+  <!--ANTICLOCKWISE TRIANGLE-HEADED TOP U-SHAPED ARROW-->
+  <symbol number="F04C" entity="&#xf04c;" char="&#x2b8f;" font="Segoe UI Symbol"/>
+  <symbol number="004C" entity="&#x004c;" char="&#x2b8f;" font="Segoe UI Symbol"/>
+  <!--ANTICLOCKWISE TRIANGLE-HEADED BOTTOM U-SHAPED ARROW-->
+  <symbol number="F04D" entity="&#xf04d;" char="&#x2b8d;" font="Segoe UI Symbol"/>
+  <symbol number="004D" entity="&#x004d;" char="&#x2b8d;" font="Segoe UI Symbol"/>
+  <!--ANTICLOCKWISE TRIANGLE-HEADED LEFT U-SHAPED ARROW-->
+  <symbol number="F04E" entity="&#xf04e;" char="&#x2b8e;" font="Segoe UI Symbol"/>
+  <symbol number="004E" entity="&#x004e;" char="&#x2b8e;" font="Segoe UI Symbol"/>
+  <!--ANTICLOCKWISE TRIANGLE-HEADED RIGHT U-SHAPED ARROW-->
+  <symbol number="F04F" entity="&#xf04f;" char="&#x2b8c;" font="Segoe UI Symbol"/>
+  <symbol number="004F" entity="&#x004f;" char="&#x2b8c;" font="Segoe UI Symbol"/>
+  <!--CLOCKWISE TRIANGLE-HEADED OPEN CIRCLE ARROW-->
+  <symbol number="F050" entity="&#xf050;" char="&#x2b6e;" font="Segoe UI Symbol"/>
+  <symbol number="0050" entity="&#x0050;" char="&#x2b6e;" font="Segoe UI Symbol"/>
+  <!--ANTICLOCKWISE TRIANGLE-HEADED OPEN CIRCLE ARROW-->
+  <symbol number="F051" entity="&#xf051;" char="&#x2b6f;" font="Segoe UI Symbol"/>
+  <symbol number="0051" entity="&#x0051;" char="&#x2b6f;" font="Segoe UI Symbol"/>
+  <!--BROKEN CIRCLE WITH NORTHWEST ARROW-->
+  <symbol number="F052" entity="&#xf052;" char="&#x238b;" font="Segoe UI Symbol"/>
+  <symbol number="0052" entity="&#x0052;" char="&#x238b;" font="Segoe UI Symbol"/>
+  <!--UP ARROWHEAD BETWEEN TWO HORIZONTAL BARS-->
+  <symbol number="F053" entity="&#xf053;" char="&#x2324;" font="Segoe UI Symbol"/>
+  <symbol number="0053" entity="&#x0053;" char="&#x2324;" font="Segoe UI Symbol"/>
+  <!--UP ARROWHEAD-->
+  <symbol number="F054" entity="&#xf054;" char="&#x2303;" font="Segoe UI Symbol"/>
+  <symbol number="0054" entity="&#x0054;" char="&#x2303;" font="Segoe UI Symbol"/>
+  <!--OPTION KEY-->
+  <symbol number="F055" entity="&#xf055;" char="&#x2325;" font="Segoe UI Symbol"/>
+  <symbol number="0055" entity="&#x0055;" char="&#x2325;" font="Segoe UI Symbol"/>
+  <!--BOTTOM SQUARE BRACKET-->
+  <symbol number="F056" entity="&#xf056;" char="&#x2325;" font="Segoe UI Symbol"/>
+  <symbol number="0056" entity="&#x0056;" char="&#x2325;" font="Segoe UI Symbol"/>
+  <!---->
+  <symbol number="F057" entity="&#xf057;" char="" font="Segoe UI Symbol"/>
+  <symbol number="0057" entity="&#x0057;" char="" font="Segoe UI Symbol"/>
+  <!--UPWARDS WHITE ARROW FROM BAR-->
+  <symbol number="F058" entity="&#xf058;" char="&#x21ea;" font="Segoe UI Symbol"/>
+  <symbol number="0058" entity="&#x0058;" char="&#x21ea;" font="Segoe UI Symbol"/>
+  <!--UPWARDS WHITE ARROW FROM BAR WITH HORIZONTAL BAR-->
+  <symbol number="F059" entity="&#xf059;" char="&#x2bb8;" font="Segoe UI Symbol"/>
+  <symbol number="0059" entity="&#x0059;" char="&#x2bb8;" font="Segoe UI Symbol"/>
+  <!--LEFTWARDS BOTTOM-SHADED WHITE ARROW-->
+  <symbol number="F05A" entity="&#xf05a;" char="&#x1f8a0;" font="Segoe UI Symbol"/>
+  <symbol number="005A" entity="&#x005a;" char="&#x1f8a0;" font="Segoe UI Symbol"/>
+  <!--RIGHTWARDS BOTTOM-SHADED WHITE ARROW-->
+  <symbol number="F05B" entity="&#xf05b;" char="&#x1f8a1;" font="Segoe UI Symbol"/>
+  <symbol number="005B" entity="&#x005b;" char="&#x1f8a1;" font="Segoe UI Symbol"/>
+  <!--LEFTWARDS TOP SHADED WHITE ARROW-->
+  <symbol number="F05C" entity="&#xf05c;" char="&#x1f8a2;" font="Segoe UI Symbol"/>
+  <symbol number="005C" entity="&#x005c;" char="&#x1f8a2;" font="Segoe UI Symbol"/>
+  <!--RIGHTWARDS TOP SHADED WHITE ARROW-->
+  <symbol number="F05D" entity="&#xf05d;" char="&#x1f8a3;" font="Segoe UI Symbol"/>
+  <symbol number="005D" entity="&#x005d;" char="&#x1f8a3;" font="Segoe UI Symbol"/>
+  <!--LEFTWARDS LEFT-SHADED WHITE ARROW-->
+  <symbol number="F05E" entity="&#xf05e;" char="&#x1f8a4;" font="Segoe UI Symbol"/>
+  <symbol number="005E" entity="&#x005e;" char="&#x1f8a4;" font="Segoe UI Symbol"/>
+  <!--RIGHTWARDS RIGHT-SHADED WHITE ARROW-->
+  <symbol number="F05F" entity="&#xf05f;" char="&#x1f8a5;" font="Segoe UI Symbol"/>
+  <symbol number="005F" entity="&#x005f;" char="&#x1f8a5;" font="Segoe UI Symbol"/>
+  <!--LEFTWARDS RIGHT-SHADED WHITE ARROW-->
+  <symbol number="F060" entity="&#xf060;" char="&#x1f8a6;" font="Segoe UI Symbol"/>
+  <symbol number="0060" entity="&#x0060;" char="&#x1f8a6;" font="Segoe UI Symbol"/>
+  <!--RIGHTWARDS LEFT-SHADED WHITE ARROW-->
+  <symbol number="F061" entity="&#xf061;" char="&#x1f8a7;" font="Segoe UI Symbol"/>
+  <symbol number="0061" entity="&#x0061;" char="&#x1f8a7;" font="Segoe UI Symbol"/>
+  <!--LEFTWARDS BACK-TILTED SHADOWED WHITE ARROW-->
+  <symbol number="F062" entity="&#xf062;" char="&#x1f8a8;" font="Segoe UI Symbol"/>
+  <symbol number="0062" entity="&#x0062;" char="&#x1f8a8;" font="Segoe UI Symbol"/>
+  <!--RIGHTWARDS BACK-TILTED SHADOWED WHITE ARROW-->
+  <symbol number="F063" entity="&#xf063;" char="&#x1f8a9;" font="Segoe UI Symbol"/>
+  <symbol number="0063" entity="&#x0063;" char="&#x1f8a9;" font="Segoe UI Symbol"/>
+  <!--LEFTWARDS FRONT-TILTED SHADOWED WHITE ARROW-->
+  <symbol number="F064" entity="&#xf064;" char="&#x1f8aa;" font="Segoe UI Symbol"/>
+  <symbol number="0064" entity="&#x0064;" char="&#x1f8aa;" font="Segoe UI Symbol"/>
+  <!--RIGHTWARDS FRONT-TILTED SHADOWED WHITE ARROW-->
+  <symbol number="F065" entity="&#xf065;" char="&#x1f8ab;" font="Segoe UI Symbol"/>
+  <symbol number="0065" entity="&#x0065;" char="&#x1f8ab;" font="Segoe UI Symbol"/>
+  <!--LEFTWARDS ARROW-->
+  <symbol number="F066" entity="&#xf066;" char="&#x2190;" font="Segoe UI Symbol"/>
+  <symbol number="0066" entity="&#x0066;" char="&#x2190;" font="Segoe UI Symbol"/>
+  <!--RIGHTWARDS ARROW-->
+  <symbol number="F067" entity="&#xf067;" char="&#x2192;" font="Segoe UI Symbol"/>
+  <symbol number="0067" entity="&#x0067;" char="&#x2192;" font="Segoe UI Symbol"/>
+  <!--UPWARDS ARROW-->
+  <symbol number="F068" entity="&#xf068;" char="&#x2191;" font="Segoe UI Symbol"/>
+  <symbol number="0068" entity="&#x0068;" char="&#x2191;" font="Segoe UI Symbol"/>
+  <!--DOWNWARDS ARROW-->
+  <symbol number="F069" entity="&#xf069;" char="&#x2193;" font="Segoe UI Symbol"/>
+  <symbol number="0069" entity="&#x0069;" char="&#x2193;" font="Segoe UI Symbol"/>
+  <!--NORTH WEST ARROW-->
+  <symbol number="F06A" entity="&#xf06a;" char="&#x2196;" font="Segoe UI Symbol"/>
+  <symbol number="006A" entity="&#x006a;" char="&#x2196;" font="Segoe UI Symbol"/>
+  <!--NORTH EAST ARROW-->
+  <symbol number="F06B" entity="&#xf06b;" char="&#x2197;" font="Segoe UI Symbol"/>
+  <symbol number="006B" entity="&#x006b;" char="&#x2197;" font="Segoe UI Symbol"/>
+  <!--SOUTH WEST ARROW-->
+  <symbol number="F06C" entity="&#xf06c;" char="&#x2199;" font="Segoe UI Symbol"/>
+  <symbol number="006C" entity="&#x006c;" char="&#x2199;" font="Segoe UI Symbol"/>
+  <!--SOUTH EAST ARROW-->
+  <symbol number="F06D" entity="&#xf06d;" char="&#x2198;" font="Segoe UI Symbol"/>
+  <symbol number="006D" entity="&#x006d;" char="&#x2198;" font="Segoe UI Symbol"/>
+  <!--LEFT RIGHT SANS-SERIF ARROW-->
+  <symbol number="F06E" entity="&#xf06e;" char="&#x1f858;" font="Segoe UI Symbol"/>
+  <symbol number="006E" entity="&#x006e;" char="&#x1f858;" font="Segoe UI Symbol"/>
+  <!--UP DOWN SANS-SERIF ARROW-->
+  <symbol number="F06F" entity="&#xf06f;" char="&#x1f859;" font="Segoe UI Symbol"/>
+  <symbol number="006F" entity="&#x006f;" char="&#x1f859;" font="Segoe UI Symbol"/>
+  <!--BLACK UP-POINTING TRIANGLE-->
+  <symbol number="F070" entity="&#xf070;" char="&#x25b2;" font="Segoe UI Symbol"/>
+  <symbol number="0070" entity="&#x0070;" char="&#x25b2;" font="Segoe UI Symbol"/>
+  <!--BLACK DOWN-POINTING TRIANGLE-->
+  <symbol number="F071" entity="&#xf071;" char="&#x25bc;" font="Segoe UI Symbol"/>
+  <symbol number="0071" entity="&#x0071;" char="&#x25bc;" font="Segoe UI Symbol"/>
+  <!--WHITE UP-POINTING TRIANGLE-->
+  <symbol number="F072" entity="&#xf072;" char="&#x25b3;" font="Segoe UI Symbol"/>
+  <symbol number="0072" entity="&#x0072;" char="&#x25b3;" font="Segoe UI Symbol"/>
+  <!--WHITE DOWN-POINTING TRIANGLE-->
+  <symbol number="F073" entity="&#xf073;" char="&#x25bd;" font="Segoe UI Symbol"/>
+  <symbol number="0073" entity="&#x0073;" char="&#x25bd;" font="Segoe UI Symbol"/>
+  <!--BLACK LEFT-POINTING POINTER-->
+  <symbol number="F074" entity="&#xf074;" char="&#x25c4;" font="Segoe UI Symbol"/>
+  <symbol number="0074" entity="&#x0074;" char="&#x25c4;" font="Segoe UI Symbol"/>
+  <!--BLACK RIGHT-POINTING POINTER-->
+  <symbol number="F075" entity="&#xf075;" char="&#x25ba;" font="Segoe UI Symbol"/>
+  <symbol number="0075" entity="&#x0075;" char="&#x25ba;" font="Segoe UI Symbol"/>
+  <!--WHITE LEFT-POINTING TRIANGLE-->
+  <symbol number="F076" entity="&#xf076;" char="&#x25c1;" font="Segoe UI Symbol"/>
+  <symbol number="0076" entity="&#x0076;" char="&#x25c1;" font="Segoe UI Symbol"/>
+  <!--WHITE RIGHT-POINTING TRIANGLE-->
+  <symbol number="F077" entity="&#xf077;" char="&#x25b7;" font="Segoe UI Symbol"/>
+  <symbol number="0077" entity="&#x0077;" char="&#x25b7;" font="Segoe UI Symbol"/>
+  <!--BLACK LOWER LEFT TRIANGLE-->
+  <symbol number="F078" entity="&#xf078;" char="&#x25e3;" font="Segoe UI Symbol"/>
+  <symbol number="0078" entity="&#x0078;" char="&#x25e3;" font="Segoe UI Symbol"/>
+  <!--BLACK LOWER RIGHT TRIANGLE-->
+  <symbol number="F079" entity="&#xf079;" char="&#x25e2;" font="Segoe UI Symbol"/>
+  <symbol number="0079" entity="&#x0079;" char="&#x25e2;" font="Segoe UI Symbol"/>
+  <!--BLACK UPPER LEFT TRIANGLE-->
+  <symbol number="F07A" entity="&#xf07a;" char="&#x25e4;" font="Segoe UI Symbol"/>
+  <symbol number="007A" entity="&#x007a;" char="&#x25e4;" font="Segoe UI Symbol"/>
+  <!--BLACK UPPER RIGHT TRIANGLE-->
+  <symbol number="F07B" entity="&#xf07b;" char="&#x25e5;" font="Segoe UI Symbol"/>
+  <symbol number="007B" entity="&#x007b;" char="&#x25e5;" font="Segoe UI Symbol"/>
+  <!--BLACK LEFT-POINTING ISOSCELES RIGHT TRIANGLE-->
+  <symbol number="F07C" entity="&#xf07c;" char="&#x1f780;" font="Segoe UI Symbol"/>
+  <symbol number="007C" entity="&#x007c;" char="&#x1f780;" font="Segoe UI Symbol"/>
+  <!--BLACK RIGHT-POINTING ISOSCELES RIGHT TRIANGLE-->
+  <symbol number="F07D" entity="&#xf07d;" char="&#x1f782;" font="Segoe UI Symbol"/>
+  <symbol number="007D" entity="&#x007d;" char="&#x1f782;" font="Segoe UI Symbol"/>
+  <!--BLACK UP-POINTING ISOSCELES RIGHT TRIANGLE-->
+  <symbol number="F07E" entity="&#xf07e;" char="&#x1f781;" font="Segoe UI Symbol"/>
+  <symbol number="007E" entity="&#x007e;" char="&#x1f781;" font="Segoe UI Symbol"/>
+  <!--BLACK DOWN-POINTING ISOSCELES RIGHT TRIANGLE-->
+  <symbol number="F080" entity="&#xf080;" char="&#x1f783;" font="Segoe UI Symbol"/>
+  <symbol number="0080" entity="&#x0080;" char="&#x1f783;" font="Segoe UI Symbol"/>
+  <!--BLACK UP-POINTING TRIANGLE-->
+  <symbol number="F081" entity="&#xf081;" char="&#x25b2;" font="Segoe UI Symbol"/>
+  <symbol number="0081" entity="&#x0081;" char="&#x25b2;" font="Segoe UI Symbol"/>
+  <!--BLACK DOWN-POINTING SMALL TRIANGLE-->
+  <symbol number="F082" entity="&#xf082;" char="&#x25bc;" font="Segoe UI Symbol"/>
+  <symbol number="0082" entity="&#x0082;" char="&#x25bc;" font="Segoe UI Symbol"/>
+  <!--BLACK LEFT-POINTING TRIANGLE-->
+  <symbol number="F083" entity="&#xf083;" char="&#x25c0;" font="Segoe UI Symbol"/>
+  <symbol number="0083" entity="&#x0083;" char="&#x25c0;" font="Segoe UI Symbol"/>
+  <!--BLACK RIGHT-POINTING TRIANGLE-->
+  <symbol number="F084" entity="&#xf084;" char="&#x25b6;" font="Segoe UI Symbol"/>
+  <symbol number="0084" entity="&#x0084;" char="&#x25b6;" font="Segoe UI Symbol"/>
+  <!--BLACK LEFTWARDS EQUILATERAL ARROWHEAD-->
+  <symbol number="F085" entity="&#xf085;" char="&#x2b9c;" font="Segoe UI Symbol"/>
+  <symbol number="0085" entity="&#x0085;" char="&#x2b9c;" font="Segoe UI Symbol"/>
+  <!--BLACK RIGHTWARDS EQUILATERAL ARROWHEAD-->
+  <symbol number="F086" entity="&#xf086;" char="&#x2b9e;" font="Segoe UI Symbol"/>
+  <symbol number="0086" entity="&#x0086;" char="&#x2b9e;" font="Segoe UI Symbol"/>
+  <!--BLACK UPWARDS EQUILATERAL ARROWHEAD-->
+  <symbol number="F087" entity="&#xf087;" char="&#x2b9d;" font="Segoe UI Symbol"/>
+  <symbol number="0087" entity="&#x0087;" char="&#x2b9d;" font="Segoe UI Symbol"/>
+  <!--BLACK DOWNWARDS EQUILATERAL ARROWHEAD-->
+  <symbol number="F088" entity="&#xf088;" char="&#x2b9f;" font="Segoe UI Symbol"/>
+  <symbol number="0088" entity="&#x0088;" char="&#x2b9f;" font="Segoe UI Symbol"/>
+  <!--LEFTWARDS ARROW WITH SMALL EQUILATERAL ARROWHEAD-->
+  <symbol number="F089" entity="&#xf089;" char="&#x1f810;" font="Segoe UI Symbol"/>
+  <symbol number="0089" entity="&#x0089;" char="&#x1f810;" font="Segoe UI Symbol"/>
+  <!--RIGHTWARDS ARROW WITH SMALL EQUILATERAL ARROWHEAD-->
+  <symbol number="F08A" entity="&#xf08a;" char="&#x1f812;" font="Segoe UI Symbol"/>
+  <symbol number="008A" entity="&#x008a;" char="&#x1f812;" font="Segoe UI Symbol"/>
+  <!--UPWARDS ARROW WITH SMALL EQUILATERAL ARROWHEAD-->
+  <symbol number="F08B" entity="&#xf08b;" char="&#x1f811;" font="Segoe UI Symbol"/>
+  <symbol number="008B" entity="&#x008b;" char="&#x1f811;" font="Segoe UI Symbol"/>
+  <!--DOWNWARDS ARROW WITH SMALL EQUILATERAL ARROWHEAD-->
+  <symbol number="F08C" entity="&#xf08c;" char="&#x1f813;" font="Segoe UI Symbol"/>
+  <symbol number="008C" entity="&#x008c;" char="&#x1f813;" font="Segoe UI Symbol"/>
+  <!--LEFTWARDS ARROW WITH EQUILATERAL ARROWHEAD-->
+  <symbol number="F08D" entity="&#xf08d;" char="&#x1f814;" font="Segoe UI Symbol"/>
+  <symbol number="008D" entity="&#x008d;" char="&#x1f814;" font="Segoe UI Symbol"/>
+  <!--RIGHTWARDS ARROW WITH EQUILATERAL ARROWHEAD-->
+  <symbol number="F08E" entity="&#xf08e;" char="&#x1f816;" font="Segoe UI Symbol"/>
+  <symbol number="008E" entity="&#x008e;" char="&#x1f816;" font="Segoe UI Symbol"/>
+  <!--UPWARDS ARROW WITH EQUILATERAL ARROWHEAD-->
+  <symbol number="F08F" entity="&#xf08f;" char="&#x1f815;" font="Segoe UI Symbol"/>
+  <symbol number="008F" entity="&#x008f;" char="&#x1f815;" font="Segoe UI Symbol"/>
+  <!--DOWNWARDS ARROW WITH EQUILATERAL ARROWHEAD-->
+  <symbol number="F090" entity="&#xf090;" char="&#x1f817;" font="Segoe UI Symbol"/>
+  <symbol number="0090" entity="&#x0090;" char="&#x1f817;" font="Segoe UI Symbol"/>
+  <!--HEAVY LEFTWARDS ARROW WITH EQUILATERAL ARROWHEAD-->
+  <symbol number="F091" entity="&#xf091;" char="&#x1f818;" font="Segoe UI Symbol"/>
+  <symbol number="0091" entity="&#x0091;" char="&#x1f818;" font="Segoe UI Symbol"/>
+  <!--HEAVY RIGHTWARDS ARROW WITH EQUILATERAL ARROWHEAD-->
+  <symbol number="F092" entity="&#xf092;" char="&#x1f81a;" font="Segoe UI Symbol"/>
+  <symbol number="0092" entity="&#x0092;" char="&#x1f81a;" font="Segoe UI Symbol"/>
+  <!--HEAVY UPWARDS ARROW WITH EQUILATERAL ARROWHEAD-->
+  <symbol number="F093" entity="&#xf093;" char="&#x1f819;" font="Segoe UI Symbol"/>
+  <symbol number="0093" entity="&#x0093;" char="&#x1f819;" font="Segoe UI Symbol"/>
+  <!--HEAVY DOWNWARDS ARROW WITH EQUILATERAL ARROWHEAD-->
+  <symbol number="F094" entity="&#xf094;" char="&#x1f81b;" font="Segoe UI Symbol"/>
+  <symbol number="0094" entity="&#x0094;" char="&#x1f81b;" font="Segoe UI Symbol"/>
+  <!--HEAVY LEFTWARDS ARROW WITH LARGE EQUILATERAL ARROWHEAD-->
+  <symbol number="F095" entity="&#xf095;" char="&#x1f81c;" font="Segoe UI Symbol"/>
+  <symbol number="0095" entity="&#x0095;" char="&#x1f81c;" font="Segoe UI Symbol"/>
+  <!--HEAVY RIGHTWARDS ARROW WITH LARGE EQUILATERAL ARROWHEAD-->
+  <symbol number="F096" entity="&#xf096;" char="&#x1f81e;" font="Segoe UI Symbol"/>
+  <symbol number="0096" entity="&#x0096;" char="&#x1f81e;" font="Segoe UI Symbol"/>
+  <!--HEAVY UPWARDS ARROW WITH LARGE EQUILATERAL ARROWHEAD-->
+  <symbol number="F097" entity="&#xf097;" char="&#x1f81d;" font="Segoe UI Symbol"/>
+  <symbol number="0097" entity="&#x0097;" char="&#x1f81d;" font="Segoe UI Symbol"/>
+  <!--HEAVY DOWNWARDS ARROW WITH LARGE EQUILATERAL ARROWHEAD-->
+  <symbol number="F098" entity="&#xf098;" char="&#x1f81f;" font="Segoe UI Symbol"/>
+  <symbol number="0098" entity="&#x0098;" char="&#x1f81f;" font="Segoe UI Symbol"/>
+  <!--LEFTWARDS ARROW WITH SMALL TRIANGLE ARROWHEAD-->
+  <symbol number="F099" entity="&#xf099;" char="&#x1f800;" font="Segoe UI Symbol"/>
+  <symbol number="0099" entity="&#x0099;" char="&#x1f800;" font="Segoe UI Symbol"/>
+  <!--RIGHTWARDS ARROW WITH SMALL TRIANGLE ARROWHEAD-->
+  <symbol number="F09A" entity="&#xf09a;" char="&#x1f802;" font="Segoe UI Symbol"/>
+  <symbol number="009A" entity="&#x009a;" char="&#x1f802;" font="Segoe UI Symbol"/>
+  <!--UPWARDS ARROW WITH SMALL TRIANGLE ARROWHEAD-->
+  <symbol number="F09B" entity="&#xf09b;" char="&#x1f801;" font="Segoe UI Symbol"/>
+  <symbol number="009B" entity="&#x009b;" char="&#x1f801;" font="Segoe UI Symbol"/>
+  <!--DOWNWARDS ARROW WITH SMALL TRIANGLE ARROWHEAD-->
+  <symbol number="F09C" entity="&#xf09c;" char="&#x1f803;" font="Segoe UI Symbol"/>
+  <symbol number="009C" entity="&#x009c;" char="&#x1f803;" font="Segoe UI Symbol"/>
+  <!--LEFTWARDS ARROW WITH MEDIUM TRIANGLE ARROWHEAD-->
+  <symbol number="F09D" entity="&#xf09d;" char="&#x1f804;" font="Segoe UI Symbol"/>
+  <symbol number="009D" entity="&#x009d;" char="&#x1f804;" font="Segoe UI Symbol"/>
+  <!--RIGHTWARDS ARROW WITH MEDIUM TRIANGLE ARROWHEAD-->
+  <symbol number="F09E" entity="&#xf09e;" char="&#x1f806;" font="Segoe UI Symbol"/>
+  <symbol number="009E" entity="&#x009e;" char="&#x1f806;" font="Segoe UI Symbol"/>
+  <!--UPWARDS ARROW WITH MEDIUM TRIANGLE ARROWHEAD-->
+  <symbol number="F09F" entity="&#xf09f;" char="&#x1f805;" font="Segoe UI Symbol"/>
+  <symbol number="009F" entity="&#x009f;" char="&#x1f805;" font="Segoe UI Symbol"/>
+  <!--DOWNWARDS ARROW WITH MEDIUM TRIANGLE ARROWHEAD-->
+  <symbol number="F0A0" entity="&#xf0a0;" char="&#x1f807;" font="Segoe UI Symbol"/>
+  <symbol number="00A0" entity="&#x00a0;" char="&#x1f807;" font="Segoe UI Symbol"/>
+  <!--LEFTWARDS ARROW WITH LARGE TRIANGLE ARROWHEAD-->
+  <symbol number="F0A1" entity="&#xf0a1;" char="&#x1f808;" font="Segoe UI Symbol"/>
+  <symbol number="00A1" entity="&#x00a1;" char="&#x1f808;" font="Segoe UI Symbol"/>
+  <!--RIGHTWARDS ARROW WITH LARGE TRIANGLE ARROWHEAD-->
+  <symbol number="F0A2" entity="&#xf0a2;" char="&#x1f80a;" font="Segoe UI Symbol"/>
+  <symbol number="00A2" entity="&#x00a2;" char="&#x1f80a;" font="Segoe UI Symbol"/>
+  <!--UPWARDS ARROW WITH LARGE TRIANGLE ARROWHEAD-->
+  <symbol number="F0A3" entity="&#xf0a3;" char="&#x1f809;" font="Segoe UI Symbol"/>
+  <symbol number="00A3" entity="&#x00a3;" char="&#x1f809;" font="Segoe UI Symbol"/>
+  <!--DOWNWARDS ARROW WITH LARGE TRIANGLE ARROWHEAD-->
+  <symbol number="F0A4" entity="&#xf0a4;" char="&#x1f80b;" font="Segoe UI Symbol"/>
+  <symbol number="00A4" entity="&#x00a4;" char="&#x1f80b;" font="Segoe UI Symbol"/>
+  <!--LEFTWARDS TRIANGLE-HEADED ARROW WITH NARROW SHAFT-->
+  <symbol number="F0A5" entity="&#xf0a5;" char="&#x1f820;" font="Segoe UI Symbol"/>
+  <symbol number="00A5" entity="&#x00a5;" char="&#x1f820;" font="Segoe UI Symbol"/>
+  <!--RIGHTWARDS TRIANGLE-HEADED ARROW WITH NARROW SHAFT-->
+  <symbol number="F0A6" entity="&#xf0a6;" char="&#x1f822;" font="Segoe UI Symbol"/>
+  <symbol number="00A6" entity="&#x00a6;" char="&#x1f822;" font="Segoe UI Symbol"/>
+  <!--LEFTWARDS TRIANGLE-HEADED ARROW WITH MEDIUM SHAFT-->
+  <symbol number="F0A7" entity="&#xf0a7;" char="&#x1f824;" font="Segoe UI Symbol"/>
+  <symbol number="00A7" entity="&#x00a7;" char="&#x1f824;" font="Segoe UI Symbol"/>
+  <!--RIGHTWARDS TRIANGLE-HEADED ARROW WITH MEDIUM SHAFT-->
+  <symbol number="F0A8" entity="&#xf0a8;" char="&#x1f826;" font="Segoe UI Symbol"/>
+  <symbol number="00A8" entity="&#x00a8;" char="&#x1f826;" font="Segoe UI Symbol"/>
+  <!--LEFTWARDS TRIANGLE-HEADED ARROW WITH BOLD SHAFT-->
+  <symbol number="F0A9" entity="&#xf0a9;" char="&#x1f828;" font="Segoe UI Symbol"/>
+  <symbol number="00A9" entity="&#x00a9;" char="&#x1f828;" font="Segoe UI Symbol"/>
+  <!--RIGHTWARDS TRIANGLE-HEADED ARROW WITH BOLD SHAFT-->
+  <symbol number="F0AA" entity="&#xf0aa;" char="&#x1f82a;" font="Segoe UI Symbol"/>
+  <symbol number="00AA" entity="&#x00aa;" char="&#x1f82a;" font="Segoe UI Symbol"/>
+  <!--LEFTWARDS TRIANGLE-HEADED ARROW WITH HEAVY SHAFT-->
+  <symbol number="F0AB" entity="&#xf0ab;" char="&#x1f82c;" font="Segoe UI Symbol"/>
+  <symbol number="00AB" entity="&#x00ab;" char="&#x1f82c;" font="Segoe UI Symbol"/>
+  <!--HEAVY ARROW SHAFT WIDTH ONE-->
+  <symbol number="F0AC" entity="&#xf0ac;" char="&#x1f89c;" font="Segoe UI Symbol"/>
+  <symbol number="00AC" entity="&#x00ac;" char="&#x1f89c;" font="Segoe UI Symbol"/>
+  <!--HEAVY ARROW SHAFT WIDTH TWO THIRDS-->
+  <symbol number="F0AD" entity="&#xf0ad;" char="&#x1f89d;" font="Segoe UI Symbol"/>
+  <symbol number="00AD" entity="&#x00ad;" char="&#x1f89d;" font="Segoe UI Symbol"/>
+  <!--HEAVY ARROW SHAFT WIDTH ONE HALF-->
+  <symbol number="F0AE" entity="&#xf0ae;" char="&#x1f89e;" font="Segoe UI Symbol"/>
+  <symbol number="00AE" entity="&#x00ae;" char="&#x1f89e;" font="Segoe UI Symbol"/>
+  <!--HEAVY ARROW SHAFT WIDTH ONE THIRD-->
+  <symbol number="F0AF" entity="&#xf0af;" char="&#x1f89f;" font="Segoe UI Symbol"/>
+  <symbol number="00AF" entity="&#x00af;" char="&#x1f89f;" font="Segoe UI Symbol"/>
+  <!--RIGHTWARDS TRIANGLE-HEADED ARROW WITH HEAVY SHAFT-->
+  <symbol number="F0B0" entity="&#xf0b0;" char="&#x1f82e;" font="Segoe UI Symbol"/>
+  <symbol number="00B0" entity="&#x00b0;" char="&#x1f82e;" font="Segoe UI Symbol"/>
+  <!--LEFTWARDS TRIANGLE-HEADED ARROW WITH VERY HEAVY SHAFT-->
+  <symbol number="F0B1" entity="&#xf0b1;" char="&#x1f830;" font="Segoe UI Symbol"/>
+  <symbol number="00B1" entity="&#x00b1;" char="&#x1f830;" font="Segoe UI Symbol"/>
+  <!--RIGHTWARDS TRIANGLE-HEADED ARROW WITH VERY HEAVY SHAFT-->
+  <symbol number="F0B2" entity="&#xf0b2;" char="&#x1f832;" font="Segoe UI Symbol"/>
+  <symbol number="00B2" entity="&#x00b2;" char="&#x1f832;" font="Segoe UI Symbol"/>
+  <!--LEFTWARDS FINGER-POST ARROW-->
+  <symbol number="F0B3" entity="&#xf0b3;" char="&#x1f834;" font="Segoe UI Symbol"/>
+  <symbol number="00B3" entity="&#x00b3;" char="&#x1f834;" font="Segoe UI Symbol"/>
+  <!--RIGHTWARDS FINGER-POST ARROW-->
+  <symbol number="F0B4" entity="&#xf0b4;" char="&#x1f836;" font="Segoe UI Symbol"/>
+  <symbol number="00B4" entity="&#x00b4;" char="&#x1f836;" font="Segoe UI Symbol"/>
+  <!--LEFTWARDS SQUARED ARROW-->
+  <symbol number="F0B5" entity="&#xf0b5;" char="&#x1f838;" font="Segoe UI Symbol"/>
+  <symbol number="00B5" entity="&#x00b5;" char="&#x1f838;" font="Segoe UI Symbol"/>
+  <!--RIGHTWARDS SQUARED ARROW-->
+  <symbol number="F0B6" entity="&#xf0b6;" char="&#x1f83a;" font="Segoe UI Symbol"/>
+  <symbol number="00B6" entity="&#x00b6;" char="&#x1f83a;" font="Segoe UI Symbol"/>
+  <!--UPWARDS SQUARED ARROW-->
+  <symbol number="F0B7" entity="&#xf0b7;" char="&#x1f839;" font="Segoe UI Symbol"/>
+  <symbol number="00B7" entity="&#x00b7;" char="&#x1f839;" font="Segoe UI Symbol"/>
+  <!--DOWNWARDS SQUARED ARROW-->
+  <symbol number="F0B8" entity="&#xf0b8;" char="&#x1f83b;" font="Segoe UI Symbol"/>
+  <symbol number="00B8" entity="&#x00b8;" char="&#x1f83b;" font="Segoe UI Symbol"/>
+  <!--LEFTWARDS ARROW WITH NOTCHED TAIL-->
+  <symbol number="F0B9" entity="&#xf0b9;" char="&#x1f898;" font="Segoe UI Symbol"/>
+  <symbol number="00B9" entity="&#x00b9;" char="&#x1f898;" font="Segoe UI Symbol"/>
+  <!--RIGHTWARDS ARROW WITH NOTCHED TAIL-->
+  <symbol number="F0BA" entity="&#xf0ba;" char="&#x1f89a;" font="Segoe UI Symbol"/>
+  <symbol number="00BA" entity="&#x00ba;" char="&#x1f89a;" font="Segoe UI Symbol"/>
+  <!--UPWARDS ARROW WITH NOTCHED TAIL-->
+  <symbol number="F0BB" entity="&#xf0bb;" char="&#x1f899;" font="Segoe UI Symbol"/>
+  <symbol number="00BB" entity="&#x00bb;" char="&#x1f899;" font="Segoe UI Symbol"/>
+  <!--DOWNWARDS ARROW WITH NOTCHED TAIL-->
+  <symbol number="F0BC" entity="&#xf0bc;" char="&#x1f89b;" font="Segoe UI Symbol"/>
+  <symbol number="00BC" entity="&#x00bc;" char="&#x1f89b;" font="Segoe UI Symbol"/>
+  <!--LEFTWARDS COMPRESSED ARROW-->
+  <symbol number="F0BD" entity="&#xf0bd;" char="&#x1f83c;" font="Segoe UI Symbol"/>
+  <symbol number="00BD" entity="&#x00bd;" char="&#x1f83c;" font="Segoe UI Symbol"/>
+  <!--RIGHTWARDS COMPRESSED ARROW-->
+  <symbol number="F0BE" entity="&#xf0be;" char="&#x1f83e;" font="Segoe UI Symbol"/>
+  <symbol number="00BE" entity="&#x00be;" char="&#x1f83e;" font="Segoe UI Symbol"/>
+  <!--UPWARDS COMPRESSED ARROW-->
+  <symbol number="F0BF" entity="&#xf0bf;" char="&#x1f83d;" font="Segoe UI Symbol"/>
+  <symbol number="00BF" entity="&#x00bf;" char="&#x1f83d;" font="Segoe UI Symbol"/>
+  <!--DOWNWARDS COMPRESSED ARROW-->
+  <symbol number="F0C0" entity="&#xf0c0;" char="&#x1f83f;" font="Segoe UI Symbol"/>
+  <symbol number="00C0" entity="&#x00c0;" char="&#x1f83f;" font="Segoe UI Symbol"/>
+  <!--LEFTWARDS HEAVY COMPRESSED ARROW-->
+  <symbol number="F0C1" entity="&#xf0c1;" char="&#x1f840;" font="Segoe UI Symbol"/>
+  <symbol number="00C1" entity="&#x00c1;" char="&#x1f840;" font="Segoe UI Symbol"/>
+  <!--RIGHTWARDS HEAVY COMPRESSED ARROW-->
+  <symbol number="F0C2" entity="&#xf0c2;" char="&#x1f842;" font="Segoe UI Symbol"/>
+  <symbol number="00C2" entity="&#x00c2;" char="&#x1f842;" font="Segoe UI Symbol"/>
+  <!--UPWARDS HEAVY COMPRESSED ARROW-->
+  <symbol number="F0C3" entity="&#xf0c3;" char="&#x1f841;" font="Segoe UI Symbol"/>
+  <symbol number="00C3" entity="&#x00c3;" char="&#x1f841;" font="Segoe UI Symbol"/>
+  <!--DOWNWARDS HEAVY COMPRESSED ARROW-->
+  <symbol number="F0C4" entity="&#xf0c4;" char="&#x1f843;" font="Segoe UI Symbol"/>
+  <symbol number="00C4" entity="&#x00c4;" char="&#x1f843;" font="Segoe UI Symbol"/>
+  <!--LEFTWARDS HEAVY ARROW-->
+  <symbol number="F0C5" entity="&#xf0c5;" char="&#x1f844;" font="Segoe UI Symbol"/>
+  <symbol number="00C5" entity="&#x00c5;" char="&#x1f844;" font="Segoe UI Symbol"/>
+  <!--RIGHTWARDS HEAVY ARROW-->
+  <symbol number="F0C6" entity="&#xf0c6;" char="&#x1f846;" font="Segoe UI Symbol"/>
+  <symbol number="00C6" entity="&#x00c6;" char="&#x1f846;" font="Segoe UI Symbol"/>
+  <!--UPWARDS HEAVY ARROW-->
+  <symbol number="F0C7" entity="&#xf0c7;" char="&#x1f845;" font="Segoe UI Symbol"/>
+  <symbol number="00C7" entity="&#x00c7;" char="&#x1f845;" font="Segoe UI Symbol"/>
+  <!--DOWNWARDS HEAVY ARROW-->
+  <symbol number="F0C8" entity="&#xf0c8;" char="&#x1f847;" font="Segoe UI Symbol"/>
+  <symbol number="00C8" entity="&#x00c8;" char="&#x1f847;" font="Segoe UI Symbol"/>
+  <!--BLACK CURVED DOWNWARDS AND LEFTWARDS ARROW-->
+  <symbol number="F0C9" entity="&#xf0c9;" char="&#x2ba8;" font="Segoe UI Symbol"/>
+  <symbol number="00C9" entity="&#x00c9;" char="&#x2ba8;" font="Segoe UI Symbol"/>
+  <!--BLACK CURVED DOWNWARDS AND RIGHTWARDS ARROW-->
+  <symbol number="F0CA" entity="&#xf0ca;" char="&#x2ba9;" font="Segoe UI Symbol"/>
+  <symbol number="00CA" entity="&#x00ca;" char="&#x2ba9;" font="Segoe UI Symbol"/>
+  <!--BLACK CURVED UPWARDS AND LEFTWARDS ARROW-->
+  <symbol number="F0CB" entity="&#xf0cb;" char="&#x2baa;" font="Segoe UI Symbol"/>
+  <symbol number="00CB" entity="&#x00cb;" char="&#x2baa;" font="Segoe UI Symbol"/>
+  <!--BLACK CURVED UPWARDS AND RIGHTWARDS ARROW-->
+  <symbol number="F0CC" entity="&#xf0cc;" char="&#x2bab;" font="Segoe UI Symbol"/>
+  <symbol number="00CC" entity="&#x00cc;" char="&#x2bab;" font="Segoe UI Symbol"/>
+  <!--BLACK CURVED LEFTWARDS AND UPWARDS ARROW-->
+  <symbol number="F0CD" entity="&#xf0cd;" char="&#x2bac;" font="Segoe UI Symbol"/>
+  <symbol number="00CD" entity="&#x00cd;" char="&#x2bac;" font="Segoe UI Symbol"/>
+  <!--BLACK CURVED RIGHTWARDS AND UPWARDS ARROW-->
+  <symbol number="F0CE" entity="&#xf0ce;" char="&#x2bad;" font="Segoe UI Symbol"/>
+  <symbol number="00CE" entity="&#x00ce;" char="&#x2bad;" font="Segoe UI Symbol"/>
+  <!--BLACK CURVED LEFTWARDS AND DOWNWARDS ARROW-->
+  <symbol number="F0CF" entity="&#xf0cf;" char="&#x2bae;" font="Segoe UI Symbol"/>
+  <symbol number="00CF" entity="&#x00cf;" char="&#x2bae;" font="Segoe UI Symbol"/>
+  <!--BLACK CURVED RIGHTWARDS AND DOWNWARDS ARROW-->
+  <symbol number="F0D0" entity="&#xf0d0;" char="&#x2baf;" font="Segoe UI Symbol"/>
+  <symbol number="00D0" entity="&#x00d0;" char="&#x2baf;" font="Segoe UI Symbol"/>
+  <!--WIDE-HEADED LEFTWARDS LIGHT BARB ARROW-->
+  <symbol number="F0D1" entity="&#xf0d1;" char="&#x1f860;" font="Segoe UI Symbol"/>
+  <symbol number="00D1" entity="&#x00d1;" char="&#x1f860;" font="Segoe UI Symbol"/>
+  <!--WIDE-HEADED RIGHTWARDS LIGHT BARB ARROW-->
+  <symbol number="F0D2" entity="&#xf0d2;" char="&#x1f862;" font="Segoe UI Symbol"/>
+  <symbol number="00D2" entity="&#x00d2;" char="&#x1f862;" font="Segoe UI Symbol"/>
+  <!--WIDE-HEADED UPWARDS LIGHT BARB ARROW-->
+  <symbol number="F0D3" entity="&#xf0d3;" char="&#x1f861;" font="Segoe UI Symbol"/>
+  <symbol number="00D3" entity="&#x00d3;" char="&#x1f861;" font="Segoe UI Symbol"/>
+  <!--WIDE-HEADED DOWNWARDS LIGHT BARB ARROW-->
+  <symbol number="F0D4" entity="&#xf0d4;" char="&#x1f863;" font="Segoe UI Symbol"/>
+  <symbol number="00D4" entity="&#x00d4;" char="&#x1f863;" font="Segoe UI Symbol"/>
+  <!--WIDE-HEADED NORTH WEST LIGHT BARB ARROW-->
+  <symbol number="F0D5" entity="&#xf0d5;" char="&#x1f864;" font="Segoe UI Symbol"/>
+  <symbol number="00D5" entity="&#x00d5;" char="&#x1f864;" font="Segoe UI Symbol"/>
+  <!--WIDE-HEADED NORTH EAST LIGHT BARB ARROW-->
+  <symbol number="F0D6" entity="&#xf0d6;" char="&#x1f865;" font="Segoe UI Symbol"/>
+  <symbol number="00D6" entity="&#x00d6;" char="&#x1f865;" font="Segoe UI Symbol"/>
+  <!--WIDE-HEADED SOUTH WEST LIGHT BARB ARROW-->
+  <symbol number="F0D7" entity="&#xf0d7;" char="&#x1f867;" font="Segoe UI Symbol"/>
+  <symbol number="00D7" entity="&#x00d7;" char="&#x1f867;" font="Segoe UI Symbol"/>
+  <!--WIDE-HEADED SOUTH EAST LIGHT BARB ARROW-->
+  <symbol number="F0D8" entity="&#xf0d8;" char="&#x1f866;" font="Segoe UI Symbol"/>
+  <symbol number="00D8" entity="&#x00d8;" char="&#x1f866;" font="Segoe UI Symbol"/>
+  <!--WIDE-HEADED LEFTWARDS MEDIUM BARB ARROW-->
+  <symbol number="F0D9" entity="&#xf0d9;" char="&#x1f870;" font="Segoe UI Symbol"/>
+  <symbol number="00D9" entity="&#x00d9;" char="&#x1f870;" font="Segoe UI Symbol"/>
+  <!--WIDE-HEADED RIGHTWARDS MEDIUM BARB ARROW-->
+  <symbol number="F0DA" entity="&#xf0da;" char="&#x1f872;" font="Segoe UI Symbol"/>
+  <symbol number="00DA" entity="&#x00da;" char="&#x1f872;" font="Segoe UI Symbol"/>
+  <!--WIDE-HEADED UPWARDS MEDIUM BARB ARROW-->
+  <symbol number="F0DB" entity="&#xf0db;" char="&#x1f871;" font="Segoe UI Symbol"/>
+  <symbol number="00DB" entity="&#x00db;" char="&#x1f871;" font="Segoe UI Symbol"/>
+  <!--WIDE-HEADED DOWNWARDS MEDIUM BARB ARROW-->
+  <symbol number="F0DC" entity="&#xf0dc;" char="&#x1f873;" font="Segoe UI Symbol"/>
+  <symbol number="00DC" entity="&#x00dc;" char="&#x1f873;" font="Segoe UI Symbol"/>
+  <!--WIDE-HEADED NORTH WEST MEDIUM BARB ARROW-->
+  <symbol number="F0DD" entity="&#xf0dd;" char="&#x1f874;" font="Segoe UI Symbol"/>
+  <symbol number="00DD" entity="&#x00dd;" char="&#x1f874;" font="Segoe UI Symbol"/>
+  <!--WIDE-HEADED NORTH EAST MEDIUM BARB ARROW-->
+  <symbol number="F0DE" entity="&#xf0de;" char="&#x1f875;" font="Segoe UI Symbol"/>
+  <symbol number="00DE" entity="&#x00de;" char="&#x1f875;" font="Segoe UI Symbol"/>
+  <!--WIDE-HEADED SOUTH WEST MEDIUM BARB ARROW-->
+  <symbol number="F0DF" entity="&#xf0df;" char="&#x1f877;" font="Segoe UI Symbol"/>
+  <symbol number="00DF" entity="&#x00df;" char="&#x1f877;" font="Segoe UI Symbol"/>
+  <!--WIDE-HEADED SOUTH EAST MEDIUM BARB ARROW-->
+  <symbol number="F0E0" entity="&#xf0e0;" char="&#x1f876;" font="Segoe UI Symbol"/>
+  <symbol number="00E0" entity="&#x00e0;" char="&#x1f876;" font="Segoe UI Symbol"/>
+  <!--WIDE-HEADED LEFTWARDS VERY HEAVY BARB ARROW-->
+  <symbol number="F0E1" entity="&#xf0e1;" char="&#x1f880;" font="Segoe UI Symbol"/>
+  <symbol number="00E1" entity="&#x00e1;" char="&#x1f880;" font="Segoe UI Symbol"/>
+  <!--WIDE-HEADED RIGHTWARDS VERY HEAVY BARB ARROW-->
+  <symbol number="F0E2" entity="&#xf0e2;" char="&#x1f882;" font="Segoe UI Symbol"/>
+  <symbol number="00E2" entity="&#x00e2;" char="&#x1f882;" font="Segoe UI Symbol"/>
+  <!--WIDE-HEADED UPWARDS VERY HEAVY BARB ARROW-->
+  <symbol number="F0E3" entity="&#xf0e3;" char="&#x1f881;" font="Segoe UI Symbol"/>
+  <symbol number="00E3" entity="&#x00e3;" char="&#x1f881;" font="Segoe UI Symbol"/>
+  <!--WIDE-HEADED DOWNWARDS VERY HEAVY BARB ARROW-->
+  <symbol number="F0E4" entity="&#xf0e4;" char="&#x1f883;" font="Segoe UI Symbol"/>
+  <symbol number="00E4" entity="&#x00e4;" char="&#x1f883;" font="Segoe UI Symbol"/>
+  <!--WIDE-HEADED NORTH WEST VERY HEAVY BARB ARROW-->
+  <symbol number="F0E5" entity="&#xf0e5;" char="&#x1f884;" font="Segoe UI Symbol"/>
+  <symbol number="00E5" entity="&#x00e5;" char="&#x1f884;" font="Segoe UI Symbol"/>
+  <!--WIDE-HEADED NORTH EAST VERY HEAVY BARB ARROW-->
+  <symbol number="F0E6" entity="&#xf0e6;" char="&#x1f885;" font="Segoe UI Symbol"/>
+  <symbol number="00E6" entity="&#x00e6;" char="&#x1f885;" font="Segoe UI Symbol"/>
+  <!--WIDE-HEADED SOUTH WEST VERY HEAVY BARB ARROW-->
+  <symbol number="F0E7" entity="&#xf0e7;" char="&#x1f887;" font="Segoe UI Symbol"/>
+  <symbol number="00E7" entity="&#x00e7;" char="&#x1f887;" font="Segoe UI Symbol"/>
+  <!--WIDE-HEADED SOUTH EAST VERY HEAVY BARB ARROW-->
+  <symbol number="F0E8" entity="&#xf0e8;" char="&#x1f886;" font="Segoe UI Symbol"/>
+  <symbol number="00E8" entity="&#x00e8;" char="&#x1f886;" font="Segoe UI Symbol"/>
+  <!--LEFTWARDS TRIANGLE ARROWHEAD-->
+  <symbol number="F0E9" entity="&#xf0e9;" char="&#x1f890;" font="Segoe UI Symbol"/>
+  <symbol number="00E9" entity="&#x00e9;" char="&#x1f890;" font="Segoe UI Symbol"/>
+  <!--RIGHTWARDS TRIANGLE ARROWHEAD-->
+  <symbol number="F0EA" entity="&#xf0ea;" char="&#x1f892;" font="Segoe UI Symbol"/>
+  <symbol number="00EA" entity="&#x00ea;" char="&#x1f892;" font="Segoe UI Symbol"/>
+  <!--UPWARDS TRIANGLE ARROWHEAD-->
+  <symbol number="F0EB" entity="&#xf0eb;" char="&#x1f891;" font="Segoe UI Symbol"/>
+  <symbol number="00EB" entity="&#x00eb;" char="&#x1f891;" font="Segoe UI Symbol"/>
+  <!--DOWNWARDS TRIANGLE ARROWHEAD-->
+  <symbol number="F0EC" entity="&#xf0ec;" char="&#x1f893;" font="Segoe UI Symbol"/>
+  <symbol number="00EC" entity="&#x00ec;" char="&#x1f893;" font="Segoe UI Symbol"/>
+  <!--LEFTWARDS WHITE ARROW WITHIN TRIANGLE ARROWHEAD-->
+  <symbol number="F0ED" entity="&#xf0ed;" char="&#x1f894;" font="Segoe UI Symbol"/>
+  <symbol number="00ED" entity="&#x00ed;" char="&#x1f894;" font="Segoe UI Symbol"/>
+  <!--RIGHTWARDS WHITE ARROW WITHIN TRIANGLE ARROWHEAD-->
+  <symbol number="F0EE" entity="&#xf0ee;" char="&#x1f896;" font="Segoe UI Symbol"/>
+  <symbol number="00EE" entity="&#x00ee;" char="&#x1f896;" font="Segoe UI Symbol"/>
+  <!--UPWARDS WHITE ARROW WITHIN TRIANGLE ARROWHEAD-->
+  <symbol number="F0EF" entity="&#xf0ef;" char="&#x1f895;" font="Segoe UI Symbol"/>
+  <symbol number="00EF" entity="&#x00ef;" char="&#x1f895;" font="Segoe UI Symbol"/>
+  <!--DOWNWARDS WHITE ARROW WITHIN TRIANGLE ARROWHEAD-->
+  <symbol number="F0F0" entity="&#xf0f0;" char="&#x1f897;" font="Segoe UI Symbol"/>
+  <symbol number="00F0" entity="&#x00f0;" char="&#x1f897;" font="Segoe UI Symbol"/>
+</symbols>

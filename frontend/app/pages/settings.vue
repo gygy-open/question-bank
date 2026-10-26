@@ -1,10 +1,10 @@
 <script setup lang="ts">
-import { ref, onMounted, watchEffect } from 'vue'
-import { useRouter } from 'vue-router'
+import { ref, computed, onMounted, watchEffect } from 'vue'
 import { toast } from 'vue-sonner'
-import { Settings, Cpu, MessageSquareText, UserPlus } from '@lucide/vue'
+import { Settings, Cpu, MessageSquareText, UserPlus, Sparkles } from '@lucide/vue'
 import PageHeader from '~/components/PageHeader.vue'
 import AiSettings from '~/components/AiSettings.vue'
+import MyAiSettings from '~/components/MyAiSettings.vue'
 import AiPromptsConfig from '~/components/AiPromptsConfig.vue'
 import {
   Card,
@@ -22,7 +22,6 @@ import { Label } from '@/components/ui/label'
 const { $api } = useNuxtApp()
 const { user } = useAuth()
 const { permissions, isAdmin, isManagerSomewhere } = usePermissions()
-const router = useRouter()
 
 // Navigation State
 const activeTab = ref('general')
@@ -30,12 +29,16 @@ const updateActiveTab = (tab: string) => {
   activeTab.value = tab
 }
 
+const canEditPrompts = computed(() => isAdmin.value || isManagerSomewhere.value)
+
+// 所有登录用户都能进入设置页管理自己的 AI 模型；系统级标签页仅管理员可见。
 watchEffect(() => {
   if (!user.value || !permissions.value) return
-  if (!isAdmin.value && !isManagerSomewhere.value) {
-    router.push('/')
-  } else if (!isAdmin.value) {
-    activeTab.value = 'prompts'
+  if (!isAdmin.value && ['general', 'ai', 'registration'].includes(activeTab.value)) {
+    activeTab.value = 'my-ai'
+  }
+  if (!canEditPrompts.value && activeTab.value === 'prompts') {
+    activeTab.value = 'my-ai'
   }
 })
 
@@ -130,7 +133,7 @@ onMounted(() => {
 </script>
 
 <template>
-  <PageHeader :title="isAdmin ? '系统设置' : '提示词配置'" />
+  <PageHeader :title="isAdmin ? '系统设置' : '设置'" />
   
   <div class="flex flex-col md:flex-row max-w-7xl mx-auto w-full items-stretch min-h-[calc(100vh-4rem)]">
     <!-- Left Sidebar Navigation -->
@@ -152,9 +155,18 @@ onMounted(() => {
           @click="updateActiveTab('ai')"
         >
           <Cpu class="w-4 h-4" />
-          AI 大脑核心
+          全局 AI 模型
         </Button>
         <Button
+          :variant="activeTab === 'my-ai' ? 'secondary' : 'ghost'" 
+          class="justify-start gap-2 whitespace-nowrap lg:w-full"
+          @click="updateActiveTab('my-ai')"
+        >
+          <Sparkles class="w-4 h-4" />
+          我的 AI 模型
+        </Button>
+        <Button
+          v-if="canEditPrompts"
           :variant="activeTab === 'prompts' ? 'secondary' : 'ghost'" 
           class="justify-start gap-2 whitespace-nowrap lg:w-full"
           @click="updateActiveTab('prompts')"
@@ -225,16 +237,25 @@ onMounted(() => {
       </div>
 
       <!-- AI Settings -->
-      <div v-show="activeTab === 'ai'">
+      <div v-if="isAdmin && activeTab === 'ai'">
         <div class="mb-6">
-          <h2 class="text-2xl font-bold tracking-tight">AI 大脑核心</h2>
-          <p class="text-sm text-muted-foreground">分配提供商、录入模型，并配置系统各场景下的主力计算引擎。</p>
+          <h2 class="text-2xl font-bold tracking-tight">全局 AI 模型</h2>
+          <p class="text-sm text-muted-foreground">接入 AI 服务商，并设置各项功能默认使用的模型。</p>
         </div>
         <AiSettings />
       </div>
 
+      <!-- My AI Settings -->
+      <div v-if="activeTab === 'my-ai'">
+        <div class="mb-6">
+          <h2 class="text-2xl font-bold tracking-tight">我的 AI 模型</h2>
+          <p class="text-sm text-muted-foreground">选择你自己使用的模型，或接入你自己的 AI 服务商账号。</p>
+        </div>
+        <MyAiSettings />
+      </div>
+
       <!-- AI Prompts -->
-      <div v-show="activeTab === 'prompts'">
+      <div v-if="canEditPrompts" v-show="activeTab === 'prompts'">
         <div class="mb-6">
           <h2 class="text-2xl font-bold tracking-tight">提示词配置</h2>
           <p class="text-sm text-muted-foreground">如果您了解大语言工作原理，可在此微调它处理指令的方式。</p>

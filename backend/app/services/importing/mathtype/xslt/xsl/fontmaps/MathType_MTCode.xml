@@ -1,0 +1,325 @@
+<?xml version="1.0" encoding="US-ASCII"?>
+<symbols>
+  <!--  *
+        * MathType MTCode encoding 
+        * 
+        * -->
+  <!--  *
+        * E900 - E9FF: Operators
+        * -->
+  <!--EQUALS WITH HAT BELOW-->
+  <!--<symbol number="E900" entity="&#xe900;" char=""/>--><!-- found no Unicode equivalent -->
+  <!--EQUALS WITH PLUS ABOVE-->
+  <symbol number="E901" entity="&#xe901;" char="&#x2a72;"/>
+  <!--EQUALS WITH PLUS BELOW-->
+  <symbol number="E902" entity="&#xe902;" char="&#x2a71;"/>
+  <!--TILDE WITH PLUS ABOVE-->
+  <symbol number="E903" entity="&#xe903;" char="&#x2a26;"/>
+  <!--TILDE WITH PLUS BELOW-->
+  <symbol number="E904" entity="&#xe904;" char="&#x2a24;"/>
+  <!--EQUAL (DOUBLE) OVER GREATER-THAN-->
+  <symbol number="E908" entity="&#xe908;" char="&#x2a9c;"/>
+  <!--EQUAL (DOUBLE) OVER LESS-THAN-->
+  <symbol number="E909" entity="&#xe909;" char="&#x2a9b;"/>
+  <!--CONTAINS OR EQUAL TO-->
+  <symbol number="E90A" entity="&#xe90a;" char="&#x22fe;"/>
+  <!--SUPERSET OF OR EQUAL TO-->
+  <symbol number="E90B" entity="&#xe90b;" char="&#x2287;"/>
+  <!--SUBSET OF OR EQUAL TO-->
+  <symbol number="E90C" entity="&#xe90c;" char="&#x2286;"/>
+  <!--EQUAL OVER LESS-THAN-->
+  <symbol number="E90D" entity="&#xe90d;" char="&#xa2a95;"/>
+  <!--ELEMENT OF OR EQUAL TO-->
+  <symbol number="E912" entity="&#xe912;" char="&#x22f7;"/>
+  <!--EQUAL TO OR GREATER-THAN-->
+  <symbol number="E913" entity="&#xe913;" char="&#x2a9a;"/>
+  <!--APPROXIMATE SUPERSET OF-->
+  <symbol number="E914" entity="&#xe914;" char="&#x2ac8;"/>
+  <!--APPROXIMATE SUBSET OF-->
+  <symbol number="E915" entity="&#xe915;" char="&#x2ac7;"/>
+  <!--SUPERSET OF WITH DOT; INCLUDES AS SUB-RELATION-->
+  <symbol number="E916" entity="&#xe916;" char="&#x2abe;"/>
+  <!--SUBSET OF WITH DOT; IS INCLUDED IN AS SUB-RELATION-->
+  <symbol number="E917" entity="&#xe917;" char="&#x2abd;"/>
+  <!--EQUAL WITH DOT BELOW-->
+  <symbol number="E918" entity="&#xe918;" char="&#x2a66;"/>
+  <!--LEFT DOT OVER MINUS OVER RIGHT DOT-->
+  <symbol number="E919" entity="&#xe919;" char="&#x2a2b;"/>
+  <!--RIGHT DOT OVER MINUS OVER LEFT DOT-->
+  <symbol number="E91A" entity="&#xe91a;" char="&#x2a2c;"/>
+  <!--ALMOST EQUAL TO MINUS-->
+  <symbol number="E91F" entity="&#xe91f;" char="&#x2a6c;"/>
+  <!--DOUBLE SQUARE CUP-->
+  <symbol number="E920" entity="&#xe920;" char="&#x2a4f;"/>
+  <!--DOUBLE SQUARE CAP-->
+  <symbol number="E921" entity="&#xe921;" char="&#x2a4e;"/>
+  <!--LESS-THAN EQUAL TO OR GREATER-THAN-->
+  <symbol number="E922" entity="&#xe922;" char="&#x22da;"/>
+  <!--TILDE WITH DOT-->
+  <symbol number="E924" entity="&#xe924;" char="&#x2A6A;"/>
+  <!--TILDE WITH TWO DOTS-->
+  <symbol number="E925" entity="&#xe925;" char="&#x2A6B;"/>
+  <!--LESS-THAN GREATER-THAN OR EQUAL TO-->
+  <symbol number="E926" entity="&#xe926;" char="&#x2A8B;"/>
+  <!--GREATER-THAN LESS-THAN OR EQUAL TO-->
+  <symbol number="E927" entity="&#xe927;" char="&#x2A8C;"/>
+  <!--EQUIVALENT TO OR LESS-THAN-->
+  <symbol number="E928" entity="&#xe928;" char="&#x2272;"/>
+  <!--EQUIVALENT TO OR GREATER-THAN-->
+  <symbol number="E929" entity="&#xe929;" char="&#x2273;"/>
+  <!--LEFT OPEN BOX OPERATOR-->
+  <symbol number="E92A" entity="&#xe92a;" char="&#x2ACD;"/>
+  <!--RIGHT OPEN BOX OPERATOR-->
+  <symbol number="E92B" entity="&#xe92b;" char="&#x2ACE;"/>
+  <!--IDENTICAL TO WITH DOT-->
+  <symbol number="E92C" entity="&#xe92c;" char="&#x2A67;"/>
+  <!--GREATER-THAN EQUAL TO OR LESS-THAN-->
+  <symbol number="E92D" entity="&#xe92d;" char="&#x22DB;"/>
+  <!--BAR OPERATOR-->
+  <symbol number="E92E" entity="&#xe92e;" char="&#x7c;"/>
+  <!--DOUBLE BAR OPERATOR-->
+  <symbol number="E92F" entity="&#xe92f;" char="&#x1c1;"/>
+  <!--TRIPLE BAR OPERATOR-->
+  <symbol number="E930" entity="&#xe930;" char="&#x2afc;"/>
+  <!--LESS-THAN OR APPROXIMATELY EQUAL TO-->
+  <symbol number="E932" entity="&#xe932;" char="&#x2272;"/>
+  <!--GREATER-THAN OR APPROXIMATELY EQUAL TO-->
+  <symbol number="E933" entity="&#xe933;" char="&#x2273;"/>
+  <!--NESTED LESS-THAN-->
+  <symbol number="E936" entity="&#xe936;" char="&#x2AA1;"/>
+  <!--NESTED GREATER-THAN-->
+  <symbol number="E937" entity="&#xe937;" char="&#x2AA2;"/>
+  <!--PRECEDES OR EQUIVALENT TO-->
+  <symbol number="E93A" entity="&#xe93a;" char="&#x2AB7;"/>
+  <!--SUCCEEDS OR EQUIVALENT TO-->
+  <symbol number="E93B" entity="&#xe93b;" char="&#x2AB8;"/>
+  <!--PRECEDES OVER EQUAL-->
+  <symbol number="E940" entity="&#xe940;" char="&#x2AB3;"/>
+  <!--SUCCEEDS OVER EQUAL-->
+  <symbol number="E941" entity="&#xe941;" char="&#x2AB4;"/>
+  <!--SATISFIED BY-->
+  <symbol number="E948" entity="&#xe948;" char="&#x2AE4;"/>
+  <!--LAZY S-->
+  <symbol number="E949" entity="&#xe949;" char="&#x223E;"/>
+  <!--NOT ASSERTION-->
+  <symbol number="E94A" entity="&#xe94a;" char="&#x22A3;"/>
+  <!--DOUBLE EQUAL-->
+  <symbol number="E94B" entity="&#xe94b;" char="&#x2A75;"/>
+  <!--TRIPLE EQUAL-->
+  <symbol number="E94C" entity="&#xe94c;" char="&#x2A76;"/>
+  <!--RULE DELAYED-->
+  <symbol number="E94D" entity="&#xe94d;" char="&#x29F4;"/>
+  <!--ALIAS DELIMITER-->
+  <symbol number="E94E" entity="&#xe94e;" char="&#x2261;"/>
+  <!--NORMAL SUBGROUP OF WITH BAR-->
+  <symbol number="E950" entity="&#xe950;" char="&#x29CF;"/>
+  <!--CONTAINS AS NORMAL SUBGROUP WITH BAR-->
+  <symbol number="E951" entity="&#xe951;" char="&#x29D0;"/>
+  <!--ROUND IMPLIES-->
+  <symbol number="E954" entity="&#xe954;" char="&#x2283;"/>
+  <!--SMILE UNDER BAR-->
+  <symbol number="E955" entity="&#xe955;" char="&#x2323;&#x0305;"/>
+  <!--FROWN OVER BAR-->
+  <symbol number="E956" entity="&#xe956;" char="&#x2322;&#x0305;"/>
+  <!--SUPERSET OF OR ALMOST EQUAL TO-->
+  <symbol number="E957" entity="&#xe957;" char="&#x2ACA;"/>
+  <!--SUBSET OF OR ALMOST EQUAL TO-->
+  <symbol number="E958" entity="&#xe958;" char="&#x2AC9;"/>
+  <!--GREATER-THAN ALMOST EQUAL TO OR LESS-THAN-->
+  <symbol number="E959" entity="&#xe959;" char="&#x2A90;"/>
+  <!--LESS-THAN ALMOST EQUAL OR GREATER-THAN-->
+  <symbol number="E95A" entity="&#xe95a;" char="&#x2A8F;"/>
+  <!--DOUBLE LOGICAL OR-->
+  <symbol number="E95C" entity="&#xe95c;" char="&#x2A53;"/>
+  <!--DOUBLE LOGICAL AND-->
+  <symbol number="E95D" entity="&#xe95d;" char="&#x2A54;"/>
+  <!--LOGICAL OR WITH DOUBLE BAR BELOW-->
+  <symbol number="E95E" entity="&#xe95e;" char="&#x2A63;"/>
+  <!--LOGICAL OR WITH BAR BELOW-->
+  <symbol number="E95F" entity="&#xe95f;" char="&#x2A62;"/>
+  <!--ALMOST EQUAL OVER EQUAL-->
+  <symbol number="E962" entity="&#xe962;" char="&#x2A70;"/>
+  <!--LEFT-POINTING TRIANGLE WITH BISECTING BAR-->
+  <!--<symbol number="E964" entity="&#xe964;" char=""/>--><!-- found no Unicode equivalent -->
+  <!--RIGHT-POINTING TRIANGLE WITH BISECTING BAR-->
+  <!--<symbol number="E965" entity="&#xe965;" char=""/>--><!-- found no Unicode equivalent -->
+  <!--EQUALS WITH DOTTED TOP LINE-->
+  <symbol number="E966" entity="&#xe966;" char="&#x2A78;"/>
+  <!--PRECEDES WITH COLON-->
+  <!--<symbol number="E967" entity="&#xe967;" char=""/>--><!-- found no Unicode equivalent -->
+  <!--SUCCEEDS WITH COLON-->
+  <!--<symbol number="E968" entity="&#xe968;" char=""/>--><!-- found no Unicode equivalent -->
+  <!--NESTED VERY MUCH LESS-THAN-->
+  <symbol number="E96B" entity="&#xe96b;" char="&#x2AF7;"/>
+  <!--NESTED VERY MUCH GREATER-THAN-->
+  <symbol number="E96C" entity="&#xe96c;" char="&#x2AF8;"/>
+  <!--DIFFERENCE BETWEEN (VARIANT)-->
+  <symbol number="E96D" entity="&#xe96d;" char="&#x224F;"/>
+  <!--LESS THAN GREATER-THAN OVERLAY-->
+  <symbol number="E96E" entity="&#xe96e;" char="&#x2AA4;"/>
+  <!--LOGICAL OR LOGICAL AND OVERLAY-->
+  <symbol number="E96F" entity="&#xe96f;" char="&#x2A59;"/>
+  <!--SUPERSET OVER SUPERSET-->
+  <symbol number="E970" entity="&#xe970;" char="&#x2AD6;"/>
+  <!--SUBSET OVER SUBSET-->
+  <symbol number="E971" entity="&#xe971;" char="&#x2AD5;"/>
+  <!--SUPERSET OVER SUBSET-->
+  <symbol number="E972" entity="&#xe972;" char="&#x2AD4;"/>
+  <!--SUBSET OVER SUPERSET-->
+  <symbol number="E973" entity="&#xe973;" char="&#x2AD3;"/>
+  <!--TRIPLE VERTICAL BAR-->
+  <symbol number="E979" entity="&#xe979;" char="&#x2AF4;"/>
+  <!--PAIRED QUADRUPLE VERTICAL DOTS-->
+  <symbol number="E97A" entity="&#xe97a;" char="&#x205e;&#x205e;"/>
+  <!--PERPENDICULAR OVER BAR-->
+  <symbol number="E97B" entity="&#xe97b;" char="&#x2AE8;"/>
+  <!--LEFT TURNSTILE DOUBLE VERTICAL BAR-->
+  <symbol number="E97C" entity="&#xe97c;" char="&#x2AE3;"/>
+  <!--DOUBLE LEFT TURNSTILE DOUBLE VERTICAL BAR-->
+  <symbol number="E97D" entity="&#xe97d;" char="&#x2AE5;"/>
+  <!--PERPENDICULAR OVER INVERTED PERPENDICULAR-->
+  <symbol number="E97E" entity="&#xe97e;" char="&#x2AE9;"/>
+  <!--DOUBLE LEFT TURNSTILE VERTICAL BAR-->
+  <symbol number="E97F" entity="&#xe97f;" char="&#x2AE4;"/>
+  <!--SPHERICAL ANGLE OPENING UP-->
+  <symbol number="E980" entity="&#xe980;" char="&#x29A1;"/>
+  <!--DOUBLE SLASH-->
+  <symbol number="E981" entity="&#xe981;" char="&#x2AFD;"/>
+  <!--RIGHT ANGLE WITH CORNER-->
+  <symbol number="E982" entity="&#xe982;" char="&#x299C;"/>
+  <!--CIRCLED VERTICAL BAR-->
+  <symbol number="E984" entity="&#xe984;" char="&#x29B6;"/>
+  <!--CIRCLED DIVISION SIGN-->
+  <symbol number="E985" entity="&#xe985;" char="&#x2A38;"/>
+  <!--DASHED SOLIDUS-->
+  <!--<symbol number="E986" entity="&#xe986;" char=""/>--><!-- found no Unicode equivalent -->
+  <!--DASHED BACKSLASH-->
+  <!--<symbol number="E987" entity="&#xe987;" char=""/>--><!-- found no Unicode equivalent -->
+  <!--DASHED MID-LINE-->
+  <!--<symbol number="E988" entity="&#xe988;" char=""/>--><!-- found no Unicode equivalent -->
+  <!--DASHED VERTICAL BAR-->
+  <!--<symbol number="E989" entity="&#xe989;" char=""/>--><!-- found no Unicode equivalent -->
+  <!--PERPENDICULAR WITH S-->
+  <symbol number="E98A" entity="&#xe98a;" char="&#x2AE1;"/>
+  <!--ANGLE WITH S-->
+  <symbol number="E98B" entity="&#xe98b;" char="&#x299E;"/>
+  <!--SPHERICAL ANGLE OPENING LEFT-->
+  <symbol number="E98C" entity="&#xe98c;" char="&#x29A0;"/>
+  <!--ANGLE OPENING LEFT-->
+  <!--<symbol number="E98D" entity="&#xe98d;" char="&#x29A0;"/>--><!-- found no Unicode equivalent -->
+  <!--VERTICAL BAR WITH DOUBLE HOOK-->
+  <symbol number="E98E" entity="&#xe98e;" char="&#x297E;"/>
+  <!--MEDIUM DOT OPERATOR (FREE RADICAL)-->
+  <symbol number="E98F" entity="&#xe98f;" char="&#x2981;"/>
+  <!--WHITE UP-POINTING TRIANGLE ABOVE BAR-->
+  <symbol number="E990" entity="&#xe990;" char="&#x29CB;"/>
+  <!--IDENTICAL AND PARALLEL TO-->
+  <symbol number="E991" entity="&#xe991;" char=""/>
+  <!--SMASH PRODUCT-->
+  <symbol number="E992" entity="&#xe992;" char="&#x2A33;"/>
+  <!--TRIPLE BAR OPERATOR WITH HORIZONTAL BAR-->
+  <symbol number="E993" entity="&#xe993;" char=""/>
+  <!--IDENTICAL TO WITH DOUBLE SLASH-->
+  <symbol number="E994" entity="&#xe994;" char="&#x29E5;"/>
+  <!--TRIPLE CROSSED BARS-->
+  <symbol number="E995" entity="&#xe995;" char="&#x2A69;"/>
+  <!--VERTICAL BAR OVER CIRCLE-->
+  <symbol number="E996" entity="&#xe996;" char="&#x2AF0;"/>
+  <!--VERTICAL PROPORTIONAL TO-->
+  <symbol number="E997" entity="&#xe997;" char=""/>
+  <!--BLACK LAST QUARTER MOON-->
+  <symbol number="E998" entity="&#xe998;" char="&#x263E;"/>
+  <!--BLACK FIRST QUARTER MOON-->
+  <symbol number="E999" entity="&#xe999;" char="&#x263A;"/>
+  <!--NEGATIVE SINE WAVE-->
+  <!--<symbol number="E9A0" entity="&#xe9a0;" char=""/>--><!-- found no Unicode equivalent -->
+  <!--PARENTHESIZED DOT-->
+  <!--<symbol number="E9A1" entity="&#xe9a1;" char=""/>--><!-- found no Unicode equivalent -->
+  <!--PARENTHESES-->
+  <!--<symbol number="E9A2" entity="&#xe9a2;" char=""/>--><!-- found no Unicode equivalent -->
+  <!--WHITE SMILE-->
+  <!--<symbol number="E9A3" entity="&#xe9a3;" char=""/>--><!-- found no Unicode equivalent -->
+  <!--WHITE FROWN-->
+  <!--<symbol number="E9A4" entity="&#xe9a4;" char=""/>--><!-- found no Unicode equivalent -->
+  <!--HEXAGON-->
+  <symbol number="E9A5" entity="&#xe9a5;" char="&#x2B21;"/>
+  <!--EQUIVALENT TO OVER PLUS-->
+  <symbol number="E9A6" entity="&#xe9a6;" char="&#x2A24;"/>
+  <!--PLUS OVER EQUIVALENT TO-->
+  <symbol number="E9A7" entity="&#xe9a7;" char="&#x2A26;"/>
+  <!--PRECEDES EQUIVALENT TO OR SUCCEEDS-->
+  <!--<symbol number="E9E0" entity="&#xe9e0;" char=""/>--><!-- found no Unicode equivalent -->
+  <!--SUCCEEDS EQUIVALENT TO OR PRECEDES-->
+  <!--<symbol number="E9E1" entity="&#xe9e1;" char=""/>--><!-- found no Unicode equivalent -->
+  <!--PRECEDES ALMOST EQUAL TO OR SUCCEEDS-->
+  <!--<symbol number="E9E2" entity="&#xe9e2;" char=""/>--><!-- found no Unicode equivalent -->
+  <!--SUCCEEDS ALMOST EQUAL TO OR PRECEDES-->
+  <!--<symbol number="E9E3" entity="&#xe9e3;" char=""/>--><!-- found no Unicode equivalent -->
+  <!--LESS-THAN EQUIVALENT TO OR GREATER-THAN-->
+  <!--<symbol number="E9F0" entity="&#xe9f0;" char=""/>--><!-- found no Unicode equivalent -->
+  <!--GREATER-THAN EQUIVALENT TO OR LESS-THAN-->
+  <!--<symbol number="E9F1" entity="&#xe9f1;" char=""/>--><!-- found no Unicode equivalent -->
+  <!--  *
+        * ED00 - EDFF: More Letterlike Symbols
+        * -->
+  <!-- MIRROR G -->
+  <symbol number="ED01" entity="&#xed01;" char="&#x2141;"/>
+  <!--  Latin small letter dotless j  -->
+  <symbol number="ED02" entity="&#xed02;" char="&#x1D6A5;"/>
+  <!--   Greek small letter digamma  -->
+  <symbol number="ED03" entity="&#xed03;" char="&#x03DD;"/>
+  <!--   Small differential d  -->
+  <symbol number="ED04" entity="&#xed04;" char="&#x2146;"/>
+  <!--   Exponential e  -->
+  <symbol number="ED05" entity="&#xed05;" char="&#x2147;"/>
+  <!--   Imaginary i  -->
+  <symbol number="ED06" entity="&#xed06;" char="&#x2148;"/>
+  <!--   Imaginary j  -->
+  <symbol number="ED07" entity="&#xed07;" char="&#x2149;"/>
+  <!--   Capital differential D  -->
+  <symbol number="ED08" entity="&#xed08;" char="&#x2145;"/>
+  <!--  *
+        * EF00 - EFFF: Non-marking Characters
+        * -->
+  <!-- ALIGNMENT MARK, no unicode representation -->
+  <!--<symbol number="EF00" entity="&#xef00;" char=""/>-->
+  <!-- ZERO WIDTH SPACE -->
+  <symbol number="EB01" entity="&#xeb01;" char="&#x200b;"/>
+  <symbol number="EF01" entity="&#xef01;" char="&#x200b;"/>
+  <!-- THIN SPACE -->
+  <symbol number="EB02" entity="&#xeb02;" char="&#x2009;"/>
+  <symbol number="EF02" entity="&#xef02;" char="&#x2009;"/>
+  <!-- MEDIUM SPACE         => FOUR-PER-EM SPACE -->
+  <symbol number="EB03" entity="&#xeb03;" char="&#x2005;"/>
+  <symbol number="EF03" entity="&#xef03;" char="&#x2005;"/>
+  <!-- THICK SPACE (1/3 EM) => THREE-PER-EM SPACE -->
+  <symbol number="EB04" entity="&#xeb04;" char="&#x2004;"/>
+  <symbol number="EF04" entity="&#xef04;" char="&#x2004;"/>
+  <!-- EM SPACE -->
+  <symbol number="EB05" entity="&#xeb05;" char="&#x2003;"/>
+  <symbol number="EF05" entity="&#xef05;" char="&#x2003;"/>
+  <!-- 2-EM SPACE -->
+  <symbol number="EB06" entity="&#xeb06;" char="&#x2003;&#x2003;"/>
+  <symbol number="EF06" entity="&#xef06;" char="&#x2003;&#x2003;"/>
+  <!-- INNER SPACE -->
+  <symbol number="EB07" entity="&#xeb07;" char="&#x2009;"/>
+  <symbol number="EF07" entity="&#xef07;" char="&#x2009;"/>
+  <!-- 1-POINT SPACE -->
+  <symbol number="EB08" entity="&#xeb08;" char="&#x2002;"/>
+  <symbol number="EF08" entity="&#xef08;" char="&#x2002;"/>
+  <!-- CLOCKWISE CONTOUR INTEGRAL (ARROW ON LEFT) -->
+  <symbol number="EF80" entity="&#xeb80;" char="&#x2232;"/>
+  <symbol number="EF80" entity="&#xef80;" char="&#x2232;"/>
+  <!-- INTEGRAL WITH SQUARE -->
+  <symbol number="EF81" entity="&#xeb81;" char="&#x2A16;"/>
+  <symbol number="EF81" entity="&#xef81;" char="&#x2A16;"/>
+  <!-- INTEGRAL WITH SLASH -->
+  <symbol number="EF82" entity="&#xeb82;" char="&#x2A0F;"/>
+  <symbol number="EF82" entity="&#xef82;" char="&#x2A0F;"/>
+  <!-- REVERSED INTEGRAL -->
+  <!--<symbol number="EF83" entity="&#xef83;" char="(REVERSED INTEGRAL)"/>-->
+  <!-- DOUBLE ZERO OVER DOUBLE ZERO -->
+  <!--<symbol number="EF90" entity="&#xef90;" char="(DOUBLE ZERO OVER DOUBLE ZERO)"/>-->
+  <!-- DIGIT ZERO WITH SLASH -->
+  <!--<symbol number="EF91" entity="&#xef91;" char="(DIGIT ZERO WITH SLASH)"/>-->
+</symbols>

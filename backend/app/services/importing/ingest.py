@@ -8,13 +8,14 @@ from __future__ import annotations
 
 import asyncio
 import glob
+import logging
 import re
 import shutil
 import uuid
 import zipfile
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Awaitable, BinaryIO, Callable, Optional
+from typing import Awaitable, BinaryIO, Callable, List, Optional
 from urllib.parse import unquote, urlsplit
 
 import pypandoc
@@ -24,6 +25,16 @@ from app.core import storage
 # (图片字节, 原文件名) -> 替换后的 URL;返回 None 表示该图片保持原引用。
 ImageStore = Callable[[bytes, str], Awaitable[Optional[str]]]
 
+from .docx_math import (
+    MathTypeResult,
+    build_warnings,
+    count_vector_images,
+    preprocess_mathtype,
+    restore_math_tokens,
+)
+
+logger = logging.getLogger(__name__)
+
 
 @dataclass
 class CanonicalDoc:
@@ -31,6 +42,7 @@ class CanonicalDoc:
     markdown: str = ""                       # 文本源内容;图像源为空
     filename: Optional[str] = None           # 传给 AI 抽取的文件名上下文
     image_data: Optional[bytes] = None       # 视觉抽取用
+    warnings: List[str] = field(default_factory=list)  # 摄取阶段的非致命问题(如公式未能转换)
 
 
 def _ensure_task_id(task_id: Optional[str]) -> str:
@@ -214,10 +226,19 @@ class DocxIngestor:
     ) -> CanonicalDoc:
         """file_path 可以是无扩展名的存储对象,因此显式指定输入格式为 docx。"""
         with storage.job_dir() as job:
+            # MathType/Equation 3.0 的 OLE 公式 pandoc 只能输出 WMF 预览图，先替换为占位符。
+            try:
+                math_result = await asyncio.to_thread(
+                    preprocess_mathtype, file_path, job / "mathtype_preprocessed.docx"
+                )
+            except Exception as e:  # noqa: BLE001 - 预处理失败不影响原有转换
+                logger.warning("MathType preprocessing failed for %s: %s", filename or file_path.name, e)
+                math_result = MathTypeResult(docx_path=file_path)
+
             try:
                 content = await asyncio.to_thread(
                     pypandoc.convert_file,
-                    glob.escape(str(file_path.resolve())),
+                    glob.escape(str(math_result.docx_path.resolve())),
                     # 只保留 pipe 表格(禁用 grid/multiline/simple):下游 markdown-it 仅解析 pipe 表格。
                     "markdown-grid_tables-multiline_tables-simple_tables",
                     format="docx",
@@ -229,6 +250,9 @@ class DocxIngestor:
             except Exception as e:
                 raise RuntimeError(f"Pandoc conversion failed: {e}") from e
 
+            content = restore_math_tokens(content, math_result.formulas)
+            # 资产 URL 不保留扩展名,须在改写图片引用之前统计残留的 WMF/EMF。
+            warnings = build_warnings(math_result, count_vector_images(content))
             content = await _rewrite_local_images(
                 content, resolve=_local_image_resolver(job, job), store=store
             )
@@ -237,6 +261,7 @@ class DocxIngestor:
             task_id=_ensure_task_id(task_id),
             markdown=_fix_text_wrapped_greek(content),
             filename=filename or file_path.name,
+            warnings=warnings,
         )
 
 

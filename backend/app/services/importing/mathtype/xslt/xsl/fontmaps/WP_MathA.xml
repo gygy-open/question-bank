@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<symbols>
+  <!--  *
+        * WP MathA
+        * -->
+  <!-- LESS-THAN OR EQUAL TO -->
+  <symbol number="F023" entity="&#xf023;" char="&#x2264;"/>
+  <!-- GREATER-THAN OR EQUAL TO -->
+  <symbol number="F024" entity="&#xf024;" char="&#x2265;"/>
+  <!-- ALMOST EQUAL TO -->
+  <symbol number="F02E" entity="&#xf02e;" char="&#x2248;"/>
+  <!-- INFINITY -->
+  <symbol number="F034" entity="&#xf034;" char="&#x221e;"/>
+  <!-- PARTIAL DIFFERENTIAL -->
+  <symbol number="F04D" entity="&#xf04d;" char="&#x2202;"/>
+  <!-- LEFTWARDS ARROW -->
+  <symbol number="F037" entity="&#xf037;" char="&#x2190;"/>
+  <!-- MULTIPLICATION X -->
+  <symbol number="F048" entity="&#xf048;" char="&#x2715;"/>
+  <!-- RIGHTWARDS HARPOON OVER LEFTWARDS HARPOON -->
+  <symbol number="F0BA" entity="&#xf0ba;" char="&#x21cc;"/>
+</symbols>

@@ -16,8 +16,7 @@ from app.schemas.question import QuestionCreate
 from app.models.question import QuestionStatus, QuestionType
 from app.services.kp_retriever import KnowledgePointRetriever
 from app.services.ai_provider import get_ai_provider
-from app.crud.crud_system_setting import system_setting
-from app.models.ai_config import AIModel
+from app.services.ai_resolver import resolve_model
 from app.models.tag import Tag
 from app.services.question_legacy_adapter import (
     LegacyQuestionError,
@@ -29,7 +28,6 @@ from app.services.question_render import (
     rich_doc_to_plain_text,
 )
 from sqlalchemy import select
-from sqlalchemy.orm import selectinload
 
 logger = logging.getLogger(__name__)
 
@@ -276,7 +274,7 @@ async def resolve_tags(db: AsyncSession, tag_names: List[str]) -> List[int]:
     # For now, just return what we found.
     return tag_ids
 
-async def _enrich_question_with_knowledge_points(db: AsyncSession, question_data: Dict[str, Any], subject_id: Optional[int] = None) -> Dict[str, Any]:
+async def _enrich_question_with_knowledge_points(db: AsyncSession, question_data: Dict[str, Any], subject_id: Optional[int] = None, user_id: Optional[int] = None) -> Dict[str, Any]:
     """
     Helper to enrich question data with knowledge points from Vector Store using AI reranking.
     Similar logic to DocProcessor._call_ai_for_questions.
@@ -344,8 +342,8 @@ async def _enrich_question_with_knowledge_points(db: AsyncSession, question_data
         
         # 2. Get AI Provider for Reranking
         # We need to get the active text model config
-        setting = await system_setting.get_by_key(db, "AI_TEXT_MODEL_ID")
-        if not setting or not setting.value:
+        resolved = await resolve_model(db, user_id=user_id, purpose="text")
+        if resolved is None:
             # Fallback: just take top 1
             top_candidate = candidates[0]
             if top_candidate in text_to_id:
@@ -353,21 +351,9 @@ async def _enrich_question_with_knowledge_points(db: AsyncSession, question_data
             return question_data
 
         try:
-            model_id = int(setting.value)
-            stmt = select(AIModel).options(selectinload(AIModel.provider)).where(AIModel.id == model_id)
-            result = await db.execute(stmt)
-            model = result.scalar_one_or_none()
-            
-            if not model:
-                return question_data
-                
-            provider_name = model.provider.interface_type
-            config = {
-                "API_KEY": model.provider.api_key,
-                "BASE_URL": model.provider.base_url,
-                "MODEL_NAME": model.name,
-            }
-            
+            provider_name = resolved.interface_type
+            config = resolved.config
+
             provider = get_ai_provider(provider_name)
             
             # 3. Rerank
@@ -438,7 +424,9 @@ async def _build_question_create(
     subject_id: Optional[int],
 ) -> QuestionCreate:
     """模型给的松散字段 → 严格 v2 入参。无法解析答案时抛 LegacyQuestionError。"""
-    data = await _enrich_question_with_knowledge_points(ctx.db, data, subject_id=subject_id)
+    data = await _enrich_question_with_knowledge_points(
+        ctx.db, data, subject_id=subject_id, user_id=getattr(ctx.actor, "id", None)
+    )
     tag_ids = await resolve_tags(ctx.db, data.get("tags")) if data.get("tags") else []
 
     v2_fields = adapt_legacy_question(

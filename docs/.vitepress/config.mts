@@ -123,7 +123,7 @@ export default defineConfig({
         {
           text: '配置',
           items: [
-            { text: 'AI 供应商与模型', link: '/admin/ai-config' },
+            { text: 'AI 服务商与模型', link: '/admin/ai-config' },
             { text: 'Prompt 模板', link: '/admin/prompts' },
             { text: '系统参数', link: '/admin/system-settings' },
             { text: '用户管理', link: '/admin/users' },
