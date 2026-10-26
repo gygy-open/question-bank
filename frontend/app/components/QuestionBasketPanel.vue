@@ -15,6 +15,8 @@ import { useQuestionBasket } from '@/composables/useQuestionBasket'
 import CompositionTargetPicker from './CompositionTargetPicker.vue'
 import type { Subject } from '~/types'
 
+const { t } = useI18n()
+
 const props = defineProps<{
   open: boolean
   subjects?: Subject[] | null
@@ -31,15 +33,19 @@ const isOpen = computed({
 
 const { groupedBySubject, remove, clear, removeMany } = useQuestionBasket()
 
-const subjectName = (id: number) => props.subjects?.find((s) => s.id === id)?.name ?? `学科 ${id}`
+const subjectName = (id: number) => props.subjects?.find((s) => s.id === id)?.name ?? t('basket.subjectFallback', { id })
 
-const qTypeLabels: Record<string, string> = {
-  single_choice: '单选',
-  multiple_choice: '多选',
-  true_false: '判断',
-  fill_in_the_blank: '填空',
-  free_response: '解答',
-  option_matching: '匹配',
+const qTypeLabelKeys: Record<string, string> = {
+  single_choice: 'basket.types.singleChoice',
+  multiple_choice: 'basket.types.multipleChoice',
+  true_false: 'basket.types.trueFalse',
+  fill_in_the_blank: 'basket.types.fillInTheBlank',
+  free_response: 'basket.types.freeResponse',
+  option_matching: 'basket.types.optionMatching',
+}
+const qTypeLabel = (qType: string) => {
+  const key = qTypeLabelKeys[qType]
+  return key ? t(key) : qType
 }
 
 const pickerOpen = ref(false)
@@ -64,8 +70,8 @@ const onAdded = () => {
       <SheetHeader class="border-b pr-12">
         <div class="flex items-start justify-between gap-2">
           <div>
-            <SheetTitle>试题篮</SheetTitle>
-            <SheetDescription>暂存的题目，可一键加入稿件</SheetDescription>
+            <SheetTitle>{{ t('basket.title') }}</SheetTitle>
+            <SheetDescription>{{ t('basket.description') }}</SheetDescription>
           </div>
           <Button
             v-if="groupedBySubject.size > 0"
@@ -74,7 +80,7 @@ const onAdded = () => {
             class="shrink-0 text-muted-foreground"
             @click="clear()"
           >
-            清空试题篮
+            {{ t('basket.clearAll') }}
           </Button>
         </div>
       </SheetHeader>
@@ -83,7 +89,7 @@ const onAdded = () => {
         v-if="groupedBySubject.size === 0"
         class="flex-1 flex items-center justify-center text-sm text-muted-foreground"
       >
-        试题篮是空的
+        {{ t('basket.empty') }}
       </div>
 
       <ScrollArea v-else class="flex-1 min-h-0">
@@ -94,16 +100,16 @@ const onAdded = () => {
               <div class="flex items-center justify-between">
                 <div class="flex items-center gap-2">
                   <span class="text-sm font-medium">{{ subjectName(subjectId) }}</span>
-                  <span class="text-xs text-muted-foreground">{{ list.length }} 题</span>
+                  <span class="text-xs text-muted-foreground">{{ t('basket.groupCount', { count: list.length }) }}</span>
                 </div>
                 <div class="flex items-center gap-1">
                   <Button size="sm" class="h-7 px-2" @click="openPickerFor(subjectId, list.map((i) => i.id))">
                     <FileText class="mr-1 h-3 w-3" />
-                    加入稿件
+                    {{ t('basket.addToComposition') }}
                   </Button>
                   <Button size="sm" variant="ghost" class="h-7 px-2 text-muted-foreground" @click="clear(subjectId)">
                     <Trash2 class="mr-1 h-3 w-3" />
-                    清空本组
+                    {{ t('basket.clearGroup') }}
                   </Button>
                 </div>
               </div>
@@ -116,10 +122,10 @@ const onAdded = () => {
               >
                 <div class="min-w-0">
                   <div class="flex items-center gap-1.5 text-xs text-muted-foreground">
-                    <Badge variant="outline" class="text-[10px] px-1">{{ qTypeLabels[item.q_type] ?? item.q_type }}</Badge>
-                    <span>难度 {{ item.difficulty }}</span>
+                    <Badge variant="outline" class="text-[10px] px-1">{{ qTypeLabel(item.q_type) }}</Badge>
+                    <span>{{ t('basket.difficulty', { level: item.difficulty }) }}</span>
                   </div>
-                  <p class="truncate">{{ item.content_preview || '（无题干文本）' }}</p>
+                  <p class="truncate">{{ item.content_preview || t('basket.noContent') }}</p>
                 </div>
                 <Button variant="ghost" size="icon" class="h-6 w-6 shrink-0" @click="remove(item.id)">
                   <X class="h-3.5 w-3.5" />

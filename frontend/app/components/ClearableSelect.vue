@@ -9,6 +9,8 @@ import {
 import { X } from '@lucide/vue'
 import { computed } from 'vue'
 
+const { t } = useI18n()
+
 interface Option {
   label: string
   value: string
@@ -49,7 +51,7 @@ const clear = (e: Event) => {
       @click="clear"
       class="absolute right-8 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground p-1 rounded-full hover:bg-muted z-10 opacity-0 group-hover:opacity-100 transition-opacity"
       type="button"
-      title="清除"
+      :title="t('common.clear')"
     >
       <X class="h-3 w-3" />
     </button>

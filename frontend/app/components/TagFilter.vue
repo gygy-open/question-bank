@@ -20,6 +20,8 @@ import {
   CommandSeparator,
 } from '@/components/ui/command'
 
+const { t } = useI18n()
+
 const props = defineProps<{
   tags: Tag[]
   categories: TagCategory[]
@@ -83,9 +85,9 @@ const clearTags = () => {
         >
           <div class="flex items-center truncate">
             <TagIcon class="mr-2 h-4 w-4 shrink-0 opacity-50" />
-            <span v-if="selectedTags.length === 0">选择标签...</span>
+            <span v-if="selectedTags.length === 0">{{ t('tagFilter.placeholder') }}</span>
             <span v-else class="truncate">
-                {{ selectedTags.length }} 个标签已选
+                {{ t('tagFilter.selectedCount', { count: selectedTags.length }) }}
             </span>
           </div>
           <ChevronsUpDown class="ml-2 h-4 w-4 shrink-0 opacity-50" />
@@ -93,9 +95,9 @@ const clearTags = () => {
       </PopoverTrigger>
       <PopoverContent class="w-[300px] p-0" align="start">
         <Command>
-          <CommandInput placeholder="搜索标签..." />
+          <CommandInput :placeholder="t('tagFilter.searchPlaceholder')" />
           <CommandList class="max-h-[400px] overflow-y-auto">
-            <CommandEmpty>未找到标签</CommandEmpty>
+            <CommandEmpty>{{ t('tagFilter.empty') }}</CommandEmpty>
             
             <template v-for="category in categories" :key="category.id">
               <CommandGroup 
@@ -134,7 +136,7 @@ const clearTags = () => {
             <!-- 未分类标签 -->
              <CommandGroup 
                 v-if="tagsByCategory['uncategorized']?.length" 
-                heading="未分类"
+                :heading="t('tagFilter.uncategorized')"
               >
                 <CommandItem
                   v-for="tag in tagsByCategory['uncategorized']"
@@ -159,7 +161,7 @@ const clearTags = () => {
           </CommandList>
           <div class="flex items-center justify-between p-2 border-t">
              <span class="text-xs text-muted-foreground">
-                已选 {{ selectedTags.length }} 个
+                {{ t('tagFilter.selectedCount', { count: selectedTags.length }) }}
              </span>
              <Button 
                 variant="ghost" 
@@ -168,7 +170,7 @@ const clearTags = () => {
                 @click="clearTags"
                 v-if="selectedTags.length > 0"
             >
-                清除
+                {{ t('common.clear') }}
              </Button>
           </div>
         </Command>

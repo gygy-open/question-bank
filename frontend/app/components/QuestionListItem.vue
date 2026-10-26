@@ -19,6 +19,7 @@ import { useQuestionBasket } from '@/composables/useQuestionBasket'
 import type { Question as DbQuestion, KnowledgePoint, OptionSpec } from '@/types'
 import type { ImportDraft } from '@/lib/questionModel'
 import { hasOptionPool } from '@/lib/questionModel'
+import { formatDate, formatDateTime } from '@/lib/locale'
 import { toast } from 'vue-sonner'
 
 // Support both import drafts (v2, not yet persisted) and database questions
@@ -58,6 +59,7 @@ const emit = defineEmits<{
   (e: 'select', val: boolean): void
 }>()
 
+const { t } = useI18n()
 const { $api } = useNuxtApp()
 
 const isReviewing = ref(false)
@@ -79,15 +81,16 @@ const handleReview = async () => {
 }
 
 const typeLabel = computed(() => {
-  const types: Record<string, string> = {
-    'single_choice': '单选题',
-    'multiple_choice': '多选题',
-    'true_false': '判断题',
-    'fill_in_the_blank': '填空题',
-    'free_response': '解答题',
-    'option_matching': '选项匹配'
+  const typeKeys: Record<string, string> = {
+    'single_choice': 'questions.types.singleChoice',
+    'multiple_choice': 'questions.types.multipleChoice',
+    'true_false': 'questions.types.trueFalse',
+    'fill_in_the_blank': 'questions.types.fillInTheBlank',
+    'free_response': 'questions.types.freeResponse',
+    'option_matching': 'questions.types.optionMatching'
   }
-  return types[props.item.q_type] || props.item.q_type
+  const key = typeKeys[props.item.q_type]
+  return key ? t(key) : props.item.q_type
 })
 
 // Kept intentionally low-saturation so type colors don't compete with the primary theme color.
@@ -110,15 +113,15 @@ const warnings = computed<string[]>(() => {
 })
 
 const difficultyLabel = computed(() => {
-  return `难度 ${props.item.difficulty}`
+  return t('questionItem.difficultyValue', { level: props.item.difficulty })
 })
 
 const copyId = async () => {
   try {
     await navigator.clipboard.writeText(String(props.item.id))
-    toast.success(`已复制题目ID：${props.item.id}`)
+    toast.success(t('questionItem.idCopied', { id: props.item.id }))
   } catch {
-    toast.error('复制失败，请手动选中复制')
+    toast.error(t('questionItem.copyFailed'))
   }
 }
 
@@ -134,22 +137,22 @@ const toggleBasket = () => {
     q_type: q.q_type,
     difficulty: q.difficulty,
   })
-  toast.success(wasInBasket ? '已移出试题篮' : '已加入试题篮')
+  toast.success(wasInBasket ? t('basket.removed') : t('basket.added'))
 }
 
 const expanded = ref(props.defaultExpanded)
 
 const statusLabel = computed(() => {
   const item = props.item as DbQuestion
-  if (item.status === 'published') return '已发布'
-  if (item.status === 'draft') return '草稿'
+  if (item.status === 'published') return t('questions.statuses.published')
+  if (item.status === 'draft') return t('questions.statuses.draft')
   if (item.status === 'pending') {
     if (item.subject?.required_review_count && item.subject.required_review_count > 1) {
-      return `待审核 (${item.review_count || 0}/${item.subject.required_review_count})`
+      return t('questions.statuses.pendingProgress', { count: item.review_count || 0, required: item.subject.required_review_count })
     }
-    return '待审核'
+    return t('questions.statuses.pending')
   }
-  if (item.status === 'archived') return '已归档'
+  if (item.status === 'archived') return t('questions.statuses.archived')
   return item.status
 })
 
@@ -244,7 +247,7 @@ const sourcePreviewQuery = computed(() => {
                 role="button"
                 tabindex="0"
                 class="font-mono text-xs cursor-pointer select-none hover:bg-muted"
-                :title="`点击复制题目ID：${item.id}`"
+                :title="t('questionItem.copyIdTitle', { id: item.id })"
                 @click="copyId"
                 @keydown.enter="copyId"
               >#{{ item.id }}</Badge>
@@ -255,18 +258,18 @@ const sourcePreviewQuery = computed(() => {
 
               <!-- 私有题标记 -->
               <Badge v-if="(item as DbQuestion).visibility === 'private'" variant="secondary" class="flex items-center gap-1 px-1.5 bg-amber-50 text-amber-700 hover:bg-amber-100 dark:bg-amber-500/10 dark:text-amber-400">
-                <Lock class="w-3 h-3" /> 私有
+                <Lock class="w-3 h-3" /> {{ t('questionItem.private') }}
               </Badge>
 
               <Badge v-if="(item as DbQuestion).stimulus_id != null" as-child variant="secondary">
                 <NuxtLink :to="`/materials/${(item as DbQuestion).stimulus_id}/edit?focus=${(item as DbQuestion).id}`">
-                  材料题 #{{ (item as DbQuestion).stimulus_id }}
+                  {{ t('questionItem.materialLink', { id: (item as DbQuestion).stimulus_id }) }}
                 </NuxtLink>
               </Badge>
 
               <!-- Fixed 5-star scale so difficulty is comparable at a glance across items -->
               <div class="flex items-center gap-1" :title="difficultyLabel">
-                <span class="text-xs text-muted-foreground">难度</span>
+                <span class="text-xs text-muted-foreground">{{ t('questionItem.difficulty') }}</span>
                 <Star v-for="i in 5" :key="i"
                   class="h-3 w-3"
                   :class="i <= item.difficulty ? 'fill-primary text-primary' : 'fill-none text-muted-foreground/30'" />
@@ -281,7 +284,7 @@ const sourcePreviewQuery = computed(() => {
               variant="ghost"
               size="icon"
               class="h-8 w-8"
-              title="编辑"
+              :title="t('common.edit')"
               @click="emit('edit')"
             >
               <Pencil class="h-4 w-4" />
@@ -292,7 +295,7 @@ const sourcePreviewQuery = computed(() => {
               variant="ghost"
               size="icon"
               class="h-8 w-8 text-green-600 hover:text-green-700 hover:bg-green-50 dark:hover:bg-green-500/10"
-              title="通过审核"
+              :title="t('questionItem.approve')"
               @click.stop="handleReview"
               :disabled="isReviewing"
             >
@@ -305,7 +308,7 @@ const sourcePreviewQuery = computed(() => {
               size="icon"
               class="h-8 w-8"
               :class="inBasket ? 'text-primary' : 'text-muted-foreground'"
-              :title="inBasket ? '移出试题篮' : '加入试题篮'"
+              :title="inBasket ? t('basket.remove') : t('basket.add')"
               @click="toggleBasket"
             >
               <ShoppingBasket class="h-4 w-4" />
@@ -324,7 +327,7 @@ const sourcePreviewQuery = computed(() => {
               variant="ghost"
               size="icon"
               class="h-8 w-8 text-muted-foreground"
-              title="查看源文件"
+              :title="t('questionItem.viewSource')"
             >
               <NuxtLink :to="{ path: '/preview', query: sourcePreviewQuery }" target="_blank">
                 <FileText class="h-4 w-4" />
@@ -334,7 +337,7 @@ const sourcePreviewQuery = computed(() => {
             <!-- Lower-frequency/destructive actions grouped to reduce icon clutter -->
             <DropdownMenu v-if="mode === 'library'">
               <DropdownMenuTrigger as-child>
-                <Button variant="ghost" size="icon" class="h-8 w-8" title="更多操作">
+                <Button variant="ghost" size="icon" class="h-8 w-8" :title="t('common.moreActions')">
                   <MoreVertical class="h-4 w-4" />
                 </Button>
               </DropdownMenuTrigger>
@@ -344,14 +347,14 @@ const sourcePreviewQuery = computed(() => {
                   @click="emit('decompose', item as DbQuestion)"
                 >
                   <GitFork class="h-4 w-4" />
-                  创建派生题
+                  {{ t('questionItem.createDerived') }}
                 </DropdownMenuItem>
                 <DropdownMenuItem
                   v-if="(item as DbQuestion).incoming_relation_count || (item as DbQuestion).outgoing_relation_count"
                   @click="emit('view-structure', item as DbQuestion)"
                 >
                   <Workflow class="h-4 w-4" />
-                  查看派生关系
+                  {{ t('questionItem.viewDerived') }}
                 </DropdownMenuItem>
                 <DropdownMenuItem
                   v-if="!hideDelete"
@@ -359,7 +362,7 @@ const sourcePreviewQuery = computed(() => {
                   @click="emit('delete')"
                 >
                   <Trash2 class="h-4 w-4" />
-                  删除
+                  {{ t('common.delete') }}
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
@@ -369,7 +372,7 @@ const sourcePreviewQuery = computed(() => {
               variant="ghost"
               size="icon"
               class="h-8 w-8"
-              title="复制"
+              :title="t('common.copy')"
               @click="emit('duplicate')"
             >
               <Copy class="h-4 w-4" />
@@ -380,7 +383,7 @@ const sourcePreviewQuery = computed(() => {
               variant="ghost"
               size="icon"
               class="h-8 w-8 text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-500/10"
-              title="删除"
+              :title="t('common.delete')"
               @click="emit('delete')"
             >
               <Trash2 class="h-4 w-4" />
@@ -399,10 +402,10 @@ const sourcePreviewQuery = computed(() => {
             </div>
           </div>
           <div v-if="mode === 'library'" class="prose prose-sm max-w-none dark:prose-invert">
-            <RichContent :content="(item as DbQuestion).content" empty-text="（空）" />
+            <RichContent :content="(item as DbQuestion).content" :empty-text="t('questionItem.emptyContent')" />
           </div>
           <div v-else class="prose prose-sm max-w-none dark:prose-invert text-sm mb-2">
-            <RichContent :content="(item as ImportDraft).content" empty-text="（空）" />
+            <RichContent :content="(item as ImportDraft).content" :empty-text="t('questionItem.emptyContent')" />
           </div>
           
           <!-- Options for choice questions -->
@@ -449,10 +452,10 @@ const sourcePreviewQuery = computed(() => {
                   </Badge>
                </template>
                <Badge v-else variant="secondary" class="text-xs">
-                  {{ knowledgePointIds.length }} 个知识点
+                  {{ t('questionItem.knowledgePointCount', { count: knowledgePointIds.length }) }}
                </Badge>
             </template>
-            <Badge v-else variant="outline" class="text-xs text-orange-600">未选择知识点</Badge>
+            <Badge v-else variant="outline" class="text-xs text-orange-600">{{ t('questionItem.noKnowledgePoint') }}</Badge>
           </div>
         </div>
 
@@ -464,7 +467,7 @@ const sourcePreviewQuery = computed(() => {
             class="h-6 w-full gap-1 text-muted-foreground hover:bg-muted/50"
             @click="expanded = !expanded"
           >
-            <span class="text-xs">{{ expanded ? '收起详情' : '展开详情' }}</span>
+            <span class="text-xs">{{ expanded ? t('questionItem.collapse') : t('questionItem.expand') }}</span>
             <ChevronDown class="h-4 w-4 transition-transform duration-200" :class="{ 'rotate-180': expanded }" />
           </Button>
         </div>
@@ -473,21 +476,21 @@ const sourcePreviewQuery = computed(() => {
       <!-- Expandable Details (import mode) -->
       <div v-if="mode === 'import' && expanded" class="mt-4 pt-4 border-t border-border/50 space-y-4">
         <div class="space-y-2">
-          <div class="text-sm font-semibold text-foreground">答案</div>
+          <div class="text-sm font-semibold text-foreground">{{ t('questionItem.answer') }}</div>
           <div class="text-sm bg-muted/30 p-2 rounded">
-            <AnswerDisplay :answer="(item as ImportDraft).answer" :options="(item as ImportDraft).options" empty-text="未填写" />
+            <AnswerDisplay :answer="(item as ImportDraft).answer" :options="(item as ImportDraft).options" :empty-text="t('questionItem.notFilled')" />
           </div>
         </div>
 
         <div v-if="!isEmptyRichDoc((item as ImportDraft).thinking)" class="space-y-2">
-          <div class="text-sm font-semibold text-foreground">分析</div>
+          <div class="text-sm font-semibold text-foreground">{{ t('questionItem.thinking') }}</div>
           <div class="text-sm bg-muted/20 p-3 rounded [&_.prose]:my-0 [&_.prose_p]:my-0">
             <RichContent :content="(item as ImportDraft).thinking" />
           </div>
         </div>
 
         <div v-if="!isEmptyRichDoc((item as ImportDraft).analysis)" class="space-y-2">
-          <div class="text-sm font-semibold text-foreground">解析</div>
+          <div class="text-sm font-semibold text-foreground">{{ t('questionItem.analysis') }}</div>
           <div class="text-sm bg-muted/20 p-3 rounded [&_.prose]:my-0 [&_.prose_p]:my-0">
             <RichContent :content="(item as ImportDraft).analysis" />
           </div>
@@ -497,28 +500,28 @@ const sourcePreviewQuery = computed(() => {
       <!-- Expandable Details (library mode) -->
       <div v-if="mode === 'library' && expanded" class="mt-4 pt-4 border-t border-border/50 space-y-4">
         <div class="space-y-2">
-          <div class="text-sm font-semibold text-foreground">答案</div>
+          <div class="text-sm font-semibold text-foreground">{{ t('questionItem.answer') }}</div>
           <div class="text-sm bg-muted/30 p-2 rounded">
             <AnswerDisplay :answer="(item as DbQuestion).answer" :options="(item as DbQuestion).options" />
           </div>
         </div>
 
         <div v-if="!isEmptyRichDoc((item as DbQuestion).thinking)" class="space-y-2">
-          <div class="text-sm font-semibold text-foreground">分析</div>
+          <div class="text-sm font-semibold text-foreground">{{ t('questionItem.thinking') }}</div>
           <div class="text-sm bg-muted/20 p-3 rounded [&_.prose]:my-0 [&_.prose_p]:my-0">
             <RichContent :content="(item as DbQuestion).thinking" />
           </div>
         </div>
 
         <div v-if="!isEmptyRichDoc((item as DbQuestion).analysis)" class="space-y-2">
-          <div class="text-sm font-semibold text-foreground">解析</div>
+          <div class="text-sm font-semibold text-foreground">{{ t('questionItem.analysis') }}</div>
           <div class="text-sm bg-muted/20 p-3 rounded [&_.prose]:my-0 [&_.prose_p]:my-0">
             <RichContent :content="(item as DbQuestion).analysis" />
           </div>
         </div>
 
         <div v-if="!isEmptyRichDoc((item as DbQuestion).summary)" class="space-y-2">
-          <div class="text-sm font-semibold text-foreground">总结</div>
+          <div class="text-sm font-semibold text-foreground">{{ t('questionItem.summary') }}</div>
           <div class="text-sm bg-muted/20 p-3 rounded [&_.prose]:my-0 [&_.prose_p]:my-0">
             <RichContent :content="(item as DbQuestion).summary" />
           </div>
@@ -528,27 +531,27 @@ const sourcePreviewQuery = computed(() => {
         <div class="text-xs text-muted-foreground flex flex-col gap-1.5 pt-3 border-t border-border/50">
           <div class="flex flex-wrap gap-x-6 gap-y-1">
             <div>
-              <span class="font-medium">创建:</span> {{ (item as DbQuestion).creator?.full_name || (item as DbQuestion).creator?.username || 'Unknown' }}
-              <span class="ml-1">{{ new Date((item as DbQuestion).created_at + 'Z').toLocaleString() }}</span>
+              <span class="font-medium">{{ t('questionItem.createdBy') }}</span> {{ (item as DbQuestion).creator?.full_name || (item as DbQuestion).creator?.username || t('common.unknown') }}
+              <span class="ml-1">{{ formatDateTime((item as DbQuestion).created_at + 'Z') }}</span>
             </div>
             <div>
-              <span class="font-medium">更新:</span> {{ (item as DbQuestion).updater?.full_name || (item as DbQuestion).updater?.username || 'Unknown' }}
-              <span class="ml-1">{{ new Date((item as DbQuestion).updated_at + 'Z').toLocaleString() }}</span>
+              <span class="font-medium">{{ t('questionItem.updatedBy') }}</span> {{ (item as DbQuestion).updater?.full_name || (item as DbQuestion).updater?.username || t('common.unknown') }}
+              <span class="ml-1">{{ formatDateTime((item as DbQuestion).updated_at + 'Z') }}</span>
             </div>
           </div>
           <div class="flex flex-col gap-1">
             <div class="flex items-center gap-2">
-              <span class="font-medium">审核次数:</span> {{ (item as DbQuestion).review_count }}
+              <span class="font-medium">{{ t('questionItem.reviewCount') }}</span> {{ (item as DbQuestion).review_count }}
             </div>
             <div v-if="(item as DbQuestion).review_logs?.length" class="flex gap-1 flex-wrap mt-1">
                <span v-for="log in (item as DbQuestion).review_logs" :key="log.id" class="bg-muted px-2 py-0.5 rounded text-[10px] flex items-center gap-1">
                   <History class="w-3 h-3" />
-                  {{ log.user?.full_name || log.user?.username }} ({{ new Date(log.created_at + 'Z').toLocaleDateString() }})
+                  {{ log.user?.full_name || log.user?.username }} ({{ formatDate(log.created_at + 'Z') }})
                </span>
             </div>
           </div>
           <div v-if="(item as DbQuestion).source">
-            <span class="font-medium">来源:</span> {{ (item as DbQuestion).source }}
+            <span class="font-medium">{{ t('questionItem.source') }}</span> {{ (item as DbQuestion).source }}
           </div>
         </div>
       </div>

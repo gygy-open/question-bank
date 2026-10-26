@@ -1,4 +1,5 @@
 import type { User, LoginRequest, UserUpdatePassword } from '~/types'
+import { translate } from '@/lib/locale'
 
 export const useAuth = () => {
   const token = useCookie<string | null>('token', {
@@ -52,7 +53,7 @@ export const useAuth = () => {
       const loggedInUser = await fetchUser()
       if (!loggedInUser) {
         token.value = null
-        throw new Error('登录校验失败，请检查网络连接与设备时间后重试')
+        throw new Error(translate('auth.login.verifyFailed'))
       }
       return true
     } catch (error) {

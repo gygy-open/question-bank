@@ -13,6 +13,8 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Loader2 } from '@lucide/vue'
 
+const { t } = useI18n()
+
 const props = defineProps<{
   open: boolean
 }>()
@@ -41,15 +43,15 @@ watch(() => props.open, (newVal) => {
 
 const handleSubmit = async () => {
   if (!formData.current_password) {
-    toast.error('请输入当前密码')
+    toast.error(t('changePassword.currentRequired'))
     return
   }
   if (!formData.new_password) {
-    toast.error('请输入新密码')
+    toast.error(t('changePassword.newRequired'))
     return
   }
   if (formData.new_password !== formData.confirm_password) {
-    toast.error('两次输入的密码不一致')
+    toast.error(t('changePassword.mismatch'))
     return
   }
 
@@ -62,10 +64,10 @@ const handleSubmit = async () => {
         new_password: formData.new_password,
       },
     })
-    toast.success('密码修改成功')
+    toast.success(t('changePassword.success'))
     emit('update:open', false)
   } catch (error: any) {
-    const detail = error.data?.detail || '修改失败'
+    const detail = error.data?.detail || t('changePassword.failed')
     toast.error(detail)
   } finally {
     isLoading.value = false
@@ -77,15 +79,15 @@ const handleSubmit = async () => {
   <Dialog :open="open" @update:open="$emit('update:open', $event)">
     <DialogContent class="sm:max-w-[425px]">
       <DialogHeader>
-        <DialogTitle>修改密码</DialogTitle>
+        <DialogTitle>{{ t('changePassword.title') }}</DialogTitle>
         <DialogDescription>
-          请输入当前密码和新密码。
+          {{ t('changePassword.description') }}
         </DialogDescription>
       </DialogHeader>
       <div class="grid gap-4 py-4">
         <div class="grid grid-cols-4 items-center gap-4">
           <Label for="current_password" class="text-right">
-            当前密码
+            {{ t('changePassword.current') }}
           </Label>
           <Input
             id="current_password"
@@ -96,7 +98,7 @@ const handleSubmit = async () => {
         </div>
         <div class="grid grid-cols-4 items-center gap-4">
           <Label for="new_password" class="text-right">
-            新密码
+            {{ t('changePassword.new') }}
           </Label>
           <Input
             id="new_password"
@@ -107,7 +109,7 @@ const handleSubmit = async () => {
         </div>
         <div class="grid grid-cols-4 items-center gap-4">
           <Label for="confirm_password" class="text-right">
-            确认新密码
+            {{ t('changePassword.confirm') }}
           </Label>
           <Input
             id="confirm_password"
@@ -120,7 +122,7 @@ const handleSubmit = async () => {
       <DialogFooter>
         <Button type="submit" @click="handleSubmit" :disabled="isLoading">
           <Loader2 v-if="isLoading" class="mr-2 h-4 w-4 animate-spin" />
-          保存
+          {{ t('common.save') }}
         </Button>
       </DialogFooter>
     </DialogContent>

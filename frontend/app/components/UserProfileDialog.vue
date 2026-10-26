@@ -16,6 +16,8 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Loader2, Upload } from '@lucide/vue'
 import { useMedia } from '@/composables/useMedia'
 
+const { t } = useI18n()
+
 const props = defineProps<{
   open: boolean
 }>()
@@ -50,7 +52,7 @@ const handleFileSelect = async (event: Event) => {
 
   const file = input.files[0]
   if (!file.type.startsWith('image/')) {
-    toast.error('请选择图片文件')
+    toast.error(t('profile.selectImage'))
     return
   }
 
@@ -58,9 +60,9 @@ const handleFileSelect = async (event: Event) => {
   try {
     const asset = await uploadUserMedia('avatar', file)
     formData.avatar_url = asset.url
-    toast.success('头像上传成功')
+    toast.success(t('profile.avatarUploaded'))
   } catch (error: any) {
-    const detail = error.data?.detail || '上传失败'
+    const detail = error.data?.detail || t('common.uploadFailed')
     toast.error(detail)
   } finally {
     isUploading.value = false
@@ -84,10 +86,10 @@ const handleSubmit = async () => {
       },
     })
     await fetchUser()
-    toast.success('个人信息更新成功')
+    toast.success(t('profile.updated'))
     emit('update:open', false)
   } catch (error: any) {
-    const detail = error.data?.detail || '更新失败'
+    const detail = error.data?.detail || t('common.updateFailed')
     toast.error(detail)
   } finally {
     isLoading.value = false
@@ -99,9 +101,9 @@ const handleSubmit = async () => {
   <Dialog :open="open" @update:open="$emit('update:open', $event)">
     <DialogContent class="sm:max-w-[425px]">
       <DialogHeader>
-        <DialogTitle>个人资料</DialogTitle>
+        <DialogTitle>{{ t('profile.title') }}</DialogTitle>
         <DialogDescription>
-          修改您的个人信息。
+          {{ t('profile.description') }}
         </DialogDescription>
       </DialogHeader>
       <div class="grid gap-4 py-4">
@@ -114,7 +116,7 @@ const handleSubmit = async () => {
             <Button variant="outline" size="sm" @click="triggerFileInput" :disabled="isUploading">
               <Loader2 v-if="isUploading" class="mr-2 h-4 w-4 animate-spin" />
               <Upload v-else class="mr-2 h-4 w-4" />
-              上传头像
+              {{ t('profile.uploadAvatar') }}
             </Button>
             <input
               ref="fileInput"
@@ -127,7 +129,7 @@ const handleSubmit = async () => {
         </div>
         <div class="grid grid-cols-4 items-center gap-4">
           <Label for="username" class="text-right">
-            用户名
+            {{ t('profile.username') }}
           </Label>
           <Input
             id="username"
@@ -138,7 +140,7 @@ const handleSubmit = async () => {
         </div>
         <div class="grid grid-cols-4 items-center gap-4">
           <Label for="full_name" class="text-right">
-            姓名
+            {{ t('profile.fullName') }}
           </Label>
           <Input
             id="full_name"
@@ -151,7 +153,7 @@ const handleSubmit = async () => {
       <DialogFooter>
         <Button type="submit" @click="handleSubmit" :disabled="isLoading || isUploading">
           <Loader2 v-if="isLoading" class="mr-2 h-4 w-4 animate-spin" />
-          保存
+          {{ t('common.save') }}
         </Button>
       </DialogFooter>
     </DialogContent>

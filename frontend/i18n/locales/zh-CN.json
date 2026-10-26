@@ -1,4 +1,27 @@
 {
+  "app": {
+    "name": "题库系统",
+    "slogan": "AI原生的题库系统"
+  },
+  "common": {
+    "save": "保存",
+    "clear": "清除",
+    "copied": "已复制",
+    "unknownError": "未知错误",
+    "uploadFailed": "上传失败",
+    "updateFailed": "更新失败",
+    "edit": "编辑",
+    "delete": "删除",
+    "copy": "复制",
+    "reset": "重置",
+    "retry": "重试",
+    "all": "全部",
+    "noData": "暂无数据",
+    "moreActions": "更多操作",
+    "prevPage": "上一页",
+    "nextPage": "下一页",
+    "unknown": "未知"
+  },
   "language": {
     "label": "语言",
     "switch": "切换语言"
@@ -71,7 +94,235 @@
       "invalidCredentials": "用户名或密码错误",
       "failed": "登录失败",
       "noAccount": "还没有账户？",
-      "register": "立即注册"
+      "register": "立即注册",
+      "verifyFailed": "登录校验失败，请检查网络连接与设备时间后重试"
+    }
+  },
+  "subjectSelector": {
+    "switch": "切换学科",
+    "switchFailed": "切换学科失败",
+    "select": "选择学科",
+    "createFirst": "请先创建学科",
+    "noneAvailable": "暂无可用学科",
+    "contactAdmin": "请联系管理员开通"
+  },
+  "questionBankNav": {
+    "label": "题库分类",
+    "questions": "题目",
+    "materials": "材料题"
+  },
+  "basket": {
+    "title": "试题篮",
+    "description": "暂存的题目，可一键加入稿件",
+    "clearAll": "清空试题篮",
+    "empty": "试题篮是空的",
+    "subjectFallback": "学科 {id}",
+    "groupCount": "{count} 题",
+    "addToComposition": "加入稿件",
+    "clearGroup": "清空本组",
+    "difficulty": "难度 {level}",
+    "noContent": "（无题干文本）",
+    "add": "加入试题篮",
+    "remove": "移出试题篮",
+    "added": "已加入试题篮",
+    "removed": "已移出试题篮",
+    "addedMany": "已将 {count} 道题加入试题篮",
+    "types": {
+      "singleChoice": "单选",
+      "multipleChoice": "多选",
+      "trueFalse": "判断",
+      "fillInTheBlank": "填空",
+      "freeResponse": "解答",
+      "optionMatching": "匹配"
+    }
+  },
+  "questions": {
+    "types": {
+      "singleChoice": "单选题",
+      "multipleChoice": "多选题",
+      "trueFalse": "判断题",
+      "fillInTheBlank": "填空题",
+      "freeResponse": "解答题",
+      "optionMatching": "选项匹配"
+    },
+    "statuses": {
+      "draft": "草稿",
+      "pending": "待审核",
+      "pendingProgress": "待审核 ({count}/{required})",
+      "published": "已发布",
+      "archived": "已归档"
+    },
+    "list": {
+      "create": "创建题目",
+      "createSingle": "单题",
+      "createSingleDesc": "一道可独立作答的题",
+      "createMaterial": "材料题",
+      "createMaterialDesc": "一段材料 + 多道小题，如阅读理解",
+      "description": "题库中的全部题目，包括单题和材料题的小题。小题加入稿件时会带上所属材料。",
+      "importTaskBanner": "正在查看最新导入的题目任务",
+      "resetFilters": "重置筛选",
+      "selectAllPage": "全选本页",
+      "invertSelection": "反选",
+      "selectedCount": "已选 {count} 项",
+      "addToComposition": "直接加入稿件",
+      "editSource": "修改来源",
+      "total": "共 {total} 道题目",
+      "perPage": "每页",
+      "deleteConfirm": "确定要删除这道题目吗？",
+      "batchDeleteConfirm": "确定要删除选中的 {count} 道题目吗？此操作不可恢复。",
+      "batchDeleted": "已删除 {count} 道题目",
+      "batchDeleteFailed": "批量删除失败",
+      "sourceUpdated": "已更新 {count} 道题目的来源",
+      "sourceUpdateFailed": "批量更新来源失败"
+    },
+    "filters": {
+      "keyword": "关键词",
+      "keywordPlaceholder": "搜索题目内容...",
+      "id": "题目ID",
+      "idPlaceholder": "按ID精确查找",
+      "status": "状态",
+      "allStatuses": "全部状态",
+      "type": "题型",
+      "allTypes": "全部题型",
+      "difficulty": "难度",
+      "allDifficulties": "全部难度",
+      "knowledgePoint": "知识点",
+      "knowledgePointSelected": "已选 {count} 个知识点",
+      "selectedCount": "已选 {count} 个",
+      "tags": "标签",
+      "membership": "归属",
+      "membershipIndependent": "单题",
+      "membershipGrouped": "材料题小题",
+      "more": "更多筛选",
+      "source": "来源",
+      "sourcePlaceholder": "搜索来源...",
+      "importTask": "导入任务",
+      "importTaskPlaceholder": "搜索任务名称...",
+      "reviewCount": "审核次数",
+      "reviewCountPlaceholder": "次数",
+      "creator": "创建人",
+      "allCreators": "全部创建人",
+      "reviewer": "审核人",
+      "allReviewers": "全部审核人"
+    },
+    "batchSource": {
+      "title": "批量修改来源",
+      "description": "请输入新的来源名称。这将更新选中的 {count} 道题目。",
+      "label": "来源",
+      "placeholder": "例如：2024年期末考试",
+      "submit": "保存更改"
+    }
+  },
+  "materials": {
+    "create": "新建材料题",
+    "description": "一段文章、图表或背景材料加上围绕它的若干小题，如阅读理解、完形填空、材料分析。加入稿件时材料与小题一起出现。",
+    "tabs": {
+      "active": "当前",
+      "deleted": "回收站"
+    },
+    "filters": {
+      "keyword": "关键词",
+      "keywordPlaceholder": "搜索材料内容或来源",
+      "status": "状态",
+      "visibility": "可见性",
+      "allVisibility": "全部可见性",
+      "public": "公开",
+      "private": "私有",
+      "usage": "出题情况",
+      "usageEmpty": "待出题",
+      "usageFilled": "已有小题"
+    },
+    "selectSubjectFirst": "请先选择学科",
+    "loadFailed": "材料题加载失败",
+    "empty": "暂无材料题。",
+    "emptyDeleted": "回收站中暂无材料题。",
+    "total": "共 {total} 道材料题",
+    "pageInfo": "第 {page} / {pages} 页",
+    "detailLoadFailed": "加载材料题失败",
+    "deleteConfirm": "确定删除材料题 #{id} 吗？",
+    "movedToTrash": "材料题已移入回收站",
+    "deleteFailed": "删除材料题失败",
+    "restored": "材料题已恢复",
+    "restoreFailed": "恢复材料题失败"
+  },
+  "questionItem": {
+    "copyIdTitle": "点击复制题目ID：{id}",
+    "idCopied": "已复制题目ID：{id}",
+    "copyFailed": "复制失败，请手动选中复制",
+    "private": "私有",
+    "materialLink": "材料题 #{id}",
+    "difficulty": "难度",
+    "difficultyValue": "难度 {level}",
+    "approve": "通过审核",
+    "viewSource": "查看源文件",
+    "createDerived": "创建派生题",
+    "viewDerived": "查看派生关系",
+    "emptyContent": "（空）",
+    "knowledgePointCount": "{count} 个知识点",
+    "noKnowledgePoint": "未选择知识点",
+    "expand": "展开详情",
+    "collapse": "收起详情",
+    "answer": "答案",
+    "notFilled": "未填写",
+    "thinking": "分析",
+    "analysis": "解析",
+    "summary": "总结",
+    "createdBy": "创建:",
+    "updatedBy": "更新:",
+    "reviewCount": "审核次数:",
+    "source": "来源:"
+  },
+  "knowledgePoint": {
+    "selectPlaceholder": "选择知识点...",
+    "searchPlaceholder": "搜索知识点...",
+    "all": "全部知识点",
+    "noMatch": "未找到匹配的知识点",
+    "remove": "移除 {name}"
+  },
+  "tagFilter": {
+    "placeholder": "选择标签...",
+    "searchPlaceholder": "搜索标签...",
+    "empty": "未找到标签",
+    "uncategorized": "未分类",
+    "selectedCount": "已选 {count} 个"
+  },
+  "profile": {
+    "title": "个人资料",
+    "description": "修改您的个人信息。",
+    "uploadAvatar": "上传头像",
+    "username": "用户名",
+    "fullName": "姓名",
+    "selectImage": "请选择图片文件",
+    "avatarUploaded": "头像上传成功",
+    "updated": "个人信息更新成功"
+  },
+  "changePassword": {
+    "title": "修改密码",
+    "description": "请输入当前密码和新密码。",
+    "current": "当前密码",
+    "new": "新密码",
+    "confirm": "确认新密码",
+    "currentRequired": "请输入当前密码",
+    "newRequired": "请输入新密码",
+    "mismatch": "两次输入的密码不一致",
+    "success": "密码修改成功",
+    "failed": "修改失败"
+  },
+  "lanShare": {
+    "menu": "共享访问地址",
+    "tooltip": "局域网共享已开启，点击查看访问地址",
+    "title": "局域网访问地址",
+    "description": "同一 WiFi / 局域网下的手机或电脑，在浏览器打开下面的地址即可访问本题库。",
+    "copy": "复制地址",
+    "tips": {
+      "sameWifi": "手机需连接与本机{em}。",
+      "sameWifiEm": "相同的 WiFi",
+      "ownAccount": "每位同事用{em}登录。",
+      "ownAccountEm": "各自的账号",
+      "keepRunning": "本机{em}后，他人将无法访问。",
+      "keepRunningEm": "关机或退出应用",
+      "ipChange": "若本机 IP 变化（重启后），此地址会随之更新。",
+      "hostnameAndroid": "更好记的地址可能在安卓手机上无法打开，此时请改用上方 IP 地址。"
     }
   }
 }

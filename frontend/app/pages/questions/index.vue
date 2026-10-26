@@ -54,6 +54,7 @@ import ClearableSelect from '@/components/ClearableSelect.vue'
 import { toast } from 'vue-sonner'
 
 
+const { t } = useI18n()
 const { $api } = useNuxtApp()
 const route = useRoute()
 const router = useRouter()
@@ -233,7 +234,7 @@ const batchAddToBasket = () => {
     q_type: q.q_type,
     difficulty: q.difficulty,
   })))
-  toast.success(`已将 ${ids.length} 道题加入试题篮`)
+  toast.success(t('basket.addedMany', { count: ids.length }))
   selectedIds.value.clear()
 }
 
@@ -252,7 +253,7 @@ const batchDelete = async () => {
   const ids = Array.from(selectedIds.value)
   if (ids.length === 0) return
   
-  if (!confirm(`确定要删除选中的 ${ids.length} 道题目吗？此操作不可恢复。`)) return
+  if (!confirm(t('questions.list.batchDeleteConfirm', { count: ids.length }))) return
   
   try {
     const res = await $api<{ deleted_count: number }>('/questions/batch-delete', {
@@ -260,12 +261,12 @@ const batchDelete = async () => {
       body: { ids }
     })
     
-    toast.success(`已删除 ${res.deleted_count} 道题目`)
+    toast.success(t('questions.list.batchDeleted', { count: res.deleted_count }))
     selectedIds.value.clear()
     refreshQuestions()
   } catch (error) {
     console.error(error)
-    toast.error('批量删除失败')
+    toast.error(t('questions.list.batchDeleteFailed'))
   }
 }
 
@@ -292,13 +293,13 @@ const batchUpdateSource = async () => {
       }
     })
     
-    toast.success(`已更新 ${res.updated_count} 道题目的来源`)
+    toast.success(t('questions.list.sourceUpdated', { count: res.updated_count }))
     isSourceDialogOpen.value = false
     selectedIds.value.clear()
     refreshQuestions()
   } catch (error) {
     console.error(error)
-    toast.error('批量更新来源失败')
+    toast.error(t('questions.list.sourceUpdateFailed'))
   }
 }
 
@@ -352,35 +353,35 @@ const { data: users } = await useAPI<User[]>('/users', {
 })
 
 // Options for Selects
-const statusOptions = [
-  { label: '全部状态', value: '0' },
-  { label: '草稿', value: 'draft' },
-  { label: '待审核', value: 'pending' },
-  { label: '已发布', value: 'published' },
-  { label: '已归档', value: 'archived' },
-]
+const statusOptions = computed(() => [
+  { label: t('questions.filters.allStatuses'), value: '0' },
+  { label: t('questions.statuses.draft'), value: 'draft' },
+  { label: t('questions.statuses.pending'), value: 'pending' },
+  { label: t('questions.statuses.published'), value: 'published' },
+  { label: t('questions.statuses.archived'), value: 'archived' },
+])
 
-const qTypeOptions = [
-  { label: '全部题型', value: '0' },
-  { label: '单选题', value: 'single_choice' },
-  { label: '多选题', value: 'multiple_choice' },
-  { label: '判断题', value: 'true_false' },
-  { label: '填空题', value: 'fill_in_the_blank' },
-  { label: '解答题', value: 'free_response' },
-  { label: '选项匹配', value: 'option_matching' },
-]
+const qTypeOptions = computed(() => [
+  { label: t('questions.filters.allTypes'), value: '0' },
+  { label: t('questions.types.singleChoice'), value: 'single_choice' },
+  { label: t('questions.types.multipleChoice'), value: 'multiple_choice' },
+  { label: t('questions.types.trueFalse'), value: 'true_false' },
+  { label: t('questions.types.fillInTheBlank'), value: 'fill_in_the_blank' },
+  { label: t('questions.types.freeResponse'), value: 'free_response' },
+  { label: t('questions.types.optionMatching'), value: 'option_matching' },
+])
 
-const difficultyOptions = [
-  { label: '全部难度', value: '0' },
+const difficultyOptions = computed(() => [
+  { label: t('questions.filters.allDifficulties'), value: '0' },
   { label: '1', value: '1' },
   { label: '2', value: '2' },
   { label: '3', value: '3' },
   { label: '4', value: '4' },
   { label: '5', value: '5' },
-]
+])
 
 const userOptions = computed(() => {
-  const opts = [{ label: '全部', value: '0' }]
+  const opts = [{ label: t('common.all'), value: '0' }]
   if (users.value) {
     opts.push(...users.value.map(u => ({
       label: u.full_name || u.username,
@@ -392,7 +393,7 @@ const userOptions = computed(() => {
 
 // --- Actions ---
 const deleteQuestion = async (id: number) => {
-  if (!confirm('确定要删除这道题目吗？')) return
+  if (!confirm(t('questions.list.deleteConfirm'))) return
   try {
     await $api(`/questions/${id}`, {
       method: 'DELETE',
@@ -446,9 +447,9 @@ const selectedKnowledgePointNames = computed(() => {
 })
 const knowledgePointFilterLabel = computed(() => {
   const names = selectedKnowledgePointNames.value
-  if (names.length === 0) return '全部知识点'
+  if (names.length === 0) return t('knowledgePoint.all')
   if (names.length === 1) return names[0]
-  return `已选 ${names.length} 个知识点`
+  return t('questions.filters.knowledgePointSelected', { count: names.length })
 })
 const toggleKnowledgePoint = (id: string) => {
   const index = filters.knowledge_point_ids.indexOf(id)
@@ -537,13 +538,13 @@ const viewStructure = (question: Question) => {
 
 <template>
   <!-- Header -->
-  <PageHeader title="题库">
+  <PageHeader :title="t('nav.questionBank')">
     <template #actions>
       <DropdownMenu v-if="canEditCurrentSubject">
         <DropdownMenuTrigger as-child>
           <Button size="sm">
             <Plus class="mr-2 h-4 w-4" />
-            创建题目
+            {{ t('questions.list.create') }}
             <ChevronDown class="ml-1 h-4 w-4" />
           </Button>
         </DropdownMenuTrigger>
@@ -551,15 +552,15 @@ const viewStructure = (question: Question) => {
           <DropdownMenuItem class="items-start" @click="createQuestion">
             <FileText class="mt-0.5 mr-2 h-4 w-4" />
             <div>
-              <div class="font-medium">单题</div>
-              <div class="text-xs text-muted-foreground">一道可独立作答的题</div>
+              <div class="font-medium">{{ t('questions.list.createSingle') }}</div>
+              <div class="text-xs text-muted-foreground">{{ t('questions.list.createSingleDesc') }}</div>
             </div>
           </DropdownMenuItem>
           <DropdownMenuItem class="items-start" @click="router.push('/materials/new')">
             <Layers3 class="mt-0.5 mr-2 h-4 w-4" />
             <div>
-              <div class="font-medium">材料题</div>
-              <div class="text-xs text-muted-foreground">一段材料 + 多道小题，如阅读理解</div>
+              <div class="font-medium">{{ t('questions.list.createMaterial') }}</div>
+              <div class="text-xs text-muted-foreground">{{ t('questions.list.createMaterialDesc') }}</div>
             </div>
           </DropdownMenuItem>
         </DropdownMenuContent>
@@ -569,13 +570,13 @@ const viewStructure = (question: Question) => {
   <QuestionBankNav />
   <div class="flex flex-1 flex-col">
     <div class="@container/main flex flex-1 flex-col px-4 space-y-6 py-6">
-      <p class="text-sm text-muted-foreground">题库中的全部题目，包括单题和材料题的小题。小题加入稿件时会带上所属材料。</p>
+      <p class="text-sm text-muted-foreground">{{ t('questions.list.description') }}</p>
       
       <div v-if="filters.import_task_id" class="bg-primary/10 text-primary px-4 py-3 rounded-md flex items-center justify-between">
-          <span class="text-sm font-medium">正在查看最新导入的题目任务</span>
+          <span class="text-sm font-medium">{{ t('questions.list.importTaskBanner') }}</span>
           <Button variant="ghost" size="sm" @click="resetFilters" class="h-8 hover:bg-primary/20">
               <X class="mr-2 h-4 w-4" />
-              重置筛选
+              {{ t('questions.list.resetFilters') }}
           </Button>
       </div>
 
@@ -587,32 +588,32 @@ const viewStructure = (question: Question) => {
                 <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
                   <!-- Keyword Filter -->
                   <div class="space-y-2 sm:col-span-2 xl:col-span-1">
-                    <Label class="text-xs font-medium">关键词</Label>
-                    <ClearableInput v-model="filters.keyword" placeholder="搜索题目内容..." />
+                    <Label class="text-xs font-medium">{{ t('questions.filters.keyword') }}</Label>
+                    <ClearableInput v-model="filters.keyword" :placeholder="t('questions.filters.keywordPlaceholder')" />
                   </div>
 
                   <!-- ID Filter: exact match, scoped to the current subject like every other filter here -->
                   <div class="space-y-2">
-                    <Label class="text-xs font-medium">题目ID</Label>
-                    <ClearableInput v-model="filters.id" type="number" placeholder="按ID精确查找" />
+                    <Label class="text-xs font-medium">{{ t('questions.filters.id') }}</Label>
+                    <ClearableInput v-model="filters.id" type="number" :placeholder="t('questions.filters.idPlaceholder')" />
                   </div>
 
                   <!-- Status Filter -->
                   <div class="space-y-2">
-                    <Label class="text-xs font-medium">状态</Label>
-                    <ClearableSelect v-model="filters.status" :options="statusOptions" placeholder="全部状态" />
+                    <Label class="text-xs font-medium">{{ t('questions.filters.status') }}</Label>
+                    <ClearableSelect v-model="filters.status" :options="statusOptions" :placeholder="t('questions.filters.allStatuses')" />
                   </div>
 
                   <!-- Type Filter -->
                   <div class="space-y-2">
-                    <Label class="text-xs font-medium">题型</Label>
-                    <ClearableSelect v-model="filters.q_type" :options="qTypeOptions" placeholder="全部题型" />
+                    <Label class="text-xs font-medium">{{ t('questions.filters.type') }}</Label>
+                    <ClearableSelect v-model="filters.q_type" :options="qTypeOptions" :placeholder="t('questions.filters.allTypes')" />
                   </div>
 
                   <!-- Difficulty Filter -->
                   <div class="space-y-2">
-                    <Label class="text-xs font-medium">难度</Label>
-                    <ClearableSelect v-model="filters.difficulty" :options="difficultyOptions" placeholder="全部难度" />
+                    <Label class="text-xs font-medium">{{ t('questions.filters.difficulty') }}</Label>
+                    <ClearableSelect v-model="filters.difficulty" :options="difficultyOptions" :placeholder="t('questions.filters.allDifficulties')" />
                   </div>
                 </div>
 
@@ -621,7 +622,7 @@ const viewStructure = (question: Question) => {
                   <div class="flex flex-1 flex-wrap gap-4">
                   <!-- Knowledge Point Filter: popover replaces the old dedicated sidebar column -->
                   <div class="space-y-2 flex-1 min-w-[200px] max-w-sm">
-                    <Label class="text-xs font-medium">知识点</Label>
+                    <Label class="text-xs font-medium">{{ t('questions.filters.knowledgePoint') }}</Label>
                     <Popover v-model:open="kpPopoverOpen">
                       <PopoverTrigger as-child>
                         <Button variant="outline" role="combobox" :aria-expanded="kpPopoverOpen" class="h-9 w-full justify-between font-normal">
@@ -647,8 +648,8 @@ const viewStructure = (question: Question) => {
                           />
                         </div>
                         <div v-if="selectedKnowledgePointNames.length > 0" class="flex items-center justify-between pt-2 mt-1 border-t px-1">
-                          <span class="text-xs text-muted-foreground">已选 {{ selectedKnowledgePointNames.length }} 个</span>
-                          <Button variant="ghost" size="sm" class="h-auto px-2 py-1 text-xs" @click="clearKnowledgePoints">清除</Button>
+                          <span class="text-xs text-muted-foreground">{{ t('questions.filters.selectedCount', { count: selectedKnowledgePointNames.length }) }}</span>
+                          <Button variant="ghost" size="sm" class="h-auto px-2 py-1 text-xs" @click="clearKnowledgePoints">{{ t('common.clear') }}</Button>
                         </div>
                       </PopoverContent>
                     </Popover>
@@ -656,7 +657,7 @@ const viewStructure = (question: Question) => {
 
                   <!-- Tag Filter -->
                   <div class="space-y-2 flex-1 min-w-[240px] max-w-sm">
-                    <Label class="text-xs font-medium">标签</Label>
+                    <Label class="text-xs font-medium">{{ t('questions.filters.tags') }}</Label>
                     <TagFilter 
                       v-model="filters.tag_ids" 
                       :tags="tags || []" 
@@ -666,7 +667,7 @@ const viewStructure = (question: Question) => {
                   </div>
 
                   <div class="space-y-2">
-                    <Label class="text-xs font-medium">归属</Label>
+                    <Label class="text-xs font-medium">{{ t('questions.filters.membership') }}</Label>
                     <ToggleGroup
                       :model-value="filters.membership"
                       type="single"
@@ -674,9 +675,9 @@ const viewStructure = (question: Question) => {
                       size="sm"
                       @update:model-value="filters.membership = ($event || 'all') as typeof filters.membership"
                     >
-                      <ToggleGroupItem value="all">全部</ToggleGroupItem>
-                      <ToggleGroupItem value="independent">单题</ToggleGroupItem>
-                      <ToggleGroupItem value="grouped">材料题小题</ToggleGroupItem>
+                      <ToggleGroupItem value="all">{{ t('common.all') }}</ToggleGroupItem>
+                      <ToggleGroupItem value="independent">{{ t('questions.filters.membershipIndependent') }}</ToggleGroupItem>
+                      <ToggleGroupItem value="grouped">{{ t('questions.filters.membershipGrouped') }}</ToggleGroupItem>
                     </ToggleGroup>
                   </div>
 
@@ -687,7 +688,7 @@ const viewStructure = (question: Question) => {
                     <PopoverTrigger as-child>
                       <Button variant="secondary">
                         <SlidersHorizontal class="mr-2 h-4 w-4" />
-                        更多筛选
+                        {{ t('questions.filters.more') }}
                         <Badge v-if="secondaryFilterCount > 0" variant="secondary" class="ml-1 px-1.5">
                           {{ secondaryFilterCount }}
                         </Badge>
@@ -697,32 +698,32 @@ const viewStructure = (question: Question) => {
                       <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         <!-- Source Filter -->
                         <div class="space-y-2">
-                          <Label class="text-xs font-medium">来源</Label>
-                          <ClearableInput v-model="filters.source" placeholder="搜索来源..." />
+                          <Label class="text-xs font-medium">{{ t('questions.filters.source') }}</Label>
+                          <ClearableInput v-model="filters.source" :placeholder="t('questions.filters.sourcePlaceholder')" />
                         </div>
 
                         <!-- Import Task Name Filter -->
                         <div class="space-y-2">
-                          <Label class="text-xs font-medium">导入任务</Label>
-                          <ClearableInput v-model="filters.import_task_name" placeholder="搜索任务名称..." />
+                          <Label class="text-xs font-medium">{{ t('questions.filters.importTask') }}</Label>
+                          <ClearableInput v-model="filters.import_task_name" :placeholder="t('questions.filters.importTaskPlaceholder')" />
                         </div>
 
                         <!-- Review Count Filter -->
                         <div class="space-y-2">
-                          <Label class="text-xs font-medium">审核次数</Label>
-                          <ClearableInput v-model="filters.review_count" type="number" placeholder="次数" />
+                          <Label class="text-xs font-medium">{{ t('questions.filters.reviewCount') }}</Label>
+                          <ClearableInput v-model="filters.review_count" type="number" :placeholder="t('questions.filters.reviewCountPlaceholder')" />
                         </div>
 
                         <!-- Creator Filter -->
                         <div class="space-y-2">
-                          <Label class="text-xs font-medium">创建人</Label>
-                          <ClearableSelect v-model="filters.creator_id" :options="userOptions" placeholder="全部创建人" />
+                          <Label class="text-xs font-medium">{{ t('questions.filters.creator') }}</Label>
+                          <ClearableSelect v-model="filters.creator_id" :options="userOptions" :placeholder="t('questions.filters.allCreators')" />
                         </div>
 
                         <!-- Reviewer Filter -->
                         <div class="space-y-2 sm:col-span-2">
-                          <Label class="text-xs font-medium">审核人</Label>
-                          <ClearableSelect v-model="filters.reviewer_id" :options="userOptions" placeholder="全部审核人" />
+                          <Label class="text-xs font-medium">{{ t('questions.filters.reviewer') }}</Label>
+                          <ClearableSelect v-model="filters.reviewer_id" :options="userOptions" :placeholder="t('questions.filters.allReviewers')" />
                         </div>
                       </div>
                     </PopoverContent>
@@ -739,7 +740,7 @@ const viewStructure = (question: Question) => {
                   <!-- Reset Button -->
                   <Button variant="secondary" @click="resetFilters">
                     <X class="mr-2 h-4 w-4" />
-                    重置
+                    {{ t('common.reset') }}
                   </Button>
                   </div>
                 </div>
@@ -754,33 +755,33 @@ const viewStructure = (question: Question) => {
                       :model-value="isAllPageSelected" 
                       @update:model-value="toggleAllPage" 
                     />
-                    <Label for="select-all" class="text-sm font-medium cursor-pointer">全选本页</Label>
-                    <Button variant="link" size="sm" class="h-auto p-0 text-muted-foreground" @click="invertSelection">反选</Button>
+                    <Label for="select-all" class="text-sm font-medium cursor-pointer">{{ t('questions.list.selectAllPage') }}</Label>
+                    <Button variant="link" size="sm" class="h-auto p-0 text-muted-foreground" @click="invertSelection">{{ t('questions.list.invertSelection') }}</Button>
                     
                     <div v-if="selectedIds.size > 0" class="flex items-center gap-2 ml-4 animate-in fade-in slide-in-from-left-5 duration-300">
-                      <span class="text-sm text-muted-foreground">已选 {{ selectedIds.size }} 项</span>
+                      <span class="text-sm text-muted-foreground">{{ t('questions.list.selectedCount', { count: selectedIds.size }) }}</span>
                       <Button size="sm" variant="outline" class="h-7 px-2" @click="batchAddToBasket">
                         <ShoppingBasket class="mr-1 h-3 w-3" />
-                        加入试题篮
+                        {{ t('basket.add') }}
                       </Button>
                       <Button size="sm" variant="outline" class="h-7 px-2" @click="batchAddDirectlyToComposition">
                         <FileText class="mr-1 h-3 w-3" />
-                        直接加入稿件
+                        {{ t('questions.list.addToComposition') }}
                       </Button>
                       <Button size="sm" variant="outline" class="h-7 px-2" @click="openBatchUpdateSourceDialog">
                         <Edit class="mr-1 h-3 w-3" />
-                        修改来源
+                        {{ t('questions.list.editSource') }}
                       </Button>
                       <Button size="sm" variant="destructive" class="h-7 px-2" @click="batchDelete">
                         <Trash2 class="mr-1 h-3 w-3" />
-                        删除
+                        {{ t('common.delete') }}
                       </Button>
                     </div>
                   </div>
                   <div class="flex items-center gap-4">
-                    <span class="text-sm text-muted-foreground">共 {{ total }} 道题目</span>
+                    <span class="text-sm text-muted-foreground">{{ t('questions.list.total', { total }) }}</span>
                     <div class="flex items-center gap-2">
-                      <span class="text-sm text-muted-foreground">每页</span>
+                      <span class="text-sm text-muted-foreground">{{ t('questions.list.perPage') }}</span>
                       <Select :model-value="String(pageSize)" @update:model-value="(v) => pageSize = Number(v)">
                         <SelectTrigger class="h-8 w-[80px]">
                           <SelectValue :placeholder="String(pageSize)" />
@@ -799,7 +800,7 @@ const viewStructure = (question: Question) => {
                   <Loader2 class="h-8 w-8 animate-spin text-muted-foreground" />
                 </div>
                 <div v-else-if="questions.length === 0" class="text-center py-8 text-muted-foreground">
-                  暂无数据
+                  {{ t('common.noData') }}
                 </div>
                 <div v-else class="space-y-4">
                   <QuestionListItem 
@@ -823,7 +824,7 @@ const viewStructure = (question: Question) => {
                   <Pagination v-model:page="page" :total="total" :sibling-count="1" show-edges :default-page="1"
                     :items-per-page="pageSize">
                     <PaginationContent v-slot="{ items }" class="flex items-center gap-1">
-                      <PaginationPrevious class="h-8 w-8 p-0" aria-label="上一页">
+                      <PaginationPrevious class="h-8 w-8 p-0" :aria-label="t('common.prevPage')">
                         <ChevronLeft class="h-4 w-4" />
                       </PaginationPrevious>
                       <template v-for="(item, index) in items">
@@ -840,7 +841,7 @@ const viewStructure = (question: Question) => {
                         </PaginationItem>
                         <PaginationEllipsis v-else :key="item.type" :index="index" class="size-8" />
                       </template>
-                      <PaginationNext class="h-8 w-8 p-0" aria-label="下一页">
+                      <PaginationNext class="h-8 w-8 p-0" :aria-label="t('common.nextPage')">
                         <ChevronRight class="h-4 w-4" />
                       </PaginationNext>
                     </PaginationContent>
@@ -874,26 +875,26 @@ const viewStructure = (question: Question) => {
   <Dialog :open="isSourceDialogOpen" @update:open="(v) => isSourceDialogOpen = v">
     <DialogContent class="sm:max-w-[425px]">
       <DialogHeader>
-        <DialogTitle>批量修改来源</DialogTitle>
+        <DialogTitle>{{ t('questions.batchSource.title') }}</DialogTitle>
         <DialogDescription>
-          请输入新的来源名称。这将更新选中的 {{ selectedIds.size }} 道题目。
+          {{ t('questions.batchSource.description', { count: selectedIds.size }) }}
         </DialogDescription>
       </DialogHeader>
       <div class="grid gap-4 py-4">
         <div class="grid grid-cols-4 items-center gap-4">
           <Label for="source" class="text-right">
-            来源
+            {{ t('questions.batchSource.label') }}
           </Label>
           <Input
             id="source"
             v-model="newSourceValue"
             class="col-span-3"
-            placeholder="例如：2024年期末考试"
+            :placeholder="t('questions.batchSource.placeholder')"
           />
         </div>
       </div>
       <DialogFooter>
-        <Button type="submit" @click="batchUpdateSource">保存更改</Button>
+        <Button type="submit" @click="batchUpdateSource">{{ t('questions.batchSource.submit') }}</Button>
       </DialogFooter>
     </DialogContent>
   </Dialog>

@@ -3,6 +3,8 @@ import { Button } from '@/components/ui/button'
 import { ShoppingBasket } from '@lucide/vue'
 import { useQuestionBasket } from '@/composables/useQuestionBasket'
 
+const { t } = useI18n()
+
 defineEmits<{ click: [] }>()
 
 const { count } = useQuestionBasket()
@@ -13,7 +15,7 @@ const { count } = useQuestionBasket()
     v-if="count > 0"
     size="icon"
     class="fixed bottom-24 right-6 z-40 h-12 w-12 rounded-full shadow-lg"
-    title="试题篮"
+    :title="t('basket.title')"
     @click="$emit('click')"
   >
     <ShoppingBasket class="h-5 w-5" />

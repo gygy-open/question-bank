@@ -9,6 +9,8 @@ import KnowledgePointTreeItem from './KnowledgePointTreeItem.vue'
 import { buildKnowledgePointTree, filterKnowledgePointTree } from '@/lib/knowledgePointTree'
 import type { KnowledgePoint } from '@/types'
 
+const { t } = useI18n()
+
 const props = withDefaults(defineProps<{
   modelValue: number[]
   knowledgePoints: KnowledgePoint[]
@@ -64,7 +66,7 @@ const remove = (id: number) => {
         :disabled="disabled"
       >
         <div class="flex flex-wrap gap-1 text-left">
-          <span v-if="modelValue.length === 0" class="text-muted-foreground">选择知识点...</span>
+          <span v-if="modelValue.length === 0" class="text-muted-foreground">{{ t('knowledgePoint.selectPlaceholder') }}</span>
           <Badge 
             v-for="entry in selectedEntries" 
             :key="entry.id" 
@@ -79,7 +81,7 @@ const remove = (id: number) => {
               @click.stop.prevent="remove(entry.id)"
             >
               <X class="h-3 w-3" aria-hidden="true" />
-              <span class="sr-only">移除 {{ entry.label }}</span>
+              <span class="sr-only">{{ t('knowledgePoint.remove', { name: entry.label }) }}</span>
             </button>
           </Badge>
         </div>
@@ -89,7 +91,7 @@ const remove = (id: number) => {
     <PopoverContent class="w-(--reka-popover-trigger-width) min-w-[280px] p-2">
       <div class="relative mb-2">
         <Search class="absolute left-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground pointer-events-none" />
-        <ClearableInput v-model="searchQuery" placeholder="搜索知识点..." class="pl-7" autofocus />
+        <ClearableInput v-model="searchQuery" :placeholder="t('knowledgePoint.searchPlaceholder')" class="pl-7" autofocus />
       </div>
       <div class="max-h-[300px] overflow-y-auto">
         <KnowledgePointTreeItem 
@@ -102,7 +104,7 @@ const remove = (id: number) => {
           @toggle="handleToggle" 
         />
         <div v-if="searchQuery && filteredTree.length === 0" class="py-4 text-center text-xs text-muted-foreground">
-          未找到匹配的知识点
+          {{ t('knowledgePoint.noMatch') }}
         </div>
       </div>
     </PopoverContent>

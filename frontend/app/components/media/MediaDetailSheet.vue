@@ -12,6 +12,7 @@ import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '
 import { useMedia, useMediaBatch, type MediaAssetListItem, type MediaReferences } from '@/composables/useMedia'
 import type { UploadedImageAttrs } from '@/components/rich-editor/useImageUpload'
 import { getApiErrorDetail } from '@/lib/apiErrors'
+import { formatDateTime } from '@/lib/locale'
 import { formatBytes, groupMediaReferences, mediaDimension, mediaFormat, mediaName, mediaReferenceLink, replaceableReferences } from '@/lib/mediaLibrary'
 
 const open = defineModel<boolean>('open', { required: true })
@@ -140,7 +141,7 @@ async function remove() {
                         <dt class="text-muted-foreground">{{ asset.kind === 'audio' ? '时长' : '尺寸' }}</dt><dd>{{ mediaDimension(asset) }}</dd>
                     </template>
                     <dt class="text-muted-foreground">大小</dt><dd>{{ formatBytes(asset.byte_size) }}</dd>
-                    <dt class="text-muted-foreground">上传时间</dt><dd>{{ new Date(asset.created_at).toLocaleString() }}</dd>
+                    <dt class="text-muted-foreground">上传时间</dt><dd>{{ formatDateTime(asset.created_at) }}</dd>
                 </dl>
 
                 <form class="space-y-3" @submit.prevent="save">

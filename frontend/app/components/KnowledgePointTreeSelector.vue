@@ -7,6 +7,8 @@ import ClearableInput from './ClearableInput.vue'
 import KnowledgePointTreeItem from './KnowledgePointTreeItem.vue'
 import { buildKnowledgePointTree, filterKnowledgePointTree } from '@/lib/knowledgePointTree'
 
+const { t } = useI18n()
+
 const props = defineProps<{
   knowledgePoints: KnowledgePoint[]
   selectedIds: string[]
@@ -26,7 +28,7 @@ const filteredTree = computed(() => filterKnowledgePointTree(tree.value, searchQ
   <div class="space-y-2">
     <div class="relative">
       <Search class="absolute left-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground pointer-events-none" />
-      <ClearableInput v-model="searchQuery" placeholder="搜索知识点..." class="pl-7" autofocus />
+      <ClearableInput v-model="searchQuery" :placeholder="t('knowledgePoint.searchPlaceholder')" class="pl-7" autofocus />
     </div>
 
     <div class="space-y-0.5">
@@ -38,7 +40,7 @@ const filteredTree = computed(() => filterKnowledgePointTree(tree.value, searchQ
         @click="emit('clear')"
       >
         <Folder class="w-4 h-4 mr-2 text-primary" />
-        <span>全部知识点</span>
+        <span>{{ t('knowledgePoint.all') }}</span>
       </div>
       
       <KnowledgePointTreeItem
@@ -52,7 +54,7 @@ const filteredTree = computed(() => filterKnowledgePointTree(tree.value, searchQ
       />
 
       <div v-if="searchQuery && filteredTree.length === 0" class="py-4 text-center text-xs text-muted-foreground">
-        未找到匹配的知识点
+        {{ t('knowledgePoint.noMatch') }}
       </div>
     </div>
   </div>

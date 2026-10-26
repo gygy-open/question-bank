@@ -27,6 +27,21 @@ export function setCurrentLocale(value: string): void {
   currentLocale.value = isSupportedLocale(value) ? value : DEFAULT_LOCALE
 }
 
+type Translator = (key: string, params?: Record<string, unknown>) => string
+let translator: Translator | null = null
+
+export function setTranslator(fn: Translator): void {
+  translator = fn
+}
+
+/**
+ * 供 lib/ 与 composables 中拿不到 useI18n 的代码使用（如 await 之后、模块级工具函数）。
+ * 组件内请优先使用 useI18n().t。
+ */
+export function translate(key: string, params?: Record<string, unknown>): string {
+  return translator ? translator(key, params) : key
+}
+
 export function getDateFnsLocale(): Locale {
   return DATE_FNS_LOCALES[currentLocale.value]
 }

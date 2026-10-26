@@ -40,6 +40,7 @@ import {
 import PageHeader from '@/components/PageHeader.vue'
 import { toast } from 'vue-sonner'
 import { zipFolder } from '@/lib/zipFolder'
+import { formatDateTime } from '@/lib/locale'
 
 definePageMeta({
     layout: 'default',
@@ -614,7 +615,7 @@ const getResultCount = (summaryJson?: string) => {
                                 <span v-else class="text-muted-foreground text-sm">-</span>
                             </TableCell>
                             <TableCell class="text-muted-foreground text-sm">
-                                {{ new Date(task.created_at + 'Z').toLocaleString() }}
+                                {{ formatDateTime(task.created_at + 'Z') }}
                             </TableCell>
                             <TableCell class="text-right">
                                 <div class="flex justify-end gap-2">

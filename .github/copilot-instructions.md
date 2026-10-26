@@ -80,7 +80,11 @@
     3. `pnpm i18n:apply` — validates (keys, `{placeholders}`, vue-i18n syntax, no leftover Chinese) and merges; rejected entries stay pending for another round.
     4. `pnpm i18n:check` must pass (also enforced by `app/lib/__tests__/i18n.test.ts`).
   - New UI text MUST NOT be hardcoded: use `const { t } = useI18n()` / `t('ns.key')` (or `$t` in templates). Group keys by feature (`nav.*`, `auth.login.*`, ...).
-  - Because pages are kept alive, never cache translated strings in module scope or plain `const`; use `t()` in templates or inside `computed` (e.g. zod schemas: `computed(() => toTypedSchema(...))`).
+  - Because pages are kept alive, never cache translated strings in module scope or plain `const`; use `t()` in templates or inside `computed` (e.g. zod schemas: `computed(() => toTypedSchema(...))`; option lists: `computed(() => [{ label: t('...'), value }])`).
+  - Outside component setup (composables after `await`, `lib/` helpers) use `translate(key, params)` from `@/lib/locale`.
+  - Rich text with inline markup: use `<i18n-t keypath="...">` with named slots (see `LanShareDialog.vue`).
+  - Counts: no vue-i18n plural syntax; phrase messages so they read correctly for any number (e.g. `已选 {count} 个` → `Selected: {count}`).
+  - Never translate "content language" (values sent to the backend, enum values, text that ends up in exported papers/question data, parser constants) — only display labels.
   - Dates/numbers: use `formatRelativeTime` (`@/lib/utils`) and `formatDateTime` / `formatDate` / `formatNumber` (`@/lib/locale`) instead of bare `toLocaleString()`.
   - Escape `@` and `|` in messages as `{'@'}` / `{'|'}` (vue-i18n syntax).
 

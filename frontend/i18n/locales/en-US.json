@@ -1,4 +1,27 @@
 {
+  "app": {
+    "name": "Question Bank",
+    "slogan": "AI-Native Question Bank"
+  },
+  "common": {
+    "save": "Save",
+    "clear": "Clear",
+    "copied": "Copied",
+    "unknownError": "Unknown error",
+    "uploadFailed": "Upload failed",
+    "updateFailed": "Update failed",
+    "edit": "Edit",
+    "delete": "Delete",
+    "copy": "Copy",
+    "reset": "Reset",
+    "retry": "Retry",
+    "all": "All",
+    "noData": "No Data",
+    "moreActions": "More Actions",
+    "prevPage": "Previous",
+    "nextPage": "Next",
+    "unknown": "Unknown"
+  },
   "language": {
     "label": "Language",
     "switch": "Switch language"
@@ -71,7 +94,235 @@
       "invalidCredentials": "Incorrect username or password",
       "failed": "Sign in failed",
       "noAccount": "Don't have an account?",
-      "register": "Sign up"
+      "register": "Sign up",
+      "verifyFailed": "Sign-in verification failed. Check your network connection and device time, then try again."
+    }
+  },
+  "subjectSelector": {
+    "switch": "Switch Subject",
+    "switchFailed": "Failed to switch subject",
+    "select": "Select Subject",
+    "createFirst": "Create a subject first.",
+    "noneAvailable": "No subjects available",
+    "contactAdmin": "Contact an administrator for access."
+  },
+  "questionBankNav": {
+    "label": "Question Bank Categories",
+    "questions": "Questions",
+    "materials": "Material Questions"
+  },
+  "basket": {
+    "title": "Question Basket",
+    "description": "Saved questions you can add to a composition in one click.",
+    "clearAll": "Clear Question Basket",
+    "empty": "The Question Basket is empty.",
+    "subjectFallback": "Subject {id}",
+    "groupCount": "Questions: {count}",
+    "addToComposition": "Add to Composition",
+    "clearGroup": "Clear Group",
+    "difficulty": "Difficulty {level}",
+    "noContent": "(No stem text)",
+    "add": "Add to Question Basket",
+    "remove": "Remove from Question Basket",
+    "added": "Added to Question Basket.",
+    "removed": "Removed from Question Basket.",
+    "addedMany": "Questions added to Question Basket: {count}.",
+    "types": {
+      "singleChoice": "Single",
+      "multipleChoice": "Multiple",
+      "trueFalse": "True/False",
+      "fillInTheBlank": "Fill-in",
+      "freeResponse": "Response",
+      "optionMatching": "Matching"
+    }
+  },
+  "questions": {
+    "types": {
+      "singleChoice": "Single Choice",
+      "multipleChoice": "Multiple Choice",
+      "trueFalse": "True/False",
+      "fillInTheBlank": "Fill in the Blank",
+      "freeResponse": "Free Response",
+      "optionMatching": "Option Matching"
+    },
+    "statuses": {
+      "draft": "Draft",
+      "pending": "Pending Review",
+      "pendingProgress": "Pending Review ({count}/{required})",
+      "published": "Published",
+      "archived": "Archived"
+    },
+    "list": {
+      "create": "Create Question",
+      "createSingle": "Single Question",
+      "createSingleDesc": "A standalone question.",
+      "createMaterial": "Material Question",
+      "createMaterialDesc": "A material with several sub-questions, such as reading comprehension.",
+      "description": "All questions in the question bank, including single questions and sub-questions of material questions. Adding a sub-question to a composition also adds its material.",
+      "importTaskBanner": "Viewing questions from the latest import task.",
+      "resetFilters": "Reset Filters",
+      "selectAllPage": "Select Page",
+      "invertSelection": "Invert Selection",
+      "selectedCount": "Selected: {count}",
+      "addToComposition": "Add to Composition",
+      "editSource": "Edit Source",
+      "total": "Total questions: {total}",
+      "perPage": "Per Page",
+      "deleteConfirm": "Are you sure you want to delete this question?",
+      "batchDeleteConfirm": "Delete the selected questions ({count})? This action cannot be undone.",
+      "batchDeleted": "Questions deleted: {count}.",
+      "batchDeleteFailed": "Failed to delete questions.",
+      "sourceUpdated": "Source updated for questions: {count}.",
+      "sourceUpdateFailed": "Failed to update sources."
+    },
+    "filters": {
+      "keyword": "Keyword",
+      "keywordPlaceholder": "Search question content...",
+      "id": "Question ID",
+      "idPlaceholder": "Find by exact ID",
+      "status": "Status",
+      "allStatuses": "All Statuses",
+      "type": "Question Type",
+      "allTypes": "All Types",
+      "difficulty": "Difficulty",
+      "allDifficulties": "All Difficulties",
+      "knowledgePoint": "Knowledge Point",
+      "knowledgePointSelected": "Knowledge Points: {count}",
+      "selectedCount": "Selected: {count}",
+      "tags": "Tags",
+      "membership": "Membership",
+      "membershipIndependent": "Single Question",
+      "membershipGrouped": "Material Sub-question",
+      "more": "More Filters",
+      "source": "Source",
+      "sourcePlaceholder": "Search sources...",
+      "importTask": "Import Task",
+      "importTaskPlaceholder": "Search task names...",
+      "reviewCount": "Review Count",
+      "reviewCountPlaceholder": "Count",
+      "creator": "Creator",
+      "allCreators": "All Creators",
+      "reviewer": "Reviewer",
+      "allReviewers": "All Reviewers"
+    },
+    "batchSource": {
+      "title": "Edit Source in Bulk",
+      "description": "Enter a new source name. This will update the selected questions ({count}).",
+      "label": "Source",
+      "placeholder": "e.g., 2024 Final Exam",
+      "submit": "Save Changes"
+    }
+  },
+  "materials": {
+    "create": "New Material Question",
+    "description": "A passage, chart, or background material with several sub-questions about it, such as reading comprehension, cloze, or source analysis. The material and its sub-questions appear together when added to a composition.",
+    "tabs": {
+      "active": "Active",
+      "deleted": "Trash"
+    },
+    "filters": {
+      "keyword": "Keyword",
+      "keywordPlaceholder": "Search material content or source",
+      "status": "Status",
+      "visibility": "Visibility",
+      "allVisibility": "All Visibility",
+      "public": "Public",
+      "private": "Private",
+      "usage": "Sub-questions",
+      "usageEmpty": "No Sub-questions",
+      "usageFilled": "Has Sub-questions"
+    },
+    "selectSubjectFirst": "Select a subject first.",
+    "loadFailed": "Failed to load material questions.",
+    "empty": "No material questions yet.",
+    "emptyDeleted": "No material questions in the trash.",
+    "total": "Total material questions: {total}",
+    "pageInfo": "Page {page} of {pages}",
+    "detailLoadFailed": "Failed to load material question.",
+    "deleteConfirm": "Delete material question #{id}?",
+    "movedToTrash": "Material question moved to trash.",
+    "deleteFailed": "Failed to delete material question.",
+    "restored": "Material question restored.",
+    "restoreFailed": "Failed to restore material question."
+  },
+  "questionItem": {
+    "copyIdTitle": "Click to copy question ID: {id}",
+    "idCopied": "Question ID copied: {id}",
+    "copyFailed": "Copy failed. Please select and copy manually.",
+    "private": "Private",
+    "materialLink": "Material Question #{id}",
+    "difficulty": "Difficulty",
+    "difficultyValue": "Difficulty {level}",
+    "approve": "Approve",
+    "viewSource": "View Source File",
+    "createDerived": "Create Derived Question",
+    "viewDerived": "View Derivations",
+    "emptyContent": "(Empty)",
+    "knowledgePointCount": "Knowledge Points: {count}",
+    "noKnowledgePoint": "No Knowledge Point Selected",
+    "expand": "Show Details",
+    "collapse": "Hide Details",
+    "answer": "Answer",
+    "notFilled": "Not Provided",
+    "thinking": "Analysis",
+    "analysis": "Explanation",
+    "summary": "Summary",
+    "createdBy": "Created:",
+    "updatedBy": "Updated:",
+    "reviewCount": "Reviews:",
+    "source": "Source:"
+  },
+  "knowledgePoint": {
+    "selectPlaceholder": "Select knowledge points...",
+    "searchPlaceholder": "Search knowledge points...",
+    "all": "All Knowledge Points",
+    "noMatch": "No matching knowledge points",
+    "remove": "Remove {name}"
+  },
+  "tagFilter": {
+    "placeholder": "Select tags...",
+    "searchPlaceholder": "Search tags...",
+    "empty": "No tags found",
+    "uncategorized": "Uncategorized",
+    "selectedCount": "Selected: {count}"
+  },
+  "profile": {
+    "title": "Profile",
+    "description": "Update your personal information.",
+    "uploadAvatar": "Upload Avatar",
+    "username": "Username",
+    "fullName": "Full Name",
+    "selectImage": "Please select an image file.",
+    "avatarUploaded": "Avatar uploaded",
+    "updated": "Profile updated"
+  },
+  "changePassword": {
+    "title": "Change Password",
+    "description": "Enter your current password and a new password.",
+    "current": "Current Password",
+    "new": "New Password",
+    "confirm": "Confirm New Password",
+    "currentRequired": "Enter your current password",
+    "newRequired": "Enter a new password",
+    "mismatch": "Passwords do not match",
+    "success": "Password changed",
+    "failed": "Change failed"
+  },
+  "lanShare": {
+    "menu": "Share Access Address",
+    "tooltip": "LAN sharing is on. Click to view the access address.",
+    "title": "LAN Access Address",
+    "description": "Phones or computers on the same WiFi or local network can open the address below in a browser to access this question bank.",
+    "copy": "Copy Address",
+    "tips": {
+      "sameWifi": "Your phone must be connected to {em} as this computer.",
+      "sameWifiEm": "the same WiFi",
+      "ownAccount": "Each colleague signs in with {em}.",
+      "ownAccountEm": "their own account",
+      "keepRunning": "If you {em}, others can no longer access it.",
+      "keepRunningEm": "shut down this computer or quit the app",
+      "ipChange": "If this computer's IP address changes (e.g., after a restart), this address will update accordingly.",
+      "hostnameAndroid": "The easier-to-remember address may not open on Android phones. If so, use the IP address above."
     }
   }
 }

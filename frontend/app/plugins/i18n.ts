@@ -1,6 +1,6 @@
 import { z } from 'zod'
 import { createZodErrorMap } from '@/lib/zodErrorMap'
-import { DEFAULT_LOCALE, LOCALE_COOKIE_KEY, isSupportedLocale, setCurrentLocale } from '@/lib/locale'
+import { DEFAULT_LOCALE, LOCALE_COOKIE_KEY, isSupportedLocale, setCurrentLocale, setTranslator } from '@/lib/locale'
 
 export default defineNuxtPlugin({
   name: 'app-i18n',
@@ -24,5 +24,6 @@ export default defineNuxtPlugin({
     })
 
     z.setErrorMap(createZodErrorMap((key, params) => i18n.t(key, params ?? {})))
+    setTranslator((key, params) => i18n.t(key, params ?? {}))
   },
 })

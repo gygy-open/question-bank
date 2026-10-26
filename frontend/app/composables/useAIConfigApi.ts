@@ -1,3 +1,4 @@
+import { translate } from '@/lib/locale'
 import type {
   AIConfigScope,
   AIModel,
@@ -12,7 +13,7 @@ export const apiErrorMessage = (error: any): string => {
   const detail = error?.data?.detail ?? error?.response?._data?.detail
   if (typeof detail === 'string') return detail
   if (Array.isArray(detail) && detail[0]?.msg) return detail[0].msg
-  return error?.message ?? '未知错误'
+  return error?.message ?? translate('common.unknownError')
 }
 
 export const apiErrorStatus = (error: any): number | undefined =>

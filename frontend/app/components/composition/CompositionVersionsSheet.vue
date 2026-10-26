@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { formatDateTime } from '@/lib/locale'
 // 编辑页版本列表侧栏：懒加载（打开时拉取），仅展示摘要（不含 snapshot），点击进入只读预览。
 import { ref, watch } from 'vue'
 import {
@@ -69,7 +70,7 @@ defineExpose({ refresh: load })
 
 function formatTime(iso: string): string {
   const d = new Date(iso)
-  return Number.isNaN(d.getTime()) ? iso : d.toLocaleString()
+  return Number.isNaN(d.getTime()) ? iso : formatDateTime(d)
 }
 </script>
 

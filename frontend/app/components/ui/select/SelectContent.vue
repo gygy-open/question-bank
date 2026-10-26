@@ -26,6 +26,10 @@ const emits = defineEmits<SelectContentEmits>()
 const delegatedProps = reactiveOmit(props, "class")
 
 const forwarded = useForwardPropsEmits(delegatedProps, emits)
+
+// reka-ui 的 SelectItemText 只在挂载时登记一次选项文本，SelectValue 显示的是这份缓存。
+// 切换语言时重新挂载选项，让已选值的显示文本随语言更新。
+const { locale } = useI18n()
 </script>
 
 <template>
@@ -42,7 +46,7 @@ const forwarded = useForwardPropsEmits(delegatedProps, emits)
       "
     >
       <SelectScrollUpButton />
-      <SelectViewport :class="cn('p-1', position === 'popper' && 'h-(--reka-select-trigger-height) w-full min-w-(--reka-select-trigger-width) scroll-my-1')">
+      <SelectViewport :key="locale" :class="cn('p-1', position === 'popper' && 'h-(--reka-select-trigger-height) w-full min-w-(--reka-select-trigger-width) scroll-my-1')">
         <slot />
       </SelectViewport>
       <SelectScrollDownButton />

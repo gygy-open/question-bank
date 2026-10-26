@@ -15,6 +15,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
 import { useMedia, useMediaBatch, type MediaAssetListItem, type MediaListQuery } from '@/composables/useMedia'
 import { getApiErrorDetail } from '@/lib/apiErrors'
+import { formatDate } from '@/lib/locale'
 import { formatBytes, mediaDimension, mediaFormat, mediaName } from '@/lib/mediaLibrary'
 
 const PAGE_SIZE = 40
@@ -347,7 +348,7 @@ function usageLabel(count: number) {
                     <td class="hidden py-1.5 text-muted-foreground md:table-cell">{{ mediaDimension(item) }}</td>
                     <td class="py-1.5 text-muted-foreground">{{ formatBytes(item.byte_size) }}</td>
                     <td class="py-1.5" :class="item.usage_count ? '' : 'text-muted-foreground/60'">{{ usageLabel(item.usage_count) }}</td>
-                    <td class="hidden py-1.5 text-muted-foreground md:table-cell">{{ new Date(item.created_at).toLocaleDateString() }}</td>
+                    <td class="hidden py-1.5 text-muted-foreground md:table-cell">{{ formatDate(item.created_at) }}</td>
                 </tr>
             </tbody>
         </table>

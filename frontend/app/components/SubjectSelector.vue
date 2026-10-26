@@ -9,6 +9,8 @@ import { SidebarMenuButton, useSidebar } from '@/components/ui/sidebar'
 import { ChevronsUpDown, AlertTriangle, Info } from '@lucide/vue'
 import { toast } from 'vue-sonner'
 
+const { t } = useI18n()
+
 // Cycle a fixed palette by subject id so each subject keeps a stable color.
 const SUBJECT_COLORS = [
   'bg-red-500', 'bg-orange-500', 'bg-amber-500', 'bg-lime-500',
@@ -28,7 +30,7 @@ const selectSubject = async (id: number) => {
   try {
     await setSubject(id)
   } catch {
-    toast.error('切换学科失败')
+    toast.error(t('subjectSelector.switchFailed'))
   }
 }
 
@@ -40,15 +42,15 @@ const goCreateSubject = () => router.push('/subjects?create=true')
     <DropdownMenuTrigger as-child>
       <SidebarMenuButton
         size="lg"
-        aria-label="切换学科"
+        :aria-label="t('subjectSelector.switch')"
         class="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground"
       >
         <div class="flex aspect-square size-8 items-center justify-center rounded-lg text-primary-foreground">
-          <img src="/logo.svg" alt="题库系统" class="size-8" />
+          <img src="/logo.svg" :alt="t('app.name')" class="size-8" />
         </div>
         <div class="flex min-w-0 flex-col gap-0.5 leading-none">
           <span class="flex min-w-0 items-center gap-1">
-            <span class="truncate font-semibold">{{ currentSubject?.name || '选择学科' }}</span>
+            <span class="truncate font-semibold">{{ currentSubject?.name || t('subjectSelector.select') }}</span>
             <ChevronsUpDown class="size-3.5 shrink-0 text-muted-foreground" />
           </span>
           <span class="truncate text-xs text-muted-foreground">{{ config.public.appName }}</span>
@@ -77,7 +79,7 @@ const goCreateSubject = () => router.push('/subjects?create=true')
   <SidebarMenuButton
     v-else-if="isAdmin"
     size="lg"
-    aria-label="请先创建学科"
+    :aria-label="t('subjectSelector.createFirst')"
     class="text-destructive hover:bg-destructive/10 hover:text-destructive"
     @click="goCreateSubject"
   >
@@ -85,7 +87,7 @@ const goCreateSubject = () => router.push('/subjects?create=true')
       <AlertTriangle class="size-4" />
     </div>
     <div class="flex flex-col gap-0.5 leading-none">
-      <span class="truncate font-semibold">请先创建学科</span>
+      <span class="truncate font-semibold">{{ t('subjectSelector.createFirst') }}</span>
     </div>
   </SidebarMenuButton>
 
@@ -93,15 +95,15 @@ const goCreateSubject = () => router.push('/subjects?create=true')
   <SidebarMenuButton
     v-else
     size="lg"
-    aria-label="暂无可用学科"
+    :aria-label="t('subjectSelector.noneAvailable')"
     class="text-muted-foreground"
   >
     <div class="flex aspect-square size-8 items-center justify-center rounded-lg border bg-muted">
       <Info class="size-4" />
     </div>
     <div class="flex min-w-0 flex-col gap-0.5 leading-none">
-      <span class="truncate font-semibold">暂无可用学科</span>
-      <span class="truncate text-xs text-muted-foreground">请联系管理员开通</span>
+      <span class="truncate font-semibold">{{ t('subjectSelector.noneAvailable') }}</span>
+      <span class="truncate text-xs text-muted-foreground">{{ t('subjectSelector.contactAdmin') }}</span>
     </div>
   </SidebarMenuButton>
 </template>

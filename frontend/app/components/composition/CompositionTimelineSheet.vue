@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { formatDateTime } from '@/lib/locale'
 // 编辑页时间线侧栏：懒加载（打开时拉取第一页），游标分页「加载更多」，只读展示。
 import { computed, ref, watch } from 'vue'
 import {
@@ -51,7 +52,7 @@ function actorLabel(e: CompositionEvent): string {
 
 function formatTime(iso: string): string {
   const d = new Date(iso)
-  return Number.isNaN(d.getTime()) ? iso : d.toLocaleString()
+  return Number.isNaN(d.getTime()) ? iso : formatDateTime(d)
 }
 
 async function load() {

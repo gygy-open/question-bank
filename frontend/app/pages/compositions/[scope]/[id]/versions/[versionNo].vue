@@ -10,6 +10,7 @@ import SnapshotRenderer from '~/components/composition/SnapshotRenderer.vue'
 import { useCompositionExport } from '~/composables/useCompositionExport'
 import { useCompositions } from '~/composables/useCompositions'
 import { normalizeScope } from '~/lib/compositions'
+import { formatDateTime } from '~/lib/locale'
 import type { CompositionExportFormat, CompositionScope, CompositionVersionDetail } from '~/types'
 
 const route = useRoute()
@@ -29,7 +30,7 @@ const editorPath = computed(() => `/compositions/${scope.value}/${compositionId.
 
 function formatTime(iso: string): string {
   const d = new Date(iso)
-  return Number.isNaN(d.getTime()) ? iso : d.toLocaleString()
+  return Number.isNaN(d.getTime()) ? iso : formatDateTime(d)
 }
 
 async function load() {

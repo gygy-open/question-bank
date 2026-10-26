@@ -5,6 +5,8 @@ import { Button } from '@/components/ui/button'
 import { Wifi, Copy, Check } from '@lucide/vue'
 import { useClipboard } from '@vueuse/core'
 
+const { t } = useI18n()
+
 interface NetworkInfo {
   lan_share: boolean
   port: number
@@ -35,17 +37,17 @@ const { copy, copied, isSupported } = useClipboard({ source: () => info.value?.l
 
 <template>
   <SidebarMenuItem v-if="info?.lan_share && info.lan_url">
-    <SidebarMenuButton tooltip="局域网共享已开启，点击查看访问地址" @click="open = true">
+    <SidebarMenuButton :tooltip="t('lanShare.tooltip')" @click="open = true">
       <Wifi class="text-primary" />
-      <span>共享访问地址</span>
+      <span>{{ t('lanShare.menu') }}</span>
     </SidebarMenuButton>
 
     <Dialog v-model:open="open">
       <DialogContent class="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>局域网访问地址</DialogTitle>
+          <DialogTitle>{{ t('lanShare.title') }}</DialogTitle>
           <DialogDescription>
-            同一 WiFi / 局域网下的手机或电脑，在浏览器打开下面的地址即可访问本题库。
+            {{ t('lanShare.description') }}
           </DialogDescription>
         </DialogHeader>
 
@@ -55,7 +57,7 @@ const { copy, copied, isSupported } = useClipboard({ source: () => info.value?.l
               class="flex-1 truncate rounded-md bg-muted px-3 py-2 text-center text-lg font-semibold tracking-wide">
               {{ info.lan_url }}
             </code>
-            <Button v-if="isSupported" size="icon" variant="outline" :title="copied ? '已复制' : '复制地址'"
+            <Button v-if="isSupported" size="icon" variant="outline" :title="copied ? t('common.copied') : t('lanShare.copy')"
               @click="copy()">
               <Check v-if="copied" class="size-4 text-green-600" />
               <Copy v-else class="size-4" />
@@ -66,18 +68,18 @@ const { copy, copied, isSupported } = useClipboard({ source: () => info.value?.l
             <code class="flex-1 truncate rounded-md bg-muted px-3 py-2 text-center text-sm text-muted-foreground">
               {{ info.lan_hostname_url }}
             </code>
-            <Button v-if="isSupported" size="icon" variant="outline" title="复制地址"
+            <Button v-if="isSupported" size="icon" variant="outline" :title="t('lanShare.copy')"
               @click="copy(info.lan_hostname_url!)">
               <Copy class="size-4" />
             </Button>
           </div>
 
           <ul class="list-disc space-y-1 pl-5 text-sm text-muted-foreground">
-            <li>手机需连接与本机<strong>相同的 WiFi</strong>。</li>
-            <li>每位同事用<strong>各自的账号</strong>登录。</li>
-            <li>本机<strong>关机或退出应用</strong>后，他人将无法访问。</li>
-            <li>若本机 IP 变化（重启后），此地址会随之更新。</li>
-            <li v-if="info.lan_hostname_url">更好记的地址可能在安卓手机上无法打开，此时请改用上方 IP 地址。</li>
+            <li><i18n-t keypath="lanShare.tips.sameWifi"><template #em><strong>{{ t('lanShare.tips.sameWifiEm') }}</strong></template></i18n-t></li>
+            <li><i18n-t keypath="lanShare.tips.ownAccount"><template #em><strong>{{ t('lanShare.tips.ownAccountEm') }}</strong></template></i18n-t></li>
+            <li><i18n-t keypath="lanShare.tips.keepRunning"><template #em><strong>{{ t('lanShare.tips.keepRunningEm') }}</strong></template></i18n-t></li>
+            <li>{{ t('lanShare.tips.ipChange') }}</li>
+            <li v-if="info.lan_hostname_url">{{ t('lanShare.tips.hostnameAndroid') }}</li>
           </ul>
         </div>
       </DialogContent>

@@ -14,6 +14,7 @@ import { getApiErrorDetail, isRevisionConflict } from '@/lib/apiErrors'
 import CompositionTargetPicker from '@/components/CompositionTargetPicker.vue'
 import type { StimulusListItem, StimulusPage } from '@/types'
 
+const { t } = useI18n()
 const { currentSubjectId } = useSubjectContext()
 const { can } = usePermissions()
 const canEdit = computed(() => can(Capability.EDIT_QUESTION, currentSubjectId.value))
@@ -28,7 +29,7 @@ const addToComposition = async (stimulus: StimulusListItem) => {
     pickerQuestionIds.value = detail.questions.map(question => question.id)
     pickerOpen.value = pickerQuestionIds.value.length > 0
   } catch (error) {
-    toast.error(getApiErrorDetail(error, '加载材料题失败'))
+    toast.error(getApiErrorDetail(error, t('materials.detailLoadFailed')))
   }
 }
 
@@ -77,34 +78,34 @@ watch([keyword, statusFilter, visibility, usage, size, view], () => {
   if (page.value !== 1) page.value = 1
 })
 
-const statusOptions = [
-  { label: '全部状态', value: '0' },
-  { label: '草稿', value: 'draft' },
-  { label: '待审核', value: 'pending' },
-  { label: '已发布', value: 'published' },
-  { label: '已归档', value: 'archived' },
-]
-const visibilityOptions = [
-  { label: '全部可见性', value: '0' },
-  { label: '公开', value: 'public' },
-  { label: '私有', value: 'private' },
-]
-const usageOptions = [
-  { label: '全部', value: '0' },
-  { label: '待出题', value: 'empty' },
-  { label: '已有小题', value: 'filled' },
-]
+const statusOptions = computed(() => [
+  { label: t('questions.filters.allStatuses'), value: '0' },
+  { label: t('questions.statuses.draft'), value: 'draft' },
+  { label: t('questions.statuses.pending'), value: 'pending' },
+  { label: t('questions.statuses.published'), value: 'published' },
+  { label: t('questions.statuses.archived'), value: 'archived' },
+])
+const visibilityOptions = computed(() => [
+  { label: t('materials.filters.allVisibility'), value: '0' },
+  { label: t('materials.filters.public'), value: 'public' },
+  { label: t('materials.filters.private'), value: 'private' },
+])
+const usageOptions = computed(() => [
+  { label: t('common.all'), value: '0' },
+  { label: t('materials.filters.usageEmpty'), value: 'empty' },
+  { label: t('materials.filters.usageFilled'), value: 'filled' },
+])
 
 const deleteItem = async (stimulus: StimulusListItem) => {
-  if (!currentSubjectId.value || !confirm(`确定删除材料题 #${stimulus.id} 吗？`)) return
+  if (!currentSubjectId.value || !confirm(t('materials.deleteConfirm', { id: stimulus.id }))) return
   try {
     await deleteStimulus(currentSubjectId.value, stimulus.id, stimulus.revision)
-    toast.success('材料题已移入回收站')
+    toast.success(t('materials.movedToTrash'))
     if (stimuli.value.length === 1 && page.value > 1) page.value--
     else await refresh()
   } catch (error) {
     if (isRevisionConflict(error)) await refresh()
-    toast.error(getApiErrorDetail(error, '删除材料题失败'))
+    toast.error(getApiErrorDetail(error, t('materials.deleteFailed')))
   }
 }
 
@@ -112,67 +113,67 @@ const restoreItem = async (stimulus: StimulusListItem) => {
   if (!currentSubjectId.value) return
   try {
     await restoreStimulus(currentSubjectId.value, stimulus.id, stimulus.revision)
-    toast.success('材料题已恢复')
+    toast.success(t('materials.restored'))
     if (stimuli.value.length === 1 && page.value > 1) page.value--
     else await refresh()
   } catch (error) {
     if (isRevisionConflict(error)) await refresh()
-    toast.error(getApiErrorDetail(error, '恢复材料题失败'))
+    toast.error(getApiErrorDetail(error, t('materials.restoreFailed')))
   }
 }
 </script>
 
 <template>
-  <PageHeader title="题库">
+  <PageHeader :title="t('nav.questionBank')">
     <template #actions>
       <Button v-if="canEdit" as-child size="sm">
-        <NuxtLink to="/materials/new"><Plus class="mr-2 size-4" />新建材料题</NuxtLink>
+        <NuxtLink to="/materials/new"><Plus class="mr-2 size-4" />{{ t('materials.create') }}</NuxtLink>
       </Button>
     </template>
   </PageHeader>
   <QuestionBankNav />
 
   <main class="flex flex-1 flex-col gap-5 px-4 py-6">
-    <p class="text-sm text-muted-foreground">一段文章、图表或背景材料加上围绕它的若干小题，如阅读理解、完形填空、材料分析。加入稿件时材料与小题一起出现。</p>
+    <p class="text-sm text-muted-foreground">{{ t('materials.description') }}</p>
     <Tabs v-model="view">
-      <TabsList><TabsTrigger value="active">当前</TabsTrigger><TabsTrigger value="deleted">回收站</TabsTrigger></TabsList>
+      <TabsList><TabsTrigger value="active">{{ t('materials.tabs.active') }}</TabsTrigger><TabsTrigger value="deleted">{{ t('materials.tabs.deleted') }}</TabsTrigger></TabsList>
     </Tabs>
     <div class="grid gap-3 bg-muted/40 p-4 sm:grid-cols-4">
       <div class="space-y-2">
-        <Label class="text-xs">关键词</Label>
-        <ClearableInput v-model="keyword" placeholder="搜索材料内容或来源" />
+        <Label class="text-xs">{{ t('materials.filters.keyword') }}</Label>
+        <ClearableInput v-model="keyword" :placeholder="t('materials.filters.keywordPlaceholder')" />
       </div>
       <div class="space-y-2">
-        <Label class="text-xs">状态</Label>
+        <Label class="text-xs">{{ t('materials.filters.status') }}</Label>
         <ClearableSelect v-model="statusFilter" :options="statusOptions" />
       </div>
       <div class="space-y-2">
-        <Label class="text-xs">可见性</Label>
+        <Label class="text-xs">{{ t('materials.filters.visibility') }}</Label>
         <ClearableSelect v-model="visibility" :options="visibilityOptions" />
       </div>
       <div class="space-y-2">
-        <Label class="text-xs">出题情况</Label>
+        <Label class="text-xs">{{ t('materials.filters.usage') }}</Label>
         <ClearableSelect v-model="usage" :options="usageOptions" />
       </div>
     </div>
 
-    <div v-if="!currentSubjectId" class="py-16 text-center text-sm text-muted-foreground">请先选择学科</div>
+    <div v-if="!currentSubjectId" class="py-16 text-center text-sm text-muted-foreground">{{ t('materials.selectSubjectFirst') }}</div>
     <div v-else-if="status === 'pending'" class="flex justify-center py-16"><Loader2 class="size-7 animate-spin text-muted-foreground" /></div>
     <div v-else-if="error" class="flex flex-col items-center gap-3 py-16 text-sm text-muted-foreground">
-      <AlertCircle class="size-6" /><span>材料题加载失败</span>
-      <Button variant="outline" size="sm" @click="load"><RotateCw class="mr-2 size-4" />重试</Button>
+      <AlertCircle class="size-6" /><span>{{ t('materials.loadFailed') }}</span>
+      <Button variant="outline" size="sm" @click="load"><RotateCw class="mr-2 size-4" />{{ t('common.retry') }}</Button>
     </div>
-    <div v-else-if="stimuli.length === 0" class="py-16 text-center text-sm text-muted-foreground">{{ view === 'deleted' ? '回收站中暂无材料题。' : '暂无材料题。' }}</div>
+    <div v-else-if="stimuli.length === 0" class="py-16 text-center text-sm text-muted-foreground">{{ view === 'deleted' ? t('materials.emptyDeleted') : t('materials.empty') }}</div>
     <section v-else class="border-y">
       <StimulusRow v-for="stimulus in stimuli" :key="stimulus.id" :stimulus="stimulus" :can-edit="canEdit" @delete="deleteItem" @restore="restoreItem" @add-composition="addToComposition" />
     </section>
 
     <div v-if="total > 0" class="flex flex-wrap items-center justify-between gap-3 text-sm text-muted-foreground">
-      <span>共 {{ total }} 道材料题</span>
+      <span>{{ t('materials.total', { total }) }}</span>
       <div class="flex items-center gap-2">
-        <Button variant="outline" size="icon" :disabled="page <= 1" title="上一页" aria-label="上一页" @click="page--"><ChevronLeft class="size-4" /></Button>
-        <span>第 {{ page }} / {{ pages }} 页</span>
-        <Button variant="outline" size="icon" :disabled="page >= pages" title="下一页" aria-label="下一页" @click="page++"><ChevronRight class="size-4" /></Button>
+        <Button variant="outline" size="icon" :disabled="page <= 1" :title="t('common.prevPage')" :aria-label="t('common.prevPage')" @click="page--"><ChevronLeft class="size-4" /></Button>
+        <span>{{ t('materials.pageInfo', { page, pages }) }}</span>
+        <Button variant="outline" size="icon" :disabled="page >= pages" :title="t('common.nextPage')" :aria-label="t('common.nextPage')" @click="page++"><ChevronRight class="size-4" /></Button>
       </div>
     </div>
   </main>
