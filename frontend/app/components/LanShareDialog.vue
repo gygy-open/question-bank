@@ -75,9 +75,9 @@ const { copy, copied, isSupported } = useClipboard({ source: () => info.value?.l
           </div>
 
           <ul class="list-disc space-y-1 pl-5 text-sm text-muted-foreground">
-            <li><i18n-t keypath="lanShare.tips.sameWifi"><template #em><strong>{{ t('lanShare.tips.sameWifiEm') }}</strong></template></i18n-t></li>
-            <li><i18n-t keypath="lanShare.tips.ownAccount"><template #em><strong>{{ t('lanShare.tips.ownAccountEm') }}</strong></template></i18n-t></li>
-            <li><i18n-t keypath="lanShare.tips.keepRunning"><template #em><strong>{{ t('lanShare.tips.keepRunningEm') }}</strong></template></i18n-t></li>
+            <li><i18n-t scope="global" keypath="lanShare.tips.sameWifi"><template #em><strong>{{ t('lanShare.tips.sameWifiEm') }}</strong></template></i18n-t></li>
+            <li><i18n-t scope="global" keypath="lanShare.tips.ownAccount"><template #em><strong>{{ t('lanShare.tips.ownAccountEm') }}</strong></template></i18n-t></li>
+            <li><i18n-t scope="global" keypath="lanShare.tips.keepRunning"><template #em><strong>{{ t('lanShare.tips.keepRunningEm') }}</strong></template></i18n-t></li>
             <li>{{ t('lanShare.tips.ipChange') }}</li>
             <li v-if="info.lan_hostname_url">{{ t('lanShare.tips.hostnameAndroid') }}</li>
           </ul>

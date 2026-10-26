@@ -25,6 +25,7 @@ const emit = defineEmits<{
   select: [detail: CompositionDetail]
 }>()
 
+const { t } = useI18n()
 const api = useCompositions()
 
 const loading = ref(false)
@@ -86,7 +87,7 @@ async function pick(c: Composition) {
     emit('select', detail)
     emit('update:open', false)
   } catch {
-    toast.error('加载稿件内容失败，请重试')
+    toast.error(t('compositionEditor.picker.loadFailed'))
   } finally {
     picking.value = false
   }
@@ -97,13 +98,13 @@ async function pick(c: Composition) {
   <Dialog :open="open" @update:open="emit('update:open', $event)">
     <DialogContent class="max-w-2xl">
       <DialogHeader>
-        <DialogTitle>插入稿件</DialogTitle>
-        <DialogDescription>选择另一份稿件，将其全部内容克隆插入当前画布。</DialogDescription>
+        <DialogTitle>{{ t('compositionEditor.picker.title') }}</DialogTitle>
+        <DialogDescription>{{ t('compositionEditor.picker.description') }}</DialogDescription>
       </DialogHeader>
 
       <div class="relative">
         <Search class="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-        <Input v-model="keyword" placeholder="搜索稿件标题…" class="pl-9" />
+        <Input v-model="keyword" :placeholder="t('compositionEditor.picker.searchPlaceholder')" class="pl-9" />
       </div>
 
       <div v-if="loading" class="flex h-[360px] items-center justify-center">
@@ -114,7 +115,7 @@ async function pick(c: Composition) {
         v-else-if="results.length === 0"
         class="flex h-[360px] items-center justify-center text-sm text-muted-foreground"
       >
-        没有匹配的稿件
+        {{ t('compositionEditor.picker.noResults') }}
       </div>
 
       <ScrollArea v-else class="h-[360px] pr-3">
@@ -127,7 +128,7 @@ async function pick(c: Composition) {
             @click="pick(c)"
           >
             <div class="mb-1 flex items-center gap-2">
-              <Badge variant="secondary" class="text-xs">{{ c.scope_type === 'personal' ? '个人' : '共享' }}</Badge>
+              <Badge variant="secondary" class="text-xs">{{ c.scope_type === 'personal' ? t('compositions.scope.personal') : t('compositions.scope.shared') }}</Badge>
               <span class="text-xs text-muted-foreground">{{ formatRelativeTime(c.updated_at) }}</span>
             </div>
             <p class="line-clamp-1 text-sm font-medium">{{ c.title }}</p>

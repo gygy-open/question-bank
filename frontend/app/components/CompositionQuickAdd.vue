@@ -7,6 +7,7 @@ import { FilePlus, Clock, Plus, Loader2 } from '@lucide/vue'
 import { toast } from 'vue-sonner'
 import { useCompositions, CompositionConflictError } from '@/composables/useCompositions'
 import { useAddQuestionsToComposition } from '@/composables/useAddQuestionsToComposition'
+import { formatDate } from '@/lib/locale'
 import type { Composition } from '~/types'
 
 const props = defineProps<{
@@ -14,6 +15,7 @@ const props = defineProps<{
   subjectId: number | null
 }>()
 
+const { t } = useI18n()
 const { listCompositions, createComposition } = useCompositions()
 const { addQuestionsToComposition } = useAddQuestionsToComposition()
 
@@ -34,7 +36,7 @@ const loadCompositions = async () => {
       .sort((a, b) => (a.updated_at < b.updated_at ? 1 : -1))
       .slice(0, 3)
   } catch {
-    toast.error('加载稿件失败')
+    toast.error(t('compositions.quickAdd.loadFailed'))
   } finally {
     loading.value = false
   }
@@ -47,16 +49,16 @@ const onOpenChange = (value: boolean) => {
 
 const handleConflict = (err: unknown) => {
   if (err instanceof CompositionConflictError && err.kind === 'revision') {
-    toast.error('稿件已被他人更新，请重新打开再试一次')
+    toast.error(t('compositions.quickAdd.conflict'))
   } else {
-    toast.error('加入稿件失败')
+    toast.error(t('compositions.quickAdd.addFailed'))
   }
 }
 
 // 加入成功后在 toast 里附上快捷跳转，无需再去组稿工作台里找该稿件。
 const jumpAction = (scope: Composition['scope_type'], id: number) => ({
   action: {
-    label: '前往查看',
+    label: t('compositions.quickAdd.view'),
     onClick: () => navigateTo(`/compositions/${scope}/${id}`),
   },
 })
@@ -66,7 +68,7 @@ const addToComposition = async (composition: Composition) => {
   adding.value = true
   try {
     await addQuestionsToComposition(props.subjectId, composition.scope_type, composition.id, [props.questionId])
-    toast.success(`已加入《${composition.title}》`, jumpAction(composition.scope_type, composition.id))
+    toast.success(t('compositions.quickAdd.added', { title: composition.title }), jumpAction(composition.scope_type, composition.id))
     open.value = false
   } catch (err) {
     handleConflict(err)
@@ -80,10 +82,10 @@ const createAndAdd = async () => {
   adding.value = true
   try {
     const composition = await createComposition(props.subjectId, 'personal', {
-      title: `新稿件 ${new Date().toLocaleDateString()}`,
+      title: t('compositions.defaultTitle', { date: formatDate(new Date()) }),
     })
     await addQuestionsToComposition(props.subjectId, 'personal', composition.id, [props.questionId])
-    toast.success(`已创建并加入《${composition.title}》`, jumpAction('personal', composition.id))
+    toast.success(t('compositions.quickAdd.createdAndAdded', { title: composition.title }), jumpAction('personal', composition.id))
     open.value = false
   } catch (err) {
     handleConflict(err)
@@ -113,7 +115,7 @@ const onKey = (e: KeyboardEvent) => {
         variant="ghost"
         size="icon"
         class="h-8 w-8 text-muted-foreground"
-        title="加入稿件"
+        :title="t('compositions.quickAdd.trigger')"
       >
         <FilePlus class="h-4 w-4" />
       </Button>
@@ -128,11 +130,11 @@ const onKey = (e: KeyboardEvent) => {
         <div class="p-2 space-y-1">
           <div class="px-2 py-1 text-xs font-medium text-muted-foreground flex items-center gap-1">
             <Clock class="h-3 w-3" />
-            最近编辑
+            {{ t('compositions.quickAdd.recent') }}
           </div>
 
           <div v-if="compositions.length === 0" class="px-2 py-3 text-sm text-muted-foreground text-center">
-            还没有稿件
+            {{ t('compositions.quickAdd.empty') }}
           </div>
 
           <button
@@ -145,7 +147,7 @@ const onKey = (e: KeyboardEvent) => {
             <div class="flex-1 min-w-0">
               <div class="flex items-center gap-1.5">
                 <span class="text-sm font-medium truncate">{{ composition.title }}</span>
-                <Badge variant="secondary" class="text-[10px] px-1">{{ composition.scope_type === 'personal' ? '个人' : '共享' }}</Badge>
+                <Badge variant="secondary" class="text-[10px] px-1">{{ composition.scope_type === 'personal' ? t('compositions.scope.personal') : t('compositions.scope.shared') }}</Badge>
               </div>
             </div>
             <kbd class="hidden group-hover:inline-flex h-5 px-1.5 items-center rounded border bg-muted text-xs font-mono">
@@ -161,13 +163,13 @@ const onKey = (e: KeyboardEvent) => {
             @click="createAndAdd"
           >
             <Plus class="h-4 w-4" />
-            新建稿件并加入
+            {{ t('compositions.quickAdd.createAndAdd') }}
           </button>
           <button
             class="w-full flex items-center justify-between p-2 rounded hover:bg-accent transition-colors text-sm"
             @click="goToWorkspace"
           >
-            <span>前往组稿工作台</span>
+            <span>{{ t('compositions.quickAdd.goToWorkspace') }}</span>
           </button>
         </div>
       </div>

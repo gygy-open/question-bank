@@ -3,6 +3,7 @@
 import { ref } from 'vue'
 import { toast } from 'vue-sonner'
 import { useCompositions } from '@/composables/useCompositions'
+import { translate } from '@/lib/locale'
 import type { CompositionExportFormat, CompositionScope } from '@/types'
 
 const LAST_FORMAT_STORAGE_KEY = 'qb:composition:last-export-format'
@@ -62,18 +63,20 @@ export function useCompositionExport() {
       link.remove()
       window.URL.revokeObjectURL(url)
       rememberFormat(format)
-      toast.success('导出成功')
+      toast.success(translate('compositionVersions.export.success'))
       return true
     } catch (err) {
       const { status, detail, nodeId } = parseExportError(err)
       if (status === 422) {
-        const reason = detail ?? '内容存在无法识别的节点'
-        toast.error(nodeId ? `导出失败：${reason}（节点 ${nodeId}）` : `导出失败：${reason}`)
+        const reason = detail ?? translate('compositionVersions.export.unknownNode')
+        toast.error(nodeId
+          ? translate('compositionVersions.export.failedWithNode', { reason, nodeId })
+          : translate('compositionVersions.export.failedWithReason', { reason }))
       } else if (status === 404) {
-        toast.error('版本不存在或无权访问')
+        toast.error(translate('compositionVersions.toast.notFound'))
         onNotFound?.()
       } else {
-        toast.error('导出失败，请稍后重试')
+        toast.error(translate('compositionVersions.export.failed'))
       }
       return false
     } finally {

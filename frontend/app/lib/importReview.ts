@@ -1,6 +1,7 @@
 import type { ImportDraft } from '@/lib/questionModel'
 import type { PaperExtraction, PaperOutlineItem } from '@/lib/paperOutline'
 import type { RichDoc } from '@/types'
+import { translate } from '@/lib/locale'
 
 export interface ImportStimulus {
   temp_id: string
@@ -56,9 +57,9 @@ export function validateImportStructure(
   const stimulusIds = stimuli.map((stimulus) => stimulus.temp_id)
   const groupIds = groups.map((group) => group.temp_id)
 
-  for (const id of duplicateValues(questionIds)) errors.push(`题目临时引用重复：${id}`)
-  for (const id of duplicateValues(stimulusIds)) errors.push(`题目材料临时引用重复：${id}`)
-  for (const id of duplicateValues(groupIds)) errors.push(`题组临时引用重复：${id}`)
+  for (const id of duplicateValues(questionIds)) errors.push(translate('importReview.errors.duplicateQuestionId', { id }))
+  for (const id of duplicateValues(stimulusIds)) errors.push(translate('importReview.errors.duplicateStimulusId', { id }))
+  for (const id of duplicateValues(groupIds)) errors.push(translate('importReview.errors.duplicateGroupId', { id }))
 
   const questionIdSet = new Set(questionIds)
   const stimulusIdSet = new Set(stimulusIds)
@@ -66,17 +67,17 @@ export function validateImportStructure(
   const groupOfQuestion = new Map<string, string>()
   for (const group of groups) {
     if (!stimulusIdSet.has(group.stimulus_temp_id)) {
-      errors.push(`题组 ${group.temp_id} 引用了不存在的题目材料：${group.stimulus_temp_id}`)
+      errors.push(translate('importReview.errors.groupMissingStimulus', { group: group.temp_id, id: group.stimulus_temp_id }))
     }
-    if (group.question_temp_ids.length === 0) errors.push(`题组 ${group.temp_id} 没有小题`)
+    if (group.question_temp_ids.length === 0) errors.push(translate('importReview.errors.groupEmpty', { group: group.temp_id }))
     for (const id of duplicateValues(group.question_temp_ids)) {
-      errors.push(`题组 ${group.temp_id} 重复引用小题：${id}`)
+      errors.push(translate('importReview.errors.groupDuplicateMember', { group: group.temp_id, id }))
     }
     for (const id of group.question_temp_ids) {
-      if (!questionIdSet.has(id)) errors.push(`题组 ${group.temp_id} 引用了不存在的小题：${id}`)
+      if (!questionIdSet.has(id)) errors.push(translate('importReview.errors.groupMissingMember', { group: group.temp_id, id }))
       const other = groupOfQuestion.get(id)
       if (other && other !== group.temp_id) {
-        errors.push(`小题 ${id} 同时属于题组 ${other} 和 ${group.temp_id}，一道题只能依赖一份题目材料`)
+        errors.push(translate('importReview.errors.questionInMultipleGroups', { id, first: other, second: group.temp_id }))
       }
       groupOfQuestion.set(id, other ?? group.temp_id)
     }
@@ -84,10 +85,10 @@ export function validateImportStructure(
 
   for (const item of paper?.outline ?? []) {
     if (item.kind === 'question_ref' && item.temp_id && !questionIdSet.has(item.temp_id)) {
-      errors.push(`试卷结构引用了不存在的题目：${item.temp_id}`)
+      errors.push(translate('importReview.errors.outlineMissingQuestion', { id: item.temp_id }))
     }
     if (item.kind === 'question_group_ref' && item.temp_id && !groupIdSet.has(item.temp_id)) {
-      errors.push(`试卷结构引用了不存在的题组：${item.temp_id}`)
+      errors.push(translate('importReview.errors.outlineMissingGroup', { id: item.temp_id }))
     }
   }
   return errors

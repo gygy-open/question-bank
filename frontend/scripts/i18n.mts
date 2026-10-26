@@ -4,10 +4,11 @@
  *   pnpm i18n:sync   以 zh-CN 为准重排/清理其他语言文件，导出缺失或过期条目到 i18n/.pending/<locale>.json
  *   pnpm i18n:apply  校验 i18n/.pending/<locale>.out.json 中的译文并合并，更新 lock
  *   pnpm i18n:check  只读校验，有问题时以非 0 退出（供 CI 使用）
+ *   pnpm i18n:merge  把 i18n/.fragments/*.json（并行批次新增的 zh-CN key）合并进 zh-CN.json
  */
 import { relative } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { apply, check, pendingFile, outFile, resolvePaths, sync } from './i18n-core.mts'
+import { MergeConflictError, apply, check, mergeFragments, pendingFile, outFile, resolvePaths, sync } from './i18n-core.mts'
 
 const paths = resolvePaths(fileURLToPath(new URL('../i18n', import.meta.url)))
 const rel = (p: string) => relative(process.cwd(), p)
@@ -56,10 +57,27 @@ function runCheck(): number {
   return 1
 }
 
-const commands: Record<string, () => number> = { sync: runSync, apply: runApply, check: runCheck }
+function runMerge(): number {
+  try {
+    const results = mergeFragments(paths)
+    if (!results.length) console.log('No fragments in i18n/.fragments; nothing to merge.')
+    for (const r of results) {
+      console.log(`[${r.fragment}] added ${r.added.length}, duplicates ${r.duplicates.length}`)
+      if (r.duplicates.length) console.log(`  duplicates (ignored): ${preview(r.duplicates)}`)
+    }
+    return 0
+  } catch (e) {
+    if (!(e instanceof MergeConflictError)) throw e
+    for (const c of e.conflicts) console.log(`[${c.fragment}] ${c.key}: ${c.reason}`)
+    console.log(`\n${e.message}; nothing was written.`)
+    return 1
+  }
+}
+
+const commands: Record<string, () => number> = { sync: runSync, apply: runApply, check: runCheck, merge: runMerge }
 const cmd = process.argv[2] ?? ''
 if (!commands[cmd]) {
-  console.error('Usage: node scripts/i18n.mts <sync|apply|check>')
+  console.error('Usage: node scripts/i18n.mts <sync|apply|check|merge>')
   process.exit(2)
 }
 process.exit(commands[cmd]!())

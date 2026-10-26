@@ -21,6 +21,7 @@ export interface I18nPaths {
   localesDir: string
   lockFile: string
   pendingDir: string
+  fragmentsDir: string
 }
 
 export function resolvePaths(root: string): I18nPaths {
@@ -29,6 +30,7 @@ export function resolvePaths(root: string): I18nPaths {
     localesDir: join(root, 'locales'),
     lockFile: join(root, '.translation-lock.json'),
     pendingDir: join(root, '.pending'),
+    fragmentsDir: join(root, '.fragments'),
   }
 }
 
@@ -279,6 +281,68 @@ export function apply(paths: I18nPaths): ApplyResult[] {
   }
 
   saveLock(paths, lock, base)
+  return results
+}
+
+export interface MergeResult {
+  fragment: string
+  added: string[]
+  duplicates: string[]
+}
+
+export class MergeConflictError extends Error {
+  conflicts: { fragment: string; key: string; reason: string }[]
+
+  constructor(conflicts: { fragment: string; key: string; reason: string }[]) {
+    super(`${conflicts.length} conflict(s) while merging fragments`)
+    this.conflicts = conflicts
+  }
+}
+
+/**
+ * 把 .fragments/*.json（并行批次各自新增的基准语言 key）合并进基准语言文件，追加在末尾。
+ * 与已有 key 值完全相同的视为重复并忽略；值不同或叶子/分组冲突则整体中止，不写任何文件。
+ * 成功后删除已合并的片段文件。
+ */
+export function mergeFragments(paths: I18nPaths): MergeResult[] {
+  if (!existsSync(paths.fragmentsDir)) return []
+  const files = readdirSync(paths.fragmentsDir).filter(f => f.endsWith('.json')).sort()
+  const base = loadLocale(paths, BASE_LOCALE)
+  const results: MergeResult[] = []
+  const conflicts: { fragment: string; key: string; reason: string }[] = []
+  const origin = new Map<string, string>()
+
+  for (const file of files) {
+    const fragment = flatten(readJson<Messages>(join(paths.fragmentsDir, file), {}))
+    const result: MergeResult = { fragment: file, added: [], duplicates: [] }
+    for (const [key, value] of fragment) {
+      const existing = base.get(key)
+      if (existing !== undefined) {
+        if (existing === value) result.duplicates.push(key)
+        else conflicts.push({ fragment: file, key, reason: `already defined${origin.has(key) ? ` by ${origin.get(key)}` : ''} with a different value` })
+        continue
+      }
+      const clash = [...base.keys()].find(k => k.startsWith(`${key}.`) || key.startsWith(`${k}.`))
+      if (clash) {
+        conflicts.push({ fragment: file, key, reason: `leaf/group clash with "${clash}"` })
+        continue
+      }
+      const issue = syntaxIssue(value)
+      if (issue) {
+        conflicts.push({ fragment: file, key, reason: issue })
+        continue
+      }
+      base.set(key, value)
+      origin.set(key, file)
+      result.added.push(key)
+    }
+    results.push(result)
+  }
+
+  if (conflicts.length) throw new MergeConflictError(conflicts)
+  // 用 unflatten 重新分组：新增 key 落到同名命名空间下（如 common.*），新命名空间追加在末尾
+  saveLocale(paths, BASE_LOCALE, base)
+  for (const file of files) rmSync(join(paths.fragmentsDir, file))
   return results
 }
 

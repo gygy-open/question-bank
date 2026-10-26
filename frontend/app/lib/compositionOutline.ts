@@ -10,6 +10,7 @@ import type { AnswerFieldKey } from '@/types/composition'
 import { ANSWER_FIELD_KEYS } from '@/types/composition'
 import { richDocToPlainText } from '@/components/rich-editor/richDoc'
 import { questionTypeLabel } from '@/lib/answerFormat'
+import { translate } from '@/lib/locale'
 import type { EditorDocument, EditorNode } from '@/lib/compositionDocument'
 import {
   answerSpacePropsOf,
@@ -41,26 +42,35 @@ export function truncate(text: string, limit = SUMMARY_LIMIT): string {
 export function describeNode(node: EditorNode): string {
   switch (node.nodeType) {
     case 'heading':
-      return `${headingLevelOf(node)} 级标题「${truncate(richDocToPlainText(node.content), 40)}」`
+      return translate('compositionEditor.diff.node.heading', {
+        level: headingLevelOf(node),
+        text: truncate(richDocToPlainText(node.content), 40),
+      })
     case 'rich_text':
-      return `文本「${truncate(richDocToPlainText(node.content), 40)}」`
+      return translate('compositionEditor.diff.node.text', { text: truncate(richDocToPlainText(node.content), 40) })
     case 'question': {
       const number = questionNumberOf(node)
       const stem = truncate(richDocToPlainText(node.questionContent?.content ?? null), 40)
-      return number ? `第 ${number} 题「${stem}」` : `题目「${stem}」`
+      return number
+        ? translate('compositionEditor.diff.node.questionNumbered', { number, stem })
+        : translate('compositionEditor.diff.node.question', { stem })
     }
     case 'question_details':
-      return `参考答案模块（${detailPropsOf(node).scope === 'all' ? '全稿' : '模块之前'}）`
+      return detailPropsOf(node).scope === 'all'
+        ? translate('compositionEditor.diff.node.detailsAll')
+        : translate('compositionEditor.diff.node.detailsBefore')
     case 'question_group':
-      return `材料题 #${node.stimulusId ?? '?'}`
+      return translate('compositionEditor.diff.node.group', { id: node.stimulusId ?? '?' })
     case 'answer_space': {
       const props = answerSpacePropsOf(node)
-      return `作答空间（${props.lines} 行${props.style === 'lined' ? '横线' : '空白'}）`
+      return props.style === 'lined'
+        ? translate('compositionEditor.diff.node.answerSpaceLined', { lines: props.lines })
+        : translate('compositionEditor.diff.node.answerSpaceBlank', { lines: props.lines })
     }
     case 'page_break':
-      return '分页符'
+      return translate('compositionEditor.diff.node.pageBreak')
     case 'answer_item':
-      return '答案条目'
+      return translate('compositionEditor.diff.node.answerItem')
   }
 }
 

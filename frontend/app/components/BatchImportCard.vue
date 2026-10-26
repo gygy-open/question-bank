@@ -13,6 +13,8 @@ const props = defineProps<{
 
 const emit = defineEmits(['confirmed', 'rejected'])
 
+const { t } = useI18n()
+
 const { $api } = useNuxtApp()
 const isOpen = ref(false)
 const loading = ref(false)
@@ -32,7 +34,7 @@ const fetchQuestions = async () => {
     })
     questions.value = data.items
   } catch (e) {
-    toast.error('加载题目详情失败')
+    toast.error(t('batchImport.loadFailed'))
   } finally {
     loading.value = false
   }
@@ -57,11 +59,11 @@ const handleConfirm = async () => {
     })
     processed.value = true
     processedAction.value = 'approved'
-    toast.success('题目导入成功')
+    toast.success(t('batchImport.imported'))
     emit('confirmed')
     isOpen.value = false
   } catch (e) {
-    toast.error('确认导入失败')
+    toast.error(t('batchImport.confirmFailed'))
   } finally {
     processing.value = false
   }
@@ -79,11 +81,11 @@ const handleReject = async () => {
     })
     processed.value = true
     processedAction.value = 'rejected'
-    toast.info('已拒绝导入题目')
+    toast.info(t('batchImport.rejected'))
     emit('rejected')
     isOpen.value = false
   } catch (e) {
-    toast.error('拒绝导入失败')
+    toast.error(t('batchImport.rejectFailed'))
   } finally {
     processing.value = false
   }
@@ -96,15 +98,15 @@ const handleReject = async () => {
       <CardHeader class="pb-2">
         <CardTitle class="text-base flex items-center gap-2">
           <FileText class="w-4 h-4 text-blue-600" />
-          AI 导入提案
+          {{ t('batchImport.title') }}
         </CardTitle>
         <CardDescription>
-          AI 提议导入 {{ questionIds.length }} 道题目。
+          {{ t('batchImport.description', { count: questionIds.length }) }}
         </CardDescription>
       </CardHeader>
       <CardFooter>
         <Button @click="openDialog" variant="default" size="sm" class="w-full">
-          审核并确认
+          {{ t('batchImport.review') }}
         </Button>
       </CardFooter>
     </Card>
@@ -114,16 +116,16 @@ const handleReject = async () => {
       <CheckCircle2 v-if="processedAction === 'approved'" class="w-4 h-4" />
       <XCircle v-else class="w-4 h-4" />
       <span>
-        {{ processedAction === 'approved' ? '题目导入成功。' : '导入提案已拒绝。' }}
+        {{ processedAction === 'approved' ? t('batchImport.importedDone') : t('batchImport.rejectedDone') }}
       </span>
     </div>
 
     <Dialog :open="isOpen" @update:open="isOpen = $event">
       <DialogContent class="max-w-3xl max-h-[80vh] flex flex-col">
         <DialogHeader>
-          <DialogTitle>审核题目</DialogTitle>
+          <DialogTitle>{{ t('batchImport.dialogTitle') }}</DialogTitle>
           <DialogDescription>
-            请在导入前审核以下 {{ questions.length }} 道题目。
+            {{ t('batchImport.dialogDescription', { count: questions.length }) }}
           </DialogDescription>
         </DialogHeader>
         
@@ -145,11 +147,11 @@ const handleReject = async () => {
 
         <DialogFooter class="gap-2 sm:gap-0">
           <Button variant="outline" @click="handleReject" :disabled="processing">
-            拒绝
+            {{ t('batchImport.reject') }}
           </Button>
           <Button @click="handleConfirm" :disabled="processing">
             <Loader2 v-if="processing" class="w-4 h-4 mr-2 animate-spin" />
-            确认导入
+            {{ t('batchImport.confirm') }}
           </Button>
         </DialogFooter>
       </DialogContent>

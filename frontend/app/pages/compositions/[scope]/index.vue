@@ -32,6 +32,7 @@ import type {
   Composition, CompositionFolder, CompositionFolderNode, CompositionScope,
 } from '~/types'
 
+const { t } = useI18n()
 const route = useRoute()
 const router = useRouter()
 const api = useCompositions()
@@ -60,8 +61,8 @@ const breadcrumb = computed(() => folderBreadcrumb(folders.value, selectedFolder
 
 const scopeHint = computed(() =>
   scope.value === 'shared'
-    ? '共享空间：本学科团队成员均可查看与编辑。'
-    : '个人空间：仅你自己可见，团队其他成员无法访问。',
+    ? t('compositions.scopeHint.shared')
+    : t('compositions.scopeHint.personal'),
 )
 
 // 扁平化目录为带缩进标签的选项，供“移动”选择器使用。
@@ -80,11 +81,11 @@ const flatFolderOptions = computed(() => {
 function handleConflict(err: unknown, fallback: string) {
   if (err instanceof CompositionConflictError) {
     if (err.kind === 'revision') {
-      toast.error('内容已被他人更新，请刷新后重试')
+      toast.error(t('compositions.conflict.revision'))
     } else if (err.kind === 'folder-not-empty') {
-      toast.error('文件夹非空，请先移动或删除其中的内容')
+      toast.error(t('compositions.conflict.folderNotEmpty'))
     } else {
-      toast.error('操作冲突，请刷新后重试')
+      toast.error(t('compositions.conflict.generic'))
     }
     return
   }
@@ -102,7 +103,7 @@ async function loadFolders() {
       expanded.value = new Set([...expanded.value, ...chain.map((f) => f.id)])
     }
   } catch {
-    toast.error('加载文件夹失败')
+    toast.error(t('compositions.toast.loadFoldersFailed'))
   } finally {
     loadingFolders.value = false
   }
@@ -123,7 +124,7 @@ async function loadCompositions() {
       })
     }
   } catch {
-    toast.error('加载组稿失败')
+    toast.error(t('compositions.toast.loadListFailed'))
   } finally {
     loadingList.value = false
   }
@@ -189,7 +190,7 @@ function openRenameFolder(folder: CompositionFolder) {
 
 async function submitFolderDialog() {
   if (!currentSubjectId.value || !folderName.value.trim()) {
-    toast.error('请输入文件夹名称')
+    toast.error(t('compositions.toast.folderNameRequired'))
     return
   }
   folderSubmitting.value = true
@@ -210,7 +211,7 @@ async function submitFolderDialog() {
     folderDialog.value = false
     await loadFolders()
   } catch (err) {
-    handleConflict(err, '保存文件夹失败')
+    handleConflict(err, t('compositions.toast.saveFolderFailed'))
   } finally {
     folderSubmitting.value = false
   }
@@ -218,14 +219,14 @@ async function submitFolderDialog() {
 
 async function deleteFolder(folder: CompositionFolder) {
   if (!currentSubjectId.value) return
-  if (!window.confirm(`删除文件夹「${folder.name}」？仅当其为空时可删除。`)) return
+  if (!window.confirm(t('compositions.confirm.deleteFolder', { name: folder.name }))) return
   try {
     await api.deleteFolder(currentSubjectId.value, scope.value, folder.id)
-    toast.success('已删除文件夹')
+    toast.success(t('compositions.toast.folderDeleted'))
     if (selectedFolderId.value === folder.id) selectFolder(null)
     await loadFolders()
   } catch (err) {
-    handleConflict(err, '删除文件夹失败')
+    handleConflict(err, t('compositions.toast.deleteFolderFailed'))
   }
 }
 
@@ -279,9 +280,9 @@ async function submitMove() {
       await loadCompositions()
     }
     moveDialog.value = false
-    toast.success('已移动')
+    toast.success(t('compositions.toast.moved'))
   } catch (err) {
-    handleConflict(err, '移动失败')
+    handleConflict(err, t('compositions.toast.moveFailed'))
   } finally {
     moveSubmitting.value = false
   }
@@ -301,7 +302,7 @@ function openCreateComposition() {
 
 async function submitCreateComposition() {
   if (!currentSubjectId.value || !createTitle.value.trim()) {
-    toast.error('请输入组稿标题')
+    toast.error(t('compositions.toast.titleRequired'))
     return
   }
   createSubmitting.value = true
@@ -314,7 +315,7 @@ async function submitCreateComposition() {
     createDialog.value = false
     router.push(`/compositions/${scope.value}/${comp.id}`)
   } catch (err) {
-    handleConflict(err, '创建组稿失败')
+    handleConflict(err, t('compositions.toast.createFailed'))
   } finally {
     createSubmitting.value = false
   }
@@ -335,7 +336,7 @@ function openEditComposition(comp: Composition) {
 
 async function submitEditComposition() {
   if (!currentSubjectId.value || !editTarget.value || !editTitle.value.trim()) {
-    toast.error('请输入组稿标题')
+    toast.error(t('compositions.toast.titleRequired'))
     return
   }
   editSubmitting.value = true
@@ -347,9 +348,9 @@ async function submitEditComposition() {
     })
     editDialog.value = false
     await loadCompositions()
-    toast.success('已保存')
+    toast.success(t('common.saved'))
   } catch (err) {
-    handleConflict(err, '保存失败')
+    handleConflict(err, t('common.saveFailed'))
   } finally {
     editSubmitting.value = false
   }
@@ -363,22 +364,22 @@ async function toggleArchive(comp: Composition) {
       expected_revision: comp.revision,
       status: next,
     })
-    toast.success(next === 'archived' ? '已归档' : '已取消归档')
+    toast.success(next === 'archived' ? t('compositions.toast.archived') : t('compositions.toast.unarchived'))
     await loadCompositions()
   } catch (err) {
-    handleConflict(err, '操作失败')
+    handleConflict(err, t('common.operationFailed'))
   }
 }
 
 async function softDelete(comp: Composition) {
   if (!currentSubjectId.value) return
-  if (!window.confirm(`将「${comp.title}」移入回收站？`)) return
+  if (!window.confirm(t('compositions.confirm.moveToTrash', { title: comp.title }))) return
   try {
     await api.deleteComposition(currentSubjectId.value, scope.value, comp.id, comp.revision)
-    toast.success('已移入回收站')
+    toast.success(t('compositions.toast.movedToTrash'))
     await loadCompositions()
   } catch (err) {
-    handleConflict(err, '删除失败')
+    handleConflict(err, t('common.deleteFailed'))
   }
 }
 
@@ -386,10 +387,10 @@ async function restore(comp: Composition) {
   if (!currentSubjectId.value) return
   try {
     await api.restoreComposition(currentSubjectId.value, scope.value, comp.id, comp.revision)
-    toast.success('已恢复')
+    toast.success(t('compositions.toast.restored'))
     await loadCompositions()
   } catch (err) {
-    handleConflict(err, '恢复失败')
+    handleConflict(err, t('compositions.toast.restoreFailed'))
   }
 }
 
@@ -400,10 +401,10 @@ async function duplicate(comp: Composition) {
   duplicatingId.value = comp.id
   try {
     await api.duplicateComposition(currentSubjectId.value, scope.value, comp.id)
-    toast.success('已创建副本')
+    toast.success(t('compositions.toast.duplicated'))
     await loadCompositions()
   } catch (err) {
-    handleConflict(err, '创建副本失败')
+    handleConflict(err, t('compositions.toast.duplicateFailed'))
   } finally {
     duplicatingId.value = null
   }
@@ -415,14 +416,14 @@ function openComposition(comp: Composition) {
 </script>
 
 <template>
-  <PageHeader title="组稿工作台">
+  <PageHeader :title="t('compositions.title')">
     <template #actions>
       <Button
         v-if="currentSubject && view === 'active'"
         size="sm"
         @click="openCreateComposition"
       >
-        <Plus class="mr-2 h-4 w-4" /> 新建稿件
+        <Plus class="mr-2 h-4 w-4" /> {{ t('compositions.newComposition') }}
       </Button>
     </template>
   </PageHeader>
@@ -435,7 +436,7 @@ function openComposition(comp: Composition) {
     >
       <FileText class="h-10 w-10 text-muted-foreground/50" />
       <p class="text-muted-foreground">
-        {{ hasSubjects ? '请先在左侧选择一个学科' : '请先创建一个学科后再使用组稿工作台' }}
+        {{ hasSubjects ? t('compositions.empty.selectSubject') : t('compositions.empty.createSubject') }}
       </p>
     </div>
 
@@ -445,10 +446,10 @@ function openComposition(comp: Composition) {
         <Tabs :model-value="scope" @update:model-value="switchScope">
           <TabsList>
             <TabsTrigger value="shared">
-              <Users class="mr-1.5 h-4 w-4" /> 共享
+              <Users class="mr-1.5 h-4 w-4" /> {{ t('compositions.scope.shared') }}
             </TabsTrigger>
             <TabsTrigger value="personal">
-              <Lock class="mr-1.5 h-4 w-4" /> 个人
+              <Lock class="mr-1.5 h-4 w-4" /> {{ t('compositions.scope.personal') }}
             </TabsTrigger>
           </TabsList>
         </Tabs>
@@ -459,7 +460,7 @@ function openComposition(comp: Composition) {
         <!-- 文件夹导航 -->
         <aside class="flex flex-col gap-2 rounded-md border bg-card p-2">
           <div class="flex items-center justify-between px-1">
-            <span class="text-xs font-medium text-muted-foreground">文件夹</span>
+            <span class="text-xs font-medium text-muted-foreground">{{ t('compositions.folders') }}</span>
             <TooltipProvider>
               <Tooltip>
                 <TooltipTrigger as-child>
@@ -467,7 +468,7 @@ function openComposition(comp: Composition) {
                     <FolderPlus class="h-4 w-4" />
                   </Button>
                 </TooltipTrigger>
-                <TooltipContent>新建根文件夹</TooltipContent>
+                <TooltipContent>{{ t('compositions.newRootFolder') }}</TooltipContent>
               </Tooltip>
             </TooltipProvider>
           </div>
@@ -479,7 +480,7 @@ function openComposition(comp: Composition) {
             @click="selectFolder(null)"
           >
             <Home class="h-4 w-4 text-muted-foreground" />
-            <span>根目录</span>
+            <span>{{ t('compositions.root') }}</span>
           </button>
 
           <div v-if="loadingFolders" class="flex justify-center py-4">
@@ -497,7 +498,7 @@ function openComposition(comp: Composition) {
             @move="openMoveFolder"
             @delete="deleteFolder"
           />
-          <p v-else class="px-2 py-2 text-xs text-muted-foreground">暂无文件夹</p>
+          <p v-else class="px-2 py-2 text-xs text-muted-foreground">{{ t('compositions.noFolders') }}</p>
 
           <div class="mt-auto border-t pt-2">
             <Button
@@ -507,7 +508,7 @@ function openComposition(comp: Composition) {
               :class="view === 'trash' ? 'bg-accent font-medium' : ''"
               @click="view = 'trash'"
             >
-              <Trash class="mr-2 h-4 w-4" /> 回收站
+              <Trash class="mr-2 h-4 w-4" /> {{ t('compositions.trash') }}
             </Button>
           </div>
         </aside>
@@ -516,15 +517,15 @@ function openComposition(comp: Composition) {
         <section class="flex flex-col gap-3">
           <!-- 面包屑 -->
           <div v-if="view === 'active'" class="flex flex-wrap items-center gap-1 text-sm text-muted-foreground">
-            <button class="hover:text-foreground" @click="selectFolder(null)">根目录</button>
+            <button class="hover:text-foreground" @click="selectFolder(null)">{{ t('compositions.root') }}</button>
             <template v-for="f in breadcrumb" :key="f.id">
               <span>/</span>
               <button class="hover:text-foreground" @click="selectFolder(f.id)">{{ f.name }}</button>
             </template>
           </div>
           <div v-else class="flex items-center gap-2 text-sm">
-            <span class="font-medium">回收站</span>
-            <Button variant="ghost" size="sm" class="h-7" @click="view = 'active'">返回</Button>
+            <span class="font-medium">{{ t('compositions.trash') }}</span>
+            <Button variant="ghost" size="sm" class="h-7" @click="view = 'active'">{{ t('common.back') }}</Button>
           </div>
 
           <div v-if="loadingList" class="flex justify-center py-16">
@@ -543,17 +544,17 @@ function openComposition(comp: Composition) {
                 <div class="min-w-0 flex-1">
                   <p class="truncate text-sm font-medium">{{ comp.title }}</p>
                   <p class="truncate text-xs text-muted-foreground">
-                    删除于 {{ comp.deleted_at ? formatRelativeTime(comp.deleted_at) : '' }}
+                    {{ t('compositions.deletedAt', { time: comp.deleted_at ? formatRelativeTime(comp.deleted_at) : '' }) }}
                   </p>
                 </div>
                 <Button variant="outline" size="sm" @click="restore(comp)">
-                  <RotateCcw class="mr-1.5 h-4 w-4" /> 恢复
+                  <RotateCcw class="mr-1.5 h-4 w-4" /> {{ t('compositions.restore') }}
                 </Button>
               </div>
             </div>
             <div v-else class="flex flex-col items-center gap-2 py-16 text-center text-muted-foreground">
               <Trash class="h-8 w-8 opacity-50" />
-              <p class="text-sm">回收站是空的</p>
+              <p class="text-sm">{{ t('compositions.trashEmpty') }}</p>
             </div>
           </template>
 
@@ -575,11 +576,11 @@ function openComposition(comp: Composition) {
                     <div class="flex items-center gap-2">
                       <span class="truncate text-sm font-medium">{{ comp.title }}</span>
                       <Badge v-if="comp.status === 'archived'" variant="secondary" class="shrink-0">
-                        已归档
+                        {{ t('compositions.archived') }}
                       </Badge>
                     </div>
                     <p class="truncate text-xs text-muted-foreground">
-                      {{ comp.description || '暂无描述' }}
+                      {{ comp.description || t('compositions.noDescription') }}
                     </p>
                   </div>
                 </button>
@@ -595,22 +596,22 @@ function openComposition(comp: Composition) {
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end">
                     <DropdownMenuItem @click="openEditComposition(comp)">
-                      <Pencil class="mr-2 h-4 w-4" /> 重命名 / 描述
+                      <Pencil class="mr-2 h-4 w-4" /> {{ t('compositions.actions.editInfo') }}
                     </DropdownMenuItem>
                     <DropdownMenuItem @click="openMoveComposition(comp)">
-                      <FolderInput class="mr-2 h-4 w-4" /> 移动
+                      <FolderInput class="mr-2 h-4 w-4" /> {{ t('compositions.actions.move') }}
                     </DropdownMenuItem>
                     <DropdownMenuItem :disabled="duplicatingId === comp.id" @click="duplicate(comp)">
-                      <Copy class="mr-2 h-4 w-4" /> 创建副本
+                      <Copy class="mr-2 h-4 w-4" /> {{ t('compositions.actions.duplicate') }}
                     </DropdownMenuItem>
                     <DropdownMenuItem @click="toggleArchive(comp)">
                       <ArchiveRestore v-if="comp.status === 'archived'" class="mr-2 h-4 w-4" />
                       <Archive v-else class="mr-2 h-4 w-4" />
-                      {{ comp.status === 'archived' ? '取消归档' : '归档' }}
+                      {{ comp.status === 'archived' ? t('compositions.actions.unarchive') : t('compositions.actions.archive') }}
                     </DropdownMenuItem>
                     <DropdownMenuSeparator />
                     <DropdownMenuItem class="text-destructive" @click="softDelete(comp)">
-                      <Trash2 class="mr-2 h-4 w-4" /> 删除
+                      <Trash2 class="mr-2 h-4 w-4" /> {{ t('common.delete') }}
                     </DropdownMenuItem>
                   </DropdownMenuContent>
                 </DropdownMenu>
@@ -618,9 +619,9 @@ function openComposition(comp: Composition) {
             </div>
             <div v-else class="flex flex-col items-center gap-3 py-16 text-center text-muted-foreground">
               <FileText class="h-8 w-8 opacity-50" />
-              <p class="text-sm">当前文件夹还没有组稿</p>
+              <p class="text-sm">{{ t('compositions.folderEmpty') }}</p>
               <Button size="sm" @click="openCreateComposition">
-                <Plus class="mr-2 h-4 w-4" /> 新建稿件
+                <Plus class="mr-2 h-4 w-4" /> {{ t('compositions.newComposition') }}
               </Button>
             </div>
           </template>
@@ -633,16 +634,16 @@ function openComposition(comp: Composition) {
   <Dialog v-model:open="folderDialog">
     <DialogContent class="sm:max-w-[420px]">
       <DialogHeader>
-        <DialogTitle>{{ folderDialogMode === 'create' ? '新建文件夹' : '重命名文件夹' }}</DialogTitle>
+        <DialogTitle>{{ folderDialogMode === 'create' ? t('compositions.folderDialog.createTitle') : t('compositions.folderDialog.renameTitle') }}</DialogTitle>
       </DialogHeader>
       <div class="space-y-2 py-2">
-        <Label>名称</Label>
-        <Input v-model="folderName" placeholder="文件夹名称" @keyup.enter="submitFolderDialog" />
+        <Label>{{ t('common.name') }}</Label>
+        <Input v-model="folderName" :placeholder="t('compositions.folderDialog.namePlaceholder')" @keyup.enter="submitFolderDialog" />
       </div>
       <DialogFooter>
-        <Button variant="outline" @click="folderDialog = false">取消</Button>
+        <Button variant="outline" @click="folderDialog = false">{{ t('common.cancel') }}</Button>
         <Button :disabled="folderSubmitting" @click="submitFolderDialog">
-          <Loader2 v-if="folderSubmitting" class="mr-2 h-4 w-4 animate-spin" /> 保存
+          <Loader2 v-if="folderSubmitting" class="mr-2 h-4 w-4 animate-spin" /> {{ t('common.save') }}
         </Button>
       </DialogFooter>
     </DialogContent>
@@ -652,9 +653,9 @@ function openComposition(comp: Composition) {
   <Dialog v-model:open="moveDialog">
     <DialogContent class="sm:max-w-[420px]">
       <DialogHeader>
-        <DialogTitle>移动到</DialogTitle>
+        <DialogTitle>{{ t('compositions.moveDialog.title') }}</DialogTitle>
         <DialogDescription>
-          选择目标文件夹，或移动到根目录。
+          {{ t('compositions.moveDialog.description') }}
         </DialogDescription>
       </DialogHeader>
       <div class="space-y-2 py-2">
@@ -666,7 +667,7 @@ function openComposition(comp: Composition) {
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="__root__">根目录</SelectItem>
+            <SelectItem value="__root__">{{ t('compositions.root') }}</SelectItem>
             <SelectItem v-for="o in moveOptions" :key="o.id" :value="String(o.id)">
               {{ o.label }}
             </SelectItem>
@@ -674,9 +675,9 @@ function openComposition(comp: Composition) {
         </Select>
       </div>
       <DialogFooter>
-        <Button variant="outline" @click="moveDialog = false">取消</Button>
+        <Button variant="outline" @click="moveDialog = false">{{ t('common.cancel') }}</Button>
         <Button :disabled="moveSubmitting" @click="submitMove">
-          <Loader2 v-if="moveSubmitting" class="mr-2 h-4 w-4 animate-spin" /> 移动
+          <Loader2 v-if="moveSubmitting" class="mr-2 h-4 w-4 animate-spin" /> {{ t('compositions.actions.move') }}
         </Button>
       </DialogFooter>
     </DialogContent>
@@ -686,23 +687,23 @@ function openComposition(comp: Composition) {
   <Dialog v-model:open="createDialog">
     <DialogContent class="sm:max-w-[460px]">
       <DialogHeader>
-        <DialogTitle>新建稿件</DialogTitle>
+        <DialogTitle>{{ t('compositions.newComposition') }}</DialogTitle>
         <DialogDescription>{{ scopeHint }}</DialogDescription>
       </DialogHeader>
       <div class="space-y-4 py-2">
         <div class="space-y-2">
-          <Label>标题</Label>
-          <Input v-model="createTitle" placeholder="例如：第一单元测验" @keyup.enter="submitCreateComposition" />
+          <Label>{{ t('compositions.form.title') }}</Label>
+          <Input v-model="createTitle" :placeholder="t('compositions.form.titleExample')" @keyup.enter="submitCreateComposition" />
         </div>
         <div class="space-y-2">
-          <Label>描述</Label>
-          <Textarea v-model="createDescription" placeholder="组稿说明（可选）" rows="3" />
+          <Label>{{ t('compositions.form.description') }}</Label>
+          <Textarea v-model="createDescription" :placeholder="t('compositions.form.descriptionPlaceholder')" rows="3" />
         </div>
       </div>
       <DialogFooter>
-        <Button variant="outline" @click="createDialog = false">取消</Button>
+        <Button variant="outline" @click="createDialog = false">{{ t('common.cancel') }}</Button>
         <Button :disabled="createSubmitting" @click="submitCreateComposition">
-          <Loader2 v-if="createSubmitting" class="mr-2 h-4 w-4 animate-spin" /> 创建并打开
+          <Loader2 v-if="createSubmitting" class="mr-2 h-4 w-4 animate-spin" /> {{ t('compositions.form.createAndOpen') }}
         </Button>
       </DialogFooter>
     </DialogContent>
@@ -712,22 +713,22 @@ function openComposition(comp: Composition) {
   <Dialog v-model:open="editDialog">
     <DialogContent class="sm:max-w-[460px]">
       <DialogHeader>
-        <DialogTitle>编辑组稿信息</DialogTitle>
+        <DialogTitle>{{ t('compositions.form.editTitle') }}</DialogTitle>
       </DialogHeader>
       <div class="space-y-4 py-2">
         <div class="space-y-2">
-          <Label>标题</Label>
-          <Input v-model="editTitle" placeholder="组稿标题" />
+          <Label>{{ t('compositions.form.title') }}</Label>
+          <Input v-model="editTitle" :placeholder="t('compositions.form.titlePlaceholder')" />
         </div>
         <div class="space-y-2">
-          <Label>描述</Label>
-          <Textarea v-model="editDescription" placeholder="组稿说明（可选）" rows="3" />
+          <Label>{{ t('compositions.form.description') }}</Label>
+          <Textarea v-model="editDescription" :placeholder="t('compositions.form.descriptionPlaceholder')" rows="3" />
         </div>
       </div>
       <DialogFooter>
-        <Button variant="outline" @click="editDialog = false">取消</Button>
+        <Button variant="outline" @click="editDialog = false">{{ t('common.cancel') }}</Button>
         <Button :disabled="editSubmitting" @click="submitEditComposition">
-          <Loader2 v-if="editSubmitting" class="mr-2 h-4 w-4 animate-spin" /> 保存
+          <Loader2 v-if="editSubmitting" class="mr-2 h-4 w-4 animate-spin" /> {{ t('common.save') }}
         </Button>
       </DialogFooter>
     </DialogContent>

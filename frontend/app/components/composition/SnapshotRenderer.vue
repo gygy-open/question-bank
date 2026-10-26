@@ -30,11 +30,13 @@ const props = defineProps<{
 const tree = computed(() => buildSnapshotTree(props.snapshot))
 const questionNodeMap = computed(() => snapshotQuestionNodeMap(props.snapshot))
 
-const FIELD_LABELS: Record<AnswerFieldKey, string> = {
-  answer: '答案',
-  thinking: '思路',
-  analysis: '解析',
-  summary: '小结',
+const { t } = useI18n()
+
+const FIELD_LABEL_KEYS: Record<AnswerFieldKey, string> = {
+  answer: 'compositionPanels.fields.answer',
+  thinking: 'compositionPanels.fields.thinking',
+  analysis: 'compositionPanels.fields.analysis',
+  summary: 'compositionPanels.fields.summary',
 }
 
 function headingClass(level: number): string {
@@ -105,11 +107,11 @@ function groupChildSnapshot(node: SnapshotTreeNode): CompositionSnapshot {
             <FileQuestion class="h-3.5 w-3.5 text-muted-foreground" />
             <span v-if="resolvedQuestionNumber(node, props.snapshot)" class="text-xs font-medium">{{ resolvedQuestionNumber(node, props.snapshot) }}.</span>
             <Badge variant="secondary" class="text-xs">{{ questionTypeLabel(node.question.q_type) }}</Badge>
-            <span class="text-xs text-muted-foreground">#{{ node.question.id }} · 版本 r{{ node.question_revision }}</span>
+            <span class="text-xs text-muted-foreground">#{{ node.question.id }} · {{ t('compositionNodes.questionRevision', { revision: node.question_revision }) }}</span>
             <span v-if="resolvedQuestionScore(node, props.snapshot) != null" class="ml-auto text-xs text-muted-foreground">（{{ resolvedQuestionScore(node, props.snapshot) }} 分）</span>
             <span v-else-if="resolvedSlotScoreText(node, props.snapshot)" class="ml-auto text-xs text-muted-foreground">（{{ resolvedSlotScoreText(node, props.snapshot) }}）</span>
           </div>
-          <RichContent :content="stemWithSlotNumbers(node.question.content, resolvedSlotNumbers(node, props.snapshot))" empty-text="（无题干）" />
+          <RichContent :content="stemWithSlotNumbers(node.question.content, resolvedSlotNumbers(node, props.snapshot))" :empty-text="t('compositionNodes.emptyStem')" />
           <ul
             v-if="node.question.options?.length"
             class="grid gap-x-6 gap-y-1"
@@ -123,14 +125,14 @@ function groupChildSnapshot(node: SnapshotTreeNode): CompositionSnapshot {
           <div v-if="anyQuestionFieldVisible(node)" class="space-y-2 border-t pt-2">
             <template v-for="key in ANSWER_FIELD_KEYS" :key="key">
               <div v-if="effectiveQuestionDisplay(node, props.snapshot, key)" class="flex flex-col gap-0.5">
-                <span class="text-xs font-medium text-muted-foreground">{{ FIELD_LABELS[key] }}</span>
+                <span class="text-xs font-medium text-muted-foreground">{{ t(FIELD_LABEL_KEYS[key]) }}</span>
                 <AnswerDisplay
                   v-if="key === 'answer'"
                   :answer="node.question.answer"
                   :options="node.question.options"
                   :slot-numbers="resolvedSlotNumbers(node, props.snapshot)"
                 />
-                <RichContent v-else :content="node.question[key]" class="[&_.prose]:my-0" empty-text="（空）" />
+                <RichContent v-else :content="node.question[key]" class="[&_.prose]:my-0" :empty-text="t('compositionNodes.emptyField')" />
               </div>
             </template>
           </div>
@@ -140,7 +142,7 @@ function groupChildSnapshot(node: SnapshotTreeNode): CompositionSnapshot {
       <!-- 分页 -->
       <div v-else-if="node.node_type === 'page_break'" class="flex items-center gap-3 py-2">
         <div class="h-px flex-1 border-t-2 border-dashed border-muted-foreground/40" />
-        <span class="text-xs font-medium text-muted-foreground">分页</span>
+        <span class="text-xs font-medium text-muted-foreground">{{ t('compositionNodes.pageBreak') }}</span>
         <div class="h-px flex-1 border-t-2 border-dashed border-muted-foreground/40" />
       </div>
 
@@ -148,11 +150,11 @@ function groupChildSnapshot(node: SnapshotTreeNode): CompositionSnapshot {
       <section v-else-if="node.node_type === 'question_group'" class="border-y bg-muted/20 px-4 py-4">
         <div class="mb-3 flex items-center gap-2">
           <Files class="h-4 w-4 text-muted-foreground" />
-          <span class="text-sm font-medium">材料题 #{{ node.stimulus_id }}</span>
-          <Badge variant="secondary" class="text-[11px]">材料 v{{ node.stimulus_revision }}</Badge>
+          <span class="text-sm font-medium">{{ t('compositionNodes.questionGroup', { id: node.stimulus_id }) }}</span>
+          <Badge variant="secondary" class="text-[11px]">{{ t('compositionNodes.stimulusRevision', { revision: node.stimulus_revision }) }}</Badge>
         </div>
         <div class="mb-5 border-l-2 border-primary/30 pl-4">
-          <RichContent :content="node.content" empty-text="（无材料）" />
+          <RichContent :content="node.content" :empty-text="t('compositionNodes.emptyStimulus')" />
         </div>
         <SnapshotRenderer :snapshot="groupChildSnapshot(node)" />
       </section>
@@ -179,11 +181,11 @@ function groupChildSnapshot(node: SnapshotTreeNode): CompositionSnapshot {
         <div class="mb-3 flex items-center gap-2">
           <ListChecks class="h-3.5 w-3.5 text-muted-foreground" />
           <span class="text-sm font-medium">
-            {{ node.props.scope === 'before' ? '答案汇总（此前题目）' : '答案汇总（全篇）' }}
+            {{ node.props.scope === 'before' ? t('compositionNodes.details.titleBefore') : t('compositionNodes.details.titleAll') }}
           </span>
         </div>
 
-        <p v-if="node.children.length === 0" class="text-xs text-muted-foreground">无可汇总的题目</p>
+        <p v-if="node.children.length === 0" class="text-xs text-muted-foreground">{{ t('compositionNodes.details.empty') }}</p>
 
         <div v-else class="space-y-4">
           <template v-for="child in node.children" :key="child.id">
@@ -198,7 +200,7 @@ function groupChildSnapshot(node: SnapshotTreeNode): CompositionSnapshot {
             <!-- answer_item：按有效字段渲染真实冻结内容 -->
             <div v-else-if="child.node_type === 'answer_item'">
               <div v-if="!sourceQuestion(child)" class="flex items-center gap-2 text-xs text-muted-foreground">
-                <AlertTriangle class="h-3.5 w-3.5" /> 题目内容在定稿时不可用
+                <AlertTriangle class="h-3.5 w-3.5" /> {{ t('compositionNodes.details.unavailableAtFinalize') }}
               </div>
               <div v-else-if="anyVisible(node, child)" class="flex gap-2 text-sm">
                 <FileQuestion class="mt-0.5 h-3.5 w-3.5 shrink-0 text-muted-foreground" />
@@ -206,14 +208,14 @@ function groupChildSnapshot(node: SnapshotTreeNode): CompositionSnapshot {
                   <span class="text-xs text-muted-foreground">#{{ sourceQuestion(child)!.id }}</span>
                   <template v-for="key in ANSWER_FIELD_KEYS" :key="key">
                     <div v-if="moduleFieldsVisible(node, child)[key]" class="flex flex-col gap-0.5">
-                      <span class="text-xs font-medium text-muted-foreground">{{ FIELD_LABELS[key] }}</span>
+                      <span class="text-xs font-medium text-muted-foreground">{{ t(FIELD_LABEL_KEYS[key]) }}</span>
                       <AnswerDisplay
                         v-if="key === 'answer'"
                         :answer="sourceQuestion(child)!.answer"
                         :options="sourceQuestion(child)!.options"
                         :slot-numbers="sourceSlotNumbers(child)"
                       />
-                      <RichContent v-else :content="sourceQuestion(child)![key]" class="[&_.prose]:my-0" empty-text="（空）" />
+                      <RichContent v-else :content="sourceQuestion(child)![key]" class="[&_.prose]:my-0" :empty-text="t('compositionNodes.emptyField')" />
                     </div>
                   </template>
                 </div>

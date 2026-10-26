@@ -79,6 +79,7 @@
     2. Delegate to the `翻译` agent (`.github/agents/translator.agent.md`) per locale; it only writes `i18n/.pending/<locale>.out.json`, following `i18n/glossary.json`.
     3. `pnpm i18n:apply` — validates (keys, `{placeholders}`, vue-i18n syntax, no leftover Chinese) and merges; rejected entries stay pending for another round.
     4. `pnpm i18n:check` must pass (also enforced by `app/lib/__tests__/i18n.test.ts`).
+    - Parallel batches: each worker writes new zh-CN keys to its own `i18n/.fragments/<batch>.json` instead of editing `zh-CN.json`; then `pnpm i18n:merge` merges them (aborts without writing on conflicting values) before step 1's sync.
   - New UI text MUST NOT be hardcoded: use `const { t } = useI18n()` / `t('ns.key')` (or `$t` in templates). Group keys by feature (`nav.*`, `auth.login.*`, ...).
   - Because pages are kept alive, never cache translated strings in module scope or plain `const`; use `t()` in templates or inside `computed` (e.g. zod schemas: `computed(() => toTypedSchema(...))`; option lists: `computed(() => [{ label: t('...'), value }])`).
   - Outside component setup (composables after `await`, `lib/` helpers) use `translate(key, params)` from `@/lib/locale`.

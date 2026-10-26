@@ -4,6 +4,7 @@ import {
   documentFromNodes,
   documentToReplaceRequest,
 } from '@/lib/compositionDocument'
+import { translate } from '@/lib/locale'
 import type { CompositionScope } from '@/types/composition'
 import type { Question, QuestionPage } from '@/types'
 
@@ -41,7 +42,7 @@ export function useAddQuestionsToComposition() {
       .filter((q): q is Question => q != null)
 
     if (freshQuestions.length === 0) {
-      throw new Error('题目已不存在，无法加入稿件')
+      throw new Error(translate('compositions.quickAdd.questionsMissing'))
     }
 
     const livePositions = new Map(
@@ -59,7 +60,7 @@ export function useAddQuestionsToComposition() {
       revision = resp.revision
     } catch (err) {
       if (err instanceof CompositionConflictError) throw err
-      throw new Error('加入稿件失败')
+      throw new Error(translate('compositions.quickAdd.addFailed'))
     }
 
     return {

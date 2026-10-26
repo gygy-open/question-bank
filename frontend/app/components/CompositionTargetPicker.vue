@@ -12,6 +12,7 @@ import { toast } from 'vue-sonner'
 import { useCompositions, CompositionConflictError } from '@/composables/useCompositions'
 import { useAddQuestionsToComposition } from '@/composables/useAddQuestionsToComposition'
 import { formatRelativeTime } from '@/lib/utils'
+import { formatDate } from '@/lib/locale'
 import type { Composition, CompositionScope } from '~/types'
 
 const props = defineProps<{
@@ -25,6 +26,7 @@ const emit = defineEmits<{
   added: []
 }>()
 
+const { t } = useI18n()
 const { listCompositions, createComposition } = useCompositions()
 const { addQuestionsToComposition } = useAddQuestionsToComposition()
 
@@ -50,7 +52,7 @@ const loadCompositions = async () => {
     ])
     compositions.value = [...personal, ...shared].sort((a, b) => (a.updated_at < b.updated_at ? 1 : -1))
   } catch {
-    toast.error('加载稿件失败')
+    toast.error(t('compositions.quickAdd.loadFailed'))
   } finally {
     loading.value = false
   }
@@ -69,9 +71,9 @@ watch(
 
 const handleConflict = (err: unknown) => {
   if (err instanceof CompositionConflictError && err.kind === 'revision') {
-    toast.error('稿件已被他人更新，请重新打开选择器再试一次')
+    toast.error(t('compositions.targetPicker.conflict'))
   } else {
-    toast.error('加入稿件失败')
+    toast.error(t('compositions.quickAdd.addFailed'))
   }
 }
 
@@ -82,7 +84,7 @@ interface JumpTarget {
 }
 const jumpAction = (target: JumpTarget) => ({
   action: {
-    label: '前往查看',
+    label: t('compositions.quickAdd.view'),
     onClick: () => navigateTo(`/compositions/${target.scope}/${target.id}`),
   },
 })
@@ -92,7 +94,7 @@ const confirmAdd = async () => {
   submitting.value = true
   try {
     const result = await addQuestionsToComposition(props.subjectId, selected.value.scope_type, selected.value.id, props.questionIds ?? [])
-    toast.success(`已将 ${result.addedCount} 道题加入《${result.compositionTitle}》`, jumpAction({
+    toast.success(t('compositions.targetPicker.added', { count: result.addedCount, title: result.compositionTitle }), jumpAction({
       scope: selected.value.scope_type,
       id: selected.value.id,
     }))
@@ -110,10 +112,10 @@ const createAndAdd = async () => {
   submitting.value = true
   try {
     const composition = await createComposition(props.subjectId, 'personal', {
-      title: `新稿件 ${new Date().toLocaleDateString()}`,
+      title: t('compositions.defaultTitle', { date: formatDate(new Date()) }),
     })
     const result = await addQuestionsToComposition(props.subjectId, 'personal', composition.id, props.questionIds ?? [])
-    toast.success(`已创建并加入 ${result.addedCount} 道题`, jumpAction({ scope: 'personal', id: composition.id }))
+    toast.success(t('compositions.targetPicker.createdAndAdded', { count: result.addedCount }), jumpAction({ scope: 'personal', id: composition.id }))
     emit('added')
     emit('update:open', false)
   } catch (err) {
@@ -128,15 +130,15 @@ const createAndAdd = async () => {
   <Dialog :open="open" @update:open="emit('update:open', $event)">
     <DialogContent class="max-w-2xl">
       <DialogHeader>
-        <DialogTitle>选择稿件</DialogTitle>
+        <DialogTitle>{{ t('compositions.targetPicker.title') }}</DialogTitle>
         <DialogDescription>
-          {{ `将 ${(questionIds ?? []).length} 道题加入稿件（同一材料题的小题会合并呈现）` }}
+          {{ t('compositions.targetPicker.description', { count: (questionIds ?? []).length }) }}
         </DialogDescription>
       </DialogHeader>
 
       <div class="relative">
         <Search class="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-        <Input v-model="searchQuery" placeholder="搜索稿件标题..." class="pl-9" />
+        <Input v-model="searchQuery" :placeholder="t('compositionEditor.picker.searchPlaceholder')" class="pl-9" />
       </div>
 
       <div v-if="loading" class="h-[360px] flex items-center justify-center">
@@ -174,14 +176,14 @@ const createAndAdd = async () => {
             <div class="flex-1 min-w-0">
               <div class="flex items-center gap-2">
                 <span class="text-sm font-medium truncate">{{ composition.title }}</span>
-                <Badge variant="secondary" class="text-xs">{{ composition.scope_type === 'personal' ? '个人' : '共享' }}</Badge>
+                <Badge variant="secondary" class="text-xs">{{ composition.scope_type === 'personal' ? t('compositions.scope.personal') : t('compositions.scope.shared') }}</Badge>
               </div>
               <div class="text-xs text-muted-foreground mt-0.5">{{ formatRelativeTime(composition.updated_at) }}</div>
             </div>
           </button>
 
           <div v-if="filteredCompositions.length === 0" class="py-8 text-center text-sm text-muted-foreground">
-            还没有稿件
+            {{ t('compositions.quickAdd.empty') }}
           </div>
         </div>
       </ScrollArea>
@@ -189,11 +191,11 @@ const createAndAdd = async () => {
       <div class="flex items-center justify-between pt-2 border-t">
         <Button variant="ghost" size="sm" :disabled="submitting" @click="createAndAdd">
           <Plus class="mr-1 h-4 w-4" />
-          新建稿件并加入
+          {{ t('compositions.quickAdd.createAndAdd') }}
         </Button>
         <Button :disabled="!selected || submitting" @click="confirmAdd">
           <Loader2 v-if="submitting" class="mr-2 h-4 w-4 animate-spin" />
-          加入所选稿件
+          {{ t('compositions.targetPicker.confirm') }}
         </Button>
       </div>
     </DialogContent>

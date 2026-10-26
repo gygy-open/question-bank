@@ -51,6 +51,8 @@ import {
 const WORD_MATH_HTML_RE = /<\s*m:oMath|<\s*math[\s/>]/i
 
 const model = defineModel<EditorDocument>('document', { required: true })
+const { t } = useI18n()
+
 const props = defineProps<{
   subjectId?: number | null
   scope?: CompositionScope | null
@@ -348,7 +350,7 @@ const editor = useEditor({
     BlockInsertKeymap,
     // 按住 Mod（Cmd/Ctrl）拖拽跨块选区；配合 DragHandle 做可视化整块拖动。
     NodeRange,
-    Placeholder.configure({ placeholder: '输入内容，或输入 “/” 唤起命令菜单…', showOnlyCurrent: false }),
+    Placeholder.configure({ placeholder: () => t('compositionEditor.canvas.placeholder'), showOnlyCurrent: false }),
     CompositionSlashCommand.configure({
       onImageSelect: triggerImagePicker,
       onInsertMath: openInsertMath,
@@ -430,16 +432,16 @@ watch(
       class="flex items-center gap-3 rounded-t-md border-b border-amber-400 bg-amber-50 px-4 py-2.5 text-sm dark:border-amber-700 dark:bg-amber-900/20"
     >
       <RefreshCw class="h-4 w-4 shrink-0 text-amber-600 dark:text-amber-400" />
-      <span class="flex-1">有 {{ staleNodeIds.length }} 道题目在题库中已更新（当前仍显示定格的旧内容）。</span>
+      <span class="flex-1">{{ t('compositionEditor.canvas.staleQuestions', { count: staleNodeIds.length }) }}</span>
       <Button
         size="sm" variant="outline"
         :disabled="(props.syncDisabled ?? false) || (props.syncing ?? false)"
-        :title="props.syncDisabled ? '请先保存未保存的修改' : '把所有过期题目更新为题库最新内容'"
+        :title="props.syncDisabled ? t('compositionEditor.canvas.saveFirst') : t('compositionEditor.canvas.syncAllHint')"
         @click="emit('sync', staleNodeIds)"
       >
         <Loader2 v-if="props.syncing" class="mr-2 h-4 w-4 animate-spin" />
         <RefreshCw v-else class="mr-2 h-4 w-4" />
-        同步全部
+        {{ t('compositionEditor.canvas.syncAll') }}
       </Button>
     </div>
 
@@ -458,7 +460,7 @@ watch(
               <FileQuestion class="size-4" />
             </Button>
           </TooltipTrigger>
-          <TooltipContent>插入题目</TooltipContent>
+          <TooltipContent>{{ t('questionPicker.title') }}</TooltipContent>
         </Tooltip>
         <Tooltip>
           <TooltipTrigger as-child>
@@ -466,7 +468,7 @@ watch(
               <Files class="size-4" />
             </Button>
           </TooltipTrigger>
-          <TooltipContent>插入稿件</TooltipContent>
+          <TooltipContent>{{ t('compositionEditor.picker.title') }}</TooltipContent>
         </Tooltip>
         <Tooltip>
           <TooltipTrigger as-child>
@@ -474,7 +476,7 @@ watch(
               <ListChecks class="size-4" />
             </Button>
           </TooltipTrigger>
-          <TooltipContent>插入参考答案</TooltipContent>
+          <TooltipContent>{{ t('compositionEditor.canvas.insertModule') }}</TooltipContent>
         </Tooltip>
       </RichEditorToolbar>
     </div>
@@ -488,22 +490,22 @@ watch(
       >
         <DropdownMenu>
           <DropdownMenuTrigger as-child>
-            <button type="button" class="flex size-full items-center justify-center" aria-label="块操作">
+            <button type="button" class="flex size-full items-center justify-center" :aria-label="t('compositionEditor.canvas.blockActions')">
               <GripVertical class="size-4 text-muted-foreground" />
             </button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="start" side="bottom" class="w-40">
             <DropdownMenuItem @click="insertRowRelative(true)">
-              <ArrowUpToLine class="mr-2 size-4" />在上方插入行
+              <ArrowUpToLine class="mr-2 size-4" />{{ t('compositionEditor.canvas.insertAbove') }}
             </DropdownMenuItem>
             <DropdownMenuItem @click="insertRowRelative(false)">
-              <ArrowDownToLine class="mr-2 size-4" />在下方插入行
+              <ArrowDownToLine class="mr-2 size-4" />{{ t('compositionEditor.canvas.insertBelow') }}
             </DropdownMenuItem>
             <DropdownMenuItem @click="duplicateHandleNode">
-              <Copy class="mr-2 size-4" />复制
+              <Copy class="mr-2 size-4" />{{ t('common.copy') }}
             </DropdownMenuItem>
             <DropdownMenuItem class="text-destructive focus:text-destructive" @click="deleteHandleNode">
-              <Trash2 class="mr-2 size-4" />删除
+              <Trash2 class="mr-2 size-4" />{{ t('common.delete') }}
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
@@ -516,7 +518,7 @@ watch(
         <button
           type="button"
           class="composition-insert-plus"
-          aria-label="在此处插入行"
+          :aria-label="t('compositionEditor.canvas.insertHere')"
           @click="onInsertBarClick"
         >
           <Plus class="size-3.5" />

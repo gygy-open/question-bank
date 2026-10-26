@@ -13,6 +13,7 @@ import { normalizeScope } from '~/lib/compositions'
 import { formatDateTime } from '~/lib/locale'
 import type { CompositionExportFormat, CompositionScope, CompositionVersionDetail } from '~/types'
 
+const { t } = useI18n()
 const route = useRoute()
 const router = useRouter()
 const api = useCompositions()
@@ -48,7 +49,7 @@ async function load() {
     )
   } catch {
     // 不存在/越权：退回编辑页并提示。
-    toast.error('版本不存在或无权访问')
+    toast.error(t('compositionVersions.toast.notFound'))
     router.push(editorPath.value)
   } finally {
     loading.value = false
@@ -83,13 +84,13 @@ function doExport(format: CompositionExportFormat) {
     </Button>
     <div class="min-w-0 flex-1">
       <p class="truncate text-sm font-medium">
-        {{ version?.title || '版本预览' }}
+        {{ version?.title || t('compositionVersions.previewTitle') }}
       </p>
     </div>
     <Badge v-if="version" variant="outline" class="shrink-0 font-mono">v{{ version.version_no }}</Badge>
     <Badge variant="outline" class="gap-1">
       <component :is="scope === 'shared' ? Users : Lock" class="h-3 w-3" />
-      {{ scope === 'shared' ? '共享' : '个人' }}
+      {{ scope === 'shared' ? t('compositions.scope.shared') : t('compositions.scope.personal') }}
     </Badge>
     <Button
       v-if="version" size="sm" variant="outline"
@@ -98,7 +99,7 @@ function doExport(format: CompositionExportFormat) {
     >
       <Loader2 v-if="exportApi.isExporting(compositionId, versionNo, 'docx')" class="mr-2 h-4 w-4 animate-spin" />
       <Download v-else class="mr-2 h-4 w-4" />
-      导出 Word
+      {{ t('compositionVersions.export.word') }}
     </Button>
     <Button
       v-if="version" size="sm" variant="outline"
@@ -107,7 +108,7 @@ function doExport(format: CompositionExportFormat) {
     >
       <Loader2 v-if="exportApi.isExporting(compositionId, versionNo, 'latex')" class="mr-2 h-4 w-4 animate-spin" />
       <Download v-else class="mr-2 h-4 w-4" />
-      导出 LaTeX
+      {{ t('compositionVersions.export.latex') }}
     </Button>
   </header>
 
@@ -121,17 +122,17 @@ function doExport(format: CompositionExportFormat) {
       <div class="space-y-2">
         <div class="flex flex-wrap items-center gap-2">
           <h1 class="text-xl font-semibold">{{ version.title }}</h1>
-          <Badge variant="secondary">只读版本</Badge>
+          <Badge variant="secondary">{{ t('compositionVersions.readonlyBadge') }}</Badge>
         </div>
         <p v-if="version.label" class="text-sm text-muted-foreground">{{ version.label }}</p>
         <p class="text-xs text-muted-foreground">
-          以下内容是定稿时刻冻结的快照，可能不含之后对草稿的修改；如需最新内容请回到编辑页重新定稿。
+          {{ t('compositionVersions.snapshotNotice') }}
         </p>
         <div class="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
-          <span>版本号 v{{ version.version_no }}</span>
-          <span>定稿时间 {{ formatTime(version.finalized_at) }}</span>
-          <span>源修订 r{{ version.source_revision }}</span>
-          <span>定稿人 用户 #{{ version.finalized_by }}</span>
+          <span>{{ t('compositionVersions.meta.versionNo', { version: version.version_no }) }}</span>
+          <span>{{ t('compositionVersions.meta.finalizedAt', { time: formatTime(version.finalized_at) }) }}</span>
+          <span>{{ t('compositionVersions.meta.sourceRevision', { revision: version.source_revision }) }}</span>
+          <span>{{ t('compositionVersions.meta.finalizedBy', { user: version.finalized_by }) }}</span>
         </div>
       </div>
 
@@ -142,8 +143,8 @@ function doExport(format: CompositionExportFormat) {
 
     <div v-else class="flex flex-col items-center gap-3 py-16 text-center text-sm text-muted-foreground">
       <AlertTriangle class="h-5 w-5 text-amber-500" />
-      <span>无法加载此版本</span>
-      <Button size="sm" variant="outline" @click="backToEditor">返回编辑页</Button>
+      <span>{{ t('compositionVersions.loadFailed') }}</span>
+      <Button size="sm" variant="outline" @click="backToEditor">{{ t('compositionVersions.backToEditor') }}</Button>
     </div>
   </div>
 </template>

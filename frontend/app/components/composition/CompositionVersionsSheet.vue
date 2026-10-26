@@ -24,6 +24,7 @@ const props = defineProps<{
 
 const open = defineModel<boolean>('open', { default: false })
 
+const { t } = useI18n()
 const api = useCompositions()
 const exportApi = useCompositionExport()
 const loading = ref(false)
@@ -79,9 +80,9 @@ function formatTime(iso: string): string {
     <SheetContent side="right" class="w-full sm:max-w-md">
       <SheetHeader>
         <SheetTitle class="flex items-center gap-2">
-          <History class="h-4 w-4" /> 版本历史
+          <History class="h-4 w-4" /> {{ t('compositionEditor.versionHistory') }}
         </SheetTitle>
-        <SheetDescription>定稿后冻结的不可变版本，内容为定稿时刻的快照，可能不含之后的草稿改动。</SheetDescription>
+        <SheetDescription>{{ t('compositionVersions.sheet.description') }}</SheetDescription>
       </SheetHeader>
 
       <div class="flex-1 overflow-y-auto px-4 pb-4">
@@ -96,9 +97,9 @@ function formatTime(iso: string): string {
           class="flex flex-col items-center gap-3 py-12 text-center text-sm text-muted-foreground"
         >
           <AlertTriangle class="h-5 w-5 text-amber-500" />
-          <span>加载版本列表失败</span>
+          <span>{{ t('compositionVersions.sheet.loadFailed') }}</span>
           <Button size="sm" variant="outline" @click="load">
-            <RefreshCw class="mr-2 h-4 w-4" /> 重试
+            <RefreshCw class="mr-2 h-4 w-4" /> {{ t('common.retry') }}
           </Button>
         </div>
 
@@ -107,7 +108,7 @@ function formatTime(iso: string): string {
           v-else-if="loaded && versions.length === 0"
           class="py-12 text-center text-sm text-muted-foreground"
         >
-          尚无定稿版本。使用「定稿」按钮冻结当前内容。
+          {{ t('compositionVersions.sheet.empty') }}
         </p>
 
         <!-- 列表（安静列表，非卡片墙） -->
@@ -120,18 +121,18 @@ function formatTime(iso: string): string {
               <Badge variant="outline" class="shrink-0 font-mono">v{{ v.version_no }}</Badge>
               <div class="min-w-0 flex-1">
                 <p class="truncate text-sm font-medium">
-                  {{ v.label || `版本 ${v.version_no}` }}
+                  {{ v.label || t('compositionVersions.sheet.versionFallback', { version: v.version_no }) }}
                 </p>
                 <p class="truncate text-xs text-muted-foreground">
-                  {{ formatTime(v.finalized_at) }} · 源修订 r{{ v.source_revision }}
+                  {{ formatTime(v.finalized_at) }} · {{ t('compositionVersions.meta.sourceRevision', { revision: v.source_revision }) }}
                 </p>
               </div>
               <TooltipProvider :delay-duration="300">
                 <Tooltip>
                   <TooltipTrigger as-child>
-                    <span class="text-xs text-muted-foreground">用户 #{{ v.finalized_by }}</span>
+                    <span class="text-xs text-muted-foreground">{{ t('compositionVersions.userFallback', { id: v.finalized_by }) }}</span>
                   </TooltipTrigger>
-                  <TooltipContent>定稿人</TooltipContent>
+                  <TooltipContent>{{ t('compositionVersions.sheet.finalizedBy') }}</TooltipContent>
                 </Tooltip>
               </TooltipProvider>
               <ChevronRight class="h-4 w-4 shrink-0 text-muted-foreground" />
@@ -144,8 +145,8 @@ function formatTime(iso: string): string {
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
-                <DropdownMenuItem @click="download(v, 'docx')">下载 Word</DropdownMenuItem>
-                <DropdownMenuItem @click="download(v, 'latex')">下载 LaTeX</DropdownMenuItem>
+                <DropdownMenuItem @click="download(v, 'docx')">{{ t('compositionEditor.download.word') }}</DropdownMenuItem>
+                <DropdownMenuItem @click="download(v, 'latex')">{{ t('compositionEditor.download.latex') }}</DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
           </li>

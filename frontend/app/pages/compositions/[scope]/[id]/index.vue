@@ -48,6 +48,7 @@ import type {
   QuestionGroupRevisionStatus,
 } from '~/types'
 
+const { t } = useI18n()
 const route = useRoute()
 const router = useRouter()
 const api = useCompositions()
@@ -165,6 +166,17 @@ const questionGroupUpdateSummary = computed(() => {
     questions: questions.length,
   }
 })
+const staleQuestionGroupsMessage = computed(() => {
+  const summary = questionGroupUpdateSummary.value
+  const parts: string[] = []
+  if (summary.stimulus) parts.push(t('compositionEditor.staleGroups.stimulus', { count: summary.stimulus }))
+  if (summary.structure) parts.push(t('compositionEditor.staleGroups.structure', { count: summary.structure }))
+  if (summary.questions) parts.push(t('compositionEditor.staleGroups.questions', { count: summary.questions }))
+  return t('compositionEditor.staleGroups.message', {
+    count: staleQuestionGroups.value.length,
+    details: parts.join(t('compositionEditor.staleGroups.separator')),
+  })
+})
 // 材料下新增了小题但尚未加入稿件：只提示，不算过期；在材料题内“添加小题”手动选用。
 const newStimulusQuestionCount = computed(() =>
   questionGroupStatus.value.reduce((sum, status) => sum + status.new_question_ids.length, 0))
@@ -219,7 +231,7 @@ async function load() {
     editConflict.value = false
     await loadSourceStatus()
   } catch {
-    toast.error('加载组稿失败')
+    toast.error(t('compositions.toast.loadListFailed'))
     router.push(`/compositions/${scope.value}`)
   } finally {
     loading.value = false
@@ -269,7 +281,7 @@ watch([currentSubjectId, scope], loadFolders)
 async function saveMeta(opts?: { silent?: boolean }) {
   if (!currentSubjectId.value || !composition.value || saving.value) return
   if (!title.value.trim()) {
-    toast.error('请输入标题')
+    toast.error(t('compositionEditor.toast.titleRequired'))
     return
   }
   savingMeta.value = true
@@ -288,14 +300,14 @@ async function saveMeta(opts?: { silent?: boolean }) {
     composition.value = { ...composition.value, ...updated }
     title.value = updated.title
     description.value = updated.description ?? ''
-    if (!opts?.silent) toast.success('已保存标题/描述')
+    if (!opts?.silent) toast.success(t('compositionEditor.toast.metaSaved'))
   } catch (err) {
     if (err instanceof CompositionConflictError && err.kind === 'revision') {
       // 与内容保存冲突采用同一策略：保留全部本地修改，由用户决定何时放弃并重载。
       editConflict.value = true
-      toast.error('组稿已被他人更新，你的本地修改尚未保存')
+      toast.error(t('compositionEditor.toast.conflictUnsaved'))
     } else {
-      toast.error('保存失败')
+      toast.error(t('common.saveFailed'))
     }
   } finally {
     savingMeta.value = false
@@ -306,7 +318,7 @@ async function saveNodes(opts?: { silent?: boolean }) {
   if (!currentSubjectId.value || !composition.value || saving.value) return
   const issues = collectDocumentIssues(document.value)
   if (issues.length) {
-    if (!opts?.silent) toast.error(`存在无法保存的块：${issues[0]}`)
+    if (!opts?.silent) toast.error(t('compositionEditor.toast.blockIssue', { issue: issues[0] }))
     return
   }
   savingNodes.value = true
@@ -331,15 +343,15 @@ async function saveNodes(opts?: { silent?: boolean }) {
     }
     composition.value = { ...composition.value, revision: resp.revision }
     editConflict.value = false
-    if (!opts?.silent) toast.success('已保存内容')
+    if (!opts?.silent) toast.success(t('compositionEditor.toast.contentSaved'))
     await loadSourceStatus()
   } catch (err) {
     if (err instanceof CompositionConflictError && err.kind === 'revision') {
       // 不静默覆盖本地改动：显示冲突条，由用户决定是否放弃本地重新加载。
       editConflict.value = true
-      toast.error('内容已被他人更新，你的本地修改尚未保存')
+      toast.error(t('compositionEditor.toast.contentConflictUnsaved'))
     } else {
-      toast.error('保存内容失败')
+      toast.error(t('compositionEditor.toast.saveContentFailed'))
     }
   } finally {
     savingNodes.value = false
@@ -361,14 +373,14 @@ async function syncNodes(nodeIds: string[]) {
     document.value = documentFromNodes(resp.nodes)
     composition.value = { ...composition.value, revision: resp.revision }
     savedSnapshot.value = snapshotDocument(document.value)
-    toast.success(`已同步 ${nodeIds.length} 道题目`)
+    toast.success(t('compositionEditor.toast.questionsSynced', { count: nodeIds.length }))
     await loadSourceStatus()
   } catch (err) {
     if (err instanceof CompositionConflictError && err.kind === 'revision') {
       editConflict.value = true
-      toast.error('组稿已被他人更新，同步失败；你的本地修改仍保留')
+      toast.error(t('compositionEditor.toast.syncConflict'))
     } else {
-      toast.error('同步题目失败')
+      toast.error(t('compositionEditor.toast.syncQuestionsFailed'))
     }
   } finally {
     syncingNodes.value = false
@@ -379,7 +391,7 @@ async function syncQuestionGroups() {
   if (!currentSubjectId.value || !composition.value || syncingQuestionGroups.value) return
   const nodeIds = staleQuestionGroups.value.map((status) => status.node_id)
   if (dirty.value || !nodeIds.length) return
-  if (!window.confirm('同步会刷新冻结的材料和已选小题内容、按材料顺序重排，并移除已脱离材料的小题；保留稿件内的题号、分值与作答区，不会自动加入新小题。确定继续？')) return
+  if (!window.confirm(t('compositionEditor.confirm.syncGroups'))) return
   syncingQuestionGroups.value = true
   try {
     const response = await api.syncQuestionGroupNodes(
@@ -391,14 +403,14 @@ async function syncQuestionGroups() {
     document.value = documentFromNodes(response.nodes)
     composition.value = { ...composition.value, revision: response.revision }
     savedSnapshot.value = snapshotDocument(document.value)
-    toast.success(`已同步 ${nodeIds.length} 道材料题`)
+    toast.success(t('compositionEditor.toast.groupsSynced', { count: nodeIds.length }))
     await loadSourceStatus()
   } catch (error) {
     if (error instanceof CompositionConflictError && error.kind === 'revision') {
       editConflict.value = true
-      toast.error('组稿已被他人更新，同步失败；本地内容仍保留')
+      toast.error(t('compositionEditor.toast.syncGroupsConflict'))
     } else {
-      toast.error(getApiErrorDetail(error, '同步材料题失败'))
+      toast.error(getApiErrorDetail(error, t('compositionEditor.toast.syncGroupsFailed')))
     }
   } finally {
     syncingQuestionGroups.value = false
@@ -433,9 +445,9 @@ async function toggleNumbering(value: boolean) {
   } catch (err) {
     if (err instanceof CompositionConflictError && err.kind === 'revision') {
       editConflict.value = true
-      toast.error('组稿已被他人更新，你的本地修改尚未保存')
+      toast.error(t('compositionEditor.toast.conflictUnsaved'))
     } else {
-      toast.error('保存失败')
+      toast.error(t('common.saveFailed'))
     }
   } finally {
     savingMeta.value = false
@@ -446,7 +458,7 @@ async function toggleNumbering(value: boolean) {
 async function toggleScoring(value: boolean) {
   if (!currentSubjectId.value || !composition.value || saving.value) return
   if (value && !numberingEnabled.value) {
-    toast.error('请先开启题号')
+    toast.error(t('compositionEditor.toast.enableNumberingFirst'))
     return
   }
   savingMeta.value = true
@@ -461,9 +473,9 @@ async function toggleScoring(value: boolean) {
   } catch (err) {
     if (err instanceof CompositionConflictError && err.kind === 'revision') {
       editConflict.value = true
-      toast.error('组稿已被他人更新，你的本地修改尚未保存')
+      toast.error(t('compositionEditor.toast.conflictUnsaved'))
     } else {
-      toast.error('保存失败')
+      toast.error(t('common.saveFailed'))
     }
   } finally {
     savingMeta.value = false
@@ -496,9 +508,9 @@ async function toggleDisplayField(key: AnswerFieldKey, value: boolean) {
   } catch (err) {
     if (err instanceof CompositionConflictError && err.kind === 'revision') {
       editConflict.value = true
-      toast.error('组稿已被他人更新，你的本地修改尚未保存')
+      toast.error(t('compositionEditor.toast.conflictUnsaved'))
     } else {
-      toast.error('保存失败')
+      toast.error(t('common.saveFailed'))
     }
   } finally {
     savingMeta.value = false
@@ -510,7 +522,7 @@ function autofillNumbers(mode: NumberingMode) {
   if (!composition.value) return
   if (
     hasAnyQuestionNumber(document.value) &&
-    !window.confirm('自动填充将覆盖所有已有题号，确定继续？')
+    !window.confirm(t('compositionEditor.confirm.autofillNumbers'))
   ) {
     return
   }
@@ -575,7 +587,7 @@ function goFinalizeFromDownloadMenu() {
 
 function openFinalize() {
   if (dirty.value) {
-    toast.error('正在自动保存，请稍候再定稿')
+    toast.error(t('compositionEditor.toast.savingBeforeFinalize'))
     return
   }
   finalizeLabel.value = ''
@@ -599,9 +611,9 @@ async function doFinalize() {
     finalizeOpen.value = false
     latestVersionLoaded.value = false
     const quickFormat = exportApi.lastFormat()
-    toast.success(`已定稿为版本 v${version.version_no}`, {
+    toast.success(t('compositionEditor.toast.finalized', { version: version.version_no }), {
       action: {
-        label: quickFormat === 'latex' ? '下载 LaTeX' : '下载 Word',
+        label: quickFormat === 'latex' ? t('compositionEditor.download.latex') : t('compositionEditor.download.word'),
         onClick: () => {
           if (!currentSubjectId.value || !composition.value) return
           exportApi.downloadVersion({
@@ -622,9 +634,9 @@ async function doFinalize() {
       // 定稿 revision 冲突：保留本地内容并复用现有冲突条。
       finalizeOpen.value = false
       editConflict.value = true
-      toast.error('组稿已被他人更新，定稿失败；你的本地修改仍保留')
+      toast.error(t('compositionEditor.toast.finalizeConflict'))
     } else {
-      toast.error('定稿失败')
+      toast.error(t('compositionEditor.toast.finalizeFailed'))
     }
   } finally {
     finalizing.value = false
@@ -642,7 +654,7 @@ onMounted(() => window.addEventListener('beforeunload', beforeUnloadHandler))
 onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnloadHandler))
 
 onBeforeRouteLeave(() => {
-  if (dirty.value && !window.confirm('有未保存的修改，确定要离开吗？')) {
+  if (dirty.value && !window.confirm(t('compositionEditor.confirm.leaveUnsaved'))) {
     return false
   }
   return true
@@ -652,7 +664,7 @@ onBeforeRouteLeave(() => {
 <template>
   <header class="flex h-16 shrink-0 items-center gap-2 border-b px-4">
     <nav class="flex min-w-0 flex-1 items-center gap-1.5 overflow-hidden text-sm">
-      <span class="shrink-0 text-muted-foreground">组稿工作台</span>
+      <span class="shrink-0 text-muted-foreground">{{ t('compositions.title') }}</span>
       <span class="shrink-0 text-muted-foreground">/</span>
       <button
         type="button"
@@ -660,7 +672,7 @@ onBeforeRouteLeave(() => {
         @click="router.push(`/compositions/${scope}`)"
       >
         <component :is="scope === 'shared' ? Users : Lock" class="h-3.5 w-3.5" />
-        {{ scope === 'shared' ? '共享空间' : '个人空间' }}
+        {{ scope === 'shared' ? t('compositionEditor.sharedSpace') : t('compositionEditor.personalSpace') }}
       </button>
       <template v-for="folder in folderBreadcrumbChain" :key="folder.id">
         <span class="shrink-0 text-muted-foreground">/</span>
@@ -673,13 +685,13 @@ onBeforeRouteLeave(() => {
         </button>
       </template>
       <span class="shrink-0 text-muted-foreground">/</span>
-      <p class="truncate font-medium">{{ composition?.title || '组稿' }}</p>
+      <p class="truncate font-medium">{{ composition?.title || t('compositionEditor.fallbackTitle') }}</p>
     </nav>
     <Badge v-if="saving" variant="outline" class="gap-1 text-muted-foreground">
-      <Loader2 class="h-3 w-3 animate-spin" /> 保存中…
+      <Loader2 class="h-3 w-3 animate-spin" /> {{ t('compositionEditor.saving') }}
     </Badge>
     <Badge v-else-if="dirty" variant="outline" class="gap-1 text-amber-600 dark:text-amber-400">
-      未保存改动
+      {{ t('compositionEditor.unsavedChanges') }}
     </Badge>
     <TooltipProvider :delay-duration="300">
       <Tooltip>
@@ -688,7 +700,7 @@ onBeforeRouteLeave(() => {
             <History class="h-4 w-4" />
           </Button>
         </TooltipTrigger>
-        <TooltipContent>版本历史</TooltipContent>
+        <TooltipContent>{{ t('compositionEditor.versionHistory') }}</TooltipContent>
       </Tooltip>
     </TooltipProvider>
     <TooltipProvider :delay-duration="300">
@@ -698,25 +710,25 @@ onBeforeRouteLeave(() => {
             <Clock class="h-4 w-4" />
           </Button>
         </TooltipTrigger>
-        <TooltipContent>时间线</TooltipContent>
+        <TooltipContent>{{ t('compositionEditor.timeline') }}</TooltipContent>
       </Tooltip>
     </TooltipProvider>
     <DropdownMenu v-model:open="downloadMenuOpen">
       <DropdownMenuTrigger as-child>
         <Button size="sm" variant="outline" :disabled="!composition">
-          <Download class="mr-2 h-4 w-4" /> 下载
+          <Download class="mr-2 h-4 w-4" /> {{ t('compositionEditor.download.label') }}
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end">
-        <DropdownMenuLabel v-if="latestVersionLoading" class="text-xs text-muted-foreground">加载中…</DropdownMenuLabel>
+        <DropdownMenuLabel v-if="latestVersionLoading" class="text-xs text-muted-foreground">{{ t('common.loading') }}</DropdownMenuLabel>
         <template v-else-if="latestVersion">
-          <DropdownMenuLabel class="text-xs text-muted-foreground">已定稿版本 v{{ latestVersion.version_no }}</DropdownMenuLabel>
+          <DropdownMenuLabel class="text-xs text-muted-foreground">{{ t('compositionEditor.download.latestVersion', { version: latestVersion.version_no }) }}</DropdownMenuLabel>
           <div
             v-if="draftAheadOfLatestVersion"
             class="flex items-start gap-1.5 px-2 py-1.5 text-xs text-amber-600 dark:text-amber-400"
           >
             <AlertTriangle class="mt-0.5 h-3.5 w-3.5 shrink-0" />
-            <span>草稿有更新的改动未定稿，下载的仍是旧内容</span>
+            <span>{{ t('compositionEditor.download.draftAhead') }}</span>
           </div>
           <DropdownMenuItem
             :disabled="exportApi.isExporting(latestVersion.composition_id, latestVersion.version_no, 'docx')"
@@ -726,7 +738,7 @@ onBeforeRouteLeave(() => {
               v-if="exportApi.isExporting(latestVersion.composition_id, latestVersion.version_no, 'docx')"
               class="mr-2 h-4 w-4 animate-spin"
             />
-            下载 Word
+            {{ t('compositionEditor.download.word') }}
           </DropdownMenuItem>
           <DropdownMenuItem
             :disabled="exportApi.isExporting(latestVersion.composition_id, latestVersion.version_no, 'latex')"
@@ -736,16 +748,16 @@ onBeforeRouteLeave(() => {
               v-if="exportApi.isExporting(latestVersion.composition_id, latestVersion.version_no, 'latex')"
               class="mr-2 h-4 w-4 animate-spin"
             />
-            下载 LaTeX
+            {{ t('compositionEditor.download.latex') }}
           </DropdownMenuItem>
           <template v-if="draftAheadOfLatestVersion">
             <DropdownMenuSeparator />
             <DropdownMenuItem @click="goFinalizeFromDownloadMenu">
-              <CheckCircle2 class="mr-2 h-4 w-4" /> 先定稿最新内容
+              <CheckCircle2 class="mr-2 h-4 w-4" /> {{ t('compositionEditor.download.finalizeFirst') }}
             </DropdownMenuItem>
           </template>
         </template>
-        <DropdownMenuLabel v-else class="text-xs text-muted-foreground">尚无定稿版本，请先定稿</DropdownMenuLabel>
+        <DropdownMenuLabel v-else class="text-xs text-muted-foreground">{{ t('compositionEditor.download.noVersion') }}</DropdownMenuLabel>
       </DropdownMenuContent>
     </DropdownMenu>
     <TooltipProvider :delay-duration="300">
@@ -754,11 +766,11 @@ onBeforeRouteLeave(() => {
           <!-- span 包裹：disabled 按钮不触发 tooltip 时仍可悬停提示 -->
           <span>
             <Button size="sm" variant="outline" :disabled="!composition || saving || dirty" @click="openFinalize">
-              <CheckCircle2 class="mr-2 h-4 w-4" /> 定稿
+              <CheckCircle2 class="mr-2 h-4 w-4" /> {{ t('compositionEditor.finalize.button') }}
             </Button>
           </span>
         </TooltipTrigger>
-        <TooltipContent>{{ dirty ? '正在自动保存，请稍候' : '冻结当前内容为不可变版本' }}</TooltipContent>
+        <TooltipContent>{{ dirty ? t('compositionEditor.finalize.savingHint') : t('compositionEditor.finalize.tooltip') }}</TooltipContent>
       </Tooltip>
     </TooltipProvider>
   </header>
@@ -773,12 +785,12 @@ onBeforeRouteLeave(() => {
       <div class="space-y-1">
         <Input
           v-model="title"
-          placeholder="组稿标题"
+          :placeholder="t('compositions.form.titlePlaceholder')"
           class="h-auto border-0 bg-transparent px-0 py-1 text-2xl font-semibold shadow-none focus-visible:ring-1 focus-visible:ring-ring/30"
         />
         <Textarea
           v-model="description"
-          placeholder="组稿说明（可选）"
+          :placeholder="t('compositions.form.descriptionPlaceholder')"
           rows="1"
           class="min-h-0 resize-none border-0 bg-transparent px-0 py-0 text-sm text-muted-foreground shadow-none focus-visible:ring-1 focus-visible:ring-ring/30"
         />
@@ -792,9 +804,9 @@ onBeforeRouteLeave(() => {
         class="flex items-center gap-3 rounded-md border border-amber-400 bg-amber-50 px-4 py-3 text-sm dark:border-amber-700 dark:bg-amber-900/20"
       >
         <AlertTriangle class="h-4 w-4 shrink-0 text-amber-600 dark:text-amber-400" />
-        <span class="flex-1">组稿已被他人更新。你的本地修改仍保留；请重新加载最新版本后再编辑，或先在别处备份当前内容。</span>
+        <span class="flex-1">{{ t('compositionEditor.conflictBanner') }}</span>
         <Button size="sm" variant="outline" @click="reloadFromServer">
-          <RefreshCw class="mr-2 h-4 w-4" /> 重新加载（放弃本地）
+          <RefreshCw class="mr-2 h-4 w-4" /> {{ t('compositionEditor.reloadDiscardLocal') }}
         </Button>
       </div>
 
@@ -805,19 +817,15 @@ onBeforeRouteLeave(() => {
         <AlertTriangle class="h-4 w-4 shrink-0 text-amber-600 dark:text-amber-400" />
         <span class="min-w-0 flex-1">
           <template v-if="staleQuestionGroups.length">
-            {{ staleQuestionGroups.length }} 道材料题有来源更新：
-            <template v-if="questionGroupUpdateSummary.stimulus">材料 {{ questionGroupUpdateSummary.stimulus }} 个</template>
-            <template v-if="questionGroupUpdateSummary.structure">{{ questionGroupUpdateSummary.stimulus ? '，' : '' }}小题顺序 {{ questionGroupUpdateSummary.structure }} 个</template>
-            <template v-if="questionGroupUpdateSummary.questions">{{ questionGroupUpdateSummary.stimulus || questionGroupUpdateSummary.structure ? '，' : '' }}小题内容或归属 {{ questionGroupUpdateSummary.questions }} 个</template>。
-            当前仍显示冻结版本，不会自动刷新。
+            {{ staleQuestionGroupsMessage }}
           </template>
           <template v-if="newStimulusQuestionCount">
-            材料题下新增了 {{ newStimulusQuestionCount }} 道未选用的小题，可在对应材料题中“添加小题”。
+            {{ t('compositionEditor.staleGroups.newQuestions', { count: newStimulusQuestionCount }) }}
           </template>
         </span>
         <Button v-if="staleQuestionGroups.length" size="sm" variant="outline" :disabled="dirty || syncingQuestionGroups" @click="syncQuestionGroups">
           <Loader2 v-if="syncingQuestionGroups" class="mr-2 h-4 w-4 animate-spin" />
-          <RefreshCw v-else class="mr-2 h-4 w-4" />同步材料题
+          <RefreshCw v-else class="mr-2 h-4 w-4" />{{ t('compositionEditor.staleGroups.sync') }}
         </Button>
       </div>
 
@@ -847,8 +855,8 @@ onBeforeRouteLeave(() => {
           />
 
           <p class="text-xs text-muted-foreground">
-            学科：{{ currentSubject?.name || '—' }} · 修订版本 r{{ composition.revision }}
-            <template v-if="scoringEnabled"> · 总分 {{ totalScoreValue }} 分</template>
+            {{ t('compositionEditor.footer.meta', { subject: currentSubject?.name || '—', revision: composition.revision }) }}
+            <template v-if="scoringEnabled"> · {{ t('compositionEditor.footer.totalScore', { score: totalScoreValue }) }}</template>
           </p>
         </div>
 
@@ -885,30 +893,32 @@ onBeforeRouteLeave(() => {
   <Dialog v-model:open="finalizeOpen">
     <DialogContent>
       <DialogHeader>
-        <DialogTitle>定稿为新版本</DialogTitle>
+        <DialogTitle>{{ t('compositionEditor.finalize.dialogTitle') }}</DialogTitle>
         <DialogDescription>
-          将冻结当前修订版本
-          <span class="font-mono font-medium">r{{ composition?.revision }}</span>
-          为不可变版本。定稿不会修改组稿本身，可继续编辑。
+          <i18n-t scope="global" keypath="compositionEditor.finalize.dialogDescription" tag="span">
+            <template #revision>
+              <span class="font-mono font-medium">r{{ composition?.revision }}</span>
+            </template>
+          </i18n-t>
         </DialogDescription>
       </DialogHeader>
       <div class="space-y-2">
-        <Label>版本备注（可选）</Label>
-        <Input v-model="finalizeLabel" placeholder="例如：期中卷终稿" maxlength="200" />
+        <Label>{{ t('compositionEditor.finalize.labelLabel') }}</Label>
+        <Input v-model="finalizeLabel" :placeholder="t('compositionEditor.finalize.labelPlaceholder')" maxlength="200" />
       </div>
       <div
         v-if="hasStaleSources"
         class="flex items-start gap-2 rounded-md border border-amber-400 bg-amber-50 px-3 py-2 text-xs dark:border-amber-700 dark:bg-amber-900/20"
       >
         <AlertTriangle class="mt-0.5 h-3.5 w-3.5 shrink-0 text-amber-600 dark:text-amber-400" />
-        <span>部分题目或题组来源已更新，本次将冻结当前显示的旧版本内容。如需最新内容，请先取消并手动同步。</span>
+        <span>{{ t('compositionEditor.finalize.staleWarning') }}</span>
       </div>
       <DialogFooter>
-        <Button variant="outline" :disabled="finalizing" @click="finalizeOpen = false">取消</Button>
+        <Button variant="outline" :disabled="finalizing" @click="finalizeOpen = false">{{ t('common.cancel') }}</Button>
         <Button :disabled="finalizing" @click="doFinalize">
           <Loader2 v-if="finalizing" class="mr-2 h-4 w-4 animate-spin" />
           <CheckCircle2 v-else class="mr-2 h-4 w-4" />
-          确认定稿
+          {{ t('compositionEditor.finalize.confirm') }}
         </Button>
       </DialogFooter>
     </DialogContent>

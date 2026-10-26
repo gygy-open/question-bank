@@ -61,6 +61,8 @@ definePageMeta({
 
 // --- Types already defined in @/types ---
 
+const { t } = useI18n()
+
 // --- State ---
 const step = ref<'upload' | 'review' | 'success'>('upload')
 const stepIndex = computed(() => ({ upload: 1, review: 2, success: 3 })[step.value])
@@ -164,7 +166,7 @@ const structuredTagWarning = computed(() => {
     const text = activeTab.value === 'text' ? markdownContent.value : (fileTextPreview.value ?? '')
     if (!text.trim()) return null
     if (STRUCTURED_TAG_PATTERN.test(text)) return null
-    return '未检测到【题目】标签，标签精准解析可能无法识别到任何题目。'
+    return t('importSmart.alerts.tagMissing', { tag: '【题目】' })
 })
 
 // --- Data Fetching ---
@@ -240,7 +242,7 @@ const handleFolderChange = async (e: Event) => {
         error.value = null
         fileTextPreview.value = null
     } catch (err: any) {
-        toast.error('打包文件夹失败: ' + (err?.message ?? err))
+        toast.error(t('importSmart.upload.zipFailed', { error: String(err?.message ?? err) }))
     } finally {
         target.value = ''
     }
@@ -268,11 +270,11 @@ const handlePaste = async (e: ClipboardEvent) => {
 const handleAutoUpload = () => {
     if (!file.value && !pastedImage.value) return;
     if (!globalSettings.value.subject_id) {
-        toast.error('请先选择所属学科')
+        toast.error(t('importSmart.upload.selectSubjectFirst'))
         return
     }
     if (parseMethod.value === 'ai' && embeddingConfigured.value && !chromaReachable.value) {
-        if (!confirm('知识点向量库暂时不可达，是否跳过知识点自动匹配继续导入？')) return
+        if (!confirm(t('importSmart.alerts.chromaUnreachableConfirm'))) return
     }
 
     // Auto-detect based on file type or pasted image
@@ -296,7 +298,7 @@ const acceptExtraction = (data: any) => {
     const drafts = toDrafts(data.questions)
     // 标签解析器缺 【题目】 标签时会静默返回空列表；留在上传页给出可操作的提示，而不是展示一个空的审核页。
     if (parseMethod.value === 'structured' && drafts.length === 0) {
-        error.value = '未解析到任何题目，请检查文档是否使用了【题目】等标签。'
+        error.value = t('importSmart.alerts.noQuestionsParsed', { tag: '【题目】' })
         showFormatGuide.value = true
         return
     }
@@ -363,7 +365,7 @@ const handleUploadDocx = async () => {
 const handleUploadMarkdown = async (isFile: boolean = false) => {
     if (isFile && !file.value) return
     if (!isFile && !markdownContent.value.trim()) {
-        toast.error('请输入 Markdown 内容')
+        toast.error(t('importSmart.upload.enterMarkdown'))
         return
     }
 
@@ -443,22 +445,22 @@ const handleUploadImage = async () => {
 
 const handleImport = async (proceedWithPartial = false) => {
     if (!globalSettings.value.subject_id) {
-        toast.error('请先选择所属学科')
+        toast.error(t('importSmart.upload.selectSubjectFirst'))
         return
     }
 
     if (structureErrors.value.length > 0) {
-        toast.error('题组结构无效，请重新解析文件')
+        toast.error(t('importSmart.review.structureInvalidToast'))
         return
     }
 
     const selectedItems = importList.value.filter(item => item.selected)
     if (selectedItems.length === 0) {
-        toast.error('请至少选择一道题目')
+        toast.error(t('importSmart.review.selectAtLeastOne'))
         return
     }
     if (saveAsComposition.value && !compositionTitle.value.trim()) {
-        toast.error('请填写稿件名称')
+        toast.error(t('importSmart.review.compositionTitleRequired'))
         return
     }
 
@@ -497,11 +499,14 @@ const handleImport = async (proceedWithPartial = false) => {
             body: { scope: compositionScope.value, ...structurePayload },
         })
         if (preview.blocking_reason) {
-            toast.error('导入预检未通过', { description: preview.blocking_reason })
+            toast.error(t('importSmart.review.previewFailed'), { description: preview.blocking_reason })
             return
         }
         if (preview.skipped.length > 0 && !proceedWithPartial) {
-            partialFailureDetail.value = `${preview.skipped.length} 道题目未能入库：${preview.skipped.map((item) => item.message).join('；')}`
+            partialFailureDetail.value = t('importSmart.review.partialSkipped', {
+                count: preview.skipped.length,
+                messages: preview.skipped.map((item) => item.message).join(t('importSmart.review.messageSeparator')),
+            })
             return
         }
 
@@ -533,9 +538,9 @@ const handleImport = async (proceedWithPartial = false) => {
             : null
 
         if (importSkipped.value.length > 0) {
-            toast.warning(`${importSkipped.value.length} 道题目被跳过，成功导入 ${res.created_count} 道`)
+            toast.warning(t('importSmart.review.importedWithSkipped', { skipped: importSkipped.value.length, created: res.created_count }))
         } else {
-            toast.success(`成功导入 ${res.created_count} 道题目`)
+            toast.success(t('importSmart.review.imported', { count: res.created_count }))
         }
         step.value = 'success'
     } catch (e: any) {
@@ -545,7 +550,7 @@ const handleImport = async (proceedWithPartial = false) => {
             partialFailureDetail.value = detail
             return
         }
-        toast.error('导入失败', { description: detail || e.message })
+        toast.error(t('importSmart.review.importFailed'), { description: detail || e.message })
     } finally {
         isImporting.value = false
     }
@@ -629,13 +634,13 @@ const reset = () => {
 </script>
 
 <template>
-    <PageHeader title="智能导入" />
+    <PageHeader :title="t('nav.smartImport')" />
     <div class="flex flex-1 flex-col p-4 space-y-6">
         <!-- 三步流程指示：只用于展示进度，不支持点击跳转 -->
         <Stepper :model-value="stepIndex" class="max-w-4xl mx-auto w-full">
             <StepperItem
-                v-for="(label, i) in ['上传', '审核', '完成']"
-                :key="label"
+                v-for="(label, i) in [t('importSmart.steps.upload'), t('importSmart.steps.review'), t('importSmart.steps.done')]"
+                :key="i"
                 v-slot="{ state }"
                 :step="i + 1"
                 class="group relative flex-1 flex flex-col items-center gap-1.5"
@@ -658,21 +663,21 @@ const reset = () => {
                 <Alert v-if="!embeddingConfigured" class="max-w-4xl mx-auto">
                     <AlertCircle class="h-4 w-4" />
                     <AlertDescription>
-                        未配置 Embedding 模型，导入时不会自动匹配知识点。可前往
-                        <NuxtLink to="/settings" class="underline font-medium">系统设置</NuxtLink>
-                        配置后再导入。
+                        <i18n-t scope="global" keypath="importSmart.alerts.embeddingNotConfigured">
+                            <template #link><NuxtLink to="/settings" class="underline font-medium">{{ t('nav.systemSettings') }}</NuxtLink></template>
+                        </i18n-t>
                     </AlertDescription>
                 </Alert>
                 <Alert v-else-if="!kpVectorized" class="max-w-4xl mx-auto">
                     <AlertCircle class="h-4 w-4" />
                     <AlertDescription>
                         <template v-if="isSuperuser">
-                            当前学科的知识点尚未建立向量索引，导入时不会自动匹配。可前往
-                            <NuxtLink to="/knowledge-points" class="underline font-medium">知识点管理</NuxtLink>
-                            重建索引。
+                            <i18n-t scope="global" keypath="importSmart.alerts.kpNotVectorizedAdmin">
+                                <template #link><NuxtLink to="/knowledge-points" class="underline font-medium">{{ t('nav.knowledgePoints') }}</NuxtLink></template>
+                            </i18n-t>
                         </template>
                         <template v-else>
-                            当前学科的知识点尚未建立向量索引，导入时不会自动匹配，请联系管理员重建索引。
+                            {{ t('importSmart.alerts.kpNotVectorized') }}
                         </template>
                     </AlertDescription>
                 </Alert>
@@ -681,11 +686,11 @@ const reset = () => {
                     <TabsList class="grid w-full grid-cols-2">
                         <TabsTrigger value="file" class="gap-2">
                             <Upload class="h-4 w-4" />
-                            文件或图片
+                            {{ t('importSmart.tabs.file') }}
                         </TabsTrigger>
                         <TabsTrigger value="text" class="gap-2">
                             <FileCode class="h-4 w-4" />
-                            纯文本粘贴
+                            {{ t('importSmart.tabs.text') }}
                         </TabsTrigger>
                     </TabsList>
                     
@@ -706,7 +711,7 @@ const reset = () => {
                                 accept=".docx,.md,.zip,image/*"
                                 @change="handleFileChange"
                                 :disabled="isUploading"
-                                title="点击上传文件"
+                                :title="t('importSmart.upload.inputTitle')"
                             />
                             
                             <!-- Initial State -->
@@ -715,13 +720,13 @@ const reset = () => {
                                     <Upload class="h-10 w-10 text-muted-foreground group-hover:text-primary transition-colors" />
                                 </div>
                                 <div class="space-y-2">
-                                    <h3 class="text-xl font-medium">点击此处 或 拖拽文件到这里上传</h3>
-                                    <p class="text-sm text-muted-foreground">同时支持 Ctrl/Cmd + V 直接粘贴屏幕截图</p>
+                                    <h3 class="text-xl font-medium">{{ t('importSmart.upload.dropTitle') }}</h3>
+                                    <p class="text-sm text-muted-foreground">{{ t('importSmart.upload.pasteHint') }}</p>
                                 </div>
                                 <div class="flex items-center justify-center gap-4 text-xs text-muted-foreground mt-4">
                                     <span class="flex items-center gap-1"><FileText class="h-3 w-3"/> Word (.docx)</span>
                                     <span class="flex items-center gap-1"><FileCode class="h-3 w-3"/> Markdown (.md / .zip)</span>
-                                    <span class="flex items-center gap-1"><ImageIcon class="h-3 w-3"/> 图片提取</span>
+                                    <span class="flex items-center gap-1"><ImageIcon class="h-3 w-3"/> {{ t('importSmart.upload.imageExtract') }}</span>
                                 </div>
                             </div>
                             
@@ -730,7 +735,7 @@ const reset = () => {
                                 <div class="p-6 bg-background rounded-lg shadow-sm border flex flex-col items-center gap-4">
                                     <template v-if="pastedImage">
                                         <img :src="pastedImage" alt="Pasted image" class="max-h-48 rounded border shadow-sm object-contain" />
-                                        <div class="text-sm font-medium text-center truncate w-full">已粘贴图片</div>
+                                        <div class="text-sm font-medium text-center truncate w-full">{{ t('importSmart.upload.pastedImage') }}</div>
                                     </template>
                                     <template v-else-if="file">
                                          <div class="h-16 w-16 bg-primary/10 rounded-full flex items-center justify-center">
@@ -749,7 +754,7 @@ const reset = () => {
                                     <div class="mt-2 w-full">
                                         <Button variant="outline" class="w-full" @click.stop="reset" :disabled="isUploading">
                                             <Trash2 class="h-4 w-4 mr-2" />
-                                            删除并重新选择
+                                            {{ t('importSmart.upload.removeAndReselect') }}
                                         </Button>
                                     </div>
                                 </div>
@@ -757,8 +762,10 @@ const reset = () => {
                         </div>
                         <!-- Markdown 含本地图片:上传 .zip 或整个文件夹 -->
                         <div class="mt-3 text-center text-xs text-muted-foreground">
-                            Markdown 引用了本地图片？上传 <span class="font-medium">.zip</span> 压缩包，或
-                            <button type="button" class="underline hover:text-primary" :disabled="isUploading" @click="folderInput?.click()">选择整个文件夹</button>
+                            <i18n-t scope="global" keypath="importSmart.upload.folderHint">
+                                <template #zip><span class="font-medium">.zip</span></template>
+                                <template #folder><button type="button" class="underline hover:text-primary" :disabled="isUploading" @click="folderInput?.click()">{{ t('importSmart.upload.selectFolder') }}</button></template>
+                            </i18n-t>
                             <input
                                 ref="folderInput"
                                 type="file"
@@ -774,7 +781,7 @@ const reset = () => {
                         <div class="border rounded-xl bg-background p-4 min-h-[320px] flex flex-col shadow-sm">
                             <Textarea
                                 v-model="markdownContent"
-                                placeholder="将含有题目的文档内容或纯文本直接粘贴到此处..."
+                                :placeholder="t('importSmart.upload.textPlaceholder')"
                                 class="min-h-[250px] flex-1 resize-y font-mono text-sm"
                             />
                         </div>
@@ -784,7 +791,7 @@ const reset = () => {
                 <!-- Parsing Settings & Submit -->
                 <div class="space-y-6 bg-accent/20 rounded-xl p-6 border max-w-4xl mx-auto w-full">
                     <div>
-                        <h3 class="text-lg font-medium mb-4">个性化解析设置</h3>
+                        <h3 class="text-lg font-medium mb-4">{{ t('importSmart.settings.title') }}</h3>
                         
                         <!-- Primary Parsing Methods -->
                         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -796,9 +803,9 @@ const reset = () => {
                                 <div class="mt-0.5"><CheckCircle2 v-if="parseMethod === 'ai'" class="h-5 w-5 text-primary" /><div v-else class="h-5 w-5 rounded-full border opacity-50"/></div>
                                 <div>
                                     <div class="text-base font-medium flex items-center gap-2">
-                                        ✨ 强力 AI 识别
+                                        {{ t('importSmart.settings.aiMethodTitle') }}
                                     </div>
-                                    <div class="text-sm text-muted-foreground mt-1">自动识别各种排版或截图题目，无需格式。</div>
+                                    <div class="text-sm text-muted-foreground mt-1">{{ t('importSmart.settings.aiMethodDescription') }}</div>
                                 </div>
                             </div>
                             
@@ -809,15 +816,15 @@ const reset = () => {
                             >
                                 <div class="mt-0.5"><CheckCircle2 v-if="parseMethod === 'structured'" class="h-5 w-5 text-primary" /><div v-else class="h-5 w-5 rounded-full border opacity-50"/></div>
                                 <div class="flex-1">
-                                    <div class="text-base font-medium">📝 严格模板解析</div>
-                                    <div class="text-sm text-muted-foreground mt-1">适用于已按【题目】【答案】等标签排版好的题库。</div>
+                                    <div class="text-base font-medium">{{ t('importSmart.settings.structuredMethodTitle') }}</div>
+                                    <div class="text-sm text-muted-foreground mt-1">{{ t('importSmart.settings.structuredMethodDescription', { tags: '【题目】【答案】' }) }}</div>
                                     <Button
                                         variant="link"
                                         size="sm"
                                         class="h-auto p-0 mt-1 text-xs"
                                         @click.stop="showFormatGuide = true"
                                     >
-                                        <BookOpen class="h-3 w-3 mr-1" />查看标签格式与示例
+                                        <BookOpen class="h-3 w-3 mr-1" />{{ t('importSmart.settings.viewTagGuide') }}
                                     </Button>
                                 </div>
                             </div>
@@ -828,7 +835,7 @@ const reset = () => {
                     <div class="pl-4 border-l-2 border-primary/20 space-y-4 pt-2">
                         <!-- AI Sub-settings -->
                         <template v-if="parseMethod === 'ai'">
-                            <Label class="text-sm font-medium text-foreground">选择 AI 处理模式</Label>
+                            <Label class="text-sm font-medium text-foreground">{{ t('importSmart.settings.aiModeLabel') }}</Label>
                             <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
                                 <div 
                                     class="flex items-center space-x-3 border rounded-lg p-3 cursor-pointer hover:bg-accent/50 bg-background transition-all"
@@ -839,8 +846,8 @@ const reset = () => {
                                         <div v-if="importMode === 'extract'" class="h-2 w-2 rounded-full bg-primary" />
                                     </div>
                                     <div>
-                                        <div class="text-sm font-medium">📥 仅提取/原样录入</div>
-                                        <div class="text-xs text-muted-foreground">提取原文件内的题目和答案。</div>
+                                        <div class="text-sm font-medium">{{ t('importSmart.settings.extractTitle') }}</div>
+                                        <div class="text-xs text-muted-foreground">{{ t('importSmart.settings.extractDescription') }}</div>
                                     </div>
                                 </div>
                                 <div 
@@ -852,8 +859,8 @@ const reset = () => {
                                         <div v-if="importMode === 'solve'" class="h-2 w-2 rounded-full bg-primary" />
                                     </div>
                                     <div>
-                                        <div class="text-sm font-medium">🤖 让 AI 帮我解答</div>
-                                        <div class="text-xs text-muted-foreground">AI 会自动为您补全标准答案和解析。</div>
+                                        <div class="text-sm font-medium">{{ t('importSmart.settings.solveTitle') }}</div>
+                                        <div class="text-xs text-muted-foreground">{{ t('importSmart.settings.solveDescription') }}</div>
                                     </div>
                                 </div>
                             </div>
@@ -864,8 +871,10 @@ const reset = () => {
                             <div class="rounded-md bg-background border p-4 text-sm text-muted-foreground flex items-start gap-2">
                                 <AlertCircle class="h-4 w-4 text-amber-500 shrink-0 mt-0.5" />
                                 <div class="flex-1 space-y-2">
-                                    <p class="font-medium text-foreground">模板说明</p>
-                                    <p>必须使用 <Badge variant="outline">【题目】</Badge> 作为每道题的开头，其余标签均可省略：</p>
+                                    <p class="font-medium text-foreground">{{ t('importSmart.settings.templateTitle') }}</p>
+                                    <i18n-t scope="global" keypath="importSmart.settings.templateBody" tag="p">
+                                        <template #tag><Badge variant="outline">【题目】</Badge></template>
+                                    </i18n-t>
                                     <div class="flex flex-wrap gap-1.5">
                                         <Badge variant="secondary">【选项】</Badge>
                                         <Badge variant="secondary">【答案】</Badge>
@@ -873,7 +882,7 @@ const reset = () => {
                                         <Badge variant="secondary">【答案区】</Badge>
                                     </div>
                                     <Button variant="outline" size="sm" @click="showFormatGuide = true">
-                                        <BookOpen class="h-3.5 w-3.5 mr-1.5" />查看完整格式说明与示例
+                                        <BookOpen class="h-3.5 w-3.5 mr-1.5" />{{ t('importSmart.settings.viewFullGuide') }}
                                     </Button>
                                 </div>
                             </div>
@@ -886,7 +895,7 @@ const reset = () => {
                             <AlertCircle class="h-4 w-4" />
                             <AlertDescription>
                                 {{ structuredTagWarning }}
-                                <button type="button" class="underline font-medium ml-1" @click="showFormatGuide = true">查看格式说明</button>
+                                <button type="button" class="underline font-medium ml-1" @click="showFormatGuide = true">{{ t('importSmart.settings.viewGuide') }}</button>
                             </AlertDescription>
                         </Alert>
                         <Button 
@@ -898,10 +907,10 @@ const reset = () => {
                             <Loader2 v-if="isUploading" class="mr-2 h-6 w-6 animate-spin" />
                             <Sparkles v-else-if="parseMethod === 'ai'" class="mr-2 h-6 w-6" />
                             <FileCode v-else class="mr-2 h-6 w-6" />
-                            {{ isUploading ? '正在拼命识别中...' : (parseMethod === 'ai' ? '开始智能识别' : '开始模板解析') }}
+                            {{ isUploading ? t('importSmart.submit.uploading') : (parseMethod === 'ai' ? t('importSmart.submit.ai') : t('importSmart.submit.structured')) }}
                         </Button>
                         <p v-if="(!file && !pastedImage && !markdownContent.trim())" class="text-center text-sm text-destructive mt-3">
-                            请在上方提供文件或纯文本内容
+                            {{ t('importSmart.submit.empty') }}
                         </p>
                     </div>
                     
@@ -920,12 +929,12 @@ const reset = () => {
             <Alert v-if="duplicateOf">
                 <AlertCircle class="h-4 w-4" />
                 <AlertDescription>
-                    检测到与此前导入内容完全相同的文件（{{ duplicateOf.original_filename }}）。你仍然可以继续导入。
+                    {{ t('importSmart.review.duplicate', { filename: duplicateOf.original_filename ?? '' }) }}
                     <NuxtLink
                         v-if="duplicateOf.composition_id"
                         :to="`/compositions/shared/${duplicateOf.composition_id}`"
                         class="underline font-medium ml-1"
-                    >查看上次生成的稿件</NuxtLink>
+                    >{{ t('importSmart.review.viewLastComposition') }}</NuxtLink>
                 </AlertDescription>
             </Alert>
 
@@ -934,14 +943,14 @@ const reset = () => {
                 <Alert v-if="structureErrors.length" variant="destructive">
                     <AlertCircle class="h-4 w-4" />
                     <AlertDescription>
-                        <p class="font-medium">题组结构无效，无法导入，请重新解析文件。</p>
+                        <p class="font-medium">{{ t('importSmart.review.structureInvalid') }}</p>
                         <ul class="mt-2 list-disc space-y-1 pl-5">
                             <li v-for="message in structureErrors" :key="message">{{ message }}</li>
                         </ul>
                     </AlertDescription>
                 </Alert>
                 <div v-if="importList.length === 0" class="text-center py-8 text-muted-foreground">
-                    无导入的题目，请先上传文档或粘贴内容
+                    {{ t('importSmart.review.empty') }}
                 </div>
 
                 <template v-for="entry in visibleReviewEntries" :key="entry.kind === 'question' ? entry.question.uid : entry.group.temp_id">
@@ -982,55 +991,55 @@ const reset = () => {
                     <div class="mb-3 flex items-center justify-between">
                         <div class="flex items-center gap-2">
                             <FileText class="h-4 w-4 text-primary" />
-                            <span class="text-sm font-medium">稿件设置</span>
-                            <span class="hidden text-xs text-muted-foreground sm:inline">导入题库后，同时生成一份可编辑稿件</span>
+                            <span class="text-sm font-medium">{{ t('importSmart.composition.settings') }}</span>
+                            <span class="hidden text-xs text-muted-foreground sm:inline">{{ t('importSmart.composition.hint') }}</span>
                         </div>
-                        <Button variant="ghost" size="icon" class="h-7 w-7" title="收起稿件设置" @click="saveAsComposition = false">
+                        <Button variant="ghost" size="icon" class="h-7 w-7" :title="t('importSmart.composition.collapse')" @click="saveAsComposition = false">
                             <ChevronDown class="h-4 w-4" />
-                            <span class="sr-only">收起稿件设置</span>
+                            <span class="sr-only">{{ t('importSmart.composition.collapse') }}</span>
                         </Button>
                     </div>
                     <div class="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-12">
                         <div class="space-y-1.5 xl:col-span-4">
-                            <Label class="text-xs text-muted-foreground">稿件名称</Label>
-                            <Input v-model="compositionTitle" placeholder="例如：高二数学小测（7）" class="h-9 bg-background" />
+                            <Label class="text-xs text-muted-foreground">{{ t('importSmart.composition.title') }}</Label>
+                            <Input v-model="compositionTitle" :placeholder="t('importSmart.composition.titlePlaceholder')" class="h-9 bg-background" />
                         </div>
                         <div class="space-y-1.5 xl:col-span-3">
-                            <Label class="text-xs text-muted-foreground">保存空间</Label>
+                            <Label class="text-xs text-muted-foreground">{{ t('importSmart.composition.scope') }}</Label>
                             <Select v-model="compositionScope">
                                 <SelectTrigger class="h-9 bg-background"><SelectValue /></SelectTrigger>
                                 <SelectContent>
-                                    <SelectItem value="personal">个人空间（仅自己可见）</SelectItem>
-                                    <SelectItem value="shared">共享空间（学科内可见）</SelectItem>
+                                    <SelectItem value="personal">{{ t('importSmart.composition.scopePersonal') }}</SelectItem>
+                                    <SelectItem value="shared">{{ t('importSmart.composition.scopeShared') }}</SelectItem>
                                 </SelectContent>
                             </Select>
                         </div>
                         <div class="space-y-1.5 xl:col-span-2">
-                            <Label class="text-xs text-muted-foreground">目标目录</Label>
+                            <Label class="text-xs text-muted-foreground">{{ t('importSmart.composition.folder') }}</Label>
                             <Select
                                 :model-value="compositionFolderId === null ? 'root' : String(compositionFolderId)"
                                 @update:model-value="(v) => compositionFolderId = v === 'root' ? null : Number(v)"
                             >
                                 <SelectTrigger class="h-9 bg-background"><SelectValue /></SelectTrigger>
                                 <SelectContent>
-                                    <SelectItem value="root">根目录</SelectItem>
+                                    <SelectItem value="root">{{ t('importSmart.composition.rootFolder') }}</SelectItem>
                                     <SelectItem v-for="f in folderOptions" :key="f.id" :value="String(f.id)">{{ f.label }}</SelectItem>
                                 </SelectContent>
                             </Select>
                         </div>
                         <div class="space-y-1.5 xl:col-span-3">
-                            <Label class="text-xs text-muted-foreground">题号处理</Label>
+                            <Label class="text-xs text-muted-foreground">{{ t('importSmart.composition.numbering') }}</Label>
                             <Select :model-value="renumber ? 'renumber' : 'keep'" @update:model-value="(v) => renumber = v === 'renumber'">
                                 <SelectTrigger class="h-9 bg-background"><SelectValue /></SelectTrigger>
                                 <SelectContent>
-                                    <SelectItem value="renumber">重新连续编号</SelectItem>
-                                    <SelectItem value="keep">保留原题号（可能缺号）</SelectItem>
+                                    <SelectItem value="renumber">{{ t('importSmart.composition.renumber') }}</SelectItem>
+                                    <SelectItem value="keep">{{ t('importSmart.composition.keepNumber') }}</SelectItem>
                                 </SelectContent>
                             </Select>
                         </div>
                     </div>
                     <p v-if="!hasStructure" class="mt-2 text-xs text-muted-foreground">
-                        未识别到大题结构，将按当前题目顺序生成稿件。
+                        {{ t('importSmart.composition.noStructure') }}
                     </p>
                 </div>
 
@@ -1038,23 +1047,23 @@ const reset = () => {
                     <div class="flex flex-wrap items-center gap-2 rounded-md bg-muted/40 px-2.5 py-2">
                         <label class="flex shrink-0 cursor-pointer select-none items-center gap-2 text-sm font-medium">
                             <Checkbox :model-value="saveAsComposition" @update:model-value="(v) => saveAsComposition = v as boolean" />
-                            保存为稿件
+                            {{ t('importSmart.composition.saveAs') }}
                         </label>
                         <Separator orientation="vertical" class="hidden h-5 sm:block" />
                         <div class="flex items-center gap-1.5">
-                            <Label class="shrink-0 text-xs text-muted-foreground">状态</Label>
+                            <Label class="shrink-0 text-xs text-muted-foreground">{{ t('importSmart.review.status') }}</Label>
                             <Select v-model="globalSettings.status">
                                 <SelectTrigger class="h-8 w-[124px] bg-background text-xs"><SelectValue /></SelectTrigger>
                                 <SelectContent>
-                                    <SelectItem value="draft">草稿 (Draft)</SelectItem>
-                                    <SelectItem value="pending">待审核 (Pending)</SelectItem>
-                                    <SelectItem value="published">已发布 (Published)</SelectItem>
+                                    <SelectItem value="draft">{{ t('questions.statuses.draft') }}</SelectItem>
+                                    <SelectItem value="pending">{{ t('questions.statuses.pending') }}</SelectItem>
+                                    <SelectItem value="published">{{ t('questions.statuses.published') }}</SelectItem>
                                 </SelectContent>
                             </Select>
                         </div>
                         <div class="flex min-w-[180px] flex-1 items-center gap-1.5 sm:max-w-[280px]">
-                            <Label class="shrink-0 text-xs text-muted-foreground">来源</Label>
-                            <Input v-model="globalSettings.source" placeholder="例如：2023年期末考试" class="h-8 bg-background text-xs" />
+                            <Label class="shrink-0 text-xs text-muted-foreground">{{ t('importSmart.review.source') }}</Label>
+                            <Input v-model="globalSettings.source" :placeholder="t('importSmart.review.sourcePlaceholder')" class="h-8 bg-background text-xs" />
                         </div>
                     </div>
                     <div class="flex flex-1 items-center justify-between gap-3 lg:justify-end">
@@ -1063,21 +1072,24 @@ const reset = () => {
                                 v-if="warningCount > 0"
                                 type="button"
                                 :aria-pressed="onlyWarnings"
-                                title="仅查看有告警的题目"
+                                :title="t('importSmart.review.onlyWarnings')"
                                 @click="onlyWarnings = !onlyWarnings"
                             >
                                 <Badge variant="outline" :class="onlyWarnings ? 'border-amber-500 bg-amber-500/10 text-amber-700 dark:text-amber-400' : 'text-amber-600 dark:text-amber-400'">
-                                    <AlertCircle class="mr-1 h-3.5 w-3.5" />{{ warningCount }} 道告警
+                                    <AlertCircle class="mr-1 h-3.5 w-3.5" />{{ t('importSmart.review.warningCount', { count: warningCount }) }}
                                 </Badge>
                             </button>
-                            <span class="whitespace-nowrap text-sm text-muted-foreground">已选 <strong class="font-medium text-foreground">{{ selectedCount }}</strong> / {{ importList.length }}</span>
+                            <i18n-t scope="global" keypath="importSmart.review.selected" tag="span" class="whitespace-nowrap text-sm text-muted-foreground">
+                                <template #selected><strong class="font-medium text-foreground">{{ selectedCount }}</strong></template>
+                                <template #total>{{ importList.length }}</template>
+                            </i18n-t>
                         </div>
                         <div class="flex items-center gap-2">
-                            <Button variant="ghost" :disabled="isImporting" @click="reset">取消</Button>
+                            <Button variant="ghost" :disabled="isImporting" @click="reset">{{ t('common.cancel') }}</Button>
                             <Button class="min-w-[148px]" @click="handleImport()" :disabled="isImporting || selectedCount === 0 || structureErrors.length > 0">
                                 <Loader2 v-if="isImporting" class="mr-2 h-4 w-4 animate-spin" />
                                 <Save v-else class="mr-2 h-4 w-4" />
-                                确认导入 ({{ selectedCount }})
+                                {{ t('importSmart.review.confirmImport', { count: selectedCount }) }}
                             </Button>
                         </div>
                     </div>
@@ -1090,38 +1102,38 @@ const reset = () => {
             <div class="rounded-full bg-green-100 p-3 dark:bg-green-900/20">
                 <CheckCircle2 class="h-12 w-12 text-green-600 dark:text-green-400" />
             </div>
-            <h2 class="text-2xl font-bold">导入成功</h2>
-            <p class="text-muted-foreground">题目已成功添加到题库中。</p>
+            <h2 class="text-2xl font-bold">{{ t('importSmart.success.title') }}</h2>
+            <p class="text-muted-foreground">{{ t('importSmart.success.description') }}</p>
 
             <!-- 稿件是独立结果，单独陈述，不并入任务状态 -->
             <div v-if="createdComposition" class="rounded-lg border bg-muted/40 px-4 py-3 text-sm text-center">
-                已生成稿件「{{ createdComposition.title }}」，可直接替换少量题目后复用。
+                {{ t('importSmart.success.composition', { title: createdComposition.title }) }}
             </div>
 
             <div v-if="importSkipped.length" class="w-full max-w-xl rounded-lg border border-amber-500/30 bg-amber-500/10 p-4 text-sm">
-                <p class="font-medium mb-2">{{ importSkipped.length }} 道题目被跳过</p>
+                <p class="font-medium mb-2">{{ t('importSmart.success.skipped', { count: importSkipped.length }) }}</p>
                 <ul class="list-disc pl-5 space-y-1 text-muted-foreground">
                     <li v-for="(s, i) in importSkipped" :key="i">{{ s.message }}</li>
                 </ul>
             </div>
 
             <div v-if="importDegraded.length" class="w-full max-w-xl rounded-lg border p-4 text-sm">
-                <p class="font-medium mb-2">以下内容做了结构降级，请在稿件中检查</p>
+                <p class="font-medium mb-2">{{ t('importSmart.success.degraded') }}</p>
                 <ul class="list-disc pl-5 space-y-1 text-muted-foreground">
-                    <li v-for="(d, i) in importDegraded" :key="i">{{ d.reason }}：{{ d.excerpt }}</li>
+                    <li v-for="(d, i) in importDegraded" :key="i">{{ t('importSmart.success.degradedItem', { reason: d.reason, excerpt: d.excerpt }) }}</li>
                 </ul>
             </div>
 
             <div class="flex flex-wrap gap-4 justify-center">
-                <Button variant="outline" @click="reset">继续导入</Button>
+                <Button variant="outline" @click="reset">{{ t('importSmart.success.continue') }}</Button>
                 <Button v-if="createdComposition" as-child>
-                    <NuxtLink :to="`/compositions/${compositionScope}/${createdComposition.id}`">打开稿件</NuxtLink>
+                    <NuxtLink :to="`/compositions/${compositionScope}/${createdComposition.id}`">{{ t('importSmart.success.openComposition') }}</NuxtLink>
                 </Button>
                 <Button as-child :variant="createdComposition ? 'outline' : 'default'" v-if="importedTaskId">
-                    <NuxtLink :to="`/questions?import_task_id=${importedTaskId}`">查看本次导入题目</NuxtLink>
+                    <NuxtLink :to="`/questions?import_task_id=${importedTaskId}`">{{ t('importSmart.success.viewImported') }}</NuxtLink>
                 </Button>
                 <Button as-child v-else>
-                    <NuxtLink to="/questions">查看题库</NuxtLink>
+                    <NuxtLink to="/questions">{{ t('importSmart.success.viewBank') }}</NuxtLink>
                 </Button>
             </div>
         </div>
@@ -1130,17 +1142,17 @@ const reset = () => {
         <Dialog :open="!!partialFailureDetail" @update:open="(v) => !v && (partialFailureDetail = null)">
             <DialogContent>
                 <DialogHeader>
-                    <DialogTitle>部分题目无法入库</DialogTitle>
+                    <DialogTitle>{{ t('importSmart.partial.title') }}</DialogTitle>
                     <DialogDescription>{{ partialFailureDetail }}</DialogDescription>
                 </DialogHeader>
                 <p class="text-sm text-muted-foreground">
-                    你可以仅用已通过校验的题目继续导入（稿件也只包含这些题目），或先返回修正后再导入。
+                    {{ t('importSmart.partial.description') }}
                 </p>
                 <DialogFooter>
-                    <Button variant="outline" @click="partialFailureDetail = null">返回修正</Button>
+                    <Button variant="outline" @click="partialFailureDetail = null">{{ t('importSmart.partial.back') }}</Button>
                     <Button :disabled="isImporting" @click="confirmPartialImport">
                         <Loader2 v-if="isImporting" class="mr-2 h-4 w-4 animate-spin" />
-                        仅导入已通过的题目
+                        {{ t('importSmart.partial.confirm') }}
                     </Button>
                 </DialogFooter>
             </DialogContent>

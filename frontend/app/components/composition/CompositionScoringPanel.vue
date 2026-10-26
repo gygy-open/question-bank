@@ -19,6 +19,8 @@ const emit = defineEmits<{
   'update-score': [nodeId: string, score: number | null, slotId?: string]
 }>()
 
+const { t } = useI18n()
+
 const total = computed(() => props.items.reduce((sum, it) => sum + (it.score ?? 0), 0))
 
 function onInput(item: ScorableItem, raw: string) {
@@ -38,7 +40,7 @@ function onInput(item: ScorableItem, raw: string) {
     <div class="flex items-center justify-between gap-2">
       <div class="flex items-center gap-2">
         <Award class="h-4 w-4 text-muted-foreground" />
-        <span class="text-sm font-medium">赋分</span>
+        <span class="text-sm font-medium">{{ t('compositionPanels.scoring.title') }}</span>
       </div>
       <TooltipProvider :delay-duration="300">
         <Tooltip>
@@ -52,22 +54,22 @@ function onInput(item: ScorableItem, raw: string) {
               />
             </span>
           </TooltipTrigger>
-          <TooltipContent v-if="!props.numberingEnabled">请先开启题号</TooltipContent>
+          <TooltipContent v-if="!props.numberingEnabled">{{ t('compositionEditor.toast.enableNumberingFirst') }}</TooltipContent>
         </Tooltip>
       </TooltipProvider>
     </div>
     <p class="mt-1.5 text-xs text-muted-foreground">
-      开启后每道题可标注分值，需先开启题号。
+      {{ t('compositionPanels.scoring.hint') }}
     </p>
 
     <template v-if="props.enabled">
       <Separator class="my-3" />
       <div class="flex items-center justify-between gap-2">
-        <span class="text-xs font-medium text-muted-foreground">分数分布</span>
-        <span class="text-xs text-muted-foreground">合计 {{ total }} 分</span>
+        <span class="text-xs font-medium text-muted-foreground">{{ t('compositionPanels.scoring.distribution') }}</span>
+        <span class="text-xs text-muted-foreground">{{ t('compositionPanels.scoring.total', { score: total }) }}</span>
       </div>
 
-      <p v-if="items.length === 0" class="mt-3 text-xs text-muted-foreground">画布中还没有题目</p>
+      <p v-if="items.length === 0" class="mt-3 text-xs text-muted-foreground">{{ t('compositionPanels.scoring.empty') }}</p>
 
       <div v-else class="mt-3 flex flex-wrap gap-2">
         <div

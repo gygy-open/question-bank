@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, beforeAll, afterAll } from 'vitest'
 import {
   createAnswerSpaceNode,
   createHeadingNode,
@@ -12,6 +12,15 @@ import { diffDocuments } from '@/lib/compositionDiff'
 import { applyOperations } from '@/lib/compositionPrimitives'
 import type { ApplyDeps } from '@/lib/compositionPrimitives'
 import type { Question } from '@/types'
+import { setTranslator } from '@/lib/locale'
+
+// 变更清单是界面文案（走 i18n）：测试里把 key 与参数原样拼出来，断言结构而不依赖具体语言。
+beforeAll(() => {
+  setTranslator((key, params) => (params ? `${key}(${Object.values(params).join('|')})` : key))
+})
+afterAll(() => {
+  setTranslator((key) => key)
+})
 
 function richDoc(text: string) {
   return { type: 'doc' as const, content: [{ type: 'paragraph', content: [{ type: 'text', text }] }] }
@@ -78,9 +87,9 @@ describe('diffDocuments', () => {
     const changes = diffDocuments(before, after)
     expect(changes).toHaveLength(1)
     expect(changes[0]!.kind).toBe('modified')
-    expect(changes[0]!.label).toContain('题号 无 → 3')
-    expect(changes[0]!.label).toContain('分值 无 → 12')
-    expect(changes[0]!.label).toContain('解析显示')
+    expect(changes[0]!.label).toContain('compositionEditor.diff.number(compositionEditor.diff.none|3)')
+    expect(changes[0]!.label).toContain('compositionEditor.diff.score(compositionEditor.diff.none|12)')
+    expect(changes[0]!.label).toContain('compositionEditor.diff.fieldShow(compositionPanels.fields.analysis)')
   })
 
   it('只换位置记成 moved，且只标出真正动了的那一个', async () => {
@@ -126,17 +135,18 @@ describe('diffDocuments', () => {
     }], deps)
 
     const changes = diffDocuments(before, after)
-    expect(changes[0]!.label).toContain('展示字段调整')
-    expect(changes[0]!.label).toContain('解析')
+    expect(changes[0]!.label).toContain('compositionEditor.diff.fields(')
+    expect(changes[0]!.label).toContain('compositionPanels.fields.analysis')
   })
 
   it('长文本摘要会截断，不把整段正文塞进清单', async () => {
-    const long = headingNode('这是一个非常非常长的标题'.repeat(10))
+    const fullText = '这是一个非常非常长的标题'.repeat(10)
+    const long = headingNode(fullText)
     const before = docOf()
     const after = docOf(long)
     const label = diffDocuments(before, after)[0]!.label
-    expect(label.length).toBeLessThan(80)
-    expect(label).toContain('…')
+    expect(label).not.toContain(fullText)
+    expect(label).toContain(`${fullText.slice(0, 40)}…`)
   })
 
   it('作答空间的行数变化说得出来', async () => {
@@ -145,6 +155,6 @@ describe('diffDocuments', () => {
     const { doc: after } = await applyOperations(before, [
       { op: 'set_node_props', node_id: space.id, props: { lines: 8 }, clear: [] },
     ], deps)
-    expect(diffDocuments(before, after)[0]!.label).toContain('行数 3 → 8')
+    expect(diffDocuments(before, after)[0]!.label).toContain('compositionEditor.diff.lines(3|8)')
   })
 })

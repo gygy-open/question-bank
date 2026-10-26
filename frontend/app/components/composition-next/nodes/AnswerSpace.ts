@@ -3,6 +3,7 @@
 import { Node, mergeAttributes } from '@tiptap/core'
 import { VueNodeViewRenderer } from '@tiptap/vue-3'
 import AnswerSpaceView from './AnswerSpaceView.vue'
+import { translate } from '@/lib/locale'
 
 export const ANSWER_SPACE_MIN_LINES = 1
 export const ANSWER_SPACE_MAX_LINES = 50
@@ -48,7 +49,7 @@ export const AnswerSpace = Node.create({
         'data-type': 'answer-space',
         class: 'composition-answer-space',
         role: 'separator',
-        'aria-label': '作答空间',
+        'aria-label': translate('compositionEditor.slash.items.answerSpace'),
       }),
     ]
   },

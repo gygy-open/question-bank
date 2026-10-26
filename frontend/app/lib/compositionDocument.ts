@@ -28,6 +28,7 @@ import type {
 } from '@/types/composition'
 import { ANSWER_FIELD_KEYS, BODY_SLOT } from '@/types/composition'
 import { resolveAnswerSpacePropsOrFallback } from '@/lib/answerSpaceRules'
+import { translate } from '@/lib/locale'
 import type { Question, RichDocNode, RichNode } from '@/types'
 import { isEmptyRichDoc, richDocToPlainText } from '@/components/rich-editor/richDoc'
 
@@ -1058,21 +1059,21 @@ export function snapshotDocument(doc: EditorDocument): string {
 export function collectDocumentIssues(doc: EditorDocument): string[] {
   const issues: string[] = []
   doc.nodes.forEach((node, i) => {
-    const at = `第 ${i + 1} 个块`
+    const index = i + 1
     // 单文档模型（schema_version>=2）的空段落/空标题是合法的连续编辑形态，不阻断保存。
     const singleDoc = (node.schemaVersion ?? 1) >= 2
     if (node.nodeType === 'rich_text' && !singleDoc && isEmptyRichDoc(node.content)) {
-      issues.push(`${at}（文本）内容为空`)
+      issues.push(translate('compositionEditor.issues.emptyText', { index }))
     } else if (node.nodeType === 'heading' && !singleDoc && isEmptyRichDoc(node.content)) {
-      issues.push(`${at}（标题）内容为空`)
+      issues.push(translate('compositionEditor.issues.emptyHeading', { index }))
     } else if (node.nodeType === 'question' && node.questionId == null) {
-      issues.push(`${at}（题目）未选择题目`)
+      issues.push(translate('compositionEditor.issues.missingQuestion', { index }))
     } else if (node.nodeType === 'question_details') {
       node.children.forEach((child) => {
         if (child.nodeType === 'rich_text' && isEmptyRichDoc(child.content)) {
-          issues.push(`${at}（汇总模块内文本）内容为空`)
+          issues.push(translate('compositionEditor.issues.emptyModuleText', { index }))
         } else if (child.nodeType === 'heading' && isEmptyRichDoc(child.content)) {
-          issues.push(`${at}（汇总模块内标题）内容为空`)
+          issues.push(translate('compositionEditor.issues.emptyModuleHeading', { index }))
         }
       })
     }

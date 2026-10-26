@@ -58,10 +58,10 @@ describe('validateImportStructure', () => {
     )
 
     expect(errors).toEqual(expect.arrayContaining([
-      expect.stringContaining('不存在的题目材料'),
-      expect.stringContaining('重复引用小题'),
-      expect.stringContaining('不存在的小题'),
-      expect.stringContaining('不存在的题组'),
+      'importReview.errors.groupMissingStimulus',
+      'importReview.errors.groupDuplicateMember',
+      'importReview.errors.groupMissingMember',
+      'importReview.errors.outlineMissingGroup',
     ]))
   })
 
@@ -75,7 +75,7 @@ describe('validateImportStructure', () => {
       ],
     )
 
-    expect(errors).toEqual([expect.stringContaining('只能依赖一份题目材料')])
+    expect(errors).toEqual(['importReview.errors.questionInMultipleGroups'])
   })
 })
 

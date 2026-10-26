@@ -20,7 +20,17 @@
     "moreActions": "更多操作",
     "prevPage": "上一页",
     "nextPage": "下一页",
-    "unknown": "未知"
+    "unknown": "未知",
+    "cancel": "取消",
+    "actions": "操作",
+    "back": "返回",
+    "name": "名称",
+    "saved": "已保存",
+    "saveFailed": "保存失败",
+    "deleteFailed": "删除失败",
+    "operationFailed": "操作失败",
+    "loading": "加载中…",
+    "loadMore": "加载更多"
   },
   "language": {
     "label": "语言",
@@ -323,6 +333,682 @@
       "keepRunningEm": "关机或退出应用",
       "ipChange": "若本机 IP 变化（重启后），此地址会随之更新。",
       "hostnameAndroid": "更好记的地址可能在安卓手机上无法打开，此时请改用上方 IP 地址。"
+    }
+  },
+  "importSmart": {
+    "steps": {
+      "upload": "上传",
+      "review": "审核",
+      "done": "完成"
+    },
+    "alerts": {
+      "embeddingNotConfigured": "未配置 Embedding 模型，导入时不会自动匹配知识点。可前往 {link} 配置后再导入。",
+      "kpNotVectorizedAdmin": "当前学科的知识点尚未建立向量索引，导入时不会自动匹配。可前往 {link} 重建索引。",
+      "kpNotVectorized": "当前学科的知识点尚未建立向量索引，导入时不会自动匹配，请联系管理员重建索引。",
+      "chromaUnreachableConfirm": "知识点向量库暂时不可达，是否跳过知识点自动匹配继续导入？",
+      "tagMissing": "未检测到{tag}标签，标签精准解析可能无法识别到任何题目。",
+      "noQuestionsParsed": "未解析到任何题目，请检查文档是否使用了{tag}等标签。"
+    },
+    "tabs": {
+      "file": "文件或图片",
+      "text": "纯文本粘贴"
+    },
+    "upload": {
+      "inputTitle": "点击上传文件",
+      "dropTitle": "点击此处 或 拖拽文件到这里上传",
+      "pasteHint": "同时支持 Ctrl/Cmd + V 直接粘贴屏幕截图",
+      "imageExtract": "图片提取",
+      "pastedImage": "已粘贴图片",
+      "removeAndReselect": "删除并重新选择",
+      "folderHint": "Markdown 引用了本地图片？上传 {zip} 压缩包，或 {folder}",
+      "selectFolder": "选择整个文件夹",
+      "textPlaceholder": "将含有题目的文档内容或纯文本直接粘贴到此处...",
+      "zipFailed": "打包文件夹失败: {error}",
+      "selectSubjectFirst": "请先选择所属学科",
+      "enterMarkdown": "请输入 Markdown 内容"
+    },
+    "settings": {
+      "title": "个性化解析设置",
+      "aiMethodTitle": "✨ 强力 AI 识别",
+      "aiMethodDescription": "自动识别各种排版或截图题目，无需格式。",
+      "structuredMethodTitle": "📝 严格模板解析",
+      "structuredMethodDescription": "适用于已按{tags}等标签排版好的题库。",
+      "viewTagGuide": "查看标签格式与示例",
+      "aiModeLabel": "选择 AI 处理模式",
+      "extractTitle": "📥 仅提取/原样录入",
+      "extractDescription": "提取原文件内的题目和答案。",
+      "solveTitle": "🤖 让 AI 帮我解答",
+      "solveDescription": "AI 会自动为您补全标准答案和解析。",
+      "templateTitle": "模板说明",
+      "templateBody": "必须使用 {tag} 作为每道题的开头，其余标签均可省略：",
+      "viewFullGuide": "查看完整格式说明与示例",
+      "viewGuide": "查看格式说明"
+    },
+    "submit": {
+      "uploading": "正在拼命识别中...",
+      "ai": "开始智能识别",
+      "structured": "开始模板解析",
+      "empty": "请在上方提供文件或纯文本内容"
+    },
+    "review": {
+      "duplicate": "检测到与此前导入内容完全相同的文件（{filename}）。你仍然可以继续导入。",
+      "viewLastComposition": "查看上次生成的稿件",
+      "structureInvalid": "题组结构无效，无法导入，请重新解析文件。",
+      "structureInvalidToast": "题组结构无效，请重新解析文件",
+      "empty": "无导入的题目，请先上传文档或粘贴内容",
+      "status": "状态",
+      "source": "来源",
+      "sourcePlaceholder": "例如：2023年期末考试",
+      "onlyWarnings": "仅查看有告警的题目",
+      "warningCount": "{count} 道告警",
+      "selected": "已选 {selected} / {total}",
+      "confirmImport": "确认导入 ({count})",
+      "selectAtLeastOne": "请至少选择一道题目",
+      "compositionTitleRequired": "请填写稿件名称",
+      "previewFailed": "导入预检未通过",
+      "partialSkipped": "{count} 道题目未能入库：{messages}",
+      "messageSeparator": "；",
+      "importedWithSkipped": "{skipped} 道题目被跳过，成功导入 {created} 道",
+      "imported": "成功导入 {count} 道题目",
+      "importFailed": "导入失败"
+    },
+    "composition": {
+      "settings": "稿件设置",
+      "hint": "导入题库后，同时生成一份可编辑稿件",
+      "collapse": "收起稿件设置",
+      "title": "稿件名称",
+      "titlePlaceholder": "例如：高二数学小测（7）",
+      "scope": "保存空间",
+      "scopePersonal": "个人空间（仅自己可见）",
+      "scopeShared": "共享空间（学科内可见）",
+      "folder": "目标目录",
+      "rootFolder": "根目录",
+      "numbering": "题号处理",
+      "renumber": "重新连续编号",
+      "keepNumber": "保留原题号（可能缺号）",
+      "noStructure": "未识别到大题结构，将按当前题目顺序生成稿件。",
+      "saveAs": "保存为稿件"
+    },
+    "success": {
+      "title": "导入成功",
+      "description": "题目已成功添加到题库中。",
+      "composition": "已生成稿件「{title}」，可直接替换少量题目后复用。",
+      "skipped": "{count} 道题目被跳过",
+      "degraded": "以下内容做了结构降级，请在稿件中检查",
+      "degradedItem": "{reason}：{excerpt}",
+      "continue": "继续导入",
+      "openComposition": "打开稿件",
+      "viewImported": "查看本次导入题目",
+      "viewBank": "查看题库"
+    },
+    "partial": {
+      "title": "部分题目无法入库",
+      "description": "你可以仅用已通过校验的题目继续导入（稿件也只包含这些题目），或先返回修正后再导入。",
+      "back": "返回修正",
+      "confirm": "仅导入已通过的题目"
+    }
+  },
+  "importTasks": {
+    "title": "异步导入队列",
+    "batchRetry": "批量重试 ({count})",
+    "batchRetryConfirm": "确定要重试选中的 {count} 个任务吗？",
+    "batchRetried": "已重试 {count} 个任务",
+    "resetStuck": "重置卡住任务",
+    "resetStuckConfirm": "确定要重置所有处理中的任务吗？这会将它们重新设为等待状态。",
+    "resetDone": "已重置 {count} 个任务",
+    "resetFailed": "重置失败",
+    "statuses": {
+      "pending": "等待中",
+      "processing": "处理中",
+      "completed": "已完成",
+      "failed": "失败",
+      "cancelled": "已取消"
+    },
+    "upload": {
+      "title": "批量上传",
+      "description": "上传文件后，系统将在后台自动处理",
+      "extractTitle": "录入原题",
+      "extractDescription": "提取文档中的题目、答案和解析，保持原样。适用于已有标准答案的题。",
+      "solveTitle": "AI 自动做题",
+      "solveDescription": "AI 提取题目并做题并生成标准答案和解析，适用于无答案的教材题。",
+      "pick": "点击选择文件 (支持多选)",
+      "hint": "支持拖拽上传，支持批量上传 .docx, .md, .zip 格式。上传文件后，系统将自动处理，不需要一直👀着。",
+      "folderHint": "Markdown 引用了本地图片？上传 {zip} 压缩包，或 {folder}",
+      "selectFolder": "选择整个文件夹",
+      "uploading": "正在上传...",
+      "zipFailed": "打包文件夹失败",
+      "created": "成功创建 {count} 个导入任务"
+    },
+    "list": {
+      "title": "导入队列",
+      "description": "查看导入任务的处理状态和结果",
+      "filterUser": "筛选用户",
+      "allUsers": "全部用户",
+      "filterStatus": "筛选状态",
+      "allStatuses": "全部状态",
+      "filename": "文件名",
+      "owner": "所属用户",
+      "status": "状态",
+      "result": "结果",
+      "createdAt": "创建时间",
+      "empty": "暂无导入任务",
+      "extracted": "成功提取 {count} 题",
+      "processFailed": "处理失败",
+      "cancelTask": "取消任务",
+      "viewQuestions": "查看题目",
+      "deleteRecord": "删除记录"
+    },
+    "cancelConfirm": "确定要取消此任务吗？",
+    "cancelled": "任务已取消",
+    "cancelFailed": "取消失败",
+    "retried": "任务已重新加入队列",
+    "retryFailed": "重试失败",
+    "deleteConfirm": "确定要删除此记录吗？",
+    "deleted": "记录已删除",
+    "deleteFailed": "删除失败"
+  },
+  "templateGuide": {
+    "title": "标签精准解析：格式说明",
+    "description": "独立题用 {question} 分隔；材料题组使用 {stimulus} 和 {group}。全角{fullwidth}与半角 {halfwidth} 均可识别。",
+    "table": {
+      "tag": "标签",
+      "required": "是否必填",
+      "note": "说明"
+    },
+    "required": {
+      "required": "必填",
+      "groupRequired": "题组必填",
+      "optional": "可选"
+    },
+    "notes": {
+      "question": "每道题的开头，同时作为题目之间的分隔符",
+      "stimulus": "声明多行题目材料；名称可选，复用时填写名称",
+      "group": "开始题组；名称省略时引用最近声明的题目材料",
+      "groupEnd": "结束题组，后续题目恢复为独立题；新题组、题目材料或大题标题也会自动结束当前题组",
+      "type": "{values}；省略时自动推断",
+      "options": "块写法 {block} 或逐项 {perItem}",
+      "answer": "选择题写字母（多选如 {multiExample}），判断题写 {trueFalse}",
+      "multiline": "可多行",
+      "difficulty": "1–5，或 {levels}",
+      "answerSection": "别名{aliases}；用于文末统一答案表"
+    },
+    "examples": {
+      "questionGroup": "材料题组",
+      "answerSection": "统一答案区"
+    },
+    "copied": "已复制，可直接粘贴到文档中"
+  },
+  "batchImport": {
+    "loadFailed": "加载题目详情失败",
+    "imported": "题目导入成功",
+    "confirmFailed": "确认导入失败",
+    "rejected": "已拒绝导入题目",
+    "rejectFailed": "拒绝导入失败",
+    "title": "AI 导入提案",
+    "description": "AI 提议导入 {count} 道题目。",
+    "review": "审核并确认",
+    "importedDone": "题目导入成功。",
+    "rejectedDone": "导入提案已拒绝。",
+    "dialogTitle": "审核题目",
+    "dialogDescription": "请在导入前审核以下 {count} 道题目。",
+    "reject": "拒绝",
+    "confirm": "确认导入"
+  },
+  "importReview": {
+    "group": {
+      "stimulus": "题目材料",
+      "memberCount": "{count} 道小题",
+      "invalidStimulus": "（题目材料引用无效）"
+    },
+    "errors": {
+      "duplicateQuestionId": "题目临时引用重复：{id}",
+      "duplicateStimulusId": "题目材料临时引用重复：{id}",
+      "duplicateGroupId": "题组临时引用重复：{id}",
+      "groupMissingStimulus": "题组 {group} 引用了不存在的题目材料：{id}",
+      "groupEmpty": "题组 {group} 没有小题",
+      "groupDuplicateMember": "题组 {group} 重复引用小题：{id}",
+      "groupMissingMember": "题组 {group} 引用了不存在的小题：{id}",
+      "questionInMultipleGroups": "小题 {id} 同时属于题组 {first} 和 {second}，一道题只能依赖一份题目材料",
+      "outlineMissingQuestion": "试卷结构引用了不存在的题目：{id}",
+      "outlineMissingGroup": "试卷结构引用了不存在的题组：{id}"
+    }
+  },
+  "compositions": {
+    "title": "组稿工作台",
+    "newComposition": "新建稿件",
+    "scopeHint": {
+      "shared": "共享空间：本学科团队成员均可查看与编辑。",
+      "personal": "个人空间：仅你自己可见，团队其他成员无法访问。"
+    },
+    "scope": {
+      "shared": "共享",
+      "personal": "个人"
+    },
+    "conflict": {
+      "revision": "内容已被他人更新，请刷新后重试",
+      "folderNotEmpty": "文件夹非空，请先移动或删除其中的内容",
+      "generic": "操作冲突，请刷新后重试"
+    },
+    "toast": {
+      "loadFoldersFailed": "加载文件夹失败",
+      "loadListFailed": "加载组稿失败",
+      "folderNameRequired": "请输入文件夹名称",
+      "saveFolderFailed": "保存文件夹失败",
+      "folderDeleted": "已删除文件夹",
+      "deleteFolderFailed": "删除文件夹失败",
+      "moved": "已移动",
+      "moveFailed": "移动失败",
+      "titleRequired": "请输入组稿标题",
+      "createFailed": "创建组稿失败",
+      "archived": "已归档",
+      "unarchived": "已取消归档",
+      "movedToTrash": "已移入回收站",
+      "restored": "已恢复",
+      "restoreFailed": "恢复失败",
+      "duplicated": "已创建副本",
+      "duplicateFailed": "创建副本失败"
+    },
+    "confirm": {
+      "deleteFolder": "删除文件夹「{name}」？仅当其为空时可删除。",
+      "moveToTrash": "将「{title}」移入回收站？"
+    },
+    "empty": {
+      "selectSubject": "请先在左侧选择一个学科",
+      "createSubject": "请先创建一个学科后再使用组稿工作台"
+    },
+    "folders": "文件夹",
+    "newRootFolder": "新建根文件夹",
+    "root": "根目录",
+    "noFolders": "暂无文件夹",
+    "trash": "回收站",
+    "trashEmpty": "回收站是空的",
+    "deletedAt": "删除于 {time}",
+    "restore": "恢复",
+    "archived": "已归档",
+    "noDescription": "暂无描述",
+    "folderEmpty": "当前文件夹还没有组稿",
+    "actions": {
+      "editInfo": "重命名 / 描述",
+      "move": "移动",
+      "duplicate": "创建副本",
+      "archive": "归档",
+      "unarchive": "取消归档"
+    },
+    "folderDialog": {
+      "createTitle": "新建文件夹",
+      "renameTitle": "重命名文件夹",
+      "namePlaceholder": "文件夹名称"
+    },
+    "moveDialog": {
+      "title": "移动到",
+      "description": "选择目标文件夹，或移动到根目录。"
+    },
+    "form": {
+      "title": "标题",
+      "titleExample": "例如：第一单元测验",
+      "titlePlaceholder": "组稿标题",
+      "description": "描述",
+      "descriptionPlaceholder": "组稿说明（可选）",
+      "createAndOpen": "创建并打开",
+      "editTitle": "编辑组稿信息"
+    },
+    "quickAdd": {
+      "loadFailed": "加载稿件失败",
+      "conflict": "稿件已被他人更新，请重新打开再试一次",
+      "addFailed": "加入稿件失败",
+      "view": "前往查看",
+      "added": "已加入《{title}》",
+      "createdAndAdded": "已创建并加入《{title}》",
+      "trigger": "加入稿件",
+      "recent": "最近编辑",
+      "empty": "还没有稿件",
+      "createAndAdd": "新建稿件并加入",
+      "goToWorkspace": "前往组稿工作台",
+      "questionsMissing": "题目已不存在，无法加入稿件"
+    },
+    "targetPicker": {
+      "conflict": "稿件已被他人更新，请重新打开选择器再试一次",
+      "added": "已将 {count} 道题加入《{title}》",
+      "createdAndAdded": "已创建并加入 {count} 道题",
+      "title": "选择稿件",
+      "description": "将 {count} 道题加入稿件（同一材料题的小题会合并呈现）",
+      "confirm": "加入所选稿件"
+    },
+    "defaultTitle": "新稿件 {date}"
+  },
+  "compositionEditor": {
+    "fallbackTitle": "组稿",
+    "sharedSpace": "共享空间",
+    "personalSpace": "个人空间",
+    "saving": "保存中…",
+    "unsavedChanges": "未保存改动",
+    "versionHistory": "版本历史",
+    "timeline": "时间线",
+    "conflictBanner": "组稿已被他人更新。你的本地修改仍保留；请重新加载最新版本后再编辑，或先在别处备份当前内容。",
+    "reloadDiscardLocal": "重新加载（放弃本地）",
+    "toast": {
+      "titleRequired": "请输入标题",
+      "metaSaved": "已保存标题/描述",
+      "conflictUnsaved": "组稿已被他人更新，你的本地修改尚未保存",
+      "blockIssue": "存在无法保存的块：{issue}",
+      "contentSaved": "已保存内容",
+      "contentConflictUnsaved": "内容已被他人更新，你的本地修改尚未保存",
+      "saveContentFailed": "保存内容失败",
+      "questionsSynced": "已同步 {count} 道题目",
+      "syncConflict": "组稿已被他人更新，同步失败；你的本地修改仍保留",
+      "syncQuestionsFailed": "同步题目失败",
+      "groupsSynced": "已同步 {count} 道材料题",
+      "syncGroupsConflict": "组稿已被他人更新，同步失败；本地内容仍保留",
+      "syncGroupsFailed": "同步材料题失败",
+      "enableNumberingFirst": "请先开启题号",
+      "savingBeforeFinalize": "正在自动保存，请稍候再定稿",
+      "finalized": "已定稿为版本 v{version}",
+      "finalizeConflict": "组稿已被他人更新，定稿失败；你的本地修改仍保留",
+      "finalizeFailed": "定稿失败"
+    },
+    "confirm": {
+      "syncGroups": "同步会刷新冻结的材料和已选小题内容、按材料顺序重排，并移除已脱离材料的小题；保留稿件内的题号、分值与作答区，不会自动加入新小题。确定继续？",
+      "autofillNumbers": "自动填充将覆盖所有已有题号，确定继续？",
+      "leaveUnsaved": "有未保存的修改，确定要离开吗？"
+    },
+    "download": {
+      "label": "下载",
+      "word": "下载 Word",
+      "latex": "下载 LaTeX",
+      "latestVersion": "已定稿版本 v{version}",
+      "draftAhead": "草稿有更新的改动未定稿，下载的仍是旧内容",
+      "finalizeFirst": "先定稿最新内容",
+      "noVersion": "尚无定稿版本，请先定稿"
+    },
+    "finalize": {
+      "button": "定稿",
+      "savingHint": "正在自动保存，请稍候",
+      "tooltip": "冻结当前内容为不可变版本",
+      "dialogTitle": "定稿为新版本",
+      "dialogDescription": "将冻结当前修订版本 {revision} 为不可变版本。定稿不会修改组稿本身，可继续编辑。",
+      "labelLabel": "版本备注（可选）",
+      "labelPlaceholder": "例如：期中卷终稿",
+      "staleWarning": "部分题目或题组来源已更新，本次将冻结当前显示的旧版本内容。如需最新内容，请先取消并手动同步。",
+      "confirm": "确认定稿"
+    },
+    "staleGroups": {
+      "message": "{count} 道材料题有来源更新：{details}。当前仍显示冻结版本，不会自动刷新。",
+      "stimulus": "材料 {count} 个",
+      "structure": "小题顺序 {count} 个",
+      "questions": "小题内容或归属 {count} 个",
+      "separator": "，",
+      "newQuestions": "材料题下新增了 {count} 道未选用的小题，可在对应材料题中“添加小题”。",
+      "sync": "同步材料题"
+    },
+    "footer": {
+      "meta": "学科：{subject} · 修订版本 r{revision}",
+      "totalScore": "总分 {score} 分"
+    },
+    "aiChanges": {
+      "title": "助手改动了 {count} 处，尚未保存",
+      "collapse": "收起",
+      "viewChanges": "查看变更",
+      "discard": "放弃",
+      "apply": "应用",
+      "kind": {
+        "added": "新增",
+        "removed": "删除",
+        "moved": "移动",
+        "modified": "修改"
+      },
+      "defaultSummary": "来自助手的改动"
+    },
+    "picker": {
+      "loadFailed": "加载稿件内容失败，请重试",
+      "title": "插入稿件",
+      "description": "选择另一份稿件，将其全部内容克隆插入当前画布。",
+      "searchPlaceholder": "搜索稿件标题…",
+      "noResults": "没有匹配的稿件"
+    },
+    "slash": {
+      "items": {
+        "paragraph": "正文",
+        "heading1": "标题 1",
+        "heading2": "标题 2",
+        "heading3": "标题 3",
+        "bulletList": "无序列表",
+        "orderedList": "有序列表",
+        "quote": "引用",
+        "codeBlock": "代码块",
+        "divider": "分隔线",
+        "table": "表格",
+        "pageBreak": "分页符",
+        "answerSpace": "作答空间",
+        "question": "题目",
+        "composition": "插入稿件",
+        "answerModule": "参考答案模块",
+        "image": "图片",
+        "inlineMath": "行内公式",
+        "blockMath": "块公式"
+      },
+      "groups": {
+        "basic": "基础",
+        "block": "块",
+        "composition": "组稿",
+        "insert": "插入"
+      }
+    },
+    "canvas": {
+      "placeholder": "输入内容，或输入 “/” 唤起命令菜单…",
+      "staleQuestions": "有 {count} 道题目在题库中已更新（当前仍显示定格的旧内容）。",
+      "saveFirst": "请先保存未保存的修改",
+      "syncAllHint": "把所有过期题目更新为题库最新内容",
+      "syncAll": "同步全部",
+      "insertModule": "插入参考答案",
+      "blockActions": "块操作",
+      "insertAbove": "在上方插入行",
+      "insertBelow": "在下方插入行",
+      "insertHere": "在此处插入行"
+    },
+    "issues": {
+      "emptyText": "第 {index} 个块（文本）内容为空",
+      "emptyHeading": "第 {index} 个块（标题）内容为空",
+      "missingQuestion": "第 {index} 个块（题目）未选择题目",
+      "emptyModuleText": "第 {index} 个块（汇总模块内文本）内容为空",
+      "emptyModuleHeading": "第 {index} 个块（汇总模块内标题）内容为空"
+    },
+    "diff": {
+      "node": {
+        "heading": "{level} 级标题「{text}」",
+        "text": "文本「{text}」",
+        "questionNumbered": "第 {number} 题「{stem}」",
+        "question": "题目「{stem}」",
+        "detailsAll": "参考答案模块（全稿）",
+        "detailsBefore": "参考答案模块（模块之前）",
+        "group": "材料题 #{id}",
+        "answerSpaceLined": "作答空间（{lines} 行横线）",
+        "answerSpaceBlank": "作答空间（{lines} 行空白）",
+        "pageBreak": "分页符",
+        "answerItem": "答案条目"
+      },
+      "typeChanged": "类型变更",
+      "none": "无",
+      "number": "题号 {from} → {to}",
+      "score": "分值 {from} → {to}",
+      "fieldInherit": "{field}跟随全局",
+      "fieldShow": "{field}显示",
+      "fieldHide": "{field}隐藏",
+      "level": "层级 {from} → {to}",
+      "textChanged": "文字变更",
+      "lines": "行数 {from} → {to}",
+      "styleChanged": "样式变更",
+      "scope": "收录范围 {from} → {to}",
+      "fields": "展示字段调整（{fields}）",
+      "fieldSeparator": "、",
+      "added": "新增 {node}",
+      "modified": "修改 {node}：{changes}",
+      "changeSeparator": "，",
+      "moved": "移动 {node}",
+      "removed": "删除 {node}"
+    }
+  },
+  "compositionVersions": {
+    "toast": {
+      "notFound": "版本不存在或无权访问"
+    },
+    "previewTitle": "版本预览",
+    "export": {
+      "word": "导出 Word",
+      "latex": "导出 LaTeX",
+      "success": "导出成功",
+      "unknownNode": "内容存在无法识别的节点",
+      "failedWithNode": "导出失败：{reason}（节点 {nodeId}）",
+      "failedWithReason": "导出失败：{reason}",
+      "failed": "导出失败，请稍后重试"
+    },
+    "readonlyBadge": "只读版本",
+    "snapshotNotice": "以下内容是定稿时刻冻结的快照，可能不含之后对草稿的修改；如需最新内容请回到编辑页重新定稿。",
+    "meta": {
+      "versionNo": "版本号 v{version}",
+      "finalizedAt": "定稿时间 {time}",
+      "sourceRevision": "源修订 r{revision}",
+      "finalizedBy": "定稿人 用户 #{user}"
+    },
+    "loadFailed": "无法加载此版本",
+    "backToEditor": "返回编辑页",
+    "events": {
+      "created": "创建组稿",
+      "updated": "更新元数据",
+      "moved": "移动目录",
+      "deleted": "删除组稿",
+      "restored": "恢复组稿",
+      "nodesReplaced": "保存内容",
+      "questionNodesSynced": "同步题目",
+      "finalized": "定稿",
+      "mediaReplaced": "替换图片"
+    },
+    "userFallback": "用户 #{id}",
+    "timeline": {
+      "description": "谁在什么时候对这份组稿做了什么，按时间倒序排列。",
+      "loadFailed": "加载时间线失败",
+      "empty": "暂无事件记录。"
+    },
+    "sheet": {
+      "description": "定稿后冻结的不可变版本，内容为定稿时刻的快照，可能不含之后的草稿改动。",
+      "loadFailed": "加载版本列表失败",
+      "empty": "尚无定稿版本。使用「定稿」按钮冻结当前内容。",
+      "versionFallback": "版本 {version}",
+      "finalizedBy": "定稿人"
+    }
+  },
+  "compositionPanels": {
+    "fields": {
+      "answer": "答案",
+      "thinking": "思路",
+      "analysis": "解析",
+      "summary": "小结"
+    },
+    "numbering": {
+      "title": "题号",
+      "hint": "开启后每道题前显示题号，可逐题手动修改。",
+      "autofillMode": "自动填充方式",
+      "global": "全局顺序",
+      "globalHint": "按题目顺序 1、2、3…",
+      "heading": "按标题分组",
+      "headingHint": "以 H2 标题分组，1.1、2.1…",
+      "autofill": "自动填充题号",
+      "autofillWarning": "自动填充为一次性操作，会覆盖所有已有题号。"
+    },
+    "display": {
+      "title": "题目显示",
+      "hint": "题干与选项始终显示；下列字段可全局开关，也可在每道题上单独覆盖。"
+    },
+    "scoring": {
+      "title": "赋分",
+      "hint": "开启后每道题可标注分值，需先开启题号。",
+      "distribution": "分数分布",
+      "total": "合计 {score} 分",
+      "empty": "画布中还没有题目"
+    }
+  },
+  "questionPicker": {
+    "title": "插入题目",
+    "openInBank": "在题库中打开",
+    "description": "从当前学科题库检索并选择题目插入画布，支持多选。",
+    "searchPlaceholder": "搜索题干关键字…",
+    "filter": "筛选",
+    "noResults": "没有匹配的题目",
+    "selectedCount": "已选 {count} 题",
+    "insert": "插入",
+    "clear": "清空"
+  },
+  "compositionNodes": {
+    "questionRevision": "版本 r{revision}",
+    "emptyStem": "（无题干）",
+    "emptyField": "（空）",
+    "pageBreak": "分页",
+    "questionGroup": "材料题 #{id}",
+    "stimulusRevision": "材料 v{revision}",
+    "emptyStimulus": "（无材料）",
+    "details": {
+      "titleBefore": "答案汇总（此前题目）",
+      "titleAll": "答案汇总（全篇）",
+      "empty": "无可汇总的题目",
+      "unavailableAtFinalize": "题目内容在定稿时不可用"
+    },
+    "questionUnavailable": "题目内容不可用（#{id}）",
+    "opaquePlaceholder": "模块占位：{type}（编辑能力将在后续阶段实现）",
+    "module": {
+      "title": "参考答案",
+      "scope": "范围",
+      "scopeAll": "全篇题目",
+      "scopeBefore": "此模块之前的题目",
+      "display": "显示",
+      "displayFields": "显示字段",
+      "delete": "删除模块",
+      "emptyScope": "此范围内暂无题目。",
+      "noFields": "未选择要显示的字段。"
+    },
+    "answerSpace": {
+      "lined": "作答横线",
+      "blank": "作答留白",
+      "decrease": "减少行数",
+      "increase": "增加行数",
+      "lines": "{count} 行",
+      "toBlank": "切换为空白",
+      "toLined": "切换为横线"
+    },
+    "group": {
+      "addQuestionTitle": "从材料题添加小题",
+      "addQuestion": "添加小题",
+      "addQuestionHint": "按材料顺序插入；已在本题中的小题不再列出",
+      "noCandidates": "材料下没有可添加的小题",
+      "delete": "删除整道材料题",
+      "instruction": "说明文字",
+      "answerArea": "作答区",
+      "instructionPlaceholder": "例如：阅读下面的文字，完成 1～5 题。",
+      "deleteInstruction": "删除说明文字",
+      "styleBlank": "留白",
+      "styleLined": "横线",
+      "deleteAnswerArea": "删除作答区",
+      "resizeAnswerArea": "拖拽调整作答区高度"
+    },
+    "question": {
+      "fallbackType": "题目",
+      "layoutAuto": "自动",
+      "layoutPerRow": "每行 {count} 个",
+      "score": "分值",
+      "stale": "题库有更新",
+      "deleted": "题库已删除",
+      "layoutTitle": "选项排版：每行显示几个选项",
+      "layout": "选项排版",
+      "layoutLabel": "选项排版（每行显示几个）",
+      "fields": "字段",
+      "fieldsTitle": "此题字段显示",
+      "inherit": "继承",
+      "show": "显示",
+      "hide": "隐藏",
+      "exitPreviewAll": "退出预览全部内容",
+      "previewAll": "临时预览全部内容",
+      "syncThis": "同步此题",
+      "slot": "第 {index} 空",
+      "number": "题号",
+      "scoreUnit": "分"
     }
   }
 }

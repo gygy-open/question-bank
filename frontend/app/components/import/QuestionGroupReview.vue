@@ -14,6 +14,8 @@ defineProps<{
 const emit = defineEmits<{
   (event: 'edit', uid: string): void
 }>()
+
+const { t } = useI18n()
 </script>
 
 <template>
@@ -21,12 +23,12 @@ const emit = defineEmits<{
     <div class="border-b bg-muted/30 px-4 py-4">
       <div class="mb-3 flex items-center gap-2">
         <FileText class="size-4 text-primary" />
-        <h3 class="text-sm font-medium">题目材料</h3>
-        <Badge variant="secondary">{{ entry.members.length }} 道小题</Badge>
+        <h3 class="text-sm font-medium">{{ t('importReview.group.stimulus') }}</h3>
+        <Badge variant="secondary">{{ t('importReview.group.memberCount', { count: entry.members.length }) }}</Badge>
       </div>
       <RichContent
         :content="entry.stimulus?.content as RichDoc | null"
-        empty-text="（题目材料引用无效）"
+        :empty-text="t('importReview.group.invalidStimulus')"
         class="text-sm"
       />
     </div>

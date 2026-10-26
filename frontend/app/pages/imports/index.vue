@@ -90,14 +90,15 @@ const importMode = ref<'extract' | 'solve'>('extract')
 
 const { $api } = useNuxtApp()
 const { user: currentUser } = useAuth()
+const { t } = useI18n()
 
 const allSelected = computed(() => {
-    return tasks.value.length > 0 && tasks.value.every(t => selectedTasks.value.includes(t.id))
+    return tasks.value.length > 0 && tasks.value.every(task => selectedTasks.value.includes(task.id))
 })
 
 const toggleSelectAll = (checked: boolean) => {
     if (checked) {
-        selectedTasks.value = tasks.value.map(t => t.id)
+        selectedTasks.value = tasks.value.map(task => task.id)
     } else {
         selectedTasks.value = []
     }
@@ -113,7 +114,7 @@ const toggleSelectTask = (taskId: number, checked: boolean) => {
 
 const batchRetryTasks = async () => {
     if (selectedTasks.value.length === 0) return
-    if (!confirm(`确定要重试选中的 ${selectedTasks.value.length} 个任务吗？`)) return
+    if (!confirm(t('importTasks.batchRetryConfirm', { count: selectedTasks.value.length }))) return
 
     let successCount = 0
     for (const taskId of selectedTasks.value) {
@@ -125,7 +126,7 @@ const batchRetryTasks = async () => {
         }
     }
     
-    toast.success(`已重试 ${successCount} 个任务`)
+    toast.success(t('importTasks.batchRetried', { count: successCount }))
     selectedTasks.value = []
     await fetchTasks()
 }
@@ -216,7 +217,7 @@ const handleFolderChange = async (event: Event) => {
         const zipped = await zipFolder(target.files, 'markdown-folder.zip')
         await uploadFiles([zipped])
     } catch (err: any) {
-        toast.error('打包文件夹失败', { description: String(err?.message ?? err) })
+        toast.error(t('importTasks.upload.zipFailed'), { description: String(err?.message ?? err) })
     } finally {
         isUploading.value = false
         target.value = ''
@@ -252,12 +253,12 @@ const uploadFiles = async (files: File[]) => {
             body: formData
         })
 
-        toast.success(`成功创建 ${data?.length || 0} 个导入任务`)
+        toast.success(t('importTasks.upload.created', { count: data?.length || 0 }))
         page.value = 1 // Reset to first page
         await fetchTasks()
     } catch (e) {
         console.error(e)
-        toast.error('上传失败', {
+        toast.error(t('common.uploadFailed'), {
             description: String(e)
         })
     } finally {
@@ -266,49 +267,49 @@ const uploadFiles = async (files: File[]) => {
 }
 
 const cancelTask = async (taskId: number) => {
-    if (!confirm('确定要取消此任务吗？')) return
+    if (!confirm(t('importTasks.cancelConfirm'))) return
     
     try {
         await $api(`/imports/${taskId}/cancel`, { method: 'POST' })
-        toast.success('任务已取消')
+        toast.success(t('importTasks.cancelled'))
         await fetchTasks()
     } catch (e) {
-        toast.error('取消失败')
+        toast.error(t('importTasks.cancelFailed'))
     }
 }
 
 const retryTask = async (taskId: number) => {
     try {
         await $api(`/imports/${taskId}/retry`, { method: 'POST' })
-        toast.success('任务已重新加入队列')
+        toast.success(t('importTasks.retried'))
         await fetchTasks()
     } catch (e) {
-        toast.error('重试失败')
+        toast.error(t('importTasks.retryFailed'))
     }
 }
 
 const resetStuckTasks = async () => {
-    if (!confirm('确定要重置所有处理中的任务吗？这会将它们重新设为等待状态。')) return
+    if (!confirm(t('importTasks.resetStuckConfirm'))) return
     
     try {
         const data: any = await $api('/imports/reset-stuck', { method: 'POST' })
-        toast.success(`已重置 ${data.count} 个任务`)
+        toast.success(t('importTasks.resetDone', { count: data.count }))
         await fetchQueueStatus()
         await fetchTasks()
     } catch (e) {
-        toast.error('重置失败')
+        toast.error(t('importTasks.resetFailed'))
     }
 }
 
 const deleteTask = async (taskId: number) => {
-    if (!confirm('确定要删除此记录吗？')) return
+    if (!confirm(t('importTasks.deleteConfirm'))) return
     
     try {
         await $api(`/imports/${taskId}`, { method: 'DELETE' })
-        toast.success('记录已删除')
+        toast.success(t('importTasks.deleted'))
         await fetchTasks()
     } catch (e) {
-        toast.error('删除失败')
+        toast.error(t('importTasks.deleteFailed'))
     }
 }
 
@@ -316,7 +317,7 @@ const startPolling = () => {
     stopPolling()
     pollingInterval.value = setInterval(async () => {
         await fetchQueueStatus()
-        const hasActive = tasks.value.some(t => ['pending', 'processing'].includes(t.status))
+        const hasActive = tasks.value.some(task => ['pending', 'processing'].includes(task.status))
         if (hasActive) {
             await fetchTasks()
         }
@@ -351,15 +352,10 @@ const statusVariant = (status: string) => {
     }
 }
 
+const TASK_STATUSES = ['pending', 'processing', 'completed', 'failed', 'cancelled'] as const
+
 const statusLabel = (status: string) => {
-    const map: Record<string, string> = {
-        pending: '等待中',
-        processing: '处理中',
-        completed: '已完成',
-        failed: '失败',
-        cancelled: '已取消'
-    }
-    return map[status] || status
+    return (TASK_STATUSES as readonly string[]).includes(status) ? t(`importTasks.statuses.${status}`) : status
 }
 
 const getResultCount = (summaryJson?: string) => {
@@ -374,15 +370,15 @@ const getResultCount = (summaryJson?: string) => {
 </script>
 
 <template>
-    <PageHeader title="异步导入队列">
+    <PageHeader :title="t('importTasks.title')">
         <template #actions>
             <Button v-if="selectedTasks.length > 0" variant="outline" @click="batchRetryTasks">
                 <RefreshCw class="mr-2 h-4 w-4" />
-                批量重试 ({{ selectedTasks.length }})
+                {{ t('importTasks.batchRetry', { count: selectedTasks.length }) }}
             </Button>
             <Button v-if="queueStats.processing > 0" variant="outline" @click="resetStuckTasks">
                 <RotateCcw class="mr-2 h-4 w-4" />
-                重置卡住任务
+                {{ t('importTasks.resetStuck') }}
             </Button>
         </template>
     </PageHeader>
@@ -392,7 +388,7 @@ const getResultCount = (summaryJson?: string) => {
         <div class="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
             <Card>
                 <CardHeader class="flex flex-row items-center justify-between space-y-0 pb-2">
-                    <CardTitle class="text-sm font-medium">等待中</CardTitle>
+                    <CardTitle class="text-sm font-medium">{{ t('importTasks.statuses.pending') }}</CardTitle>
                     <Loader2 class="h-4 w-4 text-muted-foreground" />
                 </CardHeader>
                 <CardContent>
@@ -401,7 +397,7 @@ const getResultCount = (summaryJson?: string) => {
             </Card>
             <Card>
                 <CardHeader class="flex flex-row items-center justify-between space-y-0 pb-2">
-                    <CardTitle class="text-sm font-medium">处理中</CardTitle>
+                    <CardTitle class="text-sm font-medium">{{ t('importTasks.statuses.processing') }}</CardTitle>
                     <RefreshCw class="h-4 w-4 text-muted-foreground animate-spin" />
                 </CardHeader>
                 <CardContent>
@@ -410,7 +406,7 @@ const getResultCount = (summaryJson?: string) => {
             </Card>
             <Card>
                 <CardHeader class="flex flex-row items-center justify-between space-y-0 pb-2">
-                    <CardTitle class="text-sm font-medium">已完成</CardTitle>
+                    <CardTitle class="text-sm font-medium">{{ t('importTasks.statuses.completed') }}</CardTitle>
                     <CheckCircle class="h-4 w-4 text-muted-foreground" />
                 </CardHeader>
                 <CardContent>
@@ -419,7 +415,7 @@ const getResultCount = (summaryJson?: string) => {
             </Card>
             <Card>
                 <CardHeader class="flex flex-row items-center justify-between space-y-0 pb-2">
-                    <CardTitle class="text-sm font-medium">失败</CardTitle>
+                    <CardTitle class="text-sm font-medium">{{ t('importTasks.statuses.failed') }}</CardTitle>
                     <XCircle class="h-4 w-4 text-muted-foreground" />
                 </CardHeader>
                 <CardContent>
@@ -428,7 +424,7 @@ const getResultCount = (summaryJson?: string) => {
             </Card>
              <Card>
                 <CardHeader class="flex flex-row items-center justify-between space-y-0 pb-2">
-                    <CardTitle class="text-sm font-medium">已取消</CardTitle>
+                    <CardTitle class="text-sm font-medium">{{ t('importTasks.statuses.cancelled') }}</CardTitle>
                     <Ban class="h-4 w-4 text-muted-foreground" />
                 </CardHeader>
                 <CardContent>
@@ -440,8 +436,8 @@ const getResultCount = (summaryJson?: string) => {
         <!-- Upload Area -->
         <Card>
             <CardHeader>
-                <CardTitle>批量上传</CardTitle>
-                <CardDescription>上传文件后，系统将在后台自动处理</CardDescription>
+                <CardTitle>{{ t('importTasks.upload.title') }}</CardTitle>
+                <CardDescription>{{ t('importTasks.upload.description') }}</CardDescription>
             </CardHeader>
             <CardContent class="space-y-6">
                 <!-- Mode Selection -->
@@ -455,8 +451,8 @@ const getResultCount = (summaryJson?: string) => {
                             <div v-if="importMode === 'extract'" class="h-2 w-2 rounded-full bg-primary" />
                         </div>
                         <div>
-                            <div class="font-medium">录入原题</div>
-                            <div class="text-sm text-muted-foreground mt-1">提取文档中的题目、答案和解析，保持原样。适用于已有标准答案的题。</div>
+                            <div class="font-medium">{{ t('importTasks.upload.extractTitle') }}</div>
+                            <div class="text-sm text-muted-foreground mt-1">{{ t('importTasks.upload.extractDescription') }}</div>
                         </div>
                     </div>
                     <div 
@@ -469,10 +465,10 @@ const getResultCount = (summaryJson?: string) => {
                         </div>
                         <div>
                             <div class="font-medium flex items-center gap-2">
-                                AI 自动做题
+                                {{ t('importTasks.upload.solveTitle') }}
                                 <Sparkles class="h-3 w-3 text-amber-500" />
                             </div>
-                            <div class="text-sm text-muted-foreground mt-1">AI 提取题目并做题并生成标准答案和解析，适用于无答案的教材题。</div>
+                            <div class="text-sm text-muted-foreground mt-1">{{ t('importTasks.upload.solveDescription') }}</div>
                         </div>
                     </div>
                 </div>
@@ -496,16 +492,18 @@ const getResultCount = (summaryJson?: string) => {
                             <Upload class="h-10 w-10 text-primary" />
                         </div>
                         <div class="space-y-1">
-                            <span class="text-lg font-medium block">点击选择文件 (支持多选)</span>
-                            <span class="text-sm text-muted-foreground">支持拖拽上传，支持批量上传 .docx, .md, .zip 格式。上传文件后，系统将自动处理，不需要一直👀着。</span>
+                            <span class="text-lg font-medium block">{{ t('importTasks.upload.pick') }}</span>
+                            <span class="text-sm text-muted-foreground">{{ t('importTasks.upload.hint') }}</span>
                         </div>
                     </label>
                     <div class="mt-2 text-xs text-muted-foreground">
-                        Markdown 引用了本地图片？上传 <span class="font-medium">.zip</span> 压缩包，或
-                        <button type="button" class="underline hover:text-primary" :disabled="isUploading" @click="folderInput?.click()">选择整个文件夹</button>
+                        <i18n-t scope="global" keypath="importTasks.upload.folderHint">
+                            <template #zip><span class="font-medium">.zip</span></template>
+                            <template #folder><button type="button" class="underline hover:text-primary" :disabled="isUploading" @click="folderInput?.click()">{{ t('importTasks.upload.selectFolder') }}</button></template>
+                        </i18n-t>
                     </div>
                     <div v-if="isUploading" class="mt-4 flex items-center text-sm text-muted-foreground">
-                        <Loader2 class="mr-2 h-4 w-4 animate-spin" /> 正在上传...
+                        <Loader2 class="mr-2 h-4 w-4 animate-spin" /> {{ t('importTasks.upload.uploading') }}
                     </div>
                 </div>
             </CardContent>
@@ -515,17 +513,17 @@ const getResultCount = (summaryJson?: string) => {
         <Card>
             <CardHeader class="flex flex-row items-center justify-between">
                 <div>
-                    <CardTitle>导入队列</CardTitle>
-                    <CardDescription>查看导入任务的处理状态和结果</CardDescription>
+                    <CardTitle>{{ t('importTasks.list.title') }}</CardTitle>
+                    <CardDescription>{{ t('importTasks.list.description') }}</CardDescription>
                 </div>
                 <div class="flex gap-2">
                     <div class="w-[180px]" v-if="currentUser?.is_superuser">
                         <Select v-model="userFilter">
                             <SelectTrigger>
-                                <SelectValue placeholder="筛选用户" />
+                                <SelectValue :placeholder="t('importTasks.list.filterUser')" />
                             </SelectTrigger>
                             <SelectContent>
-                                <SelectItem value="all">全部用户</SelectItem>
+                                <SelectItem value="all">{{ t('importTasks.list.allUsers') }}</SelectItem>
                                 <SelectItem v-for="user in users" :key="user.id" :value="String(user.id)">
                                     {{ user.full_name || user.username }}
                                 </SelectItem>
@@ -535,15 +533,15 @@ const getResultCount = (summaryJson?: string) => {
                     <div class="w-[180px]">
                         <Select v-model="statusFilter">
                             <SelectTrigger>
-                                <SelectValue placeholder="筛选状态" />
+                                <SelectValue :placeholder="t('importTasks.list.filterStatus')" />
                             </SelectTrigger>
                             <SelectContent>
-                                <SelectItem value="all">全部状态</SelectItem>
-                                <SelectItem value="pending">等待中</SelectItem>
-                                <SelectItem value="processing">处理中</SelectItem>
-                                <SelectItem value="completed">已完成</SelectItem>
-                                <SelectItem value="failed">失败</SelectItem>
-                                <SelectItem value="cancelled">已取消</SelectItem>
+                                <SelectItem value="all">{{ t('importTasks.list.allStatuses') }}</SelectItem>
+                                <SelectItem value="pending">{{ t('importTasks.statuses.pending') }}</SelectItem>
+                                <SelectItem value="processing">{{ t('importTasks.statuses.processing') }}</SelectItem>
+                                <SelectItem value="completed">{{ t('importTasks.statuses.completed') }}</SelectItem>
+                                <SelectItem value="failed">{{ t('importTasks.statuses.failed') }}</SelectItem>
+                                <SelectItem value="cancelled">{{ t('importTasks.statuses.cancelled') }}</SelectItem>
                             </SelectContent>
                         </Select>
                     </div>
@@ -556,18 +554,18 @@ const getResultCount = (summaryJson?: string) => {
                             <TableHead class="w-[50px]">
                                 <Checkbox :model-value="allSelected" @update:model-value="toggleSelectAll" />
                             </TableHead>
-                            <TableHead class="w-[300px]">文件名</TableHead>
-                            <TableHead>所属用户</TableHead>
-                            <TableHead>状态</TableHead>
-                            <TableHead>结果</TableHead>
-                            <TableHead>创建时间</TableHead>
-                            <TableHead class="text-right">操作</TableHead>
+                            <TableHead class="w-[300px]">{{ t('importTasks.list.filename') }}</TableHead>
+                            <TableHead>{{ t('importTasks.list.owner') }}</TableHead>
+                            <TableHead>{{ t('importTasks.list.status') }}</TableHead>
+                            <TableHead>{{ t('importTasks.list.result') }}</TableHead>
+                            <TableHead>{{ t('importTasks.list.createdAt') }}</TableHead>
+                            <TableHead class="text-right">{{ t('common.actions') }}</TableHead>
                         </TableRow>
                     </TableHeader>
                     <TableBody>
                         <TableRow v-if="tasks.length === 0">
                             <TableCell colspan="7" class="text-center py-8 text-muted-foreground">
-                                暂无导入任务
+                                {{ t('importTasks.list.empty') }}
                             </TableCell>
                         </TableRow>
                         <TableRow v-for="task in tasks" :key="task.id">
@@ -595,7 +593,7 @@ const getResultCount = (summaryJson?: string) => {
                             <TableCell>
                                 <div v-if="task.status === 'completed'" class="text-sm text-green-600 flex items-center gap-1">
                                     <CheckCircle class="h-3 w-3" />
-                                    成功提取 {{ getResultCount(task.result_summary) }} 题
+                                    {{ t('importTasks.list.extracted', { count: getResultCount(task.result_summary) }) }}
                                 </div>
                                 <div v-else-if="task.status === 'failed'" class="text-sm text-destructive flex items-center gap-1">
                                     <TooltipProvider>
@@ -603,11 +601,11 @@ const getResultCount = (summaryJson?: string) => {
                                             <TooltipTrigger>
                                                 <div class="flex items-center gap-1 cursor-help">
                                                     <AlertCircle class="h-3 w-3" />
-                                                    <span>处理失败</span>
+                                                    <span>{{ t('importTasks.list.processFailed') }}</span>
                                                 </div>
                                             </TooltipTrigger>
                                             <TooltipContent>
-                                                <p class="max-w-xs break-words">{{ task.error_message || '未知错误' }}</p>
+                                                <p class="max-w-xs break-words">{{ task.error_message || t('common.unknownError') }}</p>
                                             </TooltipContent>
                                         </Tooltip>
                                     </TooltipProvider>
@@ -621,26 +619,26 @@ const getResultCount = (summaryJson?: string) => {
                                 <div class="flex justify-end gap-2">
                                     <!-- Actions for Pending/Processing -->
                                     <Button v-if="['pending', 'processing'].includes(task.status)" 
-                                        variant="ghost" size="icon" @click="cancelTask(task.id)" title="取消任务">
+                                        variant="ghost" size="icon" @click="cancelTask(task.id)" :title="t('importTasks.list.cancelTask')">
                                         <Ban class="h-4 w-4 text-orange-500" />
                                     </Button>
 
                                     <!-- Actions for Failed/Cancelled -->
                                     <Button v-if="['failed', 'cancelled'].includes(task.status)" 
-                                        variant="ghost" size="icon" @click="retryTask(task.id)" title="重试">
+                                        variant="ghost" size="icon" @click="retryTask(task.id)" :title="t('common.retry')">
                                         <RefreshCw class="h-4 w-4 text-blue-500" />
                                     </Button>
 
                                     <!-- Actions for Completed -->
                                     <Button v-if="task.status === 'completed'" 
-                                        variant="ghost" size="icon" as-child title="查看题目">
+                                        variant="ghost" size="icon" as-child :title="t('importTasks.list.viewQuestions')">
                                         <NuxtLink :to="`/questions?import_task_id=${task.id}`">
                                             <ExternalLink class="h-4 w-4 text-green-600" />
                                         </NuxtLink>
                                     </Button>
 
                                     <!-- Delete (Always available) -->
-                                    <Button variant="ghost" size="icon" @click="deleteTask(task.id)" title="删除记录">
+                                    <Button variant="ghost" size="icon" @click="deleteTask(task.id)" :title="t('importTasks.list.deleteRecord')">
                                         <Trash2 class="h-4 w-4 text-muted-foreground hover:text-destructive" />
                                     </Button>
                                 </div>

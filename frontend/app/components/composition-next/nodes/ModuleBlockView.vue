@@ -30,7 +30,16 @@ const props = defineProps<{
 const numberingEnabled = inject(NUMBERING_ENABLED_KEY, FALLBACK_NUMBERING)
 const rootNodes = inject(ROOT_NODES_KEY, FALLBACK_ROOT_NODES)
 
+const { t } = useI18n()
+
+// 【答案】等标签是与导出一致的稿件内容，保留中文；控制条里的字段开关才是界面文案。
 const FIELD_LABELS: Record<AnswerFieldKey, string> = { answer: '答案', thinking: '思路', analysis: '解析', summary: '小结' }
+const FIELD_LABEL_KEYS: Record<AnswerFieldKey, string> = {
+  answer: 'compositionPanels.fields.answer',
+  thinking: 'compositionPanels.fields.thinking',
+  analysis: 'compositionPanels.fields.analysis',
+  summary: 'compositionPanels.fields.summary',
+}
 
 const detail = computed(() => detailPropsOf({ props: props.node.attrs.props } as EditorNode))
 
@@ -68,42 +77,42 @@ const visibleFieldKeys = computed(() => ANSWER_FIELD_KEYS.filter((k) => detail.v
       :class="selected ? 'opacity-100' : 'opacity-0 group-hover:opacity-100 focus-within:opacity-100'"
     >
       <ListChecks class="h-3.5 w-3.5 text-primary" />
-      <span class="text-[11px] font-semibold text-primary">参考答案</span>
-      <span class="ml-2 text-[11px] text-muted-foreground">范围</span>
+      <span class="text-[11px] font-semibold text-primary">{{ t('compositionNodes.module.title') }}</span>
+      <span class="ml-2 text-[11px] text-muted-foreground">{{ t('compositionNodes.module.scope') }}</span>
       <Select v-model="scopeModel">
         <SelectTrigger class="h-6 w-32 text-[11px]"><SelectValue /></SelectTrigger>
         <SelectContent>
-          <SelectItem value="all">全篇题目</SelectItem>
-          <SelectItem value="before">此模块之前的题目</SelectItem>
+          <SelectItem value="all">{{ t('compositionNodes.module.scopeAll') }}</SelectItem>
+          <SelectItem value="before">{{ t('compositionNodes.module.scopeBefore') }}</SelectItem>
         </SelectContent>
       </Select>
       <Popover>
         <PopoverTrigger as-child>
-          <Button variant="ghost" size="sm" class="h-6 gap-1 px-2 text-[11px]"><Eye class="h-3 w-3" /> 显示</Button>
+          <Button variant="ghost" size="sm" class="h-6 gap-1 px-2 text-[11px]"><Eye class="h-3 w-3" /> {{ t('compositionNodes.module.display') }}</Button>
         </PopoverTrigger>
         <PopoverContent align="end" class="w-52 space-y-2" data-rich-overlay>
-          <p class="text-xs font-medium text-muted-foreground">显示字段</p>
+          <p class="text-xs font-medium text-muted-foreground">{{ t('compositionNodes.module.displayFields') }}</p>
           <label v-for="key in ANSWER_FIELD_KEYS" :key="key" class="flex items-center justify-between gap-2 text-xs">
-            {{ FIELD_LABELS[key] }}
+            {{ t(FIELD_LABEL_KEYS[key]) }}
             <Switch :model-value="detail.fields[key]" @update:model-value="toggleGlobalField(key, $event)" />
           </label>
         </PopoverContent>
       </Popover>
-      <Button variant="ghost" size="icon" class="h-6 w-6 text-destructive hover:text-destructive" title="删除模块" @click="deleteNode()">
+      <Button variant="ghost" size="icon" class="h-6 w-6 text-destructive hover:text-destructive" :title="t('compositionNodes.module.delete')" @click="deleteNode()">
         <Trash2 class="h-3.5 w-3.5" />
       </Button>
     </div>
 
     <div class="space-y-3">
       <p v-if="!scopedQuestions.length" class="rounded-md border border-dashed py-6 text-center text-xs text-muted-foreground">
-        此范围内暂无题目。
+        {{ t('compositionNodes.module.emptyScope') }}
       </p>
-      <p v-else-if="!anyFieldOn" class="text-center text-xs text-muted-foreground">未选择要显示的字段。</p>
+      <p v-else-if="!anyFieldOn" class="text-center text-xs text-muted-foreground">{{ t('compositionNodes.module.noFields') }}</p>
       <!-- 与真实导出（docx/latex）一致的排版：题号列固定宽度（2 栏网格），各字段行的内容起点严格对齐；
       【标签】与内容同色，不用灰色区分 -->
       <div v-for="q in scopedQuestions" :key="q.id" class="space-y-0.5 text-sm">
         <div v-if="!q.questionContent" class="flex items-center gap-2 text-xs text-destructive">
-          <AlertTriangle class="h-3.5 w-3.5" /> 题目内容不可用（#{{ q.questionId }}）
+          <AlertTriangle class="h-3.5 w-3.5" /> {{ t('compositionNodes.questionUnavailable', { id: q.questionId }) }}
         </div>
         <template v-else>
           <div
@@ -114,7 +123,7 @@ const visibleFieldKeys = computed(() => ANSWER_FIELD_KEYS.filter((k) => detail.v
             <div>
               <span class="font-medium">【{{ FIELD_LABELS[key] }}】</span>
               <AnswerDisplay v-if="key === 'answer'" :answer="q.questionContent.answer" :options="q.questionContent.options" :slot-numbers="numberingEnabled ? slotNumbersOf(questionSlotsOf(q)) : undefined" class="inline" />
-              <RichContent v-else :content="q.questionContent[key]" class="inline [&_p]:my-0 [&_p]:inline" empty-text="（空）" />
+              <RichContent v-else :content="q.questionContent[key]" class="inline [&_p]:my-0 [&_p]:inline" :empty-text="t('compositionNodes.emptyField')" />
             </div>
           </div>
         </template>

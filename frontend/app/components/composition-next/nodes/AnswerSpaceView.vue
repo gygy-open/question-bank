@@ -6,6 +6,8 @@ import { Minus, Plus, Baseline, Square } from '@lucide/vue'
 import { ANSWER_SPACE_MAX_LINES, ANSWER_SPACE_MIN_LINES } from './AnswerSpace'
 
 // 单行占高（rem）；与导出端 latex/docx 的每行 baselineskip 视觉相近。
+const { t } = useI18n()
+
 const LINE_HEIGHT_REM = 1.75
 
 const props = defineProps<{
@@ -41,7 +43,7 @@ function toggleStyle() {
       v-if="style === 'lined'"
       class="flex flex-col justify-between"
       :style="{ height: heightRem }"
-      aria-label="作答横线"
+      :aria-label="t('compositionNodes.answerSpace.lined')"
     >
       <div
         v-for="i in lines"
@@ -54,7 +56,7 @@ function toggleStyle() {
       v-else
       class="rounded-sm border border-dashed border-muted-foreground/20 bg-muted/10"
       :style="{ height: heightRem }"
-      aria-label="作答留白"
+      :aria-label="t('compositionNodes.answerSpace.blank')"
     />
 
     <!-- 控件：选中或悬停时出现 -->
@@ -64,15 +66,15 @@ function toggleStyle() {
     >
       <button
         type="button" class="rounded p-1 hover:bg-muted disabled:opacity-40"
-        :disabled="lines <= ANSWER_SPACE_MIN_LINES" title="减少行数"
+        :disabled="lines <= ANSWER_SPACE_MIN_LINES" :title="t('compositionNodes.answerSpace.decrease')"
         @mousedown.prevent @click="setLines(lines - 1)"
       >
         <Minus class="size-3.5" />
       </button>
-      <span class="min-w-8 text-center text-xs tabular-nums text-muted-foreground">{{ lines }} 行</span>
+      <span class="min-w-8 text-center text-xs tabular-nums text-muted-foreground">{{ t('compositionNodes.answerSpace.lines', { count: lines }) }}</span>
       <button
         type="button" class="rounded p-1 hover:bg-muted disabled:opacity-40"
-        :disabled="lines >= ANSWER_SPACE_MAX_LINES" title="增加行数"
+        :disabled="lines >= ANSWER_SPACE_MAX_LINES" :title="t('compositionNodes.answerSpace.increase')"
         @mousedown.prevent @click="setLines(lines + 1)"
       >
         <Plus class="size-3.5" />
@@ -80,7 +82,7 @@ function toggleStyle() {
       <span class="mx-0.5 h-4 w-px bg-border" />
       <button
         type="button" class="rounded p-1 hover:bg-muted"
-        :title="style === 'lined' ? '切换为空白' : '切换为横线'"
+        :title="style === 'lined' ? t('compositionNodes.answerSpace.toBlank') : t('compositionNodes.answerSpace.toLined')"
         @mousedown.prevent @click="toggleStyle"
       >
         <Baseline v-if="style === 'lined'" class="size-3.5" />

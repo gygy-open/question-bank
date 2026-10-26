@@ -1,5 +1,6 @@
 // 分页符：atom 块节点，可拖拽、可选中；不含内容。
 import { Node, mergeAttributes } from '@tiptap/core'
+import { translate } from '@/lib/locale'
 
 export const PageBreak = Node.create({
   name: 'pageBreak',
@@ -19,7 +20,7 @@ export const PageBreak = Node.create({
         'data-type': 'page-break',
         class: 'composition-page-break',
         role: 'separator',
-        'aria-label': '分页符',
+        'aria-label': translate('compositionEditor.slash.items.pageBreak'),
       }),
     ]
   },

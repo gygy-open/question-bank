@@ -13,6 +13,7 @@ import {
 } from '@lucide/vue'
 import SlashCommandList from '@/components/rich-editor/SlashCommandList.vue'
 import { resolveAnswerSpacePropsOrFallback } from '@/lib/answerSpaceRules'
+import { translate } from '@/lib/locale'
 
 export interface CompositionSlashOptions {
   onImageSelect?: () => void
@@ -31,55 +32,61 @@ interface CompositionSlashItem {
   command: (opts: { editor: Editor; range: Range; options: CompositionSlashOptions }) => void
 }
 
-const ITEMS: CompositionSlashItem[] = [
+// 定义里只存 i18n key，查询时再翻译，保证切换语言后菜单文案随之更新。
+interface CompositionSlashItemDef extends Omit<CompositionSlashItem, 'title' | 'group'> {
+  titleKey: string
+  groupKey: string
+}
+
+const ITEMS: CompositionSlashItemDef[] = [
   {
-    title: '正文', icon: Type, group: '基础', aliases: ['paragraph', 'text', 'zhengwen', 'p'],
+    titleKey: 'compositionEditor.slash.items.paragraph', icon: Type, groupKey: 'compositionEditor.slash.groups.basic', aliases: ['paragraph', 'text', 'zhengwen', 'p'],
     command: ({ editor, range }) => editor.chain().focus().deleteRange(range).setParagraph().run(),
   },
   {
-    title: '标题 1', icon: Heading1, group: '基础', aliases: ['h1', 'heading', 'biaoti'],
+    titleKey: 'compositionEditor.slash.items.heading1', icon: Heading1, groupKey: 'compositionEditor.slash.groups.basic', aliases: ['h1', 'heading', 'biaoti'],
     command: ({ editor, range }) => editor.chain().focus().deleteRange(range).setHeading({ level: 1 }).run(),
   },
   {
-    title: '标题 2', icon: Heading2, group: '基础', aliases: ['h2', 'heading', 'biaoti'],
+    titleKey: 'compositionEditor.slash.items.heading2', icon: Heading2, groupKey: 'compositionEditor.slash.groups.basic', aliases: ['h2', 'heading', 'biaoti'],
     command: ({ editor, range }) => editor.chain().focus().deleteRange(range).setHeading({ level: 2 }).run(),
   },
   {
-    title: '标题 3', icon: Heading3, group: '基础', aliases: ['h3', 'heading', 'biaoti'],
+    titleKey: 'compositionEditor.slash.items.heading3', icon: Heading3, groupKey: 'compositionEditor.slash.groups.basic', aliases: ['h3', 'heading', 'biaoti'],
     command: ({ editor, range }) => editor.chain().focus().deleteRange(range).setHeading({ level: 3 }).run(),
   },
   {
-    title: '无序列表', icon: List, group: '基础', aliases: ['bullet', 'ul', 'list', 'liebiao'],
+    titleKey: 'compositionEditor.slash.items.bulletList', icon: List, groupKey: 'compositionEditor.slash.groups.basic', aliases: ['bullet', 'ul', 'list', 'liebiao'],
     command: ({ editor, range }) => editor.chain().focus().deleteRange(range).toggleBulletList().run(),
   },
   {
-    title: '有序列表', icon: ListOrdered, group: '基础', aliases: ['ordered', 'ol', 'number', 'liebiao'],
+    titleKey: 'compositionEditor.slash.items.orderedList', icon: ListOrdered, groupKey: 'compositionEditor.slash.groups.basic', aliases: ['ordered', 'ol', 'number', 'liebiao'],
     command: ({ editor, range }) => editor.chain().focus().deleteRange(range).toggleOrderedList().run(),
   },
   {
-    title: '引用', icon: Quote, group: '块', aliases: ['quote', 'blockquote', 'yinyong'],
+    titleKey: 'compositionEditor.slash.items.quote', icon: Quote, groupKey: 'compositionEditor.slash.groups.block', aliases: ['quote', 'blockquote', 'yinyong'],
     command: ({ editor, range }) => editor.chain().focus().deleteRange(range).toggleBlockquote().run(),
   },
   {
-    title: '代码块', icon: Code, group: '块', aliases: ['code', 'codeblock', 'daima'],
+    titleKey: 'compositionEditor.slash.items.codeBlock', icon: Code, groupKey: 'compositionEditor.slash.groups.block', aliases: ['code', 'codeblock', 'daima'],
     command: ({ editor, range }) => editor.chain().focus().deleteRange(range).toggleCodeBlock().run(),
   },
   {
-    title: '分隔线', icon: Minus, group: '块', aliases: ['hr', 'divider', 'rule', 'fengexian'],
+    titleKey: 'compositionEditor.slash.items.divider', icon: Minus, groupKey: 'compositionEditor.slash.groups.block', aliases: ['hr', 'divider', 'rule', 'fengexian'],
     command: ({ editor, range }) => editor.chain().focus().deleteRange(range).setHorizontalRule().run(),
   },
   {
-    title: '表格', icon: TableIcon, group: '块', aliases: ['table', 'biaoge'],
+    titleKey: 'compositionEditor.slash.items.table', icon: TableIcon, groupKey: 'compositionEditor.slash.groups.block', aliases: ['table', 'biaoge'],
     command: ({ editor, range }) =>
       editor.chain().focus().deleteRange(range).insertTable({ rows: 2, cols: 2, withHeaderRow: true }).run(),
   },
   {
-    title: '分页符', icon: SeparatorHorizontal, group: '块', aliases: ['pagebreak', 'page', 'fenye'],
+    titleKey: 'compositionEditor.slash.items.pageBreak', icon: SeparatorHorizontal, groupKey: 'compositionEditor.slash.groups.block', aliases: ['pagebreak', 'page', 'fenye'],
     command: ({ editor, range }) =>
       editor.chain().focus().deleteRange(range).insertContent({ type: 'pageBreak' }).run(),
   },
   {
-    title: '作答空间', icon: PencilLine, group: '块',
+    titleKey: 'compositionEditor.slash.items.answerSpace', icon: PencilLine, groupKey: 'compositionEditor.slash.groups.block',
     aliases: ['answer', 'space', 'zuoda', 'kongbai', 'liubai', 'zuodakongjian'],
     command: ({ editor, range }) => {
       // 根层插入无题目上下文，取与后端一致的兜底规则。
@@ -89,42 +96,42 @@ const ITEMS: CompositionSlashItem[] = [
     },
   },
   {
-    title: '题目', icon: FileQuestion, group: '组稿', aliases: ['question', 'timu', 'q'],
+    titleKey: 'compositionEditor.slash.items.question', icon: FileQuestion, groupKey: 'compositionEditor.slash.groups.composition', aliases: ['question', 'timu', 'q'],
     command: ({ editor, range, options }) => {
       editor.chain().focus().deleteRange(range).run()
       options.onInsertQuestion?.()
     },
   },
   {
-    title: '插入稿件', icon: Files, group: '组稿', aliases: ['composition', 'gaojian', 'insert'],
+    titleKey: 'compositionEditor.slash.items.composition', icon: Files, groupKey: 'compositionEditor.slash.groups.composition', aliases: ['composition', 'gaojian', 'insert'],
     command: ({ editor, range, options }) => {
       editor.chain().focus().deleteRange(range).run()
       options.onInsertComposition?.()
     },
   },
   {
-    title: '参考答案模块', icon: ListChecks, group: '组稿', aliases: ['module', 'answer', 'canhkao', 'daan', 'mokuai'],
+    titleKey: 'compositionEditor.slash.items.answerModule', icon: ListChecks, groupKey: 'compositionEditor.slash.groups.composition', aliases: ['module', 'answer', 'canhkao', 'daan', 'mokuai'],
     command: ({ editor, range, options }) => {
       editor.chain().focus().deleteRange(range).run()
       options.onInsertModule?.()
     },
   },
   {
-    title: '图片', icon: ImageIcon, group: '插入', aliases: ['image', 'img', 'picture', 'tupian'],
+    titleKey: 'compositionEditor.slash.items.image', icon: ImageIcon, groupKey: 'compositionEditor.slash.groups.insert', aliases: ['image', 'img', 'picture', 'tupian'],
     command: ({ editor, range, options }) => {
       editor.chain().focus().deleteRange(range).run()
       options.onImageSelect?.()
     },
   },
   {
-    title: '行内公式', icon: Sigma, group: '插入', aliases: ['inline math', 'formula', 'gongshi', 'latex'],
+    titleKey: 'compositionEditor.slash.items.inlineMath', icon: Sigma, groupKey: 'compositionEditor.slash.groups.insert', aliases: ['inline math', 'formula', 'gongshi', 'latex'],
     command: ({ editor, range, options }) => {
       editor.chain().focus().deleteRange(range).run()
       options.onInsertMath?.(false)
     },
   },
   {
-    title: '块公式', icon: SquareSigma, group: '插入', aliases: ['block math', 'formula', 'gongshi', 'latex'],
+    titleKey: 'compositionEditor.slash.items.blockMath', icon: SquareSigma, groupKey: 'compositionEditor.slash.groups.insert', aliases: ['block math', 'formula', 'gongshi', 'latex'],
     command: ({ editor, range, options }) => {
       editor.chain().focus().deleteRange(range).run()
       options.onInsertMath?.(true)
@@ -133,9 +140,14 @@ const ITEMS: CompositionSlashItem[] = [
 ]
 
 function getSuggestionItems(query: string): CompositionSlashItem[] {
+  const items = ITEMS.map(({ titleKey, groupKey, ...rest }) => ({
+    ...rest,
+    title: translate(titleKey),
+    group: translate(groupKey),
+  }))
   const q = query.trim().toLowerCase()
-  if (!q) return ITEMS
-  return ITEMS.filter(
+  if (!q) return items
+  return items.filter(
     (item) =>
       item.title.toLowerCase().includes(q) || (item.aliases?.some((a) => a.includes(q)) ?? false),
   )

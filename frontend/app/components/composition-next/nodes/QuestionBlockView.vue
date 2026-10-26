@@ -65,7 +65,9 @@ const qProps = computed<QuestionProps | null>(() => (props.node.attrs.props as Q
 // helper 只读 node.props，用轻量 shim 复用 compositionDocument 的 props 访问/合并逻辑。
 const shim = computed(() => ({ props: qProps.value }) as unknown as EditorNode)
 
-const typeLabel = computed(() => (snapshot.value ? questionTypeLabel(snapshot.value.q_type) : '题目'))
+const { t } = useI18n()
+
+const typeLabel = computed(() => (snapshot.value ? questionTypeLabel(snapshot.value.q_type) : t('compositionNodes.question.fallbackType')))
 
 function setProps(next: QuestionProps) {
   props.updateAttributes({ props: Object.keys(next).length ? next : null })
@@ -100,12 +102,12 @@ function setSlotScore(slotId: string, raw: string) {
   setProps(questionPropsWithSlot(shim.value, slotId, { score }))
 }
 
-const OPTION_LAYOUT_ITEMS: { value: OptionLayout; label: string }[] = [
-  { value: 'auto', label: '自动' },
-  { value: 1, label: '每行 1 个' },
-  { value: 2, label: '每行 2 个' },
-  { value: 4, label: '每行 4 个' },
-]
+const OPTION_LAYOUT_ITEMS = computed<{ value: OptionLayout; label: string }[]>(() => [
+  { value: 'auto', label: t('compositionNodes.question.layoutAuto') },
+  { value: 1, label: t('compositionNodes.question.layoutPerRow', { count: 1 }) },
+  { value: 2, label: t('compositionNodes.question.layoutPerRow', { count: 2 }) },
+  { value: 4, label: t('compositionNodes.question.layoutPerRow', { count: 4 }) },
+])
 const optionLayout = computed<string>({
   get: () => String(questionOptionLayoutOf(shim.value)),
   set: (v) => {
@@ -115,7 +117,12 @@ const optionLayout = computed<string>({
 })
 const optionColumns = computed(() => resolveOptionColumns(snapshot.value?.options, questionOptionLayoutOf(shim.value)))
 
-const FIELD_LABELS: Record<AnswerFieldKey, string> = { answer: '答案', thinking: '思路', analysis: '解析', summary: '小结' }
+const FIELD_LABEL_KEYS: Record<AnswerFieldKey, string> = {
+  answer: 'compositionPanels.fields.answer',
+  thinking: 'compositionPanels.fields.thinking',
+  analysis: 'compositionPanels.fields.analysis',
+  summary: 'compositionPanels.fields.summary',
+}
 const previewAll = ref(false)
 // 任一浮层（排版/字段/更多）打开时，portal 到 body 会带走 hover/focus，需强制保持工具条可见。
 const optionLayoutOpen = ref(false)
@@ -158,7 +165,7 @@ function startEditScore() {
 function stopEditScore() {
   editingScore.value = false
 }
-const scoreDisplay = computed(() => `（${questionScore.value != null ? `${questionScore.value}分` : '分值'}）`)
+const scoreDisplay = computed(() => `（${questionScore.value != null ? `${questionScore.value}分` : t('compositionNodes.question.score')}）`)
 </script>
 
 <template>
@@ -177,42 +184,42 @@ const scoreDisplay = computed(() => `（${questionScore.value != null ? `${quest
       <span class="text-[11px] text-muted-foreground">r{{ node.attrs.questionRevision }}</span>
       <Badge variant="secondary" class="text-[11px]">{{ typeLabel }}</Badge>
       <Badge v-if="isStale" variant="outline" class="gap-1 border-amber-400 text-[11px] text-amber-600 dark:text-amber-400">
-        <AlertTriangle class="h-3 w-3" /> 题库有更新
+        <AlertTriangle class="h-3 w-3" /> {{ t('compositionNodes.question.stale') }}
       </Badge>
       <Badge v-else-if="isDeleted" variant="outline" class="gap-1 border-destructive text-[11px] text-destructive">
-        <AlertTriangle class="h-3 w-3" /> 题库已删除
+        <AlertTriangle class="h-3 w-3" /> {{ t('compositionNodes.question.deleted') }}
       </Badge>
 
       <div class="mx-0.5 h-4 w-px bg-border" aria-hidden="true" />
 
       <!-- 操作段 -->
       <Select v-if="snapshot?.options?.length" v-model="optionLayout" v-model:open="optionLayoutOpen">
-        <SelectTrigger class="h-6 w-auto gap-1 px-2 text-[11px]" title="选项排版：每行显示几个选项">
+        <SelectTrigger class="h-6 w-auto gap-1 px-2 text-[11px]" :title="t('compositionNodes.question.layoutTitle')">
           <Columns3 class="h-3 w-3 text-muted-foreground" />
-          <span class="text-muted-foreground">选项排版</span>
+          <span class="text-muted-foreground">{{ t('compositionNodes.question.layout') }}</span>
           <SelectValue />
         </SelectTrigger>
         <SelectContent>
           <SelectGroup>
-            <SelectLabel class="text-[11px] text-muted-foreground">选项排版（每行显示几个）</SelectLabel>
+            <SelectLabel class="text-[11px] text-muted-foreground">{{ t('compositionNodes.question.layoutLabel') }}</SelectLabel>
             <SelectItem v-for="it in OPTION_LAYOUT_ITEMS" :key="String(it.value)" :value="String(it.value)">{{ it.label }}</SelectItem>
           </SelectGroup>
         </SelectContent>
       </Select>
       <Popover v-model:open="fieldsOpen">
         <PopoverTrigger as-child>
-          <Button variant="ghost" size="sm" class="h-6 gap-1 px-2 text-[11px]"><Eye class="h-3 w-3" /> 字段</Button>
+          <Button variant="ghost" size="sm" class="h-6 gap-1 px-2 text-[11px]"><Eye class="h-3 w-3" /> {{ t('compositionNodes.question.fields') }}</Button>
         </PopoverTrigger>
         <PopoverContent align="end" class="w-52 space-y-2" data-rich-overlay>
-          <p class="text-xs font-medium text-muted-foreground">此题字段显示</p>
+          <p class="text-xs font-medium text-muted-foreground">{{ t('compositionNodes.question.fieldsTitle') }}</p>
           <div v-for="key in ANSWER_FIELD_KEYS" :key="key" class="flex items-center justify-between gap-2">
-            <span class="text-xs">{{ FIELD_LABELS[key] }}</span>
+            <span class="text-xs">{{ t(FIELD_LABEL_KEYS[key]) }}</span>
             <Select :model-value="showModel(key)" @update:model-value="(v: any) => setShow(key, String(v))">
               <SelectTrigger class="h-7 w-24 text-[11px]"><SelectValue /></SelectTrigger>
               <SelectContent>
-                <SelectItem value="inherit">继承</SelectItem>
-                <SelectItem value="show">显示</SelectItem>
-                <SelectItem value="hide">隐藏</SelectItem>
+                <SelectItem value="inherit">{{ t('compositionNodes.question.inherit') }}</SelectItem>
+                <SelectItem value="show">{{ t('compositionNodes.question.show') }}</SelectItem>
+                <SelectItem value="hide">{{ t('compositionNodes.question.hide') }}</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -221,8 +228,8 @@ const scoreDisplay = computed(() => `（${questionScore.value != null ? `${quest
       <Button
         variant="ghost" size="icon" class="h-6 w-6"
         :class="previewAll ? 'text-primary' : ''"
-        :aria-label="previewAll ? '退出预览全部内容' : '临时预览全部内容'"
-        :title="previewAll ? '退出预览全部内容' : '临时预览全部内容'"
+        :aria-label="previewAll ? t('compositionNodes.question.exitPreviewAll') : t('compositionNodes.question.previewAll')"
+        :title="previewAll ? t('compositionNodes.question.exitPreviewAll') : t('compositionNodes.question.previewAll')"
         @click="previewAll = !previewAll"
       >
         <Maximize2 class="h-3.5 w-3.5" />
@@ -231,24 +238,24 @@ const scoreDisplay = computed(() => `（${questionScore.value != null ? `${quest
       <!-- 更多：低频/危险操作收纳，避免与常用操作误触 -->
       <DropdownMenu v-model:open="moreOpen">
         <DropdownMenuTrigger as-child>
-          <Button variant="ghost" size="icon" class="h-6 w-6" aria-label="更多操作" title="更多操作">
+          <Button variant="ghost" size="icon" class="h-6 w-6" :aria-label="t('common.moreActions')" :title="t('common.moreActions')">
             <Ellipsis class="h-3.5 w-3.5" />
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" class="w-40">
           <DropdownMenuItem v-if="isStale && deletable !== false && syncable !== false" :disabled="syncDisabled" @click="syncThis">
-            <RefreshCw class="mr-2 h-4 w-4" /> 同步此题
+            <RefreshCw class="mr-2 h-4 w-4" /> {{ t('compositionNodes.question.syncThis') }}
           </DropdownMenuItem>
           <DropdownMenuSeparator v-if="isStale && deletable !== false && syncable !== false" />
           <DropdownMenuItem v-if="deletable !== false" class="text-destructive focus:text-destructive" @click="deleteNode()">
-            <Trash2 class="mr-2 h-4 w-4" /> 删除
+            <Trash2 class="mr-2 h-4 w-4" /> {{ t('common.delete') }}
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
     </div>
 
     <div v-if="!snapshot" class="flex items-center gap-2 py-2 text-sm text-destructive">
-      <AlertTriangle class="h-4 w-4" /> 题目内容不可用（#{{ node.attrs.questionId }}）
+      <AlertTriangle class="h-4 w-4" /> {{ t('compositionNodes.questionUnavailable', { id: node.attrs.questionId }) }}
     </div>
     <div v-else class="space-y-3">
       <div class="flex items-baseline gap-2 text-sm">
@@ -284,7 +291,7 @@ const scoreDisplay = computed(() => `（${questionScore.value != null ? `${quest
                   ref="scoreInputRef"
                   type="number" min="0" max="1000" step="0.5"
                   :value="questionScore ?? ''"
-                  placeholder="分值"
+                  :placeholder="t('compositionNodes.question.score')"
                   class="no-spinner h-6 w-14 rounded border border-input bg-background text-center text-sm shadow-xs outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-3"
                   @input="questionScore = ($event.target as HTMLInputElement).value === '' ? null : Number(($event.target as HTMLInputElement).value)"
                   @blur="stopEditScore"
@@ -299,7 +306,7 @@ const scoreDisplay = computed(() => `（${questionScore.value != null ? `${quest
                 >{{ scoreDisplay }}</button>
               </span>
             </template>
-            <RichContent :content="stemContent" empty-text="（无题干）" class="[&_p]:my-0 [&_p]:!leading-5" />
+            <RichContent :content="stemContent" :empty-text="t('compositionNodes.emptyStem')" class="[&_p]:my-0 [&_p]:!leading-5" />
           </div>
           <ul
             v-if="snapshot.options?.length"
@@ -316,11 +323,11 @@ const scoreDisplay = computed(() => `（${questionScore.value != null ? `${quest
             class="flex flex-wrap gap-x-4 gap-y-1.5 rounded-md border border-dashed px-2 py-1.5 text-xs text-muted-foreground"
           >
             <span v-for="(slotId, i) in slotIds" :key="slotId" class="inline-flex items-center gap-1">
-              第 {{ i + 1 }} 空
+              {{ t('compositionNodes.question.slot', { index: i + 1 }) }}
               <input
                 v-if="numberingEnabled"
                 :value="slotProps[slotId]?.number ?? ''"
-                placeholder="题号"
+                :placeholder="t('compositionNodes.question.number')"
                 class="h-6 w-12 rounded border border-input bg-background px-1 text-center text-xs text-foreground outline-none focus-visible:border-ring"
                 @change="setSlotNumber(slotId, ($event.target as HTMLInputElement).value)"
               >
@@ -328,10 +335,10 @@ const scoreDisplay = computed(() => `（${questionScore.value != null ? `${quest
                 <input
                   type="number" min="0" max="1000" step="0.5"
                   :value="slotProps[slotId]?.score ?? ''"
-                  placeholder="分值"
+                  :placeholder="t('compositionNodes.question.score')"
                   class="no-spinner h-6 w-12 rounded border border-input bg-background px-1 text-center text-xs text-foreground outline-none focus-visible:border-ring"
                   @change="setSlotScore(slotId, ($event.target as HTMLInputElement).value)"
-                >分
+                >{{ t('compositionNodes.question.scoreUnit') }}
               </template>
             </span>
           </div>
@@ -339,9 +346,9 @@ const scoreDisplay = computed(() => `（${questionScore.value != null ? `${quest
       </div>
       <template v-for="key in ANSWER_FIELD_KEYS" :key="key">
         <div v-if="fieldVisible(key)" class="rounded-md bg-muted/50 px-3 py-2">
-          <p class="mb-1 text-xs font-medium text-muted-foreground">{{ FIELD_LABELS[key] }}</p>
+          <p class="mb-1 text-xs font-medium text-muted-foreground">{{ t(FIELD_LABEL_KEYS[key]) }}</p>
           <AnswerDisplay v-if="key === 'answer'" :answer="snapshot.answer" :options="snapshot.options" :slot-numbers="slotNumbers" />
-          <RichContent v-else :content="snapshot[key]" class="[&_.prose]:my-0" empty-text="（空）" />
+          <RichContent v-else :content="snapshot[key]" class="[&_.prose]:my-0" :empty-text="t('compositionNodes.emptyField')" />
         </div>
       </template>
     </div>

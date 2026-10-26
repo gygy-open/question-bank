@@ -20,7 +20,17 @@
     "moreActions": "More Actions",
     "prevPage": "Previous",
     "nextPage": "Next",
-    "unknown": "Unknown"
+    "unknown": "Unknown",
+    "cancel": "Cancel",
+    "actions": "Actions",
+    "back": "Back",
+    "name": "Name",
+    "saved": "Saved",
+    "saveFailed": "Failed to save",
+    "deleteFailed": "Failed to delete",
+    "operationFailed": "Operation failed",
+    "loading": "Loading…",
+    "loadMore": "Load More"
   },
   "language": {
     "label": "Language",
@@ -323,6 +333,682 @@
       "keepRunningEm": "shut down this computer or quit the app",
       "ipChange": "If this computer's IP address changes (e.g., after a restart), this address will update accordingly.",
       "hostnameAndroid": "The easier-to-remember address may not open on Android phones. If so, use the IP address above."
+    }
+  },
+  "importSmart": {
+    "steps": {
+      "upload": "Upload",
+      "review": "Review",
+      "done": "Done"
+    },
+    "alerts": {
+      "embeddingNotConfigured": "No embedding model is configured, so knowledge points won't be matched automatically during import. Configure one in {link} before importing.",
+      "kpNotVectorizedAdmin": "Knowledge points for this subject haven't been indexed yet, so they won't be matched automatically during import. Rebuild the index in {link}.",
+      "kpNotVectorized": "Knowledge points for this subject haven't been indexed yet, so they won't be matched automatically during import. Ask an administrator to rebuild the index.",
+      "chromaUnreachableConfirm": "The knowledge point vector store is temporarily unreachable. Skip automatic knowledge point matching and continue importing?",
+      "tagMissing": "No {tag} tag detected. Tag-based parsing may not find any questions.",
+      "noQuestionsParsed": "No questions were parsed. Check that the document uses tags such as {tag}."
+    },
+    "tabs": {
+      "file": "File or Image",
+      "text": "Paste Text"
+    },
+    "upload": {
+      "inputTitle": "Click to upload a file",
+      "dropTitle": "Click here or drag files here to upload",
+      "pasteHint": "You can also paste screenshots with Ctrl/Cmd + V",
+      "imageExtract": "Image Extraction",
+      "pastedImage": "Pasted Image",
+      "removeAndReselect": "Remove and Reselect",
+      "folderHint": "Markdown references local images? Upload a {zip} archive, or {folder}",
+      "selectFolder": "select an entire folder",
+      "textPlaceholder": "Paste document content or plain text containing questions here...",
+      "zipFailed": "Failed to package folder: {error}",
+      "selectSubjectFirst": "Select a subject first.",
+      "enterMarkdown": "Enter Markdown content."
+    },
+    "settings": {
+      "title": "Parsing Settings",
+      "aiMethodTitle": "✨ AI Recognition",
+      "aiMethodDescription": "Recognizes questions in any layout or screenshot. No formatting required.",
+      "structuredMethodTitle": "📝 Strict Template Parsing",
+      "structuredMethodDescription": "For question sets already formatted with tags such as {tags}.",
+      "viewTagGuide": "View Tag Format and Examples",
+      "aiModeLabel": "AI Processing Mode",
+      "extractTitle": "📥 Extract As-Is",
+      "extractDescription": "Extracts the questions and answers from the original file.",
+      "solveTitle": "🤖 Let AI Solve",
+      "solveDescription": "AI fills in standard answers and explanations automatically.",
+      "templateTitle": "Template Notes",
+      "templateBody": "Each question must start with {tag}; all other tags are optional:",
+      "viewFullGuide": "View Full Format Guide and Examples",
+      "viewGuide": "View Format Guide"
+    },
+    "submit": {
+      "uploading": "Recognizing...",
+      "ai": "Start AI Recognition",
+      "structured": "Start Template Parsing",
+      "empty": "Provide a file or plain text above"
+    },
+    "review": {
+      "duplicate": "This file is identical to a previous import ({filename}). You can still continue importing.",
+      "viewLastComposition": "View Previously Generated Composition",
+      "structureInvalid": "The question group structure is invalid and can't be imported. Parse the file again.",
+      "structureInvalidToast": "Invalid question group structure. Parse the file again.",
+      "empty": "No questions to import. Upload a document or paste content first.",
+      "status": "Status",
+      "source": "Source",
+      "sourcePlaceholder": "e.g. 2023 Final Exam",
+      "onlyWarnings": "Show only questions with warnings",
+      "warningCount": "{count} with warnings",
+      "selected": "Selected {selected} / {total}",
+      "confirmImport": "Import ({count})",
+      "selectAtLeastOne": "Select at least one question.",
+      "compositionTitleRequired": "Enter a composition name.",
+      "previewFailed": "Import pre-check failed",
+      "partialSkipped": "{count} questions couldn't be saved: {messages}",
+      "messageSeparator": "; ",
+      "importedWithSkipped": "Imported {created} questions; {skipped} skipped",
+      "imported": "Imported {count} questions",
+      "importFailed": "Import failed"
+    },
+    "composition": {
+      "settings": "Composition Settings",
+      "hint": "Also create an editable composition after importing",
+      "collapse": "Hide Composition Settings",
+      "title": "Composition Name",
+      "titlePlaceholder": "e.g. Grade 11 Math Quiz (7)",
+      "scope": "Save To",
+      "scopePersonal": "Personal (only you)",
+      "scopeShared": "Shared (visible within subject)",
+      "folder": "Target Folder",
+      "rootFolder": "Root",
+      "numbering": "Numbering",
+      "renumber": "Renumber Sequentially",
+      "keepNumber": "Keep Original Numbers (may have gaps)",
+      "noStructure": "No sections detected. The composition will follow the current question order.",
+      "saveAs": "Save as Composition"
+    },
+    "success": {
+      "title": "Import Successful",
+      "description": "The questions have been added to the question bank.",
+      "composition": "Composition “{title}” created. Swap out a few questions and reuse it.",
+      "skipped": "{count} questions skipped",
+      "degraded": "The following content was simplified structurally. Check it in the composition.",
+      "degradedItem": "{reason}: {excerpt}",
+      "continue": "Import More",
+      "openComposition": "Open Composition",
+      "viewImported": "View Imported Questions",
+      "viewBank": "View Question Bank"
+    },
+    "partial": {
+      "title": "Some Questions Can't Be Saved",
+      "description": "You can continue with only the questions that passed validation (the composition will include only those), or go back and fix them first.",
+      "back": "Go Back and Fix",
+      "confirm": "Import Valid Questions Only"
+    }
+  },
+  "importTasks": {
+    "title": "Import Queue",
+    "batchRetry": "Retry Selected ({count})",
+    "batchRetryConfirm": "Retry the {count} selected tasks?",
+    "batchRetried": "Retried {count} tasks",
+    "resetStuck": "Reset Stuck Tasks",
+    "resetStuckConfirm": "Reset all processing tasks? They will be set back to pending.",
+    "resetDone": "Reset {count} tasks",
+    "resetFailed": "Reset failed",
+    "statuses": {
+      "pending": "Pending",
+      "processing": "Processing",
+      "completed": "Completed",
+      "failed": "Failed",
+      "cancelled": "Cancelled"
+    },
+    "upload": {
+      "title": "Batch Upload",
+      "description": "Uploaded files are processed in the background.",
+      "extractTitle": "Import As-Is",
+      "extractDescription": "Extracts questions, answers, and explanations as they are. Best for questions that already have answers.",
+      "solveTitle": "AI Solves",
+      "solveDescription": "AI extracts and solves the questions, generating answers and explanations. Best for textbook questions without answers.",
+      "pick": "Click to Select Files (multiple allowed)",
+      "hint": "Drag and drop or batch upload .docx, .md, and .zip files. Files are processed automatically, so no need to keep 👀 on it.",
+      "folderHint": "Markdown references local images? Upload a {zip} archive, or {folder}",
+      "selectFolder": "select an entire folder",
+      "uploading": "Uploading...",
+      "zipFailed": "Failed to package folder",
+      "created": "Created {count} import tasks"
+    },
+    "list": {
+      "title": "Import Queue",
+      "description": "View the status and results of import tasks.",
+      "filterUser": "Filter by User",
+      "allUsers": "All Users",
+      "filterStatus": "Filter by Status",
+      "allStatuses": "All Statuses",
+      "filename": "File Name",
+      "owner": "Owner",
+      "status": "Status",
+      "result": "Result",
+      "createdAt": "Created",
+      "empty": "No import tasks yet",
+      "extracted": "Extracted {count} questions",
+      "processFailed": "Processing failed",
+      "cancelTask": "Cancel Task",
+      "viewQuestions": "View Questions",
+      "deleteRecord": "Delete Record"
+    },
+    "cancelConfirm": "Cancel this task?",
+    "cancelled": "Task cancelled",
+    "cancelFailed": "Failed to cancel",
+    "retried": "Task re-queued",
+    "retryFailed": "Retry failed",
+    "deleteConfirm": "Delete this record?",
+    "deleted": "Record deleted",
+    "deleteFailed": "Failed to delete"
+  },
+  "templateGuide": {
+    "title": "Tag-Based Parsing: Format Guide",
+    "description": "Separate standalone questions with {question}; use {stimulus} and {group} for material-based question groups. Both full-width {fullwidth} and half-width {halfwidth} forms are recognized.",
+    "table": {
+      "tag": "Tag",
+      "required": "Required",
+      "note": "Notes"
+    },
+    "required": {
+      "required": "Required",
+      "groupRequired": "Required for Groups",
+      "optional": "Optional"
+    },
+    "notes": {
+      "question": "Starts each question and separates questions from each other",
+      "stimulus": "Declares multi-line question material; the name is optional and used when reusing the material",
+      "group": "Starts a question group; without a name, it uses the most recently declared material",
+      "groupEnd": "Ends the question group so following questions are standalone again; a new group, material, or section heading also ends the current group",
+      "type": "{values}; inferred automatically if omitted",
+      "options": "As a block {block} or one by one {perItem}",
+      "answer": "Letters for choice questions (multiple answers like {multiExample}); {trueFalse} for true/false",
+      "multiline": "Multi-line allowed",
+      "difficulty": "1–5, or {levels}",
+      "answerSection": "Aliases: {aliases}; for an answer key at the end of the document"
+    },
+    "examples": {
+      "questionGroup": "Material Question Group",
+      "answerSection": "Answer Key Section"
+    },
+    "copied": "Copied. Paste it directly into your document."
+  },
+  "batchImport": {
+    "loadFailed": "Failed to load question details",
+    "imported": "Questions imported",
+    "confirmFailed": "Failed to confirm import",
+    "rejected": "Import rejected",
+    "rejectFailed": "Failed to reject import",
+    "title": "AI Import Proposal",
+    "description": "AI proposes importing {count} questions.",
+    "review": "Review and Confirm",
+    "importedDone": "Questions imported.",
+    "rejectedDone": "Import proposal rejected.",
+    "dialogTitle": "Review Questions",
+    "dialogDescription": "Review the following {count} questions before importing.",
+    "reject": "Reject",
+    "confirm": "Import"
+  },
+  "importReview": {
+    "group": {
+      "stimulus": "Material",
+      "memberCount": "{count} sub-questions",
+      "invalidStimulus": "(Invalid material reference)"
+    },
+    "errors": {
+      "duplicateQuestionId": "Duplicate temporary question reference: {id}",
+      "duplicateStimulusId": "Duplicate temporary material reference: {id}",
+      "duplicateGroupId": "Duplicate temporary question group reference: {id}",
+      "groupMissingStimulus": "Question group {group} references nonexistent material: {id}",
+      "groupEmpty": "Question group {group} has no sub-questions",
+      "groupDuplicateMember": "Question group {group} references sub-question {id} more than once",
+      "groupMissingMember": "Question group {group} references nonexistent sub-question: {id}",
+      "questionInMultipleGroups": "Sub-question {id} belongs to both group {first} and group {second}; a question can depend on only one material",
+      "outlineMissingQuestion": "Paper structure references nonexistent question: {id}",
+      "outlineMissingGroup": "Paper structure references nonexistent question group: {id}"
+    }
+  },
+  "compositions": {
+    "title": "Compositions",
+    "newComposition": "New Composition",
+    "scopeHint": {
+      "shared": "Shared: all team members in this subject can view and edit.",
+      "personal": "Personal: visible only to you; other team members can't access it."
+    },
+    "scope": {
+      "shared": "Shared",
+      "personal": "Personal"
+    },
+    "conflict": {
+      "revision": "Content was updated by someone else. Refresh and try again.",
+      "folderNotEmpty": "Folder isn't empty. Move or delete its contents first.",
+      "generic": "Conflict detected. Refresh and try again."
+    },
+    "toast": {
+      "loadFoldersFailed": "Failed to load folders",
+      "loadListFailed": "Failed to load compositions",
+      "folderNameRequired": "Enter a folder name.",
+      "saveFolderFailed": "Failed to save folder",
+      "folderDeleted": "Folder deleted",
+      "deleteFolderFailed": "Failed to delete folder",
+      "moved": "Moved",
+      "moveFailed": "Failed to move",
+      "titleRequired": "Enter a composition title.",
+      "createFailed": "Failed to create composition",
+      "archived": "Archived",
+      "unarchived": "Unarchived",
+      "movedToTrash": "Moved to trash",
+      "restored": "Restored",
+      "restoreFailed": "Failed to restore",
+      "duplicated": "Copy created",
+      "duplicateFailed": "Failed to create copy"
+    },
+    "confirm": {
+      "deleteFolder": "Delete folder “{name}”? It can only be deleted if empty.",
+      "moveToTrash": "Move “{title}” to trash?"
+    },
+    "empty": {
+      "selectSubject": "Select a subject on the left first.",
+      "createSubject": "Create a subject before using Compositions."
+    },
+    "folders": "Folders",
+    "newRootFolder": "New Root Folder",
+    "root": "Root",
+    "noFolders": "No folders yet",
+    "trash": "Trash",
+    "trashEmpty": "Trash is empty",
+    "deletedAt": "Deleted {time}",
+    "restore": "Restore",
+    "archived": "Archived",
+    "noDescription": "No description",
+    "folderEmpty": "No compositions in this folder yet",
+    "actions": {
+      "editInfo": "Rename / Description",
+      "move": "Move",
+      "duplicate": "Duplicate",
+      "archive": "Archive",
+      "unarchive": "Unarchive"
+    },
+    "folderDialog": {
+      "createTitle": "New Folder",
+      "renameTitle": "Rename Folder",
+      "namePlaceholder": "Folder name"
+    },
+    "moveDialog": {
+      "title": "Move To",
+      "description": "Select a target folder, or move to the root."
+    },
+    "form": {
+      "title": "Title",
+      "titleExample": "e.g. Unit 1 Quiz",
+      "titlePlaceholder": "Composition title",
+      "description": "Description",
+      "descriptionPlaceholder": "Composition notes (optional)",
+      "createAndOpen": "Create and Open",
+      "editTitle": "Edit Composition Info"
+    },
+    "quickAdd": {
+      "loadFailed": "Failed to load compositions",
+      "conflict": "The composition was updated by someone else. Reopen it and try again.",
+      "addFailed": "Failed to add to composition",
+      "view": "View",
+      "added": "Added to “{title}”",
+      "createdAndAdded": "Created and added to “{title}”",
+      "trigger": "Add to Composition",
+      "recent": "Recently Edited",
+      "empty": "No compositions yet",
+      "createAndAdd": "New Composition and Add",
+      "goToWorkspace": "Go to Compositions",
+      "questionsMissing": "The question no longer exists and can't be added."
+    },
+    "targetPicker": {
+      "conflict": "The composition was updated by someone else. Reopen the picker and try again.",
+      "added": "Added {count} questions to “{title}”",
+      "createdAndAdded": "Created composition and added {count} questions",
+      "title": "Select Composition",
+      "description": "Add {count} questions to a composition (sub-questions of the same material question are shown together).",
+      "confirm": "Add to Selected"
+    },
+    "defaultTitle": "Untitled Composition {date}"
+  },
+  "compositionEditor": {
+    "fallbackTitle": "Composition",
+    "sharedSpace": "Shared",
+    "personalSpace": "Personal",
+    "saving": "Saving…",
+    "unsavedChanges": "Unsaved Changes",
+    "versionHistory": "Version History",
+    "timeline": "Timeline",
+    "conflictBanner": "This composition was updated by someone else. Your local changes are kept; reload the latest version before editing, or back up your current content elsewhere first.",
+    "reloadDiscardLocal": "Reload (Discard Local)",
+    "toast": {
+      "titleRequired": "Enter a title.",
+      "metaSaved": "Title and description saved",
+      "conflictUnsaved": "The composition was updated by someone else. Your local changes haven't been saved.",
+      "blockIssue": "Some blocks can't be saved: {issue}",
+      "contentSaved": "Content saved",
+      "contentConflictUnsaved": "Content was updated by someone else. Your local changes haven't been saved.",
+      "saveContentFailed": "Failed to save content",
+      "questionsSynced": "Synced {count} questions",
+      "syncConflict": "Sync failed because the composition was updated by someone else. Your local changes are kept.",
+      "syncQuestionsFailed": "Failed to sync questions",
+      "groupsSynced": "Synced {count} material questions",
+      "syncGroupsConflict": "Sync failed because the composition was updated by someone else. Your local content is kept.",
+      "syncGroupsFailed": "Failed to sync material questions",
+      "enableNumberingFirst": "Enable question numbering first.",
+      "savingBeforeFinalize": "Autosaving. Please wait before finalizing.",
+      "finalized": "Finalized as version v{version}",
+      "finalizeConflict": "Finalize failed because the composition was updated by someone else. Your local changes are kept.",
+      "finalizeFailed": "Failed to finalize"
+    },
+    "confirm": {
+      "syncGroups": "Syncing refreshes the frozen material and selected sub-questions, reorders them to match the material, and removes sub-questions no longer linked to it. Numbers, scores, and answer areas in the composition are kept, and new sub-questions aren't added automatically. Continue?",
+      "autofillNumbers": "Autofill will overwrite all existing question numbers. Continue?",
+      "leaveUnsaved": "You have unsaved changes. Leave anyway?"
+    },
+    "download": {
+      "label": "Download",
+      "word": "Download Word",
+      "latex": "Download LaTeX",
+      "latestVersion": "Finalized version v{version}",
+      "draftAhead": "The draft has unfinalized changes; downloads still contain the older content.",
+      "finalizeFirst": "Finalize Latest Content",
+      "noVersion": "No finalized version yet. Finalize first."
+    },
+    "finalize": {
+      "button": "Finalize",
+      "savingHint": "Autosaving. Please wait.",
+      "tooltip": "Freeze current content as an immutable version",
+      "dialogTitle": "Finalize as New Version",
+      "dialogDescription": "Revision {revision} will be frozen as an immutable version. Finalizing doesn't change the composition itself; you can keep editing.",
+      "labelLabel": "Version Note (optional)",
+      "labelPlaceholder": "e.g. Midterm final draft",
+      "staleWarning": "Some question or question group sources have been updated. The older content currently shown will be frozen. To use the latest content, cancel and sync manually first.",
+      "confirm": "Finalize"
+    },
+    "staleGroups": {
+      "message": "{count} material questions have source updates: {details}. The frozen version is still shown and won't refresh automatically.",
+      "stimulus": "material: {count}",
+      "structure": "sub-question order: {count}",
+      "questions": "sub-question content or membership: {count}",
+      "separator": ", ",
+      "newQuestions": "{count} unselected sub-questions were added to material questions. Use “Add Sub-question” in the corresponding material question.",
+      "sync": "Sync Material Questions"
+    },
+    "footer": {
+      "meta": "Subject: {subject} · Revision r{revision}",
+      "totalScore": "Total: {score} pts"
+    },
+    "aiChanges": {
+      "title": "Assistant made {count} unsaved changes",
+      "collapse": "Collapse",
+      "viewChanges": "View Changes",
+      "discard": "Discard",
+      "apply": "Apply",
+      "kind": {
+        "added": "Added",
+        "removed": "Removed",
+        "moved": "Moved",
+        "modified": "Modified"
+      },
+      "defaultSummary": "Changes from the assistant"
+    },
+    "picker": {
+      "loadFailed": "Failed to load composition content. Try again.",
+      "title": "Insert Composition",
+      "description": "Select another composition to clone all of its content into the current canvas.",
+      "searchPlaceholder": "Search composition titles…",
+      "noResults": "No matching compositions"
+    },
+    "slash": {
+      "items": {
+        "paragraph": "Text",
+        "heading1": "Heading 1",
+        "heading2": "Heading 2",
+        "heading3": "Heading 3",
+        "bulletList": "Bulleted List",
+        "orderedList": "Numbered List",
+        "quote": "Quote",
+        "codeBlock": "Code Block",
+        "divider": "Divider",
+        "table": "Table",
+        "pageBreak": "Page Break",
+        "answerSpace": "Answer Space",
+        "question": "Question",
+        "composition": "Insert Composition",
+        "answerModule": "Answer Key Module",
+        "image": "Image",
+        "inlineMath": "Inline Math",
+        "blockMath": "Block Math"
+      },
+      "groups": {
+        "basic": "Basic",
+        "block": "Blocks",
+        "composition": "Composition",
+        "insert": "Insert"
+      }
+    },
+    "canvas": {
+      "placeholder": "Type something, or type “/” for commands…",
+      "staleQuestions": "{count} questions have been updated in the question bank (the frozen older content is still shown).",
+      "saveFirst": "Save your unsaved changes first.",
+      "syncAllHint": "Update all outdated questions to the latest question bank content",
+      "syncAll": "Sync All",
+      "insertModule": "Insert Answer Key",
+      "blockActions": "Block Actions",
+      "insertAbove": "Insert Row Above",
+      "insertBelow": "Insert Row Below",
+      "insertHere": "Insert Row Here"
+    },
+    "issues": {
+      "emptyText": "Block {index} (text) is empty",
+      "emptyHeading": "Block {index} (heading) is empty",
+      "missingQuestion": "Block {index} (question) has no question selected",
+      "emptyModuleText": "Block {index} (text in summary module) is empty",
+      "emptyModuleHeading": "Block {index} (heading in summary module) is empty"
+    },
+    "diff": {
+      "node": {
+        "heading": "Heading {level} “{text}”",
+        "text": "Text “{text}”",
+        "questionNumbered": "Question {number} “{stem}”",
+        "question": "Question “{stem}”",
+        "detailsAll": "Answer key module (entire composition)",
+        "detailsBefore": "Answer key module (before module)",
+        "group": "Material question #{id}",
+        "answerSpaceLined": "Answer space ({lines} lined rows)",
+        "answerSpaceBlank": "Answer space ({lines} blank rows)",
+        "pageBreak": "Page break",
+        "answerItem": "Answer item"
+      },
+      "typeChanged": "type changed",
+      "none": "None",
+      "number": "number {from} → {to}",
+      "score": "score {from} → {to}",
+      "fieldInherit": "{field}: follow global",
+      "fieldShow": "{field}: show",
+      "fieldHide": "{field}: hide",
+      "level": "level {from} → {to}",
+      "textChanged": "text changed",
+      "lines": "rows {from} → {to}",
+      "styleChanged": "style changed",
+      "scope": "scope {from} → {to}",
+      "fields": "displayed fields changed ({fields})",
+      "fieldSeparator": ", ",
+      "added": "Added {node}",
+      "modified": "Modified {node}: {changes}",
+      "changeSeparator": ", ",
+      "moved": "Moved {node}",
+      "removed": "Removed {node}"
+    }
+  },
+  "compositionVersions": {
+    "toast": {
+      "notFound": "Version not found or access denied"
+    },
+    "previewTitle": "Version Preview",
+    "export": {
+      "word": "Export Word",
+      "latex": "Export LaTeX",
+      "success": "Exported",
+      "unknownNode": "Content contains an unrecognized node",
+      "failedWithNode": "Export failed: {reason} (node {nodeId})",
+      "failedWithReason": "Export failed: {reason}",
+      "failed": "Export failed. Try again later."
+    },
+    "readonlyBadge": "Read-Only",
+    "snapshotNotice": "This is a snapshot frozen at finalization and may not include later draft changes. For the latest content, return to the editor and finalize again.",
+    "meta": {
+      "versionNo": "Version v{version}",
+      "finalizedAt": "Finalized {time}",
+      "sourceRevision": "Source revision r{revision}",
+      "finalizedBy": "Finalized by User #{user}"
+    },
+    "loadFailed": "Unable to load this version",
+    "backToEditor": "Back to Editor",
+    "events": {
+      "created": "Created composition",
+      "updated": "Updated metadata",
+      "moved": "Moved folder",
+      "deleted": "Deleted composition",
+      "restored": "Restored composition",
+      "nodesReplaced": "Saved content",
+      "questionNodesSynced": "Synced questions",
+      "finalized": "Finalized",
+      "mediaReplaced": "Replaced image"
+    },
+    "userFallback": "User #{id}",
+    "timeline": {
+      "description": "Who did what to this composition and when, newest first.",
+      "loadFailed": "Failed to load timeline",
+      "empty": "No events yet."
+    },
+    "sheet": {
+      "description": "Immutable versions frozen at finalization. Each is a snapshot from that moment and may not include later draft changes.",
+      "loadFailed": "Failed to load versions",
+      "empty": "No finalized versions yet. Use the “Finalize” button to freeze the current content.",
+      "versionFallback": "Version {version}",
+      "finalizedBy": "Finalized By"
+    }
+  },
+  "compositionPanels": {
+    "fields": {
+      "answer": "Answer",
+      "thinking": "Approach",
+      "analysis": "Explanation",
+      "summary": "Summary"
+    },
+    "numbering": {
+      "title": "Numbering",
+      "hint": "When enabled, a number appears before each question and can be edited individually.",
+      "autofillMode": "Autofill Mode",
+      "global": "Sequential",
+      "globalHint": "In question order: 1, 2, 3…",
+      "heading": "By Heading",
+      "headingHint": "Grouped by H2 headings: 1.1, 2.1…",
+      "autofill": "Autofill Numbers",
+      "autofillWarning": "Autofill is a one-time action that overwrites all existing numbers."
+    },
+    "display": {
+      "title": "Question Display",
+      "hint": "Stems and options are always shown. Toggle the fields below globally, or override them per question."
+    },
+    "scoring": {
+      "title": "Scoring",
+      "hint": "When enabled, each question can have a score. Requires numbering.",
+      "distribution": "Score Distribution",
+      "total": "Total: {score} pts",
+      "empty": "No questions on the canvas yet"
+    }
+  },
+  "questionPicker": {
+    "title": "Insert Questions",
+    "openInBank": "Open in Question Bank",
+    "description": "Search the current subject's question bank and select questions to insert into the canvas. Multiple selection supported.",
+    "searchPlaceholder": "Search stem keywords…",
+    "filter": "Filter",
+    "noResults": "No matching questions",
+    "selectedCount": "{count} selected",
+    "insert": "Insert",
+    "clear": "Clear"
+  },
+  "compositionNodes": {
+    "questionRevision": "Version r{revision}",
+    "emptyStem": "(No stem)",
+    "emptyField": "(Empty)",
+    "pageBreak": "Page Break",
+    "questionGroup": "Material Question #{id}",
+    "stimulusRevision": "Material v{revision}",
+    "emptyStimulus": "(No material)",
+    "details": {
+      "titleBefore": "Answer Key (Preceding Questions)",
+      "titleAll": "Answer Key (All)",
+      "empty": "No questions to summarize",
+      "unavailableAtFinalize": "Question content was unavailable at finalization"
+    },
+    "questionUnavailable": "Question content unavailable (#{id})",
+    "opaquePlaceholder": "Module placeholder: {type} (editing will be supported in a later release)",
+    "module": {
+      "title": "Answer Key",
+      "scope": "Scope",
+      "scopeAll": "All Questions",
+      "scopeBefore": "Questions Before This Module",
+      "display": "Display",
+      "displayFields": "Displayed Fields",
+      "delete": "Delete Module",
+      "emptyScope": "No questions in this scope yet.",
+      "noFields": "No fields selected for display."
+    },
+    "answerSpace": {
+      "lined": "Lined Answer Space",
+      "blank": "Blank Answer Space",
+      "decrease": "Fewer Rows",
+      "increase": "More Rows",
+      "lines": "{count} rows",
+      "toBlank": "Switch to Blank",
+      "toLined": "Switch to Lined"
+    },
+    "group": {
+      "addQuestionTitle": "Add Sub-questions from Material Question",
+      "addQuestion": "Add Sub-question",
+      "addQuestionHint": "Inserted in material order; sub-questions already included aren't listed",
+      "noCandidates": "No sub-questions available to add",
+      "delete": "Delete Material Question",
+      "instruction": "Instructions",
+      "answerArea": "Answer Area",
+      "instructionPlaceholder": "e.g. Read the passage below and answer questions 1–5.",
+      "deleteInstruction": "Delete Instructions",
+      "styleBlank": "Blank",
+      "styleLined": "Lined",
+      "deleteAnswerArea": "Delete Answer Area",
+      "resizeAnswerArea": "Drag to resize answer area"
+    },
+    "question": {
+      "fallbackType": "Question",
+      "layoutAuto": "Auto",
+      "layoutPerRow": "{count} per row",
+      "score": "Score",
+      "stale": "Updated in Bank",
+      "deleted": "Deleted from Bank",
+      "layoutTitle": "Option layout: options per row",
+      "layout": "Option Layout",
+      "layoutLabel": "Option layout (options per row)",
+      "fields": "Fields",
+      "fieldsTitle": "Field Display for This Question",
+      "inherit": "Inherit",
+      "show": "Show",
+      "hide": "Hide",
+      "exitPreviewAll": "Exit Full Preview",
+      "previewAll": "Preview All Content",
+      "syncThis": "Sync This Question",
+      "slot": "Blank {index}",
+      "number": "Number",
+      "scoreUnit": "pts"
     }
   }
 }

@@ -39,6 +39,7 @@ const props = defineProps<{
   selected?: boolean
 }>()
 
+const { t } = useI18n()
 const answerSpaceRules = inject(ANSWER_SPACE_RULES_KEY, FALLBACK_ANSWER_SPACE_RULES)
 const loadStimulusQuestions = inject(STIMULUS_QUESTIONS_KEY, noStimulusQuestions)
 
@@ -182,30 +183,30 @@ function patchAnswerSpace(index: number, patch: { lines?: number; style?: 'blank
   >
     <div class="mb-3 flex items-center gap-2">
       <Files class="size-4 text-muted-foreground" />
-      <span class="text-sm font-medium">材料题 #{{ node.attrs.stimulusId }}</span>
-      <Badge v-if="node.attrs.stimulusRevision != null" variant="secondary" class="text-[11px]">材料 v{{ node.attrs.stimulusRevision }}</Badge>
+      <span class="text-sm font-medium">{{ t('compositionNodes.questionGroup', { id: node.attrs.stimulusId }) }}</span>
+      <Badge v-if="node.attrs.stimulusRevision != null" variant="secondary" class="text-[11px]">{{ t('compositionNodes.stimulusRevision', { revision: node.attrs.stimulusRevision }) }}</Badge>
       <DropdownMenu @update:open="loadCandidates">
         <DropdownMenuTrigger as-child>
-          <Button class="ml-auto h-7 text-xs" variant="ghost" size="sm" title="从材料题添加小题">
-            <ListPlus class="mr-1 size-3.5" />添加小题
+          <Button class="ml-auto h-7 text-xs" variant="ghost" size="sm" :title="t('compositionNodes.group.addQuestionTitle')">
+            <ListPlus class="mr-1 size-3.5" />{{ t('compositionNodes.group.addQuestion') }}
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" class="w-80">
-          <DropdownMenuLabel class="text-xs text-muted-foreground">按材料顺序插入；已在本题中的小题不再列出</DropdownMenuLabel>
+          <DropdownMenuLabel class="text-xs text-muted-foreground">{{ t('compositionNodes.group.addQuestionHint') }}</DropdownMenuLabel>
           <div v-if="candidatesLoading" class="flex justify-center py-4"><Loader2 class="size-4 animate-spin" /></div>
-          <p v-else-if="candidates.length === 0" class="px-2 py-3 text-xs text-muted-foreground">材料下没有可添加的小题</p>
+          <p v-else-if="candidates.length === 0" class="px-2 py-3 text-xs text-muted-foreground">{{ t('compositionNodes.group.noCandidates') }}</p>
           <DropdownMenuItem v-for="question in candidates" :key="question.id" @click="addQuestion(question)">
             <span class="truncate text-xs">#{{ question.id }} {{ preview(question) }}</span>
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
-      <Button class="size-7" variant="ghost" size="icon" title="删除整道材料题" aria-label="删除整道材料题" @click="deleteNode">
+      <Button class="size-7" variant="ghost" size="icon" :title="t('compositionNodes.group.delete')" :aria-label="t('compositionNodes.group.delete')" @click="deleteNode">
         <Trash2 class="size-4 text-destructive" />
       </Button>
     </div>
 
     <div class="mb-4 border-l-2 border-primary/30 pl-4">
-      <RichContent :content="stimulus" empty-text="（无材料）" />
+      <RichContent :content="stimulus" :empty-text="t('compositionNodes.emptyStimulus')" />
     </div>
 
     <div class="space-y-2">
@@ -218,7 +219,7 @@ function patchAnswerSpace(index: number, patch: { lines?: number; style?: 'blank
               class="h-6 text-xs text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100 focus:opacity-100"
               @click="insertCustomBefore(index, child.id)"
             >
-              <Plus class="mr-1 size-3.5" />说明文字
+              <Plus class="mr-1 size-3.5" />{{ t('compositionNodes.group.instruction') }}
             </Button>
           </div>
           <QuestionBlockView
@@ -235,7 +236,7 @@ function patchAnswerSpace(index: number, patch: { lines?: number; style?: 'blank
             class="ml-3 h-7 text-xs text-muted-foreground"
             @click="addAnswerSpace(index)"
           >
-            <Plus class="mr-1 size-3.5" />作答区
+            <Plus class="mr-1 size-3.5" />{{ t('compositionNodes.group.answerArea') }}
           </Button>
         </div>
         <div
@@ -247,16 +248,16 @@ function patchAnswerSpace(index: number, patch: { lines?: number; style?: 'blank
           <RichEditor
             class="min-w-0 flex-1"
             :model-value="child.content"
-            placeholder="例如：阅读下面的文字，完成 1～5 题。"
+            :placeholder="t('compositionNodes.group.instructionPlaceholder')"
             @update:model-value="patchCustomContent(index, $event)"
           />
-          <Button variant="ghost" size="icon" class="size-7 shrink-0" title="删除说明文字" aria-label="删除说明文字" @click="removeChild(index)">
+          <Button variant="ghost" size="icon" class="size-7 shrink-0" :title="t('compositionNodes.group.deleteInstruction')" :aria-label="t('compositionNodes.group.deleteInstruction')" @click="removeChild(index)">
             <Trash2 class="size-3.5" />
           </Button>
         </div>
         <div v-else-if="child.nodeType === 'answer_space'" class="ml-3 border-l pl-3">
           <div class="flex items-center gap-2">
-            <span class="text-xs text-muted-foreground">作答区</span>
+            <span class="text-xs text-muted-foreground">{{ t('compositionNodes.group.answerArea') }}</span>
             <input
               type="number" min="1" max="50"
               class="h-7 w-16 rounded border bg-background px-2 text-xs"
@@ -268,10 +269,10 @@ function patchAnswerSpace(index: number, patch: { lines?: number; style?: 'blank
               :value="(child.props as any)?.style ?? 'blank'"
               @change="patchAnswerSpace(index, { style: ($event.target as HTMLSelectElement).value as 'blank' | 'lined' })"
             >
-              <option value="blank">留白</option>
-              <option value="lined">横线</option>
+              <option value="blank">{{ t('compositionNodes.group.styleBlank') }}</option>
+              <option value="lined">{{ t('compositionNodes.group.styleLined') }}</option>
             </select>
-            <Button variant="ghost" size="icon" class="size-7" title="删除作答区" aria-label="删除作答区" @click="removeChild(index)">
+            <Button variant="ghost" size="icon" class="size-7" :title="t('compositionNodes.group.deleteAnswerArea')" :aria-label="t('compositionNodes.group.deleteAnswerArea')" @click="removeChild(index)">
               <Trash2 class="size-3.5" />
             </Button>
           </div>
@@ -290,7 +291,7 @@ function patchAnswerSpace(index: number, patch: { lines?: number; style?: 'blank
             <div
               class="absolute inset-x-0 -bottom-1 h-2 cursor-ns-resize"
               role="separator"
-              aria-label="拖拽调整作答区高度"
+              :aria-label="t('compositionNodes.group.resizeAnswerArea')"
               @pointerdown.prevent.stop="startResize($event, index)"
             >
               <div class="mx-auto h-1 w-10 rounded-full bg-border opacity-0 transition-opacity group-hover:opacity-100" />
@@ -305,7 +306,7 @@ function patchAnswerSpace(index: number, patch: { lines?: number; style?: 'blank
           class="h-6 text-xs text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100 focus:opacity-100"
           @click="insertCustomBefore(children.length, null)"
         >
-          <Plus class="mr-1 size-3.5" />说明文字
+          <Plus class="mr-1 size-3.5" />{{ t('compositionNodes.group.instruction') }}
         </Button>
       </div>
     </div>

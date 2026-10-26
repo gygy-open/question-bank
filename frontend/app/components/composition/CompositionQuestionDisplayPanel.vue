@@ -13,11 +13,13 @@ const emit = defineEmits<{
   toggle: [key: AnswerFieldKey, value: boolean]
 }>()
 
-const FIELD_LABELS: Record<AnswerFieldKey, string> = {
-  answer: '答案',
-  thinking: '思路',
-  analysis: '解析',
-  summary: '小结',
+const { t } = useI18n()
+
+const FIELD_LABEL_KEYS: Record<AnswerFieldKey, string> = {
+  answer: 'compositionPanels.fields.answer',
+  thinking: 'compositionPanels.fields.thinking',
+  analysis: 'compositionPanels.fields.analysis',
+  summary: 'compositionPanels.fields.summary',
 }
 </script>
 
@@ -25,10 +27,10 @@ const FIELD_LABELS: Record<AnswerFieldKey, string> = {
   <div>
     <div class="flex items-center gap-2">
       <Eye class="h-4 w-4 text-muted-foreground" />
-      <span class="text-sm font-medium">题目显示</span>
+      <span class="text-sm font-medium">{{ t('compositionPanels.display.title') }}</span>
     </div>
     <p class="mt-1.5 text-xs text-muted-foreground">
-      题干与选项始终显示；下列字段可全局开关，也可在每道题上单独覆盖。
+      {{ t('compositionPanels.display.hint') }}
     </p>
     <div class="mt-3 space-y-2">
       <label
@@ -36,7 +38,7 @@ const FIELD_LABELS: Record<AnswerFieldKey, string> = {
         :key="key"
         class="flex items-center justify-between text-sm"
       >
-        {{ FIELD_LABELS[key] }}
+        {{ t(FIELD_LABEL_KEYS[key]) }}
         <Switch
           :model-value="fields[key]"
           :disabled="disabled"

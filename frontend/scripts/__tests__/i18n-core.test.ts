@@ -5,6 +5,8 @@ import { join } from 'node:path'
 import {
   apply,
   check,
+  mergeFragments,
+  MergeConflictError,
   outFile,
   pendingFile,
   placeholdersOf,
@@ -117,5 +119,45 @@ describe('sync / apply / check', () => {
     expect(problems).toContain('a:not tracked in lock')
     expect(problems).toContain('b:placeholders mismatch: expected [n], got []')
     expect(problems).toContain('*:key order differs from base locale')
+  })
+})
+
+describe('mergeFragments', () => {
+  const writeFragment = (name: string, data: unknown) => {
+    mkdirSync(paths.fragmentsDir, { recursive: true })
+    write(join(paths.fragmentsDir, name), data)
+  }
+
+  it('merges into existing namespaces, appends new ones, ignores identical duplicates and removes fragments', () => {
+    writeLocale('zh-CN', { common: { save: '保存' }, nav: { a: '甲' } })
+    writeFragment('b1.json', { common: { cancel: '取消' }, pageA: { title: '页面A' } })
+    writeFragment('b2.json', { common: { cancel: '取消', save: '保存' }, pageB: { title: '页面B' } })
+
+    const results = mergeFragments(paths)
+    expect(results.map(r => [r.fragment, r.added, r.duplicates])).toEqual([
+      ['b1.json', ['common.cancel', 'pageA.title'], []],
+      ['b2.json', ['pageB.title'], ['common.cancel', 'common.save']],
+    ])
+    expect(readLocale('zh-CN')).toEqual({
+      common: { save: '保存', cancel: '取消' },
+      nav: { a: '甲' },
+      pageA: { title: '页面A' },
+      pageB: { title: '页面B' },
+    })
+    expect(Object.keys(readLocale('zh-CN'))).toEqual(['common', 'nav', 'pageA', 'pageB'])
+    expect(existsSync(join(paths.fragmentsDir, 'b1.json'))).toBe(false)
+  })
+
+  it('aborts without writing anything on conflicts', () => {
+    writeLocale('zh-CN', { common: { save: '保存' }, x: '叶子' })
+    writeFragment('b1.json', { common: { save: '存储' }, y: '新' })
+    writeFragment('b2.json', { x: { child: '冲突' }, z: 'a@b' })
+
+    let error: unknown
+    try { mergeFragments(paths) } catch (e) { error = e }
+    expect(error).toBeInstanceOf(MergeConflictError)
+    expect((error as MergeConflictError).conflicts.map(c => c.key)).toEqual(['common.save', 'x.child', 'z'])
+    expect(readLocale('zh-CN')).toEqual({ common: { save: '保存' }, x: '叶子' })
+    expect(existsSync(join(paths.fragmentsDir, 'b1.json'))).toBe(true)
   })
 })

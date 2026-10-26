@@ -17,6 +17,8 @@ const emit = defineEmits<{
   autofill: [mode: NumberingMode]
 }>()
 
+const { t } = useI18n()
+
 const mode = ref<NumberingMode>('global')
 </script>
 
@@ -25,7 +27,7 @@ const mode = ref<NumberingMode>('global')
     <div class="flex items-center justify-between gap-2">
       <div class="flex items-center gap-2">
         <ListOrdered class="h-4 w-4 text-muted-foreground" />
-        <span class="text-sm font-medium">题号</span>
+        <span class="text-sm font-medium">{{ t('compositionPanels.numbering.title') }}</span>
       </div>
       <Switch
         :model-value="enabled"
@@ -34,25 +36,25 @@ const mode = ref<NumberingMode>('global')
       />
     </div>
     <p class="mt-1.5 text-xs text-muted-foreground">
-      开启后每道题前显示题号，可逐题手动修改。
+      {{ t('compositionPanels.numbering.hint') }}
     </p>
 
     <template v-if="enabled">
       <div class="mt-4 space-y-2">
-        <Label class="text-xs text-muted-foreground">自动填充方式</Label>
+        <Label class="text-xs text-muted-foreground">{{ t('compositionPanels.numbering.autofillMode') }}</Label>
         <RadioGroup v-model="mode" class="gap-2">
           <label class="flex items-start gap-2 text-sm">
             <RadioGroupItem value="global" class="mt-0.5" />
             <span>
-              全局顺序
-              <span class="block text-xs text-muted-foreground">按题目顺序 1、2、3…</span>
+              {{ t('compositionPanels.numbering.global') }}
+              <span class="block text-xs text-muted-foreground">{{ t('compositionPanels.numbering.globalHint') }}</span>
             </span>
           </label>
           <label class="flex items-start gap-2 text-sm">
             <RadioGroupItem value="heading" class="mt-0.5" />
             <span>
-              按标题分组
-              <span class="block text-xs text-muted-foreground">以 H2 标题分组，1.1、2.1…</span>
+              {{ t('compositionPanels.numbering.heading') }}
+              <span class="block text-xs text-muted-foreground">{{ t('compositionPanels.numbering.headingHint') }}</span>
             </span>
           </label>
         </RadioGroup>
@@ -64,10 +66,10 @@ const mode = ref<NumberingMode>('global')
         :disabled="disabled"
         @click="emit('autofill', mode)"
       >
-        <Wand2 class="mr-2 h-4 w-4" /> 自动填充题号
+        <Wand2 class="mr-2 h-4 w-4" /> {{ t('compositionPanels.numbering.autofill') }}
       </Button>
       <p class="mt-2 text-xs text-muted-foreground">
-        自动填充为一次性操作，会覆盖所有已有题号。
+        {{ t('compositionPanels.numbering.autofillWarning') }}
       </p>
     </template>
   </div>

@@ -9,7 +9,8 @@ import type { AnswerFieldKey } from '@/types/composition'
 import { ANSWER_FIELD_KEYS } from '@/types/composition'
 import { richDocToPlainText } from '@/components/rich-editor/richDoc'
 import type { EditorDocument, EditorNode } from '@/lib/compositionDocument'
-import { FIELD_LABELS, describeNode } from '@/lib/compositionOutline'
+import { describeNode } from '@/lib/compositionOutline'
+import { translate } from '@/lib/locale'
 import {
   answerSpacePropsOf,
   detailPropsOf,
@@ -18,6 +19,17 @@ import {
   questionScoreOf,
   questionShowOverride,
 } from '@/lib/compositionDocument'
+
+const FIELD_LABEL_KEYS: Record<AnswerFieldKey, string> = {
+  answer: 'compositionPanels.fields.answer',
+  thinking: 'compositionPanels.fields.thinking',
+  analysis: 'compositionPanels.fields.analysis',
+  summary: 'compositionPanels.fields.summary',
+}
+
+function fieldLabel(key: AnswerFieldKey): string {
+  return translate(FIELD_LABEL_KEYS[key])
+}
 
 export type ChangeKind = 'added' | 'removed' | 'moved' | 'modified'
 
@@ -31,48 +43,61 @@ export interface DocumentChange {
 /** 同一个节点改了什么；返回空数组表示没有可见改动。 */
 function propChanges(before: EditorNode, after: EditorNode): string[] {
   const out: string[] = []
-  if (before.nodeType !== after.nodeType) return ['类型变更']
+  if (before.nodeType !== after.nodeType) return [translate('compositionEditor.diff.typeChanged')]
+  const none = translate('compositionEditor.diff.none')
 
   switch (after.nodeType) {
     case 'question': {
       const b = questionNumberOf(before)
       const a = questionNumberOf(after)
-      if (b !== a) out.push(`题号 ${b || '无'} → ${a || '无'}`)
+      if (b !== a) out.push(translate('compositionEditor.diff.number', { from: b || none, to: a || none }))
       const bs = questionScoreOf(before)
       const as = questionScoreOf(after)
-      if (bs !== as) out.push(`分值 ${bs ?? '无'} → ${as ?? '无'}`)
+      if (bs !== as) out.push(translate('compositionEditor.diff.score', { from: bs ?? none, to: as ?? none }))
       for (const key of ANSWER_FIELD_KEYS) {
         const bv = questionShowOverride(before, key)
         const av = questionShowOverride(after, key)
         if (bv === av) continue
-        const text = av == null ? '跟随全局' : av ? '显示' : '隐藏'
-        out.push(`${FIELD_LABELS[key]}${text}`)
+        const field = fieldLabel(key)
+        out.push(av == null
+          ? translate('compositionEditor.diff.fieldInherit', { field })
+          : av
+            ? translate('compositionEditor.diff.fieldShow', { field })
+            : translate('compositionEditor.diff.fieldHide', { field }))
       }
       break
     }
     case 'heading': {
       if (headingLevelOf(before) !== headingLevelOf(after)) {
-        out.push(`层级 ${headingLevelOf(before)} → ${headingLevelOf(after)}`)
+        out.push(translate('compositionEditor.diff.level', { from: headingLevelOf(before), to: headingLevelOf(after) }))
       }
-      if (richDocToPlainText(before.content) !== richDocToPlainText(after.content)) out.push('文字变更')
+      if (richDocToPlainText(before.content) !== richDocToPlainText(after.content)) {
+        out.push(translate('compositionEditor.diff.textChanged'))
+      }
       break
     }
     case 'rich_text':
-      if (richDocToPlainText(before.content) !== richDocToPlainText(after.content)) out.push('文字变更')
+      if (richDocToPlainText(before.content) !== richDocToPlainText(after.content)) {
+        out.push(translate('compositionEditor.diff.textChanged'))
+      }
       break
     case 'answer_space': {
       const b = answerSpacePropsOf(before)
       const a = answerSpacePropsOf(after)
-      if (b.lines !== a.lines) out.push(`行数 ${b.lines} → ${a.lines}`)
-      if (b.style !== a.style) out.push('样式变更')
+      if (b.lines !== a.lines) out.push(translate('compositionEditor.diff.lines', { from: b.lines, to: a.lines }))
+      if (b.style !== a.style) out.push(translate('compositionEditor.diff.styleChanged'))
       break
     }
     case 'question_details': {
       const b = detailPropsOf(before)
       const a = detailPropsOf(after)
-      if (b.scope !== a.scope) out.push(`收录范围 ${b.scope} → ${a.scope}`)
+      if (b.scope !== a.scope) out.push(translate('compositionEditor.diff.scope', { from: b.scope, to: a.scope }))
       const fields = ANSWER_FIELD_KEYS.filter((k) => Boolean(b.fields[k]) !== Boolean(a.fields[k]))
-      if (fields.length) out.push(`展示字段调整（${fields.map((k) => FIELD_LABELS[k]).join('、')}）`)
+      if (fields.length) {
+        out.push(translate('compositionEditor.diff.fields', {
+          fields: fields.map(fieldLabel).join(translate('compositionEditor.diff.fieldSeparator')),
+        }))
+      }
       break
     }
     default:
@@ -126,7 +151,7 @@ export function diffDocuments(before: EditorDocument, after: EditorDocument): Do
   for (const node of after.nodes) {
     const prev = beforeById.get(node.id)
     if (!prev) {
-      changes.push({ kind: 'added', nodeId: node.id, label: `新增 ${describeNode(node)}` })
+      changes.push({ kind: 'added', nodeId: node.id, label: translate('compositionEditor.diff.added', { node: describeNode(node) }) })
       continue
     }
     const props = propChanges(prev, node)
@@ -134,17 +159,20 @@ export function diffDocuments(before: EditorDocument, after: EditorDocument): Do
       changes.push({
         kind: 'modified',
         nodeId: node.id,
-        label: `修改 ${describeNode(node)}：${props.join('，')}`,
+        label: translate('compositionEditor.diff.modified', {
+          node: describeNode(node),
+          changes: props.join(translate('compositionEditor.diff.changeSeparator')),
+        }),
       })
     }
     if (movedIds.has(node.id)) {
-      changes.push({ kind: 'moved', nodeId: node.id, label: `移动 ${describeNode(node)}` })
+      changes.push({ kind: 'moved', nodeId: node.id, label: translate('compositionEditor.diff.moved', { node: describeNode(node) }) })
     }
   }
 
   for (const node of before.nodes) {
     if (afterIds.has(node.id)) continue
-    changes.push({ kind: 'removed', nodeId: node.id, label: `删除 ${describeNode(node)}` })
+    changes.push({ kind: 'removed', nodeId: node.id, label: translate('compositionEditor.diff.removed', { node: describeNode(node) }) })
   }
 
   return changes

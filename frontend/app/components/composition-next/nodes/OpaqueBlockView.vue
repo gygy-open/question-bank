@@ -8,6 +8,8 @@ const props = defineProps<{
   selected?: boolean
 }>()
 
+const { t } = useI18n()
+
 const inner = computed(() => (props.node.attrs.node as { nodeType?: string } | null) ?? null)
 </script>
 
@@ -18,6 +20,6 @@ const inner = computed(() => (props.node.attrs.node as { nodeType?: string } | n
     :class="selected ? 'ring-2 ring-primary' : ''"
     contenteditable="false"
   >
-    模块占位：{{ inner?.nodeType ?? 'unknown' }}（编辑能力将在后续阶段实现）
+    {{ t('compositionNodes.opaquePlaceholder', { type: inner?.nodeType ?? 'unknown' }) }}
   </NodeViewWrapper>
 </template>

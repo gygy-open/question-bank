@@ -23,25 +23,29 @@ import { toast } from 'vue-sonner'
 defineProps<{ open: boolean }>()
 const emit = defineEmits<{ (e: 'update:open', value: boolean): void }>()
 
-const tagRows = [
-    { tag: '【题目】', required: '必填', note: '每道题的开头，同时作为题目之间的分隔符' },
-    { tag: '【题目材料】', required: '题组必填', note: '声明多行题目材料；名称可选，复用时填写名称' },
-    { tag: '【题组】', required: '题组必填', note: '开始题组；名称省略时引用最近声明的题目材料' },
-    { tag: '【题组结束】', required: '可选', note: '结束题组，后续题目恢复为独立题；新题组、题目材料或大题标题也会自动结束当前题组' },
-    { tag: '【题型】', required: '可选', note: '单选/多选/判断/填空/解答；省略时自动推断' },
-    { tag: '【选项】', required: '可选', note: '块写法 A. … B. … 或逐项 【选项A】【选项B】' },
-    { tag: '【答案】', required: '可选', note: '选择题写字母（多选如 AB），判断题写 对/错' },
-    { tag: '【解析】', required: '可选', note: '可多行' },
-    { tag: '【思路】', required: '可选', note: '可多行' },
-    { tag: '【难度】', required: '可选', note: '1–5，或 简单/中等/困难' },
-    { tag: '【小结】', required: '可选', note: '可多行' },
-    { tag: '【答案区】', required: '可选', note: '别名【答案表】【统一答案】【答案速查】；用于文末统一答案表' },
+const { t } = useI18n()
+
+// 标签名、示例取值是解析器语法 / 用户写入文档的字面量，原样作为占位符参数插入，不翻译。
+type RequiredLevel = 'required' | 'groupRequired' | 'optional'
+const tagRows: { tag: string; required: RequiredLevel; note: string; params?: Record<string, string> }[] = [
+    { tag: '【题目】', required: 'required', note: 'question' },
+    { tag: '【题目材料】', required: 'groupRequired', note: 'stimulus' },
+    { tag: '【题组】', required: 'groupRequired', note: 'group' },
+    { tag: '【题组结束】', required: 'optional', note: 'groupEnd' },
+    { tag: '【题型】', required: 'optional', note: 'type', params: { values: '单选/多选/判断/填空/解答' } },
+    { tag: '【选项】', required: 'optional', note: 'options', params: { block: 'A. … B. …', perItem: '【选项A】【选项B】' } },
+    { tag: '【答案】', required: 'optional', note: 'answer', params: { multiExample: 'AB', trueFalse: '对/错' } },
+    { tag: '【解析】', required: 'optional', note: 'multiline' },
+    { tag: '【思路】', required: 'optional', note: 'multiline' },
+    { tag: '【难度】', required: 'optional', note: 'difficulty', params: { levels: '简单/中等/困难' } },
+    { tag: '【小结】', required: 'optional', note: 'multiline' },
+    { tag: '【答案区】', required: 'optional', note: 'answerSection', params: { aliases: '【答案表】【统一答案】【答案速查】' } },
 ]
 
 const examples = [
     {
         key: 'single',
-        label: '单选题',
+        labelKey: 'questions.types.singleChoice',
         text: `【题目】下列关于集合的说法正确的是
 【选项】A. 空集是任何集合的子集  B. 0 是空集  C. {0} 是空集  D. 以上都不对
 【答案】A
@@ -49,19 +53,19 @@ const examples = [
     },
     {
         key: 'truefalse',
-        label: '判断题',
+        labelKey: 'questions.types.trueFalse',
         text: `【题目】判断：0 是自然数
 【答案】对`,
     },
     {
         key: 'blank',
-        label: '填空题',
+        labelKey: 'questions.types.fillInTheBlank',
         text: `【题目】1 + 1 = ____
 【答案】2`,
     },
     {
         key: 'question-group',
-        label: '材料题组',
+        labelKey: 'templateGuide.examples.questionGroup',
         text: `【题目】卷首独立题
 【答案】略
 
@@ -86,7 +90,7 @@ const examples = [
     },
     {
         key: 'answer-section',
-        label: '统一答案区',
+        labelKey: 'templateGuide.examples.answerSection',
         text: `【题目】1+1=?
 【选项】A. 1 B. 2 C. 3 D. 4
 【题目】3+3=?
@@ -102,7 +106,7 @@ const examples = [
 
 const copyExample = async (text: string) => {
     await navigator.clipboard.writeText(text)
-    toast.success('已复制，可直接粘贴到文档中')
+    toast.success(t('templateGuide.copied'))
 }
 </script>
 
@@ -110,36 +114,40 @@ const copyExample = async (text: string) => {
     <Dialog :open="open" @update:open="emit('update:open', $event)">
         <DialogContent class="w-[95vw] sm:max-w-[680px] max-h-[85vh] overflow-y-auto">
             <DialogHeader>
-                <DialogTitle>标签精准解析：格式说明</DialogTitle>
+                <DialogTitle>{{ t('templateGuide.title') }}</DialogTitle>
                 <DialogDescription>
-                    独立题用 <Badge variant="outline">【题目】</Badge> 分隔；材料题组使用
-                    <Badge variant="outline">【题目材料】</Badge> 和 <Badge variant="outline">【题组】</Badge>。
-                    全角【】与半角 [] 均可识别。
+                    <i18n-t scope="global" keypath="templateGuide.description">
+                        <template #question><Badge variant="outline">【题目】</Badge></template>
+                        <template #stimulus><Badge variant="outline">【题目材料】</Badge></template>
+                        <template #group><Badge variant="outline">【题组】</Badge></template>
+                        <template #fullwidth>【】</template>
+                        <template #halfwidth>[]</template>
+                    </i18n-t>
                 </DialogDescription>
             </DialogHeader>
 
             <Table>
                 <TableHeader>
                     <TableRow>
-                        <TableHead class="w-28">标签</TableHead>
-                        <TableHead class="w-16">是否必填</TableHead>
-                        <TableHead>说明</TableHead>
+                        <TableHead class="w-28">{{ t('templateGuide.table.tag') }}</TableHead>
+                        <TableHead class="w-16">{{ t('templateGuide.table.required') }}</TableHead>
+                        <TableHead>{{ t('templateGuide.table.note') }}</TableHead>
                     </TableRow>
                 </TableHeader>
                 <TableBody>
                     <TableRow v-for="row in tagRows" :key="row.tag">
                         <TableCell><Badge variant="outline">{{ row.tag }}</Badge></TableCell>
                         <TableCell>
-                            <Badge :variant="row.required === '必填' ? 'default' : 'secondary'">{{ row.required }}</Badge>
+                            <Badge :variant="row.required === 'required' ? 'default' : 'secondary'">{{ t(`templateGuide.required.${row.required}`) }}</Badge>
                         </TableCell>
-                        <TableCell class="text-sm text-muted-foreground">{{ row.note }}</TableCell>
+                        <TableCell class="text-sm text-muted-foreground">{{ t(`templateGuide.notes.${row.note}`, row.params ?? {}) }}</TableCell>
                     </TableRow>
                 </TableBody>
             </Table>
 
             <Tabs default-value="single" class="mt-2">
                 <TabsList class="grid h-auto w-full grid-cols-2 gap-1 sm:grid-cols-5">
-                    <TabsTrigger v-for="ex in examples" :key="ex.key" :value="ex.key">{{ ex.label }}</TabsTrigger>
+                    <TabsTrigger v-for="ex in examples" :key="ex.key" :value="ex.key">{{ t(ex.labelKey) }}</TabsTrigger>
                 </TabsList>
                 <TabsContent v-for="ex in examples" :key="ex.key" :value="ex.key" class="mt-3">
                     <div class="relative rounded-md border bg-muted/30">
@@ -150,7 +158,7 @@ const copyExample = async (text: string) => {
                             class="absolute right-2 top-2"
                             @click="copyExample(ex.text)"
                         >
-                            <Copy class="h-4 w-4 mr-1" />复制
+                            <Copy class="h-4 w-4 mr-1" />{{ t('common.copy') }}
                         </Button>
                     </div>
                 </TabsContent>

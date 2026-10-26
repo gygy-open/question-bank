@@ -27,6 +27,7 @@ const emit = defineEmits<{
   select: [questions: Question[]]
 }>()
 
+const { t } = useI18n()
 const { $api } = useNuxtApp()
 
 const loading = ref(false)
@@ -43,23 +44,23 @@ const difficulty = ref<string | undefined>(undefined)
 const knowledgePointIds = ref<string[]>([])
 const tagIds = ref<string[]>([])
 
-const qTypeOptions = [
-  { label: '全部题型', value: '0' },
-  { label: '单选题', value: 'single_choice' },
-  { label: '多选题', value: 'multiple_choice' },
-  { label: '判断题', value: 'true_false' },
-  { label: '填空题', value: 'fill_in_the_blank' },
-  { label: '解答题', value: 'free_response' },
-  { label: '选项匹配', value: 'option_matching' },
-]
-const difficultyOptions = [
-  { label: '全部难度', value: '0' },
+const qTypeOptions = computed(() => [
+  { label: t('questions.filters.allTypes'), value: '0' },
+  { label: t('questions.types.singleChoice'), value: 'single_choice' },
+  { label: t('questions.types.multipleChoice'), value: 'multiple_choice' },
+  { label: t('questions.types.trueFalse'), value: 'true_false' },
+  { label: t('questions.types.fillInTheBlank'), value: 'fill_in_the_blank' },
+  { label: t('questions.types.freeResponse'), value: 'free_response' },
+  { label: t('questions.types.optionMatching'), value: 'option_matching' },
+])
+const difficultyOptions = computed(() => [
+  { label: t('questions.filters.allDifficulties'), value: '0' },
   { label: '1', value: '1' },
   { label: '2', value: '2' },
   { label: '3', value: '3' },
   { label: '4', value: '4' },
   { label: '5', value: '5' },
-]
+])
 
 const activeFilterCount = computed(() => {
   let count = 0
@@ -99,9 +100,9 @@ const knowledgePointFilterLabel = computed(() => {
   const names = knowledgePointIds.value
     .map((id) => knowledgePoints.value.find((kp) => String(kp.id) === id)?.name)
     .filter((name): name is string => Boolean(name))
-  if (names.length === 0) return '全部知识点'
+  if (names.length === 0) return t('knowledgePoint.all')
   if (names.length === 1) return names[0]
-  return `已选 ${names.length} 个`
+  return t('questions.filters.selectedCount', { count: names.length })
 })
 
 async function loadFilterOptions() {
@@ -191,27 +192,27 @@ function confirmInsert() {
     <DialogContent class="max-w-3xl">
       <DialogHeader>
         <DialogTitle class="flex items-center justify-between gap-2 pr-6">
-          <span>插入题目</span>
+          <span>{{ t('questionPicker.title') }}</span>
           <NuxtLink
             to="/questions"
             target="_blank"
             class="inline-flex items-center gap-1 text-xs font-normal text-muted-foreground hover:text-primary"
           >
-            在题库中打开
+            {{ t('questionPicker.openInBank') }}
             <ExternalLink class="h-3 w-3" />
           </NuxtLink>
         </DialogTitle>
-        <DialogDescription>从当前学科题库检索并选择题目插入画布，支持多选。</DialogDescription>
+        <DialogDescription>{{ t('questionPicker.description') }}</DialogDescription>
       </DialogHeader>
 
       <div class="flex items-center gap-2">
         <div class="relative flex-1">
           <Search class="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-          <Input v-model="keyword" placeholder="搜索题干关键字…" class="pl-9" />
+          <Input v-model="keyword" :placeholder="t('questionPicker.searchPlaceholder')" class="pl-9" />
         </div>
         <Button variant="outline" size="sm" @click="filtersExpanded = !filtersExpanded">
           <SlidersHorizontal class="mr-2 h-4 w-4" />
-          筛选
+          {{ t('questionPicker.filter') }}
           <Badge v-if="activeFilterCount > 0" variant="secondary" class="ml-1.5 px-1.5">
             {{ activeFilterCount }}
           </Badge>
@@ -220,15 +221,15 @@ function confirmInsert() {
 
       <div v-if="filtersExpanded" class="flex flex-wrap items-end gap-3 rounded-lg border bg-muted/30 p-3">
         <div class="w-32 space-y-1">
-          <span class="text-xs font-medium text-muted-foreground">题型</span>
-          <ClearableSelect v-model="qType" :options="qTypeOptions" placeholder="全部题型" />
+          <span class="text-xs font-medium text-muted-foreground">{{ t('questions.filters.type') }}</span>
+          <ClearableSelect v-model="qType" :options="qTypeOptions" :placeholder="t('questions.filters.allTypes')" />
         </div>
         <div class="w-28 space-y-1">
-          <span class="text-xs font-medium text-muted-foreground">难度</span>
-          <ClearableSelect v-model="difficulty" :options="difficultyOptions" placeholder="全部难度" />
+          <span class="text-xs font-medium text-muted-foreground">{{ t('questions.filters.difficulty') }}</span>
+          <ClearableSelect v-model="difficulty" :options="difficultyOptions" :placeholder="t('questions.filters.allDifficulties')" />
         </div>
         <div class="min-w-[180px] flex-1 space-y-1">
-          <span class="text-xs font-medium text-muted-foreground">知识点</span>
+          <span class="text-xs font-medium text-muted-foreground">{{ t('questions.filters.knowledgePoint') }}</span>
           <Popover v-model:open="kpPopoverOpen">
             <PopoverTrigger as-child>
               <Button variant="outline" role="combobox" class="h-9 w-full justify-between font-normal">
@@ -252,12 +253,12 @@ function confirmInsert() {
           </Popover>
         </div>
         <div class="min-w-[200px] flex-1 space-y-1">
-          <span class="text-xs font-medium text-muted-foreground">标签</span>
+          <span class="text-xs font-medium text-muted-foreground">{{ t('questions.filters.tags') }}</span>
           <TagFilter v-model="tagIds" :tags="tags" :categories="tagCategories" />
         </div>
         <Button v-if="activeFilterCount > 0" variant="ghost" size="sm" @click="resetFilters">
           <X class="mr-1 h-3.5 w-3.5" />
-          重置
+          {{ t('common.reset') }}
         </Button>
       </div>
 
@@ -269,7 +270,7 @@ function confirmInsert() {
         v-else-if="results.length === 0"
         class="flex h-[420px] items-center justify-center text-sm text-muted-foreground"
       >
-        没有匹配的题目
+        {{ t('questionPicker.noResults') }}
       </div>
 
       <ScrollArea v-else class="h-[420px] pr-3">
@@ -287,7 +288,7 @@ function confirmInsert() {
               <div class="mb-1 flex flex-wrap items-center gap-1.5">
                 <Badge variant="outline" class="text-xs text-muted-foreground">#{{ q.id }}</Badge>
                 <Badge variant="secondary" class="text-xs">{{ questionTypeLabel(q.q_type) }}</Badge>
-                <Badge variant="outline" class="text-xs">难度 {{ q.difficulty }}</Badge>
+                <Badge variant="outline" class="text-xs">{{ t('questionItem.difficultyValue', { level: q.difficulty }) }}</Badge>
                 <Badge v-for="kp in q.knowledge_points" :key="`kp-${kp.id}`" variant="outline" class="text-xs">
                   {{ kp.name }}
                 </Badge>
@@ -297,7 +298,7 @@ function confirmInsert() {
               </div>
               <RichContent
                 :content="q.content"
-                empty-text="（无题干文本）"
+                :empty-text="t('basket.noContent')"
                 class="text-sm [&_.prose]:my-0"
               />
               <div
@@ -315,10 +316,10 @@ function confirmInsert() {
       </ScrollArea>
 
       <div class="flex items-center justify-between border-t pt-3">
-        <span class="text-sm text-muted-foreground">已选 {{ selected.size }} 题</span>
+        <span class="text-sm text-muted-foreground">{{ t('questionPicker.selectedCount', { count: selected.size }) }}</span>
         <div class="flex gap-2">
-          <Button v-if="selected.size > 0" variant="ghost" size="sm" @click="selected.clear()">清空</Button>
-          <Button size="sm" :disabled="selected.size === 0" @click="confirmInsert">插入</Button>
+          <Button v-if="selected.size > 0" variant="ghost" size="sm" @click="selected.clear()">{{ t('questionPicker.clear') }}</Button>
+          <Button size="sm" :disabled="selected.size === 0" @click="confirmInsert">{{ t('questionPicker.insert') }}</Button>
         </div>
       </div>
     </DialogContent>

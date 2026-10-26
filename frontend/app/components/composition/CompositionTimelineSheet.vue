@@ -21,6 +21,7 @@ const props = defineProps<{
 
 const open = defineModel<boolean>('open', { default: false })
 
+const { t } = useI18n()
 const api = useCompositions()
 const loading = ref(false)
 const loadingMore = ref(false)
@@ -30,24 +31,25 @@ const hasMore = ref(false)
 const events = ref<CompositionEvent[]>([])
 
 // event_type → 中文标签 + 图标；后端 summary 作为补充细节一并展示。
-const EVENT_META: Record<CompositionEventType, { label: string; icon: unknown }> = {
-  created: { label: '创建组稿', icon: FilePlus },
-  updated: { label: '更新元数据', icon: Pencil },
-  moved: { label: '移动目录', icon: FolderInput },
-  deleted: { label: '删除组稿', icon: Trash2 },
-  restored: { label: '恢复组稿', icon: RotateCcw },
-  nodes_replaced: { label: '保存内容', icon: Save },
-  question_nodes_synced: { label: '同步题目', icon: RefreshCw },
-  finalized: { label: '定稿', icon: CheckCircle2 },
-  media_replaced: { label: '替换图片', icon: ImageIcon },
+const EVENT_META: Record<CompositionEventType, { labelKey: string; icon: unknown }> = {
+  created: { labelKey: 'compositionVersions.events.created', icon: FilePlus },
+  updated: { labelKey: 'compositionVersions.events.updated', icon: Pencil },
+  moved: { labelKey: 'compositionVersions.events.moved', icon: FolderInput },
+  deleted: { labelKey: 'compositionVersions.events.deleted', icon: Trash2 },
+  restored: { labelKey: 'compositionVersions.events.restored', icon: RotateCcw },
+  nodes_replaced: { labelKey: 'compositionVersions.events.nodesReplaced', icon: Save },
+  question_nodes_synced: { labelKey: 'compositionVersions.events.questionNodesSynced', icon: RefreshCw },
+  finalized: { labelKey: 'compositionVersions.events.finalized', icon: CheckCircle2 },
+  media_replaced: { labelKey: 'compositionVersions.events.mediaReplaced', icon: ImageIcon },
 }
 
 function metaFor(type: CompositionEventType) {
-  return EVENT_META[type] ?? { label: type, icon: Clock }
+  const meta = EVENT_META[type]
+  return meta ? { label: t(meta.labelKey), icon: meta.icon } : { label: type, icon: Clock }
 }
 
 function actorLabel(e: CompositionEvent): string {
-  return e.actor?.full_name || e.actor?.username || `用户 #${e.actor_id}`
+  return e.actor?.full_name || e.actor?.username || t('compositionVersions.userFallback', { id: e.actor_id })
 }
 
 function formatTime(iso: string): string {
@@ -98,9 +100,9 @@ const isEmpty = computed(() => loaded.value && events.value.length === 0)
     <SheetContent side="right" class="w-full sm:max-w-md">
       <SheetHeader>
         <SheetTitle class="flex items-center gap-2">
-          <Clock class="h-4 w-4" /> 时间线
+          <Clock class="h-4 w-4" /> {{ t('compositionEditor.timeline') }}
         </SheetTitle>
-        <SheetDescription>谁在什么时候对这份组稿做了什么，按时间倒序排列。</SheetDescription>
+        <SheetDescription>{{ t('compositionVersions.timeline.description') }}</SheetDescription>
       </SheetHeader>
 
       <div class="flex-1 overflow-y-auto px-4 pb-4">
@@ -115,15 +117,15 @@ const isEmpty = computed(() => loaded.value && events.value.length === 0)
           class="flex flex-col items-center gap-3 py-12 text-center text-sm text-muted-foreground"
         >
           <AlertTriangle class="h-5 w-5 text-amber-500" />
-          <span>加载时间线失败</span>
+          <span>{{ t('compositionVersions.timeline.loadFailed') }}</span>
           <Button size="sm" variant="outline" @click="load">
-            <RefreshCw class="mr-2 h-4 w-4" /> 重试
+            <RefreshCw class="mr-2 h-4 w-4" /> {{ t('common.retry') }}
           </Button>
         </div>
 
         <!-- 空态 -->
         <p v-else-if="isEmpty" class="py-12 text-center text-sm text-muted-foreground">
-          暂无事件记录。
+          {{ t('compositionVersions.timeline.empty') }}
         </p>
 
         <!-- 列表 -->
@@ -144,7 +146,7 @@ const isEmpty = computed(() => loaded.value && events.value.length === 0)
           <div v-if="hasMore" class="flex justify-center pt-2">
             <Button size="sm" variant="outline" :disabled="loadingMore" @click="loadMore">
               <Loader2 v-if="loadingMore" class="mr-2 h-4 w-4 animate-spin" />
-              加载更多
+              {{ t('common.loadMore') }}
             </Button>
           </div>
         </template>

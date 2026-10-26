@@ -20,6 +20,7 @@ import type { DocumentChange } from '@/lib/compositionDiff'
 import { applyOperations } from '@/lib/compositionPrimitives'
 import type { AiOperation } from '@/lib/compositionPrimitives'
 import { registerClientTool, unregisterClientTool } from '@/composables/useAiClientTools'
+import { translate } from '@/lib/locale'
 
 export const AI_TOOL_READ_OUTLINE = 'read_composition_outline'
 export const AI_TOOL_EDIT = 'edit_composition'
@@ -88,7 +89,7 @@ export function useCompositionAiTools(options: CompositionAiToolsOptions): void 
 
     const summary = typeof args?.summary === 'string' && args.summary.trim()
       ? args.summary.trim()
-      : '来自助手的改动'
+      : translate('compositionEditor.aiChanges.defaultSummary')
     options.stagePending(doc, changes, summary)
 
     const lines = [
