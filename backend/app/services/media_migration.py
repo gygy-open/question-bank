@@ -68,6 +68,13 @@ class MigrationReport:
         out += [f"  跳过 {s}" for s in self.skipped]
         return out
 
+    def summary(self) -> str:
+        return (
+            f"新建资产 {self.assets_created}, 题目 {self.questions_updated}, 材料 {self.stimuli_updated}, "
+            f"稿件节点 {self.nodes_updated}, 缺失 {len(self.missing)}, 无法识别 {len(self.unreadable)}, "
+            f"跳过 {len(self.skipped)}"
+        )
+
 
 class _Migrator:
     def __init__(self, db: AsyncSession, report: MigrationReport) -> None:

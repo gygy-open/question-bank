@@ -14,6 +14,7 @@ from app.core.config import get_db_url, is_configured
 from app.core.file_paths import task_source_file
 from app.models.import_task import ImportTask, ImportTaskStatus
 from app.models.user import User
+from app.services import data_migrations
 from app.services.doc_processor import doc_processor
 from app.services.embedding import reload_embedding_function
 from app.services.paper_import_service import commit_extracted_paper_import
@@ -118,6 +119,20 @@ async def wait_for_schema() -> None:
             await asyncio.sleep(5)
 
 
+async def run_data_migrations(*, retry_interval: float = 60, max_attempts: int = 60) -> None:
+    """执行一次性数据迁移。库结构可能仍在另一个进程中升级,未就绪时定期重试。"""
+    for _ in range(max_attempts):
+        try:
+            outcome = await data_migrations.run_pending()
+        except Exception:
+            logger.exception("Data migrations could not run")
+            return
+        if outcome is not data_migrations.Outcome.NOT_READY:
+            return
+        await asyncio.sleep(retry_interval)
+    logger.warning("Data migrations still not ready; will retry on next start.")
+
+
 async def worker():
     logger.info("Worker started, initializing...")
 
@@ -132,6 +147,9 @@ async def worker():
     # still be running in another process. Wait for the tables before touching
     # the DB or the embedding model (which reads ``system_settings``).
     await wait_for_schema()
+
+    # 一次性数据迁移在后台跑,不耽误导入任务;保留引用防止任务被回收。
+    data_migration_task = asyncio.create_task(run_data_migrations())  # noqa: F841
 
     # Initialize Embedding Function
     try:

@@ -6,6 +6,8 @@
     uv run python scripts/migrate_media_assets.py --purge-legacy --apply  # 删除已迁移的旧文件
 
 执行前请先备份数据库与数据目录。清理旧目录只删除内容已确认保存在对象存储的文件。
+worker 启动后会自动执行一次同样的迁移(data_migration.legacy_media_assets);
+本脚本 --apply 成功后也会写入该标记,worker 不再重复扫描。
 """
 import argparse
 import asyncio
@@ -15,6 +17,7 @@ import sys
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from app.db.session import SessionLocal, engine  # noqa: E402
+from app.services import data_migrations  # noqa: E402
 from app.services.media_migration import migrate_media, purge_legacy_files  # noqa: E402
 
 
@@ -24,6 +27,9 @@ async def main(apply: bool, purge: bool) -> None:
             report = await purge_legacy_files(db, apply=apply)
         else:
             report = await migrate_media(db, apply=apply)
+            if apply:
+                await data_migrations.mark_done(db, "legacy_media_assets", report.summary())
+                await db.commit()
     await engine.dispose()
     print("\n".join(report.lines()))
     print("已执行。" if apply else "预演完成，未做任何修改；确认后加 --apply 执行。")

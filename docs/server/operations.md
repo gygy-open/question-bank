@@ -52,6 +52,21 @@ docker compose run --rm migrate
 
 升级前建议先 [备份](/server/database#备份与恢复-服务器版-mysql)。
 
+### 升级后的数据整理
+
+表结构迁移完成后，worker 会在后台执行一次性的数据整理（例如把旧版上传在题目中的图片转入媒体库），完成后记入 `system_settings` 表中以 `data_migration.` 开头的键，之后不再执行。可在 worker 日志中查看进度与报告：
+
+```bash
+docker compose logs worker | grep -i "data migration"
+```
+
+执行失败只记录日志、不影响使用，下次启动 worker 会再试；多个 worker 同时启动时只有一个会执行。也可以手动执行历史媒体迁移（默认只预演）：
+
+```bash
+docker compose exec backend python scripts/migrate_media_assets.py
+docker compose exec backend python scripts/migrate_media_assets.py --apply
+```
+
 ## 常见问题排查
 
 | 现象 | 排查方向 |
