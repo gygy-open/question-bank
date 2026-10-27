@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { z } from 'zod'
 import { resolve } from 'node:path'
 import { check, resolvePaths } from '../../../scripts/i18n-core.mts'
+import { checkHardcoded } from '../../../scripts/i18n-hardcoded.mts'
 import { createZodErrorMap } from '@/lib/zodErrorMap'
 import { currentLocale, formatDate, setCurrentLocale } from '@/lib/locale'
 import { formatRelativeTime } from '@/lib/utils'
@@ -11,6 +12,11 @@ describe('locale files', () => {
   it('pass i18n:check', () => {
     const paths = resolvePaths(resolve(process.cwd(), 'i18n'))
     expect(check(paths)).toEqual([])
+  })
+
+  it('have no hardcoded Chinese outside the baseline', () => {
+    const root = process.cwd()
+    expect(checkHardcoded(root, resolve(root, 'i18n/.hardcoded-baseline.json'))).toEqual([])
   })
 })
 

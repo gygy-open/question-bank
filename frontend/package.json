@@ -16,7 +16,8 @@
     "i18n:sync": "node scripts/i18n.mts sync",
     "i18n:apply": "node scripts/i18n.mts apply",
     "i18n:check": "node scripts/i18n.mts check",
-    "i18n:merge": "node scripts/i18n.mts merge"
+    "i18n:merge": "node scripts/i18n.mts merge",
+    "i18n:baseline": "node scripts/i18n.mts baseline"
   },
   "dependencies": {
     "@floating-ui/dom": "^1.8.0",

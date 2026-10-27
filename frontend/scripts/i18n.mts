@@ -3,14 +3,18 @@
  *
  *   pnpm i18n:sync   以 zh-CN 为准重排/清理其他语言文件，导出缺失或过期条目到 i18n/.pending/<locale>.json
  *   pnpm i18n:apply  校验 i18n/.pending/<locale>.out.json 中的译文并合并，更新 lock
- *   pnpm i18n:check  只读校验，有问题时以非 0 退出（供 CI 使用）
+ *   pnpm i18n:check  只读校验（含硬编码中文检查），有问题时以非 0 退出（供 CI 使用）
  *   pnpm i18n:merge  把 i18n/.fragments/*.json（并行批次新增的 zh-CN key）合并进 zh-CN.json
+ *   pnpm i18n:baseline  把 app/ 中现有的非注释中文行登记为有意保留的内容语言
  */
-import { relative } from 'node:path'
+import { join, relative } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { MergeConflictError, apply, check, mergeFragments, pendingFile, outFile, resolvePaths, sync } from './i18n-core.mts'
+import { checkHardcoded, writeBaseline } from './i18n-hardcoded.mts'
 
 const paths = resolvePaths(fileURLToPath(new URL('../i18n', import.meta.url)))
+const frontendDir = fileURLToPath(new URL('..', import.meta.url))
+const baselineFile = join(paths.root, '.hardcoded-baseline.json')
 const rel = (p: string) => relative(process.cwd(), p)
 const preview = (keys: string[], n = 10) =>
   keys.slice(0, n).join(', ') + (keys.length > n ? `, ... (+${keys.length - n})` : '')
@@ -48,13 +52,25 @@ function runApply(): number {
 
 function runCheck(): number {
   const issues = check(paths)
-  if (!issues.length) {
+  const hardcoded = checkHardcoded(frontendDir, baselineFile)
+  if (!issues.length && !hardcoded.length) {
     console.log('i18n check passed.')
     return 0
   }
   for (const i of issues) console.log(`[${i.locale}] ${i.key}: ${i.problem}`)
-  console.log(`\n${issues.length} issue(s). Run "pnpm i18n:sync" and translate pending entries.`)
+  if (issues.length) console.log(`\n${issues.length} issue(s). Run "pnpm i18n:sync" and translate pending entries.`)
+  for (const h of hardcoded) console.log(`${h.file}:${h.line}: ${h.text}`)
+  if (hardcoded.length) {
+    console.log(`\n${hardcoded.length} hardcoded Chinese line(s). Use t('...') for UI text; if it is content language, run "pnpm i18n:baseline".`)
+  }
   return 1
+}
+
+function runBaseline(): number {
+  const baseline = writeBaseline(frontendDir, baselineFile)
+  const lines = Object.values(baseline).reduce((n, l) => n + l.length, 0)
+  console.log(`Recorded ${lines} line(s) in ${Object.keys(baseline).length} file(s) to ${rel(baselineFile)}.`)
+  return 0
 }
 
 function runMerge(): number {
@@ -74,10 +90,10 @@ function runMerge(): number {
   }
 }
 
-const commands: Record<string, () => number> = { sync: runSync, apply: runApply, check: runCheck, merge: runMerge }
+const commands: Record<string, () => number> = { sync: runSync, apply: runApply, check: runCheck, merge: runMerge, baseline: runBaseline }
 const cmd = process.argv[2] ?? ''
 if (!commands[cmd]) {
-  console.error('Usage: node scripts/i18n.mts <sync|apply|check|merge>')
+  console.error('Usage: node scripts/i18n.mts <sync|apply|check|merge|baseline>')
   process.exit(2)
 }
 process.exit(commands[cmd]!())

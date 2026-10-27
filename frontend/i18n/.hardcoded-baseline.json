@@ -1,0 +1,174 @@
+{
+  "app/components/StructuredTemplateGuideDialog.vue": [
+    "1.【题目】请概括题目材料的主要内容",
+    "1．因为1+1=2，选B。",
+    "2.【题目】下列理解正确的是",
+    "2．因为3+3=6，选B。`,",
+    "<template #group><Badge variant=\"outline\">【题组】</Badge></template>",
+    "<template #question><Badge variant=\"outline\">【题目】</Badge></template>",
+    "<template #stimulus><Badge variant=\"outline\">【题目材料】</Badge></template>",
+    "text: `【题目】1 + 1 = ____",
+    "text: `【题目】1+1=?",
+    "text: `【题目】下列关于集合的说法正确的是",
+    "text: `【题目】判断：0 是自然数",
+    "text: `【题目】卷首独立题",
+    "{ tag: '【小结】', required: 'optional', note: 'multiline' },",
+    "{ tag: '【思路】', required: 'optional', note: 'multiline' },",
+    "{ tag: '【答案】', required: 'optional', note: 'answer', params: { multiExample: 'AB', trueFalse: '对/错' } },",
+    "{ tag: '【答案区】', required: 'optional', note: 'answerSection', params: { aliases: '【答案表】【统一答案】【答案速查】' } },",
+    "{ tag: '【解析】', required: 'optional', note: 'multiline' },",
+    "{ tag: '【选项】', required: 'optional', note: 'options', params: { block: 'A. … B. …', perItem: '【选项A】【选项B】' } },",
+    "{ tag: '【难度】', required: 'optional', note: 'difficulty', params: { levels: '简单/中等/困难' } },",
+    "{ tag: '【题型】', required: 'optional', note: 'type', params: { values: '单选/多选/判断/填空/解答' } },",
+    "{ tag: '【题目】', required: 'required', note: 'question' },",
+    "{ tag: '【题目材料】', required: 'groupRequired', note: 'stimulus' },",
+    "{ tag: '【题组】', required: 'groupRequired', note: 'group' },",
+    "{ tag: '【题组结束】', required: 'optional', note: 'groupEnd' },",
+    "| 答案 | B | B |",
+    "| 题号 | 1 | 2 |",
+    "【答案】2`,",
+    "【答案】A",
+    "【答案】A",
+    "【答案】对`,",
+    "【答案】略",
+    "【答案】略",
+    "【答案】略`,",
+    "【答案区】",
+    "【解析】空集是任何集合的子集。`,",
+    "【选项】A. 1 B. 2 C. 3 D. 4",
+    "【选项】A. 5 B. 6 C. 7 D. 8",
+    "【选项】A. 空集是任何集合的子集  B. 0 是空集  C. {0} 是空集  D. 以上都不对",
+    "【选项】A. 选项一  B. 选项二",
+    "【题型】单选",
+    "【题型】解答",
+    "【题目】3+3=?",
+    "【题目】题组后的独立题",
+    "【题目材料】材料一",
+    "【题组】材料一",
+    "【题组结束】",
+    "这里可以包含多段 Markdown 内容。",
+    "阅读下面的文字，完成后续题目。"
+  ],
+  "app/components/composition-next/nodes/ModuleBlockView.vue": [
+    "const FIELD_LABELS: Record<AnswerFieldKey, string> = { answer: '答案', thinking: '思路', analysis: '解析', summary: '小结' }"
+  ],
+  "app/components/composition-next/nodes/QuestionBlockView.vue": [
+    ">分）</template>",
+    "const scoreDisplay = computed(() => `（${questionScore.value != null ? `${questionScore.value}分` : t('compositionNodes.question.score')}）`)"
+  ],
+  "app/components/composition/SnapshotRenderer.vue": [
+    "<span v-if=\"resolvedQuestionScore(node, props.snapshot) != null\" class=\"ml-auto text-xs text-muted-foreground\">（{{ resolvedQuestionScore(node, props.snapshot) }} 分）</span>"
+  ],
+  "app/components/manager/KnowledgePointImportDialog.vue": [
+    "<p class=\"text-muted-foreground mt-1\">{{ t('kpImport.templateColumns', { subject: '学科名称', level1: '一级目录', level2: '二级目录', level8: '八级目录' }) }}</p>"
+  ],
+  "app/components/manager/TagImportDialog.vue": [
+    "<li>{{ t('tagImport.steps.fill', { name: '名称', category: '分类', color: '颜色' }) }}</li>",
+    "<li>{{ t('tagImport.steps.upload', { name: '名称' }) }}</li>",
+    "<p class=\"text-muted-foreground mt-1\">{{ t('tagImport.templateColumns', { name: '名称', category: '分类', color: '颜色' }) }}</p>"
+  ],
+  "app/components/manager/UserImportDialog.vue": [
+    "<li>{{ t('userImport.steps.fill', { username: '用户名', fullName: '姓名', password: '密码', admin: '管理员' }) }}</li>",
+    "<p class=\"text-muted-foreground mt-1\">{{ t('userImport.templateColumns', { username: '用户名', fullName: '姓名', password: '密码', admin: '管理员', yes: '是' }) }}</p>"
+  ],
+  "app/components/rich-editor/richDoc.ts": [
+    "parts.push(' [音频] ')"
+  ],
+  "app/composables/useAiClientTools.ts": [
+    "if (!handler) return { ok: false, content: `前端没有实现工具 ${name}。` }",
+    "return { ok: false, content: 'composition_id 不是有效的稿件 id。' }",
+    "return { ok: false, content: 'scope 只能是 shared 或 personal。' }",
+    "return { ok: false, content: `前端执行失败：${e?.message ?? e}` }",
+    "return { ok: false, content: `未知的页面标识：${page}` }",
+    "return { ok: true, content: '已在浏览器中打开该稿件。', data: { composition_id: id } }",
+    "return { ok: true, content: '已在浏览器中打开该页面。', data: { page } }"
+  ],
+  "app/composables/useCompositionAiTools.ts": [
+    ": '这批操作没有产生任何实际变化。'",
+    "`已生成 ${changes.length} 处改动的预览，等待用户点「应用」确认后才会保存：`,",
+    "content: '上一批改动还等着用户确认，请先让用户点「应用」或「放弃」，再提交新的改动。',",
+    "lines.push('', '以下操作失败，其余已生效：')",
+    "return { ok: false, content: 'operations 是空的，没有可执行的操作。' }",
+    "return { ok: false, content: '当前用户没有这个学科的组稿编辑权限，无法修改稿件。' }"
+  ],
+  "app/lib/answerFormat.ts": [
+    "fill_in_the_blank: '填空题',",
+    "free_response: '解答题',",
+    "multiple_choice: '多选题',",
+    "option_matching: '选项匹配',",
+    "return answer.correct ? '正确' : '错误'",
+    "single_choice: '单选题',",
+    "true_false: '判断题',"
+  ],
+  "app/lib/compositionDocument.ts": [
+    "heading.content = headingTextToDoc('参考答案')"
+  ],
+  "app/lib/compositionOutline.ts": [
+    "+ `分值${ctx.scoringEnabled ? '开' : '关'}、`",
+    "+ `默认展示${globals.length ? globals.join('/') : '无'}`,",
+    "`全局设置：题号${ctx.numberingEnabled ? '开' : '关'}、`",
+    "`稿件《${ctx.title}》 共 ${doc.nodes.length} 个顶层节点`,",
+    "analysis: '解析',",
+    "answer: '答案',",
+    "if (number) parts.push(`题号${number}`)",
+    "if (score != null) parts.push(`${score}分`)",
+    "lines.push('（稿件是空的，还没有任何内容）')",
+    "parts.push(slotNumbers.length ? `空位题号${slotNumbers.join(',')}` : '空位未编号')",
+    "return `answer_space ${props.lines}行 ${props.style}`",
+    "return `question_details 收录=${props.scope} 展示=${on.length ? on.join('/') : '无'}`",
+    "return `question_group 材料#${node.stimulusId ?? '?'} 「${truncate(richDocToPlainText(node.content))}」`",
+    "return v == null ? null : `${v ? '显示' : '隐藏'}${FIELD_LABELS[key]}`",
+    "summary: '小结',",
+    "thinking: '思路',"
+  ],
+  "app/lib/compositionPrimitives.ts": [
+    "default: throw new Error(`不支持的操作：${(op as { op: string }).op}`)",
+    "if (!allowed) throw new Error(`${node.nodeType} 节点没有可修改的属性。`)",
+    "if (!changed.length) throw new Error('show 里没有任何可识别的字段。')",
+    "if (idx < 0) throw new Error(`找不到节点 ${after}，请先用 read_composition_outline 获取最新的节点 id。`)",
+    "if (node.nodeType !== 'question') throw new Error(`节点 ${op.node_id} 不是题目，无法设置字段显隐。`)",
+    "if (op.before === op.node_id) throw new Error('不能把节点移到它自己之前。')",
+    "message: `已添加「${op.title}」模块。`,",
+    "message: `已设置题目字段显隐（${changed.join('，')}）。`,",
+    "return { doc: insertRootNodesAfter(doc, index, nodes), message: `已插入 ${nodes.length} 个节点。` }",
+    "return { doc: normalizeDocument(patchNode(doc, node.id, { props })), message: '已更新节点属性。' }",
+    "return { doc: normalizeDocument({ nodes }), message: `已删除 ${doomed.size} 个节点。` }",
+    "return { doc: normalizeDocument({ nodes: rest }), message: '已移动节点。' }",
+    "throw new Error('选项匹配题按空位编号和赋分，不支持设置整题题号或分值；请让用户在画布上设置。')",
+    "throw new Error(`${node.nodeType} 节点只支持修改 ${allowed.join('/')}，不支持 ${unknown.join('/')}。`)",
+    "throw new Error(`找不到节点 ${id}，请先用 read_composition_outline 获取最新的节点 id。`)",
+    "throw new Error(`找不到节点 ${id}，请先用 read_composition_outline 获取最新的节点 id。`)",
+    "throw new Error(`找不到落点节点 ${op.before}，请先用 read_composition_outline 获取最新的节点 id。`)",
+    "throw new Error(`节点 ${id} 是参考答案模块内的子节点，不支持直接修改；请改动模块本身或它引用的题目。`)",
+    "throw new Error(`节点 ${id} 是参考答案模块内的派生节点，不能单独删除；要去掉它请删除对应的题目或整个模块。`)",
+    "throw new Error(`题库里找不到 id 为 ${spec.question_id} 的题目（可能已删除或不属于本学科）。`)"
+  ],
+  "app/lib/compositionSnapshot.ts": [
+    "if (scores.length === slotCount && new Set(scores).size === 1) return `每空 ${scores[0]} 分`",
+    "return `共 ${scores.reduce((sum, score) => sum + score, 0)} 分`"
+  ],
+  "app/pages/about.vue": [
+    "{ name: '寻梦', noteKey: 'about.contributors.xunmeng' },"
+  ],
+  "app/pages/import/smart.vue": [
+    "<Badge variant=\"secondary\">【答案】</Badge>",
+    "<Badge variant=\"secondary\">【答案区】</Badge>",
+    "<Badge variant=\"secondary\">【解析】</Badge>",
+    "<Badge variant=\"secondary\">【选项】</Badge>",
+    "<div class=\"text-sm text-muted-foreground mt-1\">{{ t('importSmart.settings.structuredMethodDescription', { tags: '【题目】【答案】' }) }}</div>",
+    "<template #tag><Badge variant=\"outline\">【题目】</Badge></template>",
+    "const STRUCTURED_TAG_PATTERN = /[【\\[]\\s*(题目|题干|question|title)\\s*[】\\]]/i",
+    "error.value = t('importSmart.alerts.noQuestionsParsed', { tag: '【题目】' })",
+    "if (typeof detail === 'string' && detail.includes('未能入库') && !proceedWithPartial) {",
+    "return t('importSmart.alerts.tagMissing', { tag: '【题目】' })"
+  ],
+  "app/pages/settings.vue": [
+    "saveRegistrationSetting(REGISTRATION_APPROVAL_KEY, value, '注册用户是否需要管理员审核')",
+    "saveRegistrationSetting(REGISTRATION_ENABLED_KEY, value, '是否开放用户自助注册')"
+  ],
+  "app/pages/test.vue": [
+    "content: { type: 'doc', content: [{ type: 'paragraph', content: [{ type: 'text', text: '拖动左侧手柄可整块移动；按住 Ctrl/Cmd 拖拽可跨块框选。' }] }] },",
+    "content: { type: 'doc', content: [{ type: 'paragraph', content: [{ type: 'text', text: '期中测试卷' }] }] },",
+    "content: { type: 'doc', content: [{ type: 'paragraph', content: [{ type: 'text', text: '示例题干：1 + 1 = ?' }] }] },"
+  ]
+}
