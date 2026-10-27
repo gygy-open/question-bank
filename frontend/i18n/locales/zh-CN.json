@@ -2120,6 +2120,16 @@
     "fillDefault": "填入默认模板",
     "resetToDefault": "重置为默认",
     "saveOverride": "保存覆盖",
+    "items": {
+      "AI_EXTRACT_PROMPT": {
+        "title": "文档题目提取助手",
+        "description": "控制 AI 从上传的 Word 或图片中识别并拆分题干与选项的行为准则。"
+      },
+      "AI_SOLVE_PROMPT": {
+        "title": "解题推理分析助手",
+        "description": "定义 AI 在生成题目解析和答案时应遵循的逻辑与排版格式。"
+      }
+    },
     "emptyTitle": "暂无可配置的提示词",
     "emptyDescription": "请先选择一个学科",
     "noSubjectsTitle": "暂无可管理的学科",

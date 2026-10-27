@@ -16,7 +16,7 @@ import {
 import type { Subject } from '~/types'
 import { filterPromptManageableSubjects } from '@/lib/subjectPromptAccess'
 
-const { t } = useI18n()
+const { t, te } = useI18n()
 const { $api } = useNuxtApp()
 const { permissions } = usePermissions()
 
@@ -29,11 +29,16 @@ interface SubjectPrompt {
   is_custom: boolean
 }
 
-// 图标按 key 映射；标题/描述由后端返回
+// 图标按 key 映射；标题/描述按 key 走前端翻译，未登记的 key 回退到后端返回值
 const iconMap: Record<string, any> = {
   AI_EXTRACT_PROMPT: FileText,
   AI_SOLVE_PROMPT: BrainCircuit,
 }
+
+const promptTitle = (p: SubjectPrompt) =>
+  te(`prompts.items.${p.key}.title`) ? t(`prompts.items.${p.key}.title`) : p.title
+const promptDescription = (p: SubjectPrompt) =>
+  te(`prompts.items.${p.key}.description`) ? t(`prompts.items.${p.key}.description`) : p.description
 
 const availableSubjects = ref<Subject[]>([])
 const subjects = computed(() =>
@@ -89,7 +94,7 @@ const save = async (p: SubjectPrompt) => {
       method: 'PUT',
       body: { value: drafts[p.key] },
     })
-    toast.success(t('common.saved'), { description: t('prompts.toast.savedDescription', { title: p.title }) })
+    toast.success(t('common.saved'), { description: t('prompts.toast.savedDescription', { title: promptTitle(p) }) })
     await fetchPrompts()
   } catch (error) {
     toast.error(t('common.saveFailed'), { description: (error as any).message })
@@ -102,7 +107,7 @@ const reset = async (p: SubjectPrompt) => {
   saving[p.key] = true
   try {
     await $api(`/subjects/${selectedSubjectId.value}/prompts/${p.key}`, { method: 'DELETE' })
-    toast.success(t('prompts.toast.resetDone'), { description: t('prompts.toast.resetDescription', { title: p.title }) })
+    toast.success(t('prompts.toast.resetDone'), { description: t('prompts.toast.resetDescription', { title: promptTitle(p) }) })
     await fetchPrompts()
   } catch (error) {
     toast.error(t('prompts.toast.resetFailed'), { description: (error as any).message })
@@ -163,7 +168,7 @@ onMounted(async () => {
               </div>
               <div>
                 <div class="flex items-center gap-2">
-                  <h3 class="font-semibold text-base">{{ p.title }}</h3>
+                  <h3 class="font-semibold text-base">{{ promptTitle(p) }}</h3>
                   <Badge variant="outline" class="text-[10px] font-mono py-0 h-4">{{ p.key }}</Badge>
                   <Badge
                     :variant="p.is_custom ? 'default' : 'secondary'"
@@ -173,7 +178,7 @@ onMounted(async () => {
                   </Badge>
                 </div>
                 <p class="text-xs text-muted-foreground mt-0.5 line-clamp-1 font-normal">
-                  {{ p.description }}
+                  {{ promptDescription(p) }}
                 </p>
               </div>
             </div>

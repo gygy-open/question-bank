@@ -2120,6 +2120,16 @@
     "fillDefault": "Fill Default Template",
     "resetToDefault": "Reset to Default",
     "saveOverride": "Save Override",
+    "items": {
+      "AI_EXTRACT_PROMPT": {
+        "title": "Document Question Extraction Assistant",
+        "description": "Controls how the AI identifies and splits stems and options from uploaded Word files or images."
+      },
+      "AI_SOLVE_PROMPT": {
+        "title": "Solution Reasoning Assistant",
+        "description": "Defines the logic and formatting the AI follows when generating question explanations and answers."
+      }
+    },
     "emptyTitle": "No Configurable Prompts",
     "emptyDescription": "Select a subject first.",
     "noSubjectsTitle": "No Subjects to Manage",
