@@ -60,3 +60,13 @@ pnpm docs:dev
 ```
 
 向 `main` 分支的 `docs/**` 推送后，GitHub Actions 会自动构建并部署到 GitHub Pages。
+
+### 文档多语言
+
+中文是唯一原文；英文译文放在 `docs/en/`，与中文路径一一对应（`guide/`、`desktop/`、`server/`、`admin/`、`features/` 与首页）。`development/` 等开发者文档只维护中文。
+
+- 修改中文页面后运行 `pnpm i18n:status`，查看缺失（missing）、过期（stale）、多余（orphan）及结构不一致（structure）的译文。
+- 更新 `docs/en/` 下对应页面：标题、代码块、`:::` 容器、图片数量须与原文一致；站内链接加 `/en` 前缀；界面文案使用应用英文界面的实际文字（见 `frontend/i18n/locales/en-US.json`），术语遵循 `frontend/i18n/glossary.json`。
+- 译文完成后运行 `pnpm i18n:mark <路径>`（如 `pnpm i18n:mark guide/introduction.md`）记录原文哈希，并提交 `docs/.translation-lock.json`。
+- `pnpm i18n:check` 在存在任何问题时返回非零；部署流程只打印状态，不会因译文过期而阻断发布。
+- 侧边栏与导航分别在 `.vitepress/locales/zh.mts` 和 `en.mts` 中维护，新增页面时两边都要加。

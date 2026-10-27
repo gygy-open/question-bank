@@ -1,0 +1,28 @@
+{
+  "en": {
+    "admin/ai-config.md": "97696a773ad2f2af",
+    "admin/permissions.md": "de45935001ac2da3",
+    "admin/prompts.md": "15f9f50fe5235050",
+    "admin/system-settings.md": "dfef5926a25907a2",
+    "admin/users.md": "fd2c29fc43f8b5ad",
+    "desktop/install.md": "4cec05921c509ffb",
+    "desktop/lan-sharing.md": "997afd04b71fa9e8",
+    "desktop/personal.md": "0ca483687f7b183a",
+    "desktop/upgrade.md": "b392613edfb4891f",
+    "features/activity-logs.md": "67acf7053acf272d",
+    "features/chat.md": "b5dbf28d5a387d74",
+    "features/import.md": "dceaa53623a70382",
+    "features/knowledge-points.md": "050e53a37c4d4dfa",
+    "features/preview.md": "be03e74263840cf3",
+    "features/questions.md": "63035efebe7dc435",
+    "features/review-workflow.md": "df1ebea133dac29a",
+    "features/subjects-and-tags.md": "f562d2903bbcce07",
+    "guide/editions.md": "6e731ece168b210d",
+    "guide/introduction.md": "e5cd3184b4209fe1",
+    "index.md": "bdd9d464d1e91eb7",
+    "server/configuration.md": "e3cb46be866891d8",
+    "server/database.md": "455375ed3803d908",
+    "server/docker.md": "28bdcb85c84d00df",
+    "server/operations.md": "708cce81e148d31b"
+  }
+}

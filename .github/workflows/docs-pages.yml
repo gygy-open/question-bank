@@ -49,6 +49,9 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Translation status (informational)
+        run: pnpm i18n:status
+
       - name: Build with VitePress
         run: pnpm docs:build
 

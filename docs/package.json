@@ -6,7 +6,10 @@
   "scripts": {
     "docs:dev": "vitepress dev",
     "docs:build": "vitepress build",
-    "docs:preview": "vitepress preview"
+    "docs:preview": "vitepress preview",
+    "i18n:status": "node scripts/i18n-docs.mjs status",
+    "i18n:check": "node scripts/i18n-docs.mjs check",
+    "i18n:mark": "node scripts/i18n-docs.mjs mark"
   },
   "devDependencies": {
     "vitepress": "^1.6.3"
