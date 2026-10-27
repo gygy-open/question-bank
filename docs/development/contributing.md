@@ -70,3 +70,4 @@ pnpm docs:dev
 - 译文完成后运行 `pnpm i18n:mark <路径>`（如 `pnpm i18n:mark guide/introduction.md`）记录原文哈希，并提交 `docs/.translation-lock.json`。
 - `pnpm i18n:check` 在存在任何问题时返回非零；部署流程只打印状态，不会因译文过期而阻断发布。
 - 侧边栏与导航分别在 `.vitepress/locales/zh.mts` 和 `en.mts` 中维护，新增页面时两边都要加。
+- 浏览器语言检测：首次访问双语页面时，若浏览器首选语言不是中文，会跳转到对应英文页；之后记住用户最后浏览的语言（通过语言菜单切换即生效）。逻辑在 `.vitepress/lang-redirect.mts`，其中的双语范围需与 `scripts/i18n-docs.mjs` 的 `SCOPE` 保持一致。
