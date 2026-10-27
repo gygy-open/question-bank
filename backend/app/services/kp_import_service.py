@@ -5,14 +5,9 @@ Handles Excel template generation, preflight checks (for the rebuild mode),
 and importing an .xlsx file into the knowledge point tree.
 """
 import asyncio
-import io
 import time
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Dict, List, Optional, Tuple
 
-import pandas as pd
-from openpyxl import Workbook
-from openpyxl.styles import Font, PatternFill
-from openpyxl.utils import get_column_letter
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -21,61 +16,20 @@ from app.core.vector_store import VectorStore
 from app.models.knowledge_point import KnowledgePoint
 from app.models.question import question_knowledge_points
 from app.models.subject import Subject
+from app.services import excel_import
+from app.services.excel_import import MissingColumnsError, clean as _clean, text as _t
 from app.schemas.knowledge_point import (
     KPImportPreflight,
     KPImportResult,
     KPImportRowError,
 )
 
-# Template column headers (Chinese, matched exactly on import).
-SUBJECT_COL = "学科名称"
-LEVEL_COLS = [
-    "一级目录",
-    "二级目录",
-    "三级目录",
-    "四级目录",
-    "五级目录",
-    "六级目录",
-    "七级目录",
-    "八级目录",
-]
-ALL_COLS = [SUBJECT_COL] + LEVEL_COLS
-
-# Example rows shipped inside the template so users see the expected format.
-# Rows are padded to the full column count in generate_template().
-EXAMPLE_ROWS = [
-    ["数学", "代数", "方程", "一元一次方程"],
-    ["数学", "代数", "方程", "一元二次方程", "解法", "公式法"],
-    ["数学", "几何", "平面几何", "三角形"],
-]
+LEVEL_KEYS = [f"level_{i}" for i in range(1, excel_import.KP_LEVELS + 1)]
 
 
 def generate_template() -> bytes:
-    """Generate the .xlsx import template (headers + example rows)."""
-    wb = Workbook()
-    ws = wb.active
-    ws.title = "知识点导入"
-
-    header_font = Font(bold=True, color="FFFFFF")
-    header_fill = PatternFill(start_color="4F81BD", end_color="4F81BD", fill_type="solid")
-
-    ws.append(ALL_COLS)
-    for cell in ws[1]:
-        cell.font = header_font
-        cell.fill = header_fill
-
-    for row in EXAMPLE_ROWS:
-        padded = list(row) + [""] * (len(ALL_COLS) - len(row))
-        ws.append(padded)
-
-    # Reasonable column widths.
-    ws.column_dimensions["A"].width = 16
-    for idx in range(2, len(ALL_COLS) + 1):
-        ws.column_dimensions[get_column_letter(idx)].width = 18
-
-    buffer = io.BytesIO()
-    wb.save(buffer)
-    return buffer.getvalue()
+    """Generate the .xlsx import template in the request locale."""
+    return excel_import.generate_template(excel_import.KP_SCHEMA)
 
 
 async def preflight(db: AsyncSession, subject_id: int) -> Optional[KPImportPreflight]:
@@ -113,21 +67,6 @@ async def preflight(db: AsyncSession, subject_id: int) -> Optional[KPImportPrefl
     )
 
 
-def _parse_rows(file_bytes: bytes) -> pd.DataFrame:
-    """Read the .xlsx into a DataFrame, validating required columns exist."""
-    df = pd.read_excel(io.BytesIO(file_bytes), dtype=str)
-    missing = [c for c in ALL_COLS if c not in df.columns]
-    if missing:
-        raise ValueError(f"缺少必需的列：{', '.join(missing)}。请使用最新导入模板。")
-    return df
-
-
-def _clean(value: Any) -> str:
-    if value is None or pd.isna(value):
-        return ""
-    return str(value).strip()
-
-
 async def import_excel(
     db: AsyncSession,
     *,
@@ -144,9 +83,13 @@ async def import_excel(
     started = time.perf_counter()
 
     try:
-        df = _parse_rows(file_bytes)
-    except ValueError as e:
-        return KPImportResult(status="failed", mode=mode, errors=[KPImportRowError(row=0, message=str(e))])
+        df = excel_import.read_rows(file_bytes, excel_import.KP_SCHEMA)
+    except MissingColumnsError as e:
+        return KPImportResult(
+            status="failed",
+            mode=mode,
+            errors=[KPImportRowError(row=0, message=excel_import.missing_columns_message(e))],
+        )
 
     # Cache subjects by name and slug for fast lookup.
     subjects_result = await db.execute(select(Subject))
@@ -163,20 +106,20 @@ async def import_excel(
 
     for idx, row in df.iterrows():
         excel_row = int(idx) + 2  # +1 header, +1 for 1-based
-        subject_name = _clean(row.get(SUBJECT_COL))
+        subject_name = _clean(row.get("subject"))
         if not subject_name:
-            errors.append(KPImportRowError(row=excel_row, message="学科名称不能为空"))
+            errors.append(KPImportRowError(row=excel_row, message=_t("knowledge_point.err.subject_required")))
             continue
         subject = subject_by_key.get(subject_name)
         if not subject:
             errors.append(KPImportRowError(
-                row=excel_row, message=f"学科 '{subject_name}' 不存在，请先创建该学科"
+                row=excel_row, message=_t("knowledge_point.err.subject_not_found", subject=subject_name)
             ))
             continue
 
-        path = [p for p in (_clean(row.get(c)) for c in LEVEL_COLS) if p]
+        path = [p for p in (_clean(row.get(c)) for c in LEVEL_KEYS) if p]
         if not path:
-            errors.append(KPImportRowError(row=excel_row, message="一级目录不能为空"))
+            errors.append(KPImportRowError(row=excel_row, message=_t("knowledge_point.err.level_1_required")))
             continue
 
         parsed.append((subject, path))
