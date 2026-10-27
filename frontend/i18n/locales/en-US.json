@@ -36,7 +36,13 @@
     "add": "Add",
     "download": "Download",
     "confirm": "OK",
-    "close": "Close"
+    "close": "Close",
+    "more": "More",
+    "prevStep": "Back",
+    "nextStep": "Next",
+    "toggleSidebar": "Toggle sidebar",
+    "scrollToEnd": "Scroll to bottom",
+    "scrollToStart": "Scroll to top"
   },
   "language": {
     "label": "Language",
@@ -1096,20 +1102,12 @@
       "confirm": "Reset"
     }
   },
-  "userImport": {
-    "title": "Batch Import Users",
-    "description": "Create multiple user accounts at once from an Excel file.",
+  "importDialog": {
     "instructions": "Instructions",
-    "steps": {
-      "download": "Download the Excel template and review the sample format",
-      "fill": "Fill in the {username}, {fullName}, and {password} columns (the {admin} column is optional)",
-      "upload": "Upload the completed file"
-    },
-    "section": {
-      "template": "1. Download and Fill In the Template",
-      "upload": "2. Upload the Completed File"
-    },
-    "templateColumns": "Template columns: {username} (required), {fullName} (required), {password} (required, at least 6 characters), {admin} (optional, enter “{yes}”)",
+    "stepDownload": "Download the Excel template and review the sample format",
+    "stepUpload": "Upload the completed file",
+    "sectionTemplate": "1. Download and Fill In the Template",
+    "sectionUpload": "2. Upload the Completed File",
     "downloadTemplate": "Download Excel Template",
     "dropHint": "Click to select a file or drag it here",
     "formatHint": "Only .xlsx files are supported, up to 5 MB.",
@@ -1121,18 +1119,26 @@
     "errorsCopied": "Error details copied.",
     "start": "Start Import",
     "processing": "Processing, please wait…",
-    "importing": "Importing users…",
     "resultTitle": "Import Results",
+    "rowLabel": "Row {row}",
+    "fileLabel": "File",
+    "continue": "Import More"
+  },
+  "userImport": {
+    "title": "Batch Import Users",
+    "description": "Create multiple user accounts at once from an Excel file.",
+    "steps": {
+      "fill": "Fill in the {username}, {fullName}, and {password} columns (the {admin} column is optional)"
+    },
+    "templateColumns": "Template columns: {username} (required), {fullName} (required), {password} (required, at least 6 characters), {admin} (optional, enter “{yes}”)",
+    "importing": "Importing users…",
     "resultSummary": "{total} rows: {created} succeeded, {failed} failed",
     "status": {
       "success": "All users imported",
       "partial": "Partially imported"
     },
     "createdCount": "Created {count} users",
-    "errorDetails": "Failures ({count})",
-    "rowLabel": "Row {row}",
-    "fileLabel": "File",
-    "continue": "Import More"
+    "errorDetails": "Failures ({count})"
   },
   "subjects": {
     "listTitle": "Subjects",
@@ -1208,30 +1214,12 @@
   "tagImport": {
     "title": "Batch Import Tags",
     "description": "Create multiple tags for the current subject at once from an Excel file.",
-    "instructions": "Instructions",
     "steps": {
-      "download": "Download the Excel template and review the sample format",
       "fill": "Fill in the {name} column, the {category} column (optional; missing categories are created automatically), and the {color} column (optional)",
       "upload": "Upload the completed file. Tags with existing names are skipped automatically (other tags still import). The whole file is rejected only on format errors (e.g. an empty {name} column); just fix them and upload again"
     },
-    "section": {
-      "template": "1. Download and Fill In the Template",
-      "upload": "2. Upload the Completed File"
-    },
     "templateColumns": "Template columns: {name} (required), {category} (optional; created automatically if missing), {color} (optional; hex value such as #4F81BD)",
-    "downloadTemplate": "Download Excel Template",
-    "dropHint": "Click to select a file or drag it here",
-    "formatHint": "Only .xlsx files are supported, up to 5 MB.",
-    "invalidFormat": "Invalid file format. Please upload an .xlsx file.",
-    "fileTooLarge": "File is too large. It must be smaller than 5 MB.",
-    "downloadTemplateFailed": "Failed to download template: {error}",
-    "importFailed": "Import failed.",
-    "errorLine": "Row {row}: {message}",
-    "errorsCopied": "Error details copied.",
-    "start": "Start Import",
-    "processing": "Processing, please wait…",
     "importing": "Importing tags…",
-    "resultTitle": "Import Results",
     "resultSummary": "{total} rows: {created} created, {skipped} duplicates skipped",
     "status": {
       "success": "Import complete",
@@ -1240,39 +1228,19 @@
     "createdCount": "Created {count} tags",
     "skippedSuffix": ", skipped {count} tags with existing names",
     "fixAndRetry": "Fix the file as described below and upload it again.",
-    "errorDetails": "Errors ({count})",
-    "rowLabel": "Row {row}",
-    "fileLabel": "File",
-    "continue": "Import More"
+    "errorDetails": "Errors ({count})"
   },
   "kpImport": {
     "title": "Batch Import Knowledge Points",
     "step1": "Step 1 of 2: Prepare the Import File",
     "step2": "Step 2 of 2: Confirm Import Settings",
-    "instructions": "Instructions",
     "intro": "Use this feature to create knowledge point trees in bulk, with up to eight levels of nesting. Follow these steps:",
     "steps": {
-      "download": "Download the Excel template and review the sample format",
-      "fill": "Fill in the knowledge point data in the template",
-      "upload": "Upload the completed file"
-    },
-    "section": {
-      "template": "1. Download and Fill In the Template",
-      "upload": "2. Upload the Completed File"
+      "fill": "Fill in the knowledge point data in the template"
     },
     "templateColumns": "Template columns: {subject} (required), {level1} (required), {level2}–{level8} (optional)",
-    "downloadTemplate": "Download Excel Template",
-    "dropHint": "Click to select a file or drag it here",
-    "formatHint": "Only .xlsx files are supported, up to 5 MB.",
-    "invalidFormat": "Invalid file format. Please upload an .xlsx file.",
-    "fileTooLarge": "File is too large. It must be smaller than 5 MB.",
-    "downloadTemplateFailed": "Failed to download template: {error}",
-    "importFailed": "Import failed.",
-    "errorLine": "Row {row}: {message}",
-    "errorsCopied": "Error details copied.",
     "next": "Next",
     "prev": "Back",
-    "start": "Start Import",
     "fileName": "Import file: {name}",
     "selectMode": "Select Import Mode",
     "mode": {
@@ -1399,6 +1367,22 @@
       "ipAddress": "IP Address",
       "time": "Time",
       "details": "Details"
+    },
+    "actions": {
+      "login": "Sign In",
+      "logout": "Log Out",
+      "create": "Create",
+      "update": "Update",
+      "delete": "Delete",
+      "restore": "Restore",
+      "review": "Review"
+    },
+    "resourceTypes": {
+      "question": "Question",
+      "knowledgePoint": "Knowledge Point",
+      "subject": "Subject",
+      "tag": "Tag",
+      "user": "User"
     }
   },
   "media": {
@@ -1485,7 +1469,10 @@
       "summarySkipped": ", {count} not replaced due to missing permissions",
       "summaryFrozen": ", {count} finalized versions keep the original",
       "failed": "Replacement failed.",
-      "title": "Replace {noun}",
+      "title": {
+        "image": "Replace Image",
+        "audio": "Replace Audio"
+      },
       "description": "Replace this {noun} in the selected content with a new one. The original file stays in the media library.",
       "originalAlt": "Original",
       "newAlt": "New image",
@@ -1533,7 +1520,10 @@
     "selectAudioFile": "Select an audio file.",
     "audioUploadFailed": "Audio upload failed.",
     "selectImageFile": "Select an image file.",
-    "title": "Insert {noun}",
+    "title": {
+      "image": "Insert Image",
+      "audio": "Insert Audio"
+    },
     "description": "Upload a new {noun} or choose one from this subject's media library.",
     "selectSubjectFirst": "Select a subject before inserting a {noun}.",
     "recent": "Recently Used",
@@ -1545,7 +1535,10 @@
     "noMatch": "No matching {noun}",
     "empty": "No {noun} in the media library yet. Upload one to get started.",
     "unsupportedFormat": "Your browser can't display this format",
-    "unnamed": "{noun} #{id}",
+    "unnamed": {
+      "image": "Image #{id}",
+      "audio": "Audio #{id}"
+    },
     "noRecent": "No {noun} inserted yet"
   },
   "settings": {

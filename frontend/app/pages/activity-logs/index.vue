@@ -29,7 +29,7 @@ import { X } from '@lucide/vue'
 import { format } from 'date-fns'
 import PageHeader from '~/components/PageHeader.vue'
 
-const { t } = useI18n()
+const { t, te } = useI18n()
 const { user } = useAuth()
 const router = useRouter()
 
@@ -76,6 +76,12 @@ const formatDate = (dateStr: string) => {
 const formatDetails = (details: any) => {
   if (!details) return '-'
   return JSON.stringify(details)
+}
+
+const logLabel = (group: 'actions' | 'resourceTypes', value?: string | null) => {
+  if (!value) return '-'
+  const key = `activityLogs.${group}.${value.replace(/_(\w)/g, (_, c: string) => c.toUpperCase())}`
+  return te(key) ? t(key) : value
 }
 </script>
 
@@ -139,8 +145,8 @@ const formatDetails = (details: any) => {
               </div>
               <span v-else class="text-muted-foreground">-</span>
             </TableCell>
-            <TableCell>{{ log.action }}</TableCell>
-            <TableCell>{{ log.resource_type || '-' }}</TableCell>
+            <TableCell>{{ logLabel('actions', log.action) }}</TableCell>
+            <TableCell>{{ logLabel('resourceTypes', log.resource_type) }}</TableCell>
             <TableCell>{{ log.resource_id || '-' }}</TableCell>
             <TableCell>{{ log.ip_address || '-' }}</TableCell>
             <TableCell>{{ formatDate(log.created_at) }}</TableCell>

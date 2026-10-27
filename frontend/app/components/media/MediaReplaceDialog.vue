@@ -67,7 +67,7 @@ async function submit() {
     <Dialog v-model:open="open">
         <DialogContent class="sm:max-w-lg">
             <DialogHeader>
-                <DialogTitle>{{ t('media.replace.title', { noun }) }}</DialogTitle>
+                <DialogTitle>{{ t(props.asset.kind === 'audio' ? 'media.replace.title.audio' : 'media.replace.title.image') }}</DialogTitle>
                 <DialogDescription>{{ t('media.replace.description', { noun }) }}</DialogDescription>
             </DialogHeader>
 

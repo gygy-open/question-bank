@@ -14,7 +14,7 @@ import {
     SquareSigma,
 } from '@lucide/vue'
 import SlashCommandList from './SlashCommandList.vue'
-import { translate } from '@/lib/locale'
+import { DEFAULT_LOCALE, translate } from '@/lib/locale'
 
 export interface SlashCommandOptions {
     /** Called when the "image" item is picked, so the host can open a file picker. */
@@ -102,17 +102,14 @@ const ITEMS: SlashCommandItemDef[] = [
 ]
 
 function getSuggestionItems(query: string): SlashCommandItem[] {
-    const items = ITEMS.map(({ titleKey, ...rest }) => ({ ...rest, title: translate(titleKey) }))
     const q = query.trim().toLowerCase()
-    if (!q) {
-        return items
-    }
-    return items.filter((item) => {
-        if (item.title.toLowerCase().includes(q)) {
-            return true
-        }
-        return item.aliases?.some((alias) => alias.includes(q)) ?? false
-    })
+    // 额外匹配中文标题，让其他语言界面下也能用中文搜索。
+    return ITEMS
+        .filter(({ titleKey, aliases }) => !q
+            || translate(titleKey).toLowerCase().includes(q)
+            || translate(titleKey, undefined, DEFAULT_LOCALE).includes(q)
+            || (aliases?.some((alias) => alias.includes(q)) ?? false))
+        .map(({ titleKey, ...rest }) => ({ ...rest, title: translate(titleKey) }))
 }
 
 function createRenderer() {

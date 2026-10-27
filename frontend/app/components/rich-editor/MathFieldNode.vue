@@ -12,7 +12,9 @@ if (typeof window !== 'undefined') {
 }
 
 const props = defineProps(nodeViewProps)
-const { t } = useI18n()
+const { t, locale } = useI18n()
+// MathLive 默认跟随浏览器语言，改为跟随界面语言。
+MathfieldElement.locale = locale.value
 
 const isBlock = computed(() => props.node.type.name === 'blockMath')
 const latex = computed<string>(() => (props.node.attrs.latex as string) || '')

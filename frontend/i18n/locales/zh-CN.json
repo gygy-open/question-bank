@@ -36,7 +36,13 @@
     "add": "添加",
     "download": "下载",
     "confirm": "确定",
-    "close": "关闭"
+    "close": "关闭",
+    "more": "更多",
+    "prevStep": "上一步",
+    "nextStep": "下一步",
+    "toggleSidebar": "展开或收起侧边栏",
+    "scrollToEnd": "滚动到底部",
+    "scrollToStart": "滚动到顶部"
   },
   "language": {
     "label": "语言",
@@ -1096,20 +1102,12 @@
       "confirm": "确认重置"
     }
   },
-  "userImport": {
-    "title": "批量导入用户",
-    "description": "通过 Excel 一次性创建多个用户账号",
+  "importDialog": {
     "instructions": "使用说明",
-    "steps": {
-      "download": "下载 Excel 模板，查看格式示例",
-      "fill": "填写{username}、{fullName}、{password}（{admin}列可选）",
-      "upload": "上传填写好的文件"
-    },
-    "section": {
-      "template": "1. 下载并填写模板",
-      "upload": "2. 上传填写好的文件"
-    },
-    "templateColumns": "模板列：{username}(必填)、{fullName}(必填)、{password}(必填，≥6位)、{admin}(可选，填“{yes}”)",
+    "stepDownload": "下载 Excel 模板，查看格式示例",
+    "stepUpload": "上传填写好的文件",
+    "sectionTemplate": "1. 下载并填写模板",
+    "sectionUpload": "2. 上传填写好的文件",
     "downloadTemplate": "下载 Excel 模板",
     "dropHint": "点击选择文件 或 拖拽文件到此处",
     "formatHint": "仅支持 .xlsx 格式，最大 5MB",
@@ -1121,18 +1119,26 @@
     "errorsCopied": "已复制错误信息",
     "start": "开始导入",
     "processing": "正在处理，请稍候…",
-    "importing": "正在导入用户…",
     "resultTitle": "导入结果",
+    "rowLabel": "第 {row} 行",
+    "fileLabel": "文件",
+    "continue": "继续导入"
+  },
+  "userImport": {
+    "title": "批量导入用户",
+    "description": "通过 Excel 一次性创建多个用户账号",
+    "steps": {
+      "fill": "填写{username}、{fullName}、{password}（{admin}列可选）"
+    },
+    "templateColumns": "模板列：{username}(必填)、{fullName}(必填)、{password}(必填，≥6位)、{admin}(可选，填“{yes}”)",
+    "importing": "正在导入用户…",
     "resultSummary": "共 {total} 行，成功 {created} 个，失败 {failed} 个",
     "status": {
       "success": "全部导入成功",
       "partial": "部分导入成功"
     },
     "createdCount": "成功创建 {count} 个用户",
-    "errorDetails": "失败明细（{count}）",
-    "rowLabel": "第 {row} 行",
-    "fileLabel": "文件",
-    "continue": "继续导入"
+    "errorDetails": "失败明细（{count}）"
   },
   "subjects": {
     "listTitle": "学科列表",
@@ -1208,30 +1214,12 @@
   "tagImport": {
     "title": "批量导入标签",
     "description": "通过 Excel 一次性为当前学科创建多个标签",
-    "instructions": "使用说明",
     "steps": {
-      "download": "下载 Excel 模板，查看格式示例",
       "fill": "填写{name}、{category}（可选，不存在会自动创建）、{color}（可选）",
       "upload": "上传填写好的文件 —— 已存在的重名标签会被自动跳过（不影响其他标签导入），格式错误（如{name}为空）时才会整体拒绝，修正后重新上传即可"
     },
-    "section": {
-      "template": "1. 下载并填写模板",
-      "upload": "2. 上传填写好的文件"
-    },
     "templateColumns": "模板列：{name}(必填)、{category}(可选，不存在会自动创建)、{color}(可选，十六进制色值如 #4F81BD)",
-    "downloadTemplate": "下载 Excel 模板",
-    "dropHint": "点击选择文件 或 拖拽文件到此处",
-    "formatHint": "仅支持 .xlsx 格式，最大 5MB",
-    "invalidFormat": "文件格式不正确，请上传 .xlsx 文件",
-    "fileTooLarge": "文件过大，请确保文件小于 5MB",
-    "downloadTemplateFailed": "下载模板失败: {error}",
-    "importFailed": "导入失败",
-    "errorLine": "第 {row} 行: {message}",
-    "errorsCopied": "已复制错误信息",
-    "start": "开始导入",
-    "processing": "正在处理，请稍候…",
     "importing": "正在导入标签…",
-    "resultTitle": "导入结果",
     "resultSummary": "共 {total} 行，成功创建 {created} 个，跳过重复 {skipped} 个",
     "status": {
       "success": "导入完成",
@@ -1240,39 +1228,19 @@
     "createdCount": "成功创建 {count} 个标签",
     "skippedSuffix": "，跳过 {count} 个已存在的重名标签",
     "fixAndRetry": "请按下方提示修正文件后重新上传",
-    "errorDetails": "错误明细（{count}）",
-    "rowLabel": "第 {row} 行",
-    "fileLabel": "文件",
-    "continue": "继续导入"
+    "errorDetails": "错误明细（{count}）"
   },
   "kpImport": {
     "title": "批量导入知识点",
     "step1": "步骤 1 / 2：准备导入文件",
     "step2": "步骤 2 / 2：确认导入设置",
-    "instructions": "使用说明",
     "intro": "本功能用于批量创建知识点树，支持八级嵌套。请按以下步骤操作：",
     "steps": {
-      "download": "下载 Excel 模板，查看格式示例",
-      "fill": "在模板中填写知识点数据",
-      "upload": "上传填写好的文件"
-    },
-    "section": {
-      "template": "1. 下载并填写模板",
-      "upload": "2. 上传填写好的文件"
+      "fill": "在模板中填写知识点数据"
     },
     "templateColumns": "模板列：{subject}(必填)、{level1}(必填)、{level2}~{level8}(可选)",
-    "downloadTemplate": "下载 Excel 模板",
-    "dropHint": "点击选择文件 或 拖拽文件到此处",
-    "formatHint": "仅支持 .xlsx 格式，最大 5MB",
-    "invalidFormat": "文件格式不正确，请上传 .xlsx 文件",
-    "fileTooLarge": "文件过大，请确保文件小于 5MB",
-    "downloadTemplateFailed": "下载模板失败: {error}",
-    "importFailed": "导入失败",
-    "errorLine": "第 {row} 行: {message}",
-    "errorsCopied": "已复制错误信息",
     "next": "下一步",
     "prev": "上一步",
-    "start": "开始导入",
     "fileName": "导入文件：{name}",
     "selectMode": "选择导入模式",
     "mode": {
@@ -1399,6 +1367,22 @@
       "ipAddress": "IP地址",
       "time": "时间",
       "details": "详情"
+    },
+    "actions": {
+      "login": "登录",
+      "logout": "退出登录",
+      "create": "创建",
+      "update": "更新",
+      "delete": "删除",
+      "restore": "恢复",
+      "review": "审核"
+    },
+    "resourceTypes": {
+      "question": "题目",
+      "knowledgePoint": "知识点",
+      "subject": "学科",
+      "tag": "标签",
+      "user": "用户"
     }
   },
   "media": {
@@ -1485,7 +1469,10 @@
       "summarySkipped": "，{count} 处无权修改未替换",
       "summaryFrozen": "，{count} 个定稿版本保持原图",
       "failed": "替换失败",
-      "title": "替换{noun}",
+      "title": {
+        "image": "替换图片",
+        "audio": "替换音频"
+      },
       "description": "把所选内容里的这个{noun}换成新的。原文件仍保留在媒体库中。",
       "originalAlt": "原图",
       "newAlt": "新图片",
@@ -1533,7 +1520,10 @@
     "selectAudioFile": "请选择音频文件",
     "audioUploadFailed": "音频上传失败",
     "selectImageFile": "请选择图片文件",
-    "title": "插入{noun}",
+    "title": {
+      "image": "插入图片",
+      "audio": "插入音频"
+    },
     "description": "上传新{noun}，或从本学科媒体库中选择已有{noun}。",
     "selectSubjectFirst": "请先选择学科再插入{noun}。",
     "recent": "最近使用",
@@ -1545,7 +1535,10 @@
     "noMatch": "没有匹配的{noun}",
     "empty": "媒体库里还没有{noun}，先上传一个吧",
     "unsupportedFormat": "浏览器无法显示此格式",
-    "unnamed": "{noun} #{id}",
+    "unnamed": {
+      "image": "图片 #{id}",
+      "audio": "音频 #{id}"
+    },
     "noRecent": "还没有插入过{noun}"
   },
   "settings": {

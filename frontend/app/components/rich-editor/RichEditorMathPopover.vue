@@ -17,7 +17,9 @@ const props = defineProps<{
     canDelete: boolean
 }>()
 
-const { t } = useI18n()
+const { t, locale } = useI18n()
+// MathLive 默认跟随浏览器语言，改为跟随界面语言。
+MathfieldElement.locale = locale.value
 
 const emit = defineEmits<{
     submit: [string]

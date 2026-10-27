@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, watch, onMounted } from 'vue'
-import 'mathlive'
+import { MathfieldElement } from 'mathlive'
 import 'mathlive/static.css'
 import { Button } from '@/components/ui/button'
 import { Keyboard } from '@lucide/vue'
@@ -11,7 +11,9 @@ const props = defineProps<{
 
 const emit = defineEmits(['update:modelValue', 'confirm'])
 
-const { t } = useI18n()
+const { t, locale } = useI18n()
+// MathLive 默认跟随浏览器语言，改为跟随界面语言。
+MathfieldElement.locale = locale.value
 const mathfieldRef = ref<HTMLElement | null>(null)
 const keyboardContainerRef = ref<HTMLElement | null>(null)
 

@@ -24,6 +24,6 @@ export default defineNuxtPlugin({
     })
 
     z.setErrorMap(createZodErrorMap((key, params) => i18n.t(key, params ?? {})))
-    setTranslator((key, params) => i18n.t(key, params ?? {}))
+    setTranslator((key, params, locale) => (locale ? i18n.t(key, params ?? {}, { locale }) : i18n.t(key, params ?? {})))
   },
 })

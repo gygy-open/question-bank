@@ -23,6 +23,7 @@ const props = withDefaults(defineProps<{
 
 const { scrollToEnd, scrollToStart } = useMessageScroller()
 const scrollable = useMessageScrollerScrollable()
+const { t } = useI18n()
 
 const active = computed(() =>
   props.direction === "start" ? scrollable.value.start : scrollable.value.end)
@@ -58,7 +59,7 @@ function onClick(event: MouseEvent) {
   >
     <slot>
       <ArrowDownIcon />
-      <span class="sr-only">{{ direction === "end" ? "Scroll to end" : "Scroll to start" }}</span>
+      <span class="sr-only">{{ direction === "end" ? t('common.scrollToEnd') : t('common.scrollToStart') }}</span>
     </slot>
   </Button>
 </template>

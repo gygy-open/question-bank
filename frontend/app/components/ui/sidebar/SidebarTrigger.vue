@@ -10,6 +10,7 @@ const props = defineProps<{
 }>()
 
 const { toggleSidebar } = useSidebar()
+const { t } = useI18n()
 </script>
 
 <template>
@@ -22,6 +23,6 @@ const { toggleSidebar } = useSidebar()
     @click="toggleSidebar"
   >
     <PanelLeft />
-    <span class="sr-only">Toggle Sidebar</span>
+    <span class="sr-only">{{ t('common.toggleSidebar') }}</span>
   </Button>
 </template>

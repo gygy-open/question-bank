@@ -25,6 +25,7 @@ const emits = defineEmits<{
 }>()
 
 const root = injectQuestionnaireRootContext()
+const { t } = useI18n()
 
 const visible = computed(() => root.total.value > 1 && !root.first.value)
 
@@ -69,6 +70,6 @@ function handleClick(event: MouseEvent) {
     )"
     @click="handleClick"
   >
-    <slot>Previous</slot>
+    <slot>{{ t('common.prevStep') }}</slot>
   </Primitive>
 </template>

@@ -65,11 +65,11 @@ const formatFileSize = (bytes: number): string => {
 
 const validateAndSet = (f: File): boolean => {
   if (!f.name.toLowerCase().endsWith('.xlsx')) {
-    toast.error(t('kpImport.invalidFormat'))
+    toast.error(t('importDialog.invalidFormat'))
     return false
   }
   if (f.size > 5 * 1024 * 1024) {
-    toast.error(t('kpImport.fileTooLarge'))
+    toast.error(t('importDialog.fileTooLarge'))
     return false
   }
   selectedFile.value = f
@@ -102,7 +102,7 @@ const downloadTemplate = async () => {
     a.click()
     window.URL.revokeObjectURL(url)
   } catch (e: any) {
-    toast.error(t('kpImport.downloadTemplateFailed', { error: e.data?.detail || e.message }))
+    toast.error(t('importDialog.downloadTemplateFailed', { error: e.data?.detail || e.message }))
   }
 }
 
@@ -154,7 +154,7 @@ const runImport = async () => {
     result.value = {
       status: 'failed', mode: importMode.value, created: 0, skipped: 0, failed: 0,
       total: 0, duration: 0, vector_synced: false,
-      errors: [{ row: 0, message: e.data?.detail || e.message || t('kpImport.importFailed') }],
+      errors: [{ row: 0, message: e.data?.detail || e.message || t('importDialog.importFailed') }],
     }
     step.value = 'result'
   }
@@ -162,9 +162,9 @@ const runImport = async () => {
 
 const copyErrors = () => {
   if (!result.value) return
-  const text = result.value.errors.map(err => t('kpImport.errorLine', { row: err.row, message: err.message })).join('\n')
+  const text = result.value.errors.map(err => t('importDialog.errorLine', { row: err.row, message: err.message })).join('\n')
   navigator.clipboard.writeText(text)
-  toast.success(t('kpImport.errorsCopied'))
+  toast.success(t('importDialog.errorsCopied'))
 }
 
 const backToUpload = () => { step.value = 'upload' }
@@ -184,20 +184,20 @@ const modeName = computed(() => importMode.value === 'incremental' ? t('kpImport
 
         <Alert>
           <BookOpen class="h-4 w-4" />
-          <AlertTitle>{{ t('kpImport.instructions') }}</AlertTitle>
+          <AlertTitle>{{ t('importDialog.instructions') }}</AlertTitle>
           <AlertDescription>
             <p class="mb-1">{{ t('kpImport.intro') }}</p>
             <ol class="list-decimal list-inside space-y-0.5 text-sm">
-              <li>{{ t('kpImport.steps.download') }}</li>
+              <li>{{ t('importDialog.stepDownload') }}</li>
               <li>{{ t('kpImport.steps.fill') }}</li>
-              <li>{{ t('kpImport.steps.upload') }}</li>
+              <li>{{ t('importDialog.stepUpload') }}</li>
             </ol>
           </AlertDescription>
         </Alert>
 
         <div class="space-y-4">
           <div>
-            <Label class="text-sm font-medium">{{ t('kpImport.section.template') }}</Label>
+            <Label class="text-sm font-medium">{{ t('importDialog.sectionTemplate') }}</Label>
             <Card class="mt-2 bg-muted/30">
               <CardContent class="pt-4">
                 <div class="flex items-start gap-3">
@@ -208,14 +208,14 @@ const modeName = computed(() => importMode.value === 'incremental' ? t('kpImport
                   </div>
                 </div>
                 <Button variant="outline" class="mt-3 w-full" @click="downloadTemplate">
-                  <Download class="w-4 h-4 mr-2" />{{ t('kpImport.downloadTemplate') }}
+                  <Download class="w-4 h-4 mr-2" />{{ t('importDialog.downloadTemplate') }}
                 </Button>
               </CardContent>
             </Card>
           </div>
 
           <div>
-            <Label class="text-sm font-medium">{{ t('kpImport.section.upload') }}</Label>
+            <Label class="text-sm font-medium">{{ t('importDialog.sectionUpload') }}</Label>
             <div
               class="mt-2 border-2 border-dashed rounded-lg p-6 text-center cursor-pointer transition-colors"
               :class="isDragging ? 'border-primary bg-primary/5' : 'hover:border-primary/50'"
@@ -228,8 +228,8 @@ const modeName = computed(() => importMode.value === 'incremental' ? t('kpImport
               @drop.prevent="handleDrop"
             >
               <Upload class="w-7 h-7 mx-auto text-muted-foreground mb-2" />
-              <p class="text-sm font-medium">{{ t('kpImport.dropHint') }}</p>
-              <p class="text-xs text-muted-foreground mt-1">{{ t('kpImport.formatHint') }}</p>
+              <p class="text-sm font-medium">{{ t('importDialog.dropHint') }}</p>
+              <p class="text-xs text-muted-foreground mt-1">{{ t('importDialog.formatHint') }}</p>
               <input ref="fileInput" type="file" accept=".xlsx" class="hidden" @change="handleFileChange" />
             </div>
 
@@ -317,7 +317,7 @@ const modeName = computed(() => importMode.value === 'incremental' ? t('kpImport
           </Button>
           <Button variant="outline" @click="close">{{ t('common.cancel') }}</Button>
           <Button :variant="importMode === 'rebuild' ? 'destructive' : 'default'" @click="confirmImport">
-            <Upload class="w-4 h-4 mr-2" />{{ t('kpImport.start') }}
+            <Upload class="w-4 h-4 mr-2" />{{ t('importDialog.start') }}
           </Button>
         </DialogFooter>
       </template>
@@ -342,7 +342,7 @@ const modeName = computed(() => importMode.value === 'incremental' ? t('kpImport
             <XCircle v-else class="w-5 h-5 text-red-600" />
             <span v-if="result.status === 'success'">{{ t('kpImport.status.success') }}</span>
             <span v-else-if="result.status === 'partial'">{{ t('kpImport.status.partial') }}</span>
-            <span v-else>{{ t('kpImport.importFailed') }}</span>
+            <span v-else>{{ t('importDialog.importFailed') }}</span>
           </DialogTitle>
         </DialogHeader>
 

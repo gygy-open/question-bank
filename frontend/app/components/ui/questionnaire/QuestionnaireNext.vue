@@ -25,6 +25,7 @@ const emits = defineEmits<{
 }>()
 
 const root = injectQuestionnaireRootContext()
+const { t } = useI18n()
 
 const visible = computed(() => root.total.value > 1 && !root.last.value)
 const shortcut = computed(() => (visible.value && !props.disabled ? "Enter" : null))
@@ -72,6 +73,6 @@ function handleClick(event: MouseEvent) {
     )"
     @click="handleClick"
   >
-    <slot>Next</slot>
+    <slot>{{ t('common.nextStep') }}</slot>
   </Primitive>
 </template>

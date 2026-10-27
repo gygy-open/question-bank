@@ -162,10 +162,6 @@
     "if (typeof detail === 'string' && detail.includes('未能入库') && !proceedWithPartial) {",
     "return t('importSmart.alerts.tagMissing', { tag: '【题目】' })"
   ],
-  "app/pages/settings.vue": [
-    "saveRegistrationSetting(REGISTRATION_APPROVAL_KEY, value, '注册用户是否需要管理员审核')",
-    "saveRegistrationSetting(REGISTRATION_ENABLED_KEY, value, '是否开放用户自助注册')"
-  ],
   "app/pages/test.vue": [
     "content: { type: 'doc', content: [{ type: 'paragraph', content: [{ type: 'text', text: '拖动左侧手柄可整块移动；按住 Ctrl/Cmd 拖拽可跨块框选。' }] }] },",
     "content: { type: 'doc', content: [{ type: 'paragraph', content: [{ type: 'text', text: '期中测试卷' }] }] },",

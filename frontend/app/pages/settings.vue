@@ -81,12 +81,12 @@ const fetchSettings = async () => {
   }
 }
 
-const saveRegistrationSetting = async (key: string, value: boolean, description: string) => {
+const saveRegistrationSetting = async (key: string, value: boolean) => {
   registrationSaving.value = true
   try {
     await $api(`/settings/${key}`, {
       method: 'PUT',
-      body: { value: value ? 'true' : 'false', description },
+      body: { value: value ? 'true' : 'false' },
     })
     toast.success(t('settings.toast.saveSuccess'))
   } catch (error) {
@@ -99,12 +99,12 @@ const saveRegistrationSetting = async (key: string, value: boolean, description:
 
 const onToggleRegistration = (value: boolean) => {
   registrationEnabled.value = value
-  saveRegistrationSetting(REGISTRATION_ENABLED_KEY, value, '是否开放用户自助注册')
+  saveRegistrationSetting(REGISTRATION_ENABLED_KEY, value)
 }
 
 const onToggleApproval = (value: boolean) => {
   registrationRequiresApproval.value = value
-  saveRegistrationSetting(REGISTRATION_APPROVAL_KEY, value, '注册用户是否需要管理员审核')
+  saveRegistrationSetting(REGISTRATION_APPROVAL_KEY, value)
 }
 
 const updateSetting = async (setting: SystemSetting) => {

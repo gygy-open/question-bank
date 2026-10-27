@@ -52,11 +52,11 @@ const formatFileSize = (bytes: number): string => {
 
 const validateAndSet = (f: File): boolean => {
   if (!f.name.toLowerCase().endsWith('.xlsx')) {
-    toast.error(t('tagImport.invalidFormat'))
+    toast.error(t('importDialog.invalidFormat'))
     return false
   }
   if (f.size > 5 * 1024 * 1024) {
-    toast.error(t('tagImport.fileTooLarge'))
+    toast.error(t('importDialog.fileTooLarge'))
     return false
   }
   selectedFile.value = f
@@ -89,7 +89,7 @@ const downloadTemplate = async () => {
     a.click()
     window.URL.revokeObjectURL(url)
   } catch (e: any) {
-    toast.error(t('tagImport.downloadTemplateFailed', { error: e.data?.detail || e.message }))
+    toast.error(t('importDialog.downloadTemplateFailed', { error: e.data?.detail || e.message }))
   }
 }
 
@@ -111,7 +111,7 @@ const runImport = async () => {
   } catch (e: any) {
     result.value = {
       status: 'failed', created: 0, failed: 0, skipped: 0, total: 0,
-      errors: [{ row: 0, message: e.data?.detail || e.message || t('tagImport.importFailed') }],
+      errors: [{ row: 0, message: e.data?.detail || e.message || t('importDialog.importFailed') }],
     }
     step.value = 'result'
   }
@@ -119,9 +119,9 @@ const runImport = async () => {
 
 const copyErrors = () => {
   if (!result.value) return
-  const text = result.value.errors.map(err => t('tagImport.errorLine', { row: err.row, message: err.message })).join('\n')
+  const text = result.value.errors.map(err => t('importDialog.errorLine', { row: err.row, message: err.message })).join('\n')
   navigator.clipboard.writeText(text)
-  toast.success(t('tagImport.errorsCopied'))
+  toast.success(t('importDialog.errorsCopied'))
 }
 
 const backToUpload = () => { step.value = 'upload' }
@@ -139,10 +139,10 @@ const backToUpload = () => { step.value = 'upload' }
 
         <Alert>
           <BookOpen class="h-4 w-4" />
-          <AlertTitle>{{ t('tagImport.instructions') }}</AlertTitle>
+          <AlertTitle>{{ t('importDialog.instructions') }}</AlertTitle>
           <AlertDescription>
             <ol class="list-decimal list-inside space-y-0.5 text-sm">
-              <li>{{ t('tagImport.steps.download') }}</li>
+              <li>{{ t('importDialog.stepDownload') }}</li>
               <li>{{ t('tagImport.steps.fill', { name: '名称', category: '分类', color: '颜色' }) }}</li>
               <li>{{ t('tagImport.steps.upload', { name: '名称' }) }}</li>
             </ol>
@@ -151,7 +151,7 @@ const backToUpload = () => { step.value = 'upload' }
 
         <div class="space-y-4">
           <div>
-            <Label class="text-sm font-medium">{{ t('tagImport.section.template') }}</Label>
+            <Label class="text-sm font-medium">{{ t('importDialog.sectionTemplate') }}</Label>
             <Card class="mt-2 bg-muted/30">
               <CardContent class="pt-4">
                 <div class="flex items-start gap-3">
@@ -162,14 +162,14 @@ const backToUpload = () => { step.value = 'upload' }
                   </div>
                 </div>
                 <Button variant="outline" class="mt-3 w-full" @click="downloadTemplate">
-                  <Download class="w-4 h-4 mr-2" />{{ t('tagImport.downloadTemplate') }}
+                  <Download class="w-4 h-4 mr-2" />{{ t('importDialog.downloadTemplate') }}
                 </Button>
               </CardContent>
             </Card>
           </div>
 
           <div>
-            <Label class="text-sm font-medium">{{ t('tagImport.section.upload') }}</Label>
+            <Label class="text-sm font-medium">{{ t('importDialog.sectionUpload') }}</Label>
             <div
               class="mt-2 border-2 border-dashed rounded-lg p-6 text-center cursor-pointer transition-colors"
               :class="isDragging ? 'border-primary bg-primary/5' : 'hover:border-primary/50'"
@@ -182,8 +182,8 @@ const backToUpload = () => { step.value = 'upload' }
               @drop.prevent="handleDrop"
             >
               <Upload class="w-7 h-7 mx-auto text-muted-foreground mb-2" />
-              <p class="text-sm font-medium">{{ t('tagImport.dropHint') }}</p>
-              <p class="text-xs text-muted-foreground mt-1">{{ t('tagImport.formatHint') }}</p>
+              <p class="text-sm font-medium">{{ t('importDialog.dropHint') }}</p>
+              <p class="text-xs text-muted-foreground mt-1">{{ t('importDialog.formatHint') }}</p>
               <input ref="fileInput" type="file" accept=".xlsx" class="hidden" @change="handleFileChange" />
             </div>
 
@@ -200,7 +200,7 @@ const backToUpload = () => { step.value = 'upload' }
 
         <DialogFooter class="flex-col sm:flex-row gap-2">
           <Button variant="outline" @click="close">{{ t('common.cancel') }}</Button>
-          <Button :disabled="!selectedFile || !subjectId" @click="runImport">{{ t('tagImport.start') }}</Button>
+          <Button :disabled="!selectedFile || !subjectId" @click="runImport">{{ t('importDialog.start') }}</Button>
         </DialogFooter>
       </template>
 
@@ -208,7 +208,7 @@ const backToUpload = () => { step.value = 'upload' }
       <template v-else-if="step === 'importing'">
         <DialogHeader>
           <DialogTitle>{{ t('tagImport.title') }}</DialogTitle>
-          <DialogDescription>{{ t('tagImport.processing') }}</DialogDescription>
+          <DialogDescription>{{ t('importDialog.processing') }}</DialogDescription>
         </DialogHeader>
         <div class="flex flex-col items-center justify-center py-12 gap-3">
           <Loader2 class="w-8 h-8 animate-spin text-primary" />
@@ -219,7 +219,7 @@ const backToUpload = () => { step.value = 'upload' }
       <!-- ===== Step 3: Result ===== -->
       <template v-else>
         <DialogHeader>
-          <DialogTitle>{{ t('tagImport.resultTitle') }}</DialogTitle>
+          <DialogTitle>{{ t('importDialog.resultTitle') }}</DialogTitle>
           <DialogDescription>
             {{ t('tagImport.resultSummary', { total: result?.total ?? 0, created: result?.created ?? 0, skipped: result?.skipped ?? 0 }) }}
           </DialogDescription>
@@ -251,7 +251,7 @@ const backToUpload = () => { step.value = 'upload' }
             </div>
             <div class="max-h-60 overflow-y-auto divide-y">
               <div v-for="(err, i) in result.errors" :key="i" class="flex gap-3 px-3 py-2 text-sm">
-                <span class="text-muted-foreground shrink-0">{{ err.row > 0 ? t('tagImport.rowLabel', { row: err.row }) : t('tagImport.fileLabel') }}</span>
+                <span class="text-muted-foreground shrink-0">{{ err.row > 0 ? t('importDialog.rowLabel', { row: err.row }) : t('importDialog.fileLabel') }}</span>
                 <span class="text-destructive">{{ err.message }}</span>
               </div>
             </div>
@@ -259,7 +259,7 @@ const backToUpload = () => { step.value = 'upload' }
         </div>
 
         <DialogFooter class="flex-col sm:flex-row gap-2">
-          <Button variant="outline" @click="backToUpload">{{ t('tagImport.continue') }}</Button>
+          <Button variant="outline" @click="backToUpload">{{ t('importDialog.continue') }}</Button>
           <Button @click="close">{{ t('common.done') }}</Button>
         </DialogFooter>
       </template>

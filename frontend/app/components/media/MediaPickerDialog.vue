@@ -140,7 +140,7 @@ function usageLabel(count: number) {
     <Dialog v-model:open="open">
         <DialogContent class="w-[95vw] sm:max-w-[760px]">
             <DialogHeader>
-                <DialogTitle>{{ t('mediaPicker.title', { noun }) }}</DialogTitle>
+                <DialogTitle>{{ t(`mediaPicker.title.${kind}`) }}</DialogTitle>
                 <DialogDescription>{{ t('mediaPicker.description', { noun }) }}</DialogDescription>
             </DialogHeader>
 
@@ -199,7 +199,7 @@ function usageLabel(count: number) {
                                     <img v-else-if="item.displayable" :src="item.url" :alt="item.original_filename ?? ''" loading="lazy" class="max-h-full max-w-full object-contain" />
                                     <ImageOff v-else class="size-6 text-muted-foreground" />
                                 </div>
-                                <span class="truncate text-xs">{{ item.original_filename || t('mediaPicker.unnamed', { noun, id: item.id }) }}</span>
+                                <span class="truncate text-xs">{{ item.original_filename || t(`mediaPicker.unnamed.${kind}`, { id: item.id }) }}</span>
                                 <span class="text-[11px]" :class="item.usage_count ? 'text-muted-foreground' : 'text-muted-foreground/60'">{{ usageLabel(item.usage_count) }}</span>
                             </button>
                         </div>
@@ -224,7 +224,7 @@ function usageLabel(count: number) {
                                 <Music v-if="kind === 'audio'" class="size-6 text-muted-foreground" />
                                 <img v-else :src="entry.url" :alt="entry.name ?? ''" loading="lazy" class="max-h-full max-w-full object-contain" />
                             </div>
-                            <span class="truncate text-xs">{{ entry.name || t('mediaPicker.unnamed', { noun, id: entry.id }) }}</span>
+                            <span class="truncate text-xs">{{ entry.name || t(`mediaPicker.unnamed.${kind}`, { id: entry.id }) }}</span>
                         </button>
                     </div>
                 </TabsContent>
