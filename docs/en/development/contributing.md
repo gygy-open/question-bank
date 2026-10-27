@@ -63,7 +63,7 @@ After a push to `docs/**` on the `main` branch, GitHub Actions automatically bui
 
 ### Docs Translations
 
-Chinese is the single source; English translations live in `docs/en/`, mirroring the Chinese paths one-to-one (`guide/`, `desktop/`, `server/`, `admin/`, `features/`, `development/` and the home page).
+Chinese is the single source; English translations live in `docs/en/`, mirroring the Chinese paths one-to-one (`guide/`, `desktop/`, `server/`, `admin/`, `features/`, `development/` and the home page). The repository `README.md` has an English counterpart, `README.en.md`, which is only checked for staleness, not structure, so the two may differ in content (e.g. the English one omits the WeChat section); mark it with the path `../README.md`.
 
 - After changing a Chinese page, run `pnpm i18n:status` to list translations that are missing, stale, orphaned, or structurally inconsistent (structure).
 - Update the matching page under `docs/en/`: the number of headings, code blocks, `:::` containers and images must match the source; prefix internal links with `/en`; use the app's actual English UI text for UI labels (see `frontend/i18n/locales/en-US.json`), and follow `frontend/i18n/glossary.json` for terminology.

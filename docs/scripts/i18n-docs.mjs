@@ -7,7 +7,8 @@
 //   node scripts/i18n-docs.mjs mark <file...>  record current zh source hash as translated
 //   node scripts/i18n-docs.mjs mark --all      mark every existing translation
 //
-// <file> is a source-relative path such as `guide/introduction.md`.
+// <file> is a source-relative path such as `guide/introduction.md`, or
+// `../README.md` for the repository README (see EXTRA).
 // The lock file (.translation-lock.json) must be committed.
 
 import { createHash } from 'node:crypto'
@@ -19,6 +20,10 @@ const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const LOCALES = ['en']
 // specs/ and design/ are internal and not translated.
 const SCOPE = ['index.md', 'guide', 'desktop', 'server', 'admin', 'features', 'development']
+// Files outside docs/ that are translated side by side: source → locale → target (docs-relative).
+// Only staleness is tracked for these; their content may intentionally differ per locale
+// (e.g. the English README omits China-specific sections), so no structure check.
+const EXTRA = { '../README.md': { en: '../README.en.md' } }
 const LOCK_PATH = join(ROOT, '.translation-lock.json')
 
 const sha = (text) => createHash('sha256').update(text).digest('hex').slice(0, 16)
@@ -30,9 +35,15 @@ function walk(rel) {
   return readdirSync(abs).flatMap((name) => walk(join(rel, name)))
 }
 
-const sources = () => SCOPE.flatMap(walk).sort()
+const targetOf = (locale, file) => join(ROOT, EXTRA[file]?.[locale] ?? join(locale, file))
+
+const sources = () =>
+  [...SCOPE.flatMap(walk), ...Object.keys(EXTRA).filter((f) => existsSync(join(ROOT, f)))].sort()
 const translations = (locale) =>
-  SCOPE.flatMap((p) => walk(join(locale, p)).map((f) => relative(locale, f))).sort()
+  [
+    ...SCOPE.flatMap((p) => walk(join(locale, p)).map((f) => relative(locale, f))),
+    ...Object.keys(EXTRA).filter((f) => EXTRA[f][locale] && existsSync(targetOf(locale, f)))
+  ].sort()
 
 const readLock = () => (existsSync(LOCK_PATH) ? JSON.parse(readFileSync(LOCK_PATH, 'utf8')) : {})
 const writeLock = (lock) => writeFileSync(LOCK_PATH, JSON.stringify(lock, null, 2) + '\n')
@@ -74,8 +85,9 @@ function collect() {
       }
       const source = readFileSync(join(ROOT, file), 'utf8')
       if (lock[locale]?.[file] !== sha(source)) stale.push(file)
+      if (EXTRA[file]) continue
       const a = skeleton(source)
-      const b = skeleton(readFileSync(join(ROOT, locale, file), 'utf8'))
+      const b = skeleton(readFileSync(targetOf(locale, file), 'utf8'))
       const diff = Object.keys(a).filter((k) => a[k] !== b[k])
       if (diff.length) structure.push(`${file} (${diff.map((k) => `${k}: ${a[k]}→${b[k]}`).join(', ')})`)
     }

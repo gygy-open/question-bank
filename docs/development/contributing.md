@@ -63,7 +63,7 @@ pnpm docs:dev
 
 ### 文档多语言
 
-中文是唯一原文；英文译文放在 `docs/en/`，与中文路径一一对应（`guide/`、`desktop/`、`server/`、`admin/`、`features/`、`development/` 与首页）。
+中文是唯一原文；英文译文放在 `docs/en/`，与中文路径一一对应（`guide/`、`desktop/`、`server/`、`admin/`、`features/`、`development/` 与首页）。仓库根目录的 `README.md` 对应英文版 `README.en.md`，只检查是否过期、不做结构比对，两版内容可以不同（如英文版不放公众号）；标记时路径写作 `../README.md`。
 
 - 修改中文页面后运行 `pnpm i18n:status`，查看缺失（missing）、过期（stale）、多余（orphan）及结构不一致（structure）的译文。
 - 更新 `docs/en/` 下对应页面：标题、代码块、`:::` 容器、图片数量须与原文一致；站内链接加 `/en` 前缀；界面文案使用应用英文界面的实际文字（见 `frontend/i18n/locales/en-US.json`），术语遵循 `frontend/i18n/glossary.json`。
