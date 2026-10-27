@@ -1,12 +1,11 @@
 <script setup lang="ts">
-import { ArrowDown, Bot, Loader2 } from '@lucide/vue'
+import { Loader2 } from '@lucide/vue'
 import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import ChatMessage from '@/components/ChatMessage.vue'
+import AiMascot from '@/components/chat/AiMascot.vue'
 import {
   MessageScroller,
-  MessageScrollerButton,
   MessageScrollerContent,
   MessageScrollerItem,
   MessageScrollerProvider,
@@ -21,7 +20,9 @@ const chat = useGlobalChat()
 <template>
   <MessageScrollerProvider :auto-scroll="true" default-scroll-position="end">
     <MessageScroller class="min-h-0 flex-1">
-      <MessageScrollerViewport>
+      <MessageScrollerViewport
+        class="[scrollbar-color:transparent_transparent] [scrollbar-gutter:stable] [scrollbar-width:thin] hover:[scrollbar-color:color-mix(in_oklab,var(--muted-foreground)_40%,transparent)_transparent]"
+      >
         <div v-if="chat.hasMore.value" class="flex justify-center px-4 pt-4">
           <Button variant="ghost" size="sm" :disabled="chat.isLoadingMore.value" @click="chat.loadMore()">
             <Loader2 v-if="chat.isLoadingMore.value" class="mr-2 h-4 w-4 animate-spin" />
@@ -33,7 +34,7 @@ const chat = useGlobalChat()
           v-if="chat.messages.value.length === 0"
           class="flex h-48 flex-col items-center justify-center text-muted-foreground"
         >
-          <Bot class="mb-3 h-10 w-10 opacity-20" />
+          <AiMascot class="mb-3 size-12 text-primary/60" />
           <p class="text-sm">{{ t('chat.messages.empty') }}</p>
         </div>
 
@@ -69,18 +70,6 @@ const chat = useGlobalChat()
           </MessageScrollerItem>
         </MessageScrollerContent>
       </MessageScrollerViewport>
-
-      <TooltipProvider :delay-duration="300">
-        <Tooltip>
-          <TooltipTrigger as-child>
-            <MessageScrollerButton direction="end" :aria-label="t('chat.messages.scrollToLatest')">
-              <ArrowDown />
-              <span class="sr-only">{{ t('chat.messages.scrollToLatest') }}</span>
-            </MessageScrollerButton>
-          </TooltipTrigger>
-          <TooltipContent>{{ t('chat.messages.scrollToLatest') }}</TooltipContent>
-        </Tooltip>
-      </TooltipProvider>
     </MessageScroller>
   </MessageScrollerProvider>
 </template>

@@ -2219,6 +2219,7 @@
       "selectModel": "Select Model",
       "noModels": "No models available. Configure one in \"Settings → My AI Models\".",
       "uploadImage": "Upload Image",
+      "send": "Send Message",
       "placeholder": "Type a message...",
       "placeholderVision": "Type a message... (paste images supported)"
     },
@@ -2229,8 +2230,7 @@
     },
     "messages": {
       "loadMoreHistory": "Load Earlier Messages",
-      "empty": "Start chatting with AI...",
-      "scrollToLatest": "Jump to Latest"
+      "empty": "Start chatting with AI..."
     },
     "selection": {
       "count": "{count} selected"

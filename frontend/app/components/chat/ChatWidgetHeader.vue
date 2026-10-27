@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { MessageSquarePlus, CheckSquare, Maximize2, Minimize2, X, ArrowLeft } from '@lucide/vue'
 import { Button } from '@/components/ui/button'
+import AiMascot from '@/components/chat/AiMascot.vue'
 import { useGlobalChat } from '@/composables/useGlobalChat'
 
 const { t } = useI18n()
@@ -19,6 +20,7 @@ withDefaults(defineProps<{ showExpand?: boolean }>(), { showExpand: true })
         @click="chat.view.value = 'history'">
         <ArrowLeft class="h-4 w-4" />
       </Button>
+      <AiMascot :thinking="chat.loading.value" class="size-4 shrink-0 text-primary" />
       <span class="min-w-0 flex-1 truncate text-sm font-medium">{{ chat.currentTitle.value }}</span>
     </template>
 

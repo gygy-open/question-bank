@@ -138,3 +138,24 @@
     }
   }
 }
+
+/* AI 助手形象（AiMascot）动画 */
+@theme {
+  --animate-mascot-blink: mascot-blink 5s ease-in-out infinite;
+  --animate-mascot-glance: mascot-glance 1.6s ease-in-out infinite;
+  --animate-mascot-twinkle: mascot-twinkle 1.2s ease-in-out infinite;
+
+  @keyframes mascot-blink {
+    0%, 92%, 100% { transform: scaleY(1); }
+    96% { transform: scaleY(0.15); }
+  }
+  @keyframes mascot-glance {
+    0%, 100% { transform: translateX(0); }
+    25% { transform: translateX(-12%); }
+    75% { transform: translateX(12%); }
+  }
+  @keyframes mascot-twinkle {
+    0%, 100% { transform: scale(1) rotate(0deg); opacity: 1; }
+    50% { transform: scale(0.55) rotate(45deg); opacity: 0.6; }
+  }
+}

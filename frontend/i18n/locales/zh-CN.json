@@ -2219,6 +2219,7 @@
       "selectModel": "选择模型",
       "noModels": "暂无可用模型，请在“设置 → 我的 AI 模型”中配置",
       "uploadImage": "上传图片",
+      "send": "发送",
       "placeholder": "输入消息...",
       "placeholderVision": "输入消息... (支持粘贴图片)"
     },
@@ -2229,8 +2230,7 @@
     },
     "messages": {
       "loadMoreHistory": "加载更多历史消息",
-      "empty": "开始与 AI 对话吧...",
-      "scrollToLatest": "回到最新消息"
+      "empty": "开始与 AI 对话吧..."
     },
     "selection": {
       "count": "已选择 {count} 条"
