@@ -1,3 +1,4 @@
+/// <reference types="node" />
 /**
  * i18n 翻译文件维护 CLI。
  *

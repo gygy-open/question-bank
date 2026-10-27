@@ -51,6 +51,15 @@ export default defineNuxtConfig({
 
   modules: ['shadcn-nuxt', '@nuxtjs/i18n'],
 
+  typescript: {
+    tsConfig: {
+      compilerOptions: {
+        // i18n 测试直接引用 scripts/*.mts，仅用于 vue-tsc 类型检查（noEmit）。
+        allowImportingTsExtensions: true,
+      },
+    },
+  },
+
   // 语言文件位于 <rootDir>/i18n/locales；运行时状态同步见 app/plugins/i18n.ts。
   i18n: {
     strategy: 'no_prefix',

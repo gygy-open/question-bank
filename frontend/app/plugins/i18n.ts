@@ -1,3 +1,4 @@
+import type { Composer } from 'vue-i18n'
 import { z } from 'zod'
 import { createZodErrorMap } from '@/lib/zodErrorMap'
 import { LOCALE_COOKIE_KEY, detectBrowserLocale, isSupportedLocale, setCurrentLocale, setTranslator } from '@/lib/locale'
@@ -6,7 +7,7 @@ export default defineNuxtPlugin({
   name: 'app-i18n',
   dependsOn: ['i18n:plugin'],
   async setup(nuxtApp) {
-    const i18n = nuxtApp.$i18n
+    const i18n = nuxtApp.$i18n as Composer
     const localeCookie = useCookie<string | null>(LOCALE_COOKIE_KEY, {
       maxAge: 60 * 60 * 24 * 365,
       sameSite: 'lax',

@@ -1,3 +1,4 @@
+/// <reference types="node" />
 /**
  * i18n 翻译文件维护的核心逻辑（纯函数 + 文件读写），CLI 见 ./i18n.mts。
  *
