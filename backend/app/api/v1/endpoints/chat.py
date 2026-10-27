@@ -1,7 +1,8 @@
-from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
+from fastapi import APIRouter, Depends, BackgroundTasks
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from app.api import deps
+from app.core.api_errors import ApiError, ErrorCode
 from app.schemas.chat import ChatRequest, ChatSession, ChatSessionCreate, ChatSessionUpdate, ChatMessageCreate, ChatMessage, ChatSessionSummary, ChatMessageUpdate, ClientToolResult
 from app.models.chat import ChatMessage as ChatMessageModel
 from app.capabilities.errors import Invalid
@@ -284,9 +285,9 @@ async def get_session(
     """Get a chat session."""
     session = await chat_session.get(db, id=session_id)
     if not session:
-        raise HTTPException(status_code=404, detail="Session not found")
+        raise ApiError(404, ErrorCode.CHAT_SESSION_NOT_FOUND, "Session not found")
     if session.user_id != current_user.id:
-        raise HTTPException(status_code=403, detail="Not authorized")
+        raise ApiError(403, ErrorCode.AUTH_FORBIDDEN, "Not authorized")
     session.messages = await chat_message.get_transcript(db, session_id=session_id)
     return session
 
@@ -300,9 +301,9 @@ async def update_session(
     """Update a chat session."""
     session = await chat_session.get(db, id=session_id)
     if not session:
-        raise HTTPException(status_code=404, detail="Session not found")
+        raise ApiError(404, ErrorCode.CHAT_SESSION_NOT_FOUND, "Session not found")
     if session.user_id != current_user.id:
-        raise HTTPException(status_code=403, detail="Not authorized")
+        raise ApiError(403, ErrorCode.AUTH_FORBIDDEN, "Not authorized")
     return await chat_session.update(db, db_obj=session, obj_in=session_in)
 
 @router.delete("/sessions/{session_id}")
@@ -314,9 +315,9 @@ async def delete_session(
     """Delete a chat session."""
     session = await chat_session.get(db, id=session_id)
     if not session:
-        raise HTTPException(status_code=404, detail="Session not found")
+        raise ApiError(404, ErrorCode.CHAT_SESSION_NOT_FOUND, "Session not found")
     if session.user_id != current_user.id:
-        raise HTTPException(status_code=403, detail="Not authorized")
+        raise ApiError(403, ErrorCode.AUTH_FORBIDDEN, "Not authorized")
     await chat_session.remove(db, id=session_id)
     return {"ok": True}
 
@@ -331,9 +332,9 @@ async def get_session_messages(
     """Get messages for a chat session with pagination."""
     session = await chat_session.get(db, id=session_id)
     if not session:
-        raise HTTPException(status_code=404, detail="Session not found")
+        raise ApiError(404, ErrorCode.CHAT_SESSION_NOT_FOUND, "Session not found")
     if session.user_id != current_user.id:
-        raise HTTPException(status_code=403, detail="Not authorized")
+        raise ApiError(403, ErrorCode.AUTH_FORBIDDEN, "Not authorized")
     
     messages = await chat_message.get_by_session_desc(db, session_id=session_id, skip=skip, limit=limit)
     return list(reversed(messages))
@@ -349,13 +350,13 @@ async def create_message(
     """Add a message to a session and get AI response."""
     session = await chat_session.get(db, id=session_id)
     if not session:
-        raise HTTPException(status_code=404, detail="Session not found")
+        raise ApiError(404, ErrorCode.CHAT_SESSION_NOT_FOUND, "Session not found")
     if session.user_id != current_user.id:
-        raise HTTPException(status_code=403, detail="Not authorized")
+        raise ApiError(403, ErrorCode.AUTH_FORBIDDEN, "Not authorized")
 
     model = await get_usable_model(db, user_id=current_user.id, model_id=request.model_id)
     if model is None or not supports(model, "text"):
-        raise HTTPException(status_code=400, detail="所选模型不存在、已停用、不支持对话或无权使用")
+        raise ApiError(400, ErrorCode.CHAT_MODEL_UNUSABLE, "所选模型不存在、已停用、不支持对话或无权使用")
 
     return StreamingResponse(
         chat_generator(session_id, request.message, request.model_id, db, current_user, background_tasks, request.subject_id, request.scene, request.scene_context),
@@ -376,11 +377,11 @@ async def submit_client_tool_result(
     """
     run = await db.get(AgentRun, run_id)
     if run is None or run.user_id != current_user.id:
-        raise HTTPException(status_code=404, detail="Run not found")
+        raise ApiError(404, ErrorCode.CHAT_RUN_NOT_FOUND, "Run not found")
 
     if not client_channel.resolve(payload.ticket, run_id, payload.model_dump()):
         # 票据不存在/已消费/不属于该 run:多半是超时之后才回来的。
-        raise HTTPException(status_code=409, detail="Ticket is no longer pending")
+        raise ApiError(409, ErrorCode.CHAT_TICKET_NOT_PENDING, "Ticket is no longer pending")
     return None
 
 @router.patch("/messages/{message_id}", response_model=ChatMessage)
@@ -395,12 +396,12 @@ async def update_message(
     """
     message = await chat_message.get(db, id=message_id)
     if not message:
-        raise HTTPException(status_code=404, detail="Message not found")
+        raise ApiError(404, ErrorCode.CHAT_MESSAGE_NOT_FOUND, "Message not found")
     
     # Verify user owns the session of this message
     session = await chat_session.get(db, id=message.session_id)
     if not session or session.user_id != current_user.id:
-        raise HTTPException(status_code=403, detail="Not authorized")
+        raise ApiError(403, ErrorCode.AUTH_FORBIDDEN, "Not authorized")
         
     message = await chat_message.update(db, db_obj=message, obj_in=message_in)
     return message
@@ -416,12 +417,12 @@ async def delete_message(
     """
     message = await chat_message.get(db, id=message_id)
     if not message:
-        raise HTTPException(status_code=404, detail="Message not found")
+        raise ApiError(404, ErrorCode.CHAT_MESSAGE_NOT_FOUND, "Message not found")
         
     # Verify user owns the session of this message
     session = await chat_session.get(db, id=message.session_id)
     if not session or session.user_id != current_user.id:
-        raise HTTPException(status_code=403, detail="Not authorized")
+        raise ApiError(403, ErrorCode.AUTH_FORBIDDEN, "Not authorized")
         
     message = await chat_message.remove(db, id=message_id)
     return message

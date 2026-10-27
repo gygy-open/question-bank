@@ -1,7 +1,8 @@
 from typing import Any, List
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.api import deps
+from app.core.api_errors import ApiError, ErrorCode
 from app.crud.crud_prompt import prompt_template
 from app.schemas.prompt import PromptTemplate, PromptTemplateCreate, PromptTemplateUpdate
 from app.models.user import User
@@ -47,9 +48,9 @@ async def update_prompt(
     """
     prompt = await prompt_template.get(db, id=id)
     if not prompt:
-        raise HTTPException(status_code=404, detail="Prompt template not found")
+        raise ApiError(404, ErrorCode.PROMPT_TEMPLATE_NOT_FOUND, "Prompt template not found")
     if prompt.user_id != current_user.id:
-        raise HTTPException(status_code=400, detail="Not enough permissions")
+        raise ApiError(400, ErrorCode.AUTH_FORBIDDEN, "Not enough permissions")
     prompt = await prompt_template.update(db, db_obj=prompt, obj_in=prompt_in)
     return prompt
 
@@ -65,8 +66,8 @@ async def delete_prompt(
     """
     prompt = await prompt_template.get(db, id=id)
     if not prompt:
-        raise HTTPException(status_code=404, detail="Prompt template not found")
+        raise ApiError(404, ErrorCode.PROMPT_TEMPLATE_NOT_FOUND, "Prompt template not found")
     if prompt.user_id != current_user.id:
-        raise HTTPException(status_code=400, detail="Not enough permissions")
+        raise ApiError(400, ErrorCode.AUTH_FORBIDDEN, "Not enough permissions")
     prompt = await prompt_template.remove(db, id=id)
     return prompt

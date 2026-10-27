@@ -16,13 +16,35 @@ function getApiErrorBody(error: unknown): ApiErrorBody | undefined {
   return candidate?.data ?? candidate?.response?._data
 }
 
+/**
+ * 后端把"本身也需要翻译的片段"（如模型槽位名）以 `<name>_ref` 参数传来，值是 `apiErrors.refs.` 下的键，
+ * 多个用逗号分隔。这里先翻译成 `<name>` 再插值，避免后端写死某种语言的名词。
+ */
+function resolveRefParams(params: Record<string, unknown> | undefined): Record<string, unknown> | undefined {
+  if (!params) return params
+  const resolved: Record<string, unknown> = {}
+  for (const [name, value] of Object.entries(params)) {
+    if (name.endsWith('_ref') && typeof value === 'string') {
+      const parts = value.split(',').map((ref) => {
+        const key = `apiErrors.refs.${ref}`
+        const text = translate(key)
+        return text && text !== key ? text : ref
+      })
+      resolved[name.slice(0, -4)] = parts.join(translate('apiErrors.refs.separator'))
+    } else {
+      resolved[name] = value
+    }
+  }
+  return resolved
+}
+
 /** 后端错误码对应的本地化文案；没有 code 或该 code 尚无翻译时返回 undefined。 */
 export function getApiErrorCodeMessage(error: unknown): string | undefined {
   const body = getApiErrorBody(error)
   if (typeof body?.code !== 'string') return undefined
   const key = `apiErrors.${body.code}`
-  const params = body.params && typeof body.params === 'object' ? body.params as Record<string, unknown> : undefined
-  const message = translate(key, params)
+  const rawParams = body.params && typeof body.params === 'object' ? body.params as Record<string, unknown> : undefined
+  const message = translate(key, resolveRefParams(rawParams))
   return message && message !== key ? message : undefined
 }
 

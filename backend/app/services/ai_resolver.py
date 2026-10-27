@@ -14,6 +14,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.capabilities.errors import Invalid
+from app.core.api_errors import ErrorCode
 from app.core.secrets import SecretDecryptError, decrypt_secret
 from app.models.ai_config import AIModel, AIProvider, UserAIPreference
 from app.models.system_setting import SystemSetting
@@ -55,7 +56,11 @@ def build_config(model: AIModel, provider: AIProvider) -> dict:
     try:
         api_key = decrypt_secret(provider.api_key)
     except SecretDecryptError as exc:
-        raise Invalid(f"服务商「{provider.name}」的 API Key 无法解密，请重新填写") from exc
+        raise Invalid(
+            f"服务商「{provider.name}」的 API Key 无法解密，请重新填写",
+            ErrorCode.AI_CONFIG_API_KEY_UNDECRYPTABLE,
+            {"name": provider.name},
+        ) from exc
     config = {"API_KEY": api_key, "MODEL_NAME": model.name}
     if provider.base_url:
         config["BASE_URL"] = provider.base_url
@@ -107,9 +112,9 @@ async def resolve_model(
     if model_id is not None:
         model = await get_usable_model(db, user_id=user_id, model_id=model_id, lock=lock)
         if model is None:
-            raise Invalid("所选模型不存在、已停用或无权使用")
+            raise Invalid("所选模型不存在、已停用或无权使用", ErrorCode.AI_CONFIG_MODEL_UNUSABLE)
         if not supports(model, purpose):
-            raise Invalid("所选模型不支持该用途")
+            raise Invalid("所选模型不支持该用途", ErrorCode.AI_CONFIG_MODEL_PURPOSE_UNSUPPORTED)
         return ResolvedModel(model, model.provider, build_config(model, model.provider), "explicit")
 
     candidates = (

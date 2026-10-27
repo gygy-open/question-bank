@@ -11,6 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api import deps
 from app.capabilities.errors import Forbidden, Invalid
+from app.core.api_errors import ErrorCode
 from app.crud.crud_system_setting import system_setting
 from app.models.user import User
 from app.schemas.ai_config import (
@@ -51,7 +52,7 @@ async def read_ai_providers(
 ) -> Any:
     """全局 + 自己的服务商。管理员带 include_personal=true 时返回所有人的(用于审查,不含 Key)。"""
     if include_personal and not current_user.is_superuser:
-        raise Forbidden("Not enough privileges")
+        raise Forbidden("Not enough privileges", ErrorCode.AUTH_FORBIDDEN)
     return await svc.list_providers(db, user_id=current_user.id, include_all=include_personal)
 
 
@@ -273,7 +274,7 @@ async def discover_models(
     owner_id: Optional[int] = current_user.id
     if scope == "global":
         if not current_user.is_superuser:
-            raise Forbidden("Not enough privileges")
+            raise Forbidden("Not enough privileges", ErrorCode.AUTH_FORBIDDEN)
         owner_id = None
     return await svc.discover_models(
         db,

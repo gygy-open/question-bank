@@ -119,6 +119,52 @@
       "stimulus_unavailable": "材料 {stimulus} 不存在或属于其他学科",
       "private_stimulus": "私有材料 {stimulus} 不能加入该稿件"
     },
+    "refs": {
+      "separator": "、",
+      "model_slot": {
+        "text": "文本模型",
+        "vision": "视觉模型",
+        "embedding": "向量模型"
+      }
+    },
+    "ai_config": {
+      "active_id_invalid": "{target} ID 必须是整数",
+      "active_model_not_found": "{target}不存在",
+      "global_provider_only": "只能选择全局服务商下的模型",
+      "not_embedding_model": "所选模型不是向量模型",
+      "embedding_not_for_text_vision": "向量模型不能用于文本或识图",
+      "embedding_not_for_text": "向量模型不能用于文本",
+      "model_no_vision": "所选模型不支持识图",
+      "in_use_confirm": "该配置仍被用作{targets}，确认停用后才能删除",
+      "provider_not_found": "服务商不存在",
+      "model_not_found": "模型不存在",
+      "provider_in_use": "服务商仍被其他数据引用，暂时无法删除",
+      "model_in_use": "模型仍被其他数据引用，暂时无法删除",
+      "unsupported_interface": "不支持的服务类型",
+      "provider_name_taken": "已存在名为「{name}」的服务商",
+      "api_key_required": "请填写 API Key",
+      "interface_and_key_required": "请填写服务类型和 API Key",
+      "model_name_required": "请填写模型名称",
+      "model_name_taken": "模型「{name}」已存在",
+      "embedding_flag_locked": "该模型正被用作向量模型，不能取消“向量”标记",
+      "cannot_become_embedding": "该模型正被用作{target}，不能标记为向量模型",
+      "vision_flag_locked": "该模型正被用作识图模型，不能取消“识图”标记",
+      "model_unusable": "所选模型不存在、已停用或无权使用",
+      "model_purpose_unsupported": "所选模型不支持该用途",
+      "api_key_undecryptable": "服务商「{name}」的 API Key 无法解密，请重新填写"
+    },
+    "chat": {
+      "session_not_found": "会话不存在",
+      "model_unusable": "所选模型不存在、已停用、不支持对话或无权使用",
+      "run_not_found": "对话运行记录不存在",
+      "ticket_not_pending": "该工具调用已不在等待结果",
+      "message_not_found": "消息不存在"
+    },
+    "prompt": {
+      "template_not_found": "提示词模板不存在",
+      "unknown_key": "未知的提示词类型",
+      "subject_not_found": "学科不存在"
+    },
     "import_task": {
       "no_files": "请选择要导入的文件",
       "subject_required": "请先选择所属学科",

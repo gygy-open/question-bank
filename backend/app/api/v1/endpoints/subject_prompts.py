@@ -1,9 +1,10 @@
 from typing import Any, List
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends
 
 from app import models
 from app.api import deps
+from app.core.api_errors import ApiError, ErrorCode
 from app.core.permissions import Permission
 from app.crud.crud_subject import subject as crud_subject
 from app.crud.crud_subject_prompt import subject_prompt as crud_subject_prompt
@@ -34,7 +35,7 @@ async def list_subject_prompts(
     """列出某学科的可覆盖提示词：含代码默认值、覆盖原文与是否已定制。"""
     subject = await crud_subject.get(db, id=subject_id)
     if not subject:
-        raise HTTPException(status_code=404, detail="Subject not found")
+        raise ApiError(404, ErrorCode.PROMPT_SUBJECT_NOT_FOUND, "Subject not found")
     deps.require(current_user, Permission.VIEW_QUESTION, subject_id=subject_id)
     out = []
     for key in SUBJECT_PROMPTS:
@@ -53,10 +54,10 @@ async def update_subject_prompt(
 ) -> Any:
     """保存某学科对某提示词的覆盖。"""
     if key not in SUBJECT_PROMPTS:
-        raise HTTPException(status_code=404, detail="Unknown prompt key")
+        raise ApiError(404, ErrorCode.PROMPT_UNKNOWN_KEY, "Unknown prompt key")
     subject = await crud_subject.get(db, id=subject_id)
     if not subject:
-        raise HTTPException(status_code=404, detail="Subject not found")
+        raise ApiError(404, ErrorCode.PROMPT_SUBJECT_NOT_FOUND, "Subject not found")
     deps.require(current_user, Permission.MANAGE_SUBJECT, subject_id=subject_id)
     await crud_subject_prompt.upsert(db, subject_id, key, payload.value)
     return _to_out(key, payload.value)
@@ -71,10 +72,10 @@ async def reset_subject_prompt(
 ) -> Any:
     """重置为默认：删除该学科的覆盖行。"""
     if key not in SUBJECT_PROMPTS:
-        raise HTTPException(status_code=404, detail="Unknown prompt key")
+        raise ApiError(404, ErrorCode.PROMPT_UNKNOWN_KEY, "Unknown prompt key")
     subject = await crud_subject.get(db, id=subject_id)
     if not subject:
-        raise HTTPException(status_code=404, detail="Subject not found")
+        raise ApiError(404, ErrorCode.PROMPT_SUBJECT_NOT_FOUND, "Subject not found")
     deps.require(current_user, Permission.MANAGE_SUBJECT, subject_id=subject_id)
     await crud_subject_prompt.remove(db, subject_id, key)
     return _to_out(key, None)

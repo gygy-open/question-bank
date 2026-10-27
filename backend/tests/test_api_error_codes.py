@@ -34,3 +34,30 @@ async def test_login_wrong_credentials_has_code(client):
     )
     assert resp.status_code == 400
     assert resp.json()["code"] == ErrorCode.AUTH_INVALID_CREDENTIALS
+
+
+def test_model_slot_refs_are_translated():
+    from app.services.ai_config_service import ACTIVE_MODEL_SLOT_REFS
+
+    refs = json.loads(ZH_CN.read_text(encoding="utf-8"))["apiErrors"]["refs"]
+    for ref in ACTIVE_MODEL_SLOT_REFS.values():
+        node = refs
+        for part in ref.split("."):
+            node = node[part]
+        assert isinstance(node, str)
+
+
+async def test_ai_config_domain_errors_carry_code_and_ref_params(db_session):
+    import pytest
+
+    from app.capabilities.errors import Invalid
+    from app.services.ai_config_service import validate_active_model
+
+    with pytest.raises(Invalid) as bad_id:
+        await validate_active_model(db_session, key="AI_VISION_MODEL_ID", value="abc")
+    assert bad_id.value.code == ErrorCode.AI_CONFIG_ACTIVE_ID_INVALID
+    assert bad_id.value.params == {"target_ref": "model_slot.vision"}
+
+    with pytest.raises(Invalid) as missing:
+        await validate_active_model(db_session, key="AI_TEXT_MODEL_ID", value="999999")
+    assert missing.value.code == ErrorCode.AI_CONFIG_ACTIVE_MODEL_NOT_FOUND

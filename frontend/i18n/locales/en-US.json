@@ -119,6 +119,52 @@
       "stimulus_unavailable": "Material {stimulus} doesn't exist or belongs to a different subject.",
       "private_stimulus": "Private material {stimulus} can't be added to this composition."
     },
+    "refs": {
+      "separator": ", ",
+      "model_slot": {
+        "text": "text model",
+        "vision": "vision model",
+        "embedding": "embedding model"
+      }
+    },
+    "ai_config": {
+      "active_id_invalid": "The {target} ID must be an integer.",
+      "active_model_not_found": "The {target} does not exist.",
+      "global_provider_only": "Only models from global providers can be selected.",
+      "not_embedding_model": "The selected model is not an embedding model.",
+      "embedding_not_for_text_vision": "An embedding model cannot be used for text or vision.",
+      "embedding_not_for_text": "An embedding model cannot be used for text.",
+      "model_no_vision": "The selected model does not support vision.",
+      "in_use_confirm": "This configuration is still in use as {targets}. Confirm deactivation before deleting it.",
+      "provider_not_found": "The provider does not exist.",
+      "model_not_found": "The model does not exist.",
+      "provider_in_use": "This provider is still referenced by other data and cannot be deleted for now.",
+      "model_in_use": "This model is still referenced by other data and cannot be deleted for now.",
+      "unsupported_interface": "Unsupported provider type.",
+      "provider_name_taken": "A provider named \"{name}\" already exists.",
+      "api_key_required": "Enter an API Key.",
+      "interface_and_key_required": "Enter the provider type and API Key.",
+      "model_name_required": "Enter a model name.",
+      "model_name_taken": "The model \"{name}\" already exists.",
+      "embedding_flag_locked": "This model is in use as an embedding model, so the \"Embedding\" flag cannot be removed.",
+      "cannot_become_embedding": "This model is in use as {target} and cannot be marked as an embedding model.",
+      "vision_flag_locked": "This model is in use as a vision model, so the \"Vision\" flag cannot be removed.",
+      "model_unusable": "The selected model does not exist, is disabled, or you don't have permission to use it.",
+      "model_purpose_unsupported": "The selected model does not support this purpose.",
+      "api_key_undecryptable": "The API Key for provider \"{name}\" could not be decrypted. Please enter it again."
+    },
+    "chat": {
+      "session_not_found": "The session does not exist.",
+      "model_unusable": "The selected model does not exist, is disabled, doesn't support chat, or you don't have permission to use it.",
+      "run_not_found": "The chat run record does not exist.",
+      "ticket_not_pending": "This tool call is no longer waiting for a result.",
+      "message_not_found": "The message does not exist."
+    },
+    "prompt": {
+      "template_not_found": "The prompt template does not exist.",
+      "unknown_key": "Unknown prompt type.",
+      "subject_not_found": "The subject does not exist."
+    },
     "import_task": {
       "no_files": "Select files to import.",
       "subject_required": "Select a subject first.",
