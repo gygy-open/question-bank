@@ -358,10 +358,12 @@
   },
   "auth": {
     "login": {
-      "title": "登录账户",
-      "description": "输入您的用户名和密码进行登录",
       "username": "用户名",
       "password": "密码",
+      "clearUsername": "清空用户名",
+      "clearPassword": "清空密码",
+      "showPassword": "显示密码",
+      "hidePassword": "隐藏密码",
       "usernameRequired": "请输入用户名",
       "passwordRequired": "请输入密码",
       "submit": "登录",

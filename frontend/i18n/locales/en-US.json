@@ -358,10 +358,12 @@
   },
   "auth": {
     "login": {
-      "title": "Sign In",
-      "description": "Enter your username and password to sign in",
       "username": "Username",
       "password": "Password",
+      "clearUsername": "Clear Username",
+      "clearPassword": "Clear Password",
+      "showPassword": "Show Password",
+      "hidePassword": "Hide Password",
       "usernameRequired": "Please enter your username",
       "passwordRequired": "Please enter your password",
       "submit": "Sign In",
