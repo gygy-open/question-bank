@@ -9,13 +9,16 @@ import {
 } from '@/components/ui/dropdown-menu'
 
 const { locale, locales, setLocale, t } = useI18n()
+// 显示当前语言的自称（简体中文 / English），读不懂当前界面的人也能认出它是语言入口。
+const currentName = computed(() => locales.value.find(l => l.code === locale.value)?.name ?? locale.value)
 </script>
 
 <template>
   <DropdownMenu>
     <DropdownMenuTrigger as-child>
-      <Button variant="ghost" size="icon" :aria-label="t('language.switch')" :title="t('language.switch')">
+      <Button variant="ghost" size="sm" class="gap-1.5 text-muted-foreground" :aria-label="t('language.switch')" :title="t('language.switch')">
         <Languages class="size-4" />
+        <span>{{ currentName }}</span>
       </Button>
     </DropdownMenuTrigger>
     <DropdownMenuContent align="end">

@@ -68,8 +68,7 @@ const onSubmit = form.handleSubmit(async (values) => {
 </script>
 
 <template>
-  <div class="relative flex h-screen w-full items-center justify-center bg-muted/40 px-4">
-    <LanguageSwitcher class="absolute right-4 top-4" />
+  <div class="flex h-screen w-full items-center justify-center bg-muted/40 px-4">
     <Card class="w-full sm:w-[400px]">
       <CardHeader class="space-y-1">
         <div class="flex justify-center mb-4">
