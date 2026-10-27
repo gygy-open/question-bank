@@ -23,8 +23,8 @@ class ChatMessage(Base):
     session_id = Column(String(36), ForeignKey("chat_sessions.id"), nullable=False)
     role = Column(String(50), nullable=False)  # user, assistant, system, tool
     content = Column(Text, nullable=True)
-    images = Column(JSON, nullable=True)  # List of file paths
-    tool_calls = Column(JSON, nullable=True) # Store tool calls
+    images = Column(JSON(none_as_null=True), nullable=True)  # List of file paths
+    tool_calls = Column(JSON(none_as_null=True), nullable=True)  # None 存为 SQL NULL,_transcript_only 依赖 IS NULL
     tool_call_id = Column(String(64), nullable=True)  # role=tool 时回指发起调用的 tool_call
     run_id = Column(String(36), ForeignKey("agent_runs.id"), nullable=True, index=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())

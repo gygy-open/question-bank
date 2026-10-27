@@ -288,8 +288,13 @@ async def get_session(
         raise ApiError(404, ErrorCode.CHAT_SESSION_NOT_FOUND, "Session not found")
     if session.user_id != current_user.id:
         raise ApiError(403, ErrorCode.AUTH_FORBIDDEN, "Not authorized")
-    session.messages = await chat_message.get_transcript(db, session_id=session_id)
-    return session
+    # Don't assign to the ORM relationship: that lazy-loads the old collection
+    # (MissingGreenlet under async) and would orphan-delete filtered-out messages.
+    transcript = await chat_message.get_transcript(db, session_id=session_id)
+    return ChatSession(
+        **ChatSessionSummary.model_validate(session).model_dump(),
+        messages=[ChatMessage.model_validate(m) for m in transcript],
+    )
 
 @router.patch("/sessions/{session_id}", response_model=ChatSessionSummary)
 async def update_session(
