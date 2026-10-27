@@ -159,7 +159,6 @@
     "<template #tag><Badge variant=\"outline\">【题目】</Badge></template>",
     "const STRUCTURED_TAG_PATTERN = /[【\\[]\\s*(题目|题干|question|title)\\s*[】\\]]/i",
     "error.value = t('importSmart.alerts.noQuestionsParsed', { tag: '【题目】' })",
-    "if (typeof detail === 'string' && detail.includes('未能入库') && !proceedWithPartial) {",
     "return t('importSmart.alerts.tagMissing', { tag: '【题目】' })"
   ],
   "app/pages/test.vue": [

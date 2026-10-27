@@ -726,6 +726,8 @@ async def test_partial_failure_is_rejected_until_user_decides(client, ctx, db_se
 
     assert response.status_code == 422
     assert "未能入库" in response.json()["detail"]
+    assert response.json()["code"] == "paper_import.partial_skipped"
+    assert response.json()["params"] == {"count": 1}
     assert (await db_session.execute(select(Question))).scalars().all() == []
 
 

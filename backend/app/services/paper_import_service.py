@@ -21,6 +21,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app import schemas
+from app.core.api_errors import ErrorCode
 from app.core.file_paths import VIRTUAL_SOURCE
 from app.models.composition import ScopeType
 from app.models.import_task import (
@@ -52,7 +53,17 @@ logger = logging.getLogger(__name__)
 
 
 class PaperImportError(ValueError):
-    """整卷导入的领域错误;文案直接面向用户。"""
+    """整卷导入的领域错误;``detail`` 为中文回退文案,``code`` / ``params`` 供前端本地化。"""
+
+    def __init__(
+        self,
+        detail: str,
+        code: Optional[str] = None,
+        params: Optional[Dict[str, Any]] = None,
+    ) -> None:
+        super().__init__(detail)
+        self.code = code
+        self.params = params
 
 
 @dataclass
@@ -76,6 +87,18 @@ class PaperImportPreview:
     skipped: List[SkippedQuestion] = field(default_factory=list)
     degraded: List[DegradedItem] = field(default_factory=list)
     blocking_reason: Optional[str] = None
+    blocking_code: Optional[str] = None
+    blocking_params: Optional[Dict[str, Any]] = None
+
+    def block(
+        self,
+        reason: str,
+        code: Optional[str] = None,
+        params: Optional[Dict[str, Any]] = None,
+    ) -> None:
+        self.blocking_reason = reason
+        self.blocking_code = code
+        self.blocking_params = params
 
     @property
     def has_blocking_issue(self) -> bool:
@@ -192,17 +215,17 @@ def _validate_temp_references(
 ) -> None:
     question_ids = [str(q["temp_id"]) for q in questions if q.get("temp_id")]
     if len(question_ids) != len(set(question_ids)):
-        raise PaperImportError("题目 temp_id 重复，无法确定引用目标。")
+        raise PaperImportError("题目 temp_id 重复，无法确定引用目标。", ErrorCode.PAPER_IMPORT_QUESTION_TEMP_ID_DUPLICATE)
     stimulus_ids = [str(s.get("temp_id") or "") for s in stimuli]
     if any(not value for value in stimulus_ids):
-        raise PaperImportError("材料缺少 temp_id。")
+        raise PaperImportError("材料缺少 temp_id。", ErrorCode.PAPER_IMPORT_STIMULUS_TEMP_ID_MISSING)
     if len(stimulus_ids) != len(set(stimulus_ids)):
-        raise PaperImportError("材料 temp_id 重复，无法确定引用目标。")
+        raise PaperImportError("材料 temp_id 重复，无法确定引用目标。", ErrorCode.PAPER_IMPORT_STIMULUS_TEMP_ID_DUPLICATE)
     group_ids = [str(g.get("temp_id") or "") for g in question_groups]
     if any(not value for value in group_ids):
-        raise PaperImportError("题组缺少 temp_id。")
+        raise PaperImportError("题组缺少 temp_id。", ErrorCode.PAPER_IMPORT_GROUP_TEMP_ID_MISSING)
     if len(group_ids) != len(set(group_ids)):
-        raise PaperImportError("题组 temp_id 重复，无法确定引用目标。")
+        raise PaperImportError("题组 temp_id 重复，无法确定引用目标。", ErrorCode.PAPER_IMPORT_GROUP_TEMP_ID_DUPLICATE)
 
     question_id_set = set(question_ids)
     stimulus_id_set = set(stimulus_ids)
@@ -220,17 +243,19 @@ def _validate_temp_references(
         child_ref = str(raw.get("temp_id") or "")
         if not child_ref or parent_ref not in question_id_set:
             raise PaperImportError(
-                f"派生关系引用不存在的题目 temp_id：{parent_ref!r}。"
+                f"派生关系引用不存在的题目 temp_id：{parent_ref!r}。",
+                ErrorCode.PAPER_IMPORT_RELATION_PARENT_MISSING,
+                {"ref": parent_ref},
             )
         if child_ref == parent_ref:
-            raise PaperImportError("派生关系不能引用题目自身。")
+            raise PaperImportError("派生关系不能引用题目自身。", ErrorCode.PAPER_IMPORT_RELATION_SELF)
         relation_edges[child_ref] = parent_ref
     for child_ref in relation_edges:
         seen = {child_ref}
         cursor = relation_edges.get(child_ref)
         while cursor is not None:
             if cursor in seen:
-                raise PaperImportError("派生关系形成循环。")
+                raise PaperImportError("派生关系形成循环。", ErrorCode.PAPER_IMPORT_RELATION_CYCLE)
             seen.add(cursor)
             cursor = relation_edges.get(cursor)
 
@@ -240,24 +265,36 @@ def _validate_temp_references(
         stimulus_ref = str(group.get("stimulus_temp_id") or "")
         if stimulus_ref not in stimulus_id_set:
             raise PaperImportError(
-                f"题组 {group_ref!r} 引用了不存在的材料 temp_id：{stimulus_ref!r}。"
+                f"题组 {group_ref!r} 引用了不存在的材料 temp_id：{stimulus_ref!r}。",
+                ErrorCode.PAPER_IMPORT_GROUP_STIMULUS_MISSING,
+                {"group": group_ref, "ref": stimulus_ref},
             )
         member_refs = [str(value) for value in group.get("question_temp_ids") or []]
         if not member_refs:
-            raise PaperImportError(f"题组 {group_ref!r} 至少需要一道题。")
+            raise PaperImportError(
+                f"题组 {group_ref!r} 至少需要一道题。", ErrorCode.PAPER_IMPORT_GROUP_EMPTY, {"group": group_ref}
+            )
         if len(member_refs) != len(set(member_refs)):
-            raise PaperImportError(f"题组 {group_ref!r} 包含重复的题目引用。")
+            raise PaperImportError(
+                f"题组 {group_ref!r} 包含重复的题目引用。",
+                ErrorCode.PAPER_IMPORT_GROUP_DUPLICATE_MEMBER,
+                {"group": group_ref},
+            )
         missing = [value for value in member_refs if value not in question_id_set]
         if missing:
             raise PaperImportError(
-                f"题组 {group_ref!r} 引用了不存在的题目 temp_id：{missing[0]!r}。"
+                f"题组 {group_ref!r} 引用了不存在的题目 temp_id：{missing[0]!r}。",
+                ErrorCode.PAPER_IMPORT_GROUP_MEMBER_MISSING,
+                {"group": group_ref, "ref": missing[0]},
             )
         for member_ref in member_refs:
             other = group_of_question.setdefault(member_ref, group_ref)
             if other != group_ref:
                 raise PaperImportError(
                     f"题目 {member_ref!r} 同时属于题组 {other!r} 和 {group_ref!r}；"
-                    "一道题只能依赖一份题目材料。"
+                    "一道题只能依赖一份题目材料。",
+                    ErrorCode.PAPER_IMPORT_QUESTION_IN_MULTIPLE_GROUPS,
+                    {"question": member_ref, "group": other, "other": group_ref},
                 )
         stimulus_private = (
             _enum_value(
@@ -271,7 +308,9 @@ def _validate_temp_references(
             for member_ref in member_refs
         ):
             raise PaperImportError(
-                f"题组 {group_ref!r} 的公开题目不能挂在私有材料下。"
+                f"题组 {group_ref!r} 的公开题目不能挂在私有材料下。",
+                ErrorCode.PAPER_IMPORT_GROUP_VISIBILITY_CONFLICT,
+                {"group": group_ref},
             )
 
 
@@ -286,11 +325,15 @@ def _validate_outline_refs(
         ref = str(item.get("temp_id") or "")
         if item.get("kind") == OUTLINE_QUESTION_REF and ref not in question_ids:
             raise PaperImportError(
-                f"稿件结构引用了不存在的题目 temp_id：{ref!r}。"
+                f"稿件结构引用了不存在的题目 temp_id：{ref!r}。",
+                ErrorCode.PAPER_IMPORT_OUTLINE_QUESTION_MISSING,
+                {"ref": ref},
             )
         if item.get("kind") == OUTLINE_QUESTION_GROUP_REF and ref not in group_ids:
             raise PaperImportError(
-                f"稿件结构引用了不存在的题组 temp_id：{ref!r}。"
+                f"稿件结构引用了不存在的题组 temp_id：{ref!r}。",
+                ErrorCode.PAPER_IMPORT_OUTLINE_GROUP_MISSING,
+                {"ref": ref},
             )
 
 
@@ -301,7 +344,9 @@ def _validate_subject_ids(
         raw_subject_id = raw.get("subject_id")
         if raw_subject_id is not None and raw_subject_id != subject_id:
             raise PaperImportError(
-                f"题目 {raw.get('temp_id')!r} 的 subject_id 与导入学科不一致。"
+                f"题目 {raw.get('temp_id')!r} 的 subject_id 与导入学科不一致。",
+                ErrorCode.PAPER_IMPORT_SUBJECT_MISMATCH,
+                {"ref": str(raw.get("temp_id"))},
             )
 
 
@@ -323,7 +368,7 @@ async def preview_paper_import(
         _validate_subject_ids(questions, subject_id)
         _validate_outline_refs(questions, outline, question_groups)
     except PaperImportError as exc:
-        preview.blocking_reason = str(exc)
+        preview.block(str(exc), exc.code, exc.params)
 
     for index, raw in enumerate(questions):
         try:
@@ -339,11 +384,12 @@ async def preview_paper_import(
         importable_questions.append(raw)
 
     if scope_type is ScopeType.SHARED and _has_private_question(questions):
-        preview.blocking_reason = (
-            "本次导入包含私有题，私有题不能加入共享稿件；请改存到个人空间，或先调整题目可见性。"
+        preview.block(
+            "本次导入包含私有题，私有题不能加入共享稿件；请改存到个人空间，或先调整题目可见性。",
+            ErrorCode.PAPER_IMPORT_PRIVATE_IN_SHARED,
         )
-    if preview.importable_count == 0:
-        preview.blocking_reason = preview.blocking_reason or "没有任何题目可以导入。"
+    if preview.importable_count == 0 and not preview.has_blocking_issue:
+        preview.block("没有任何题目可以导入。", ErrorCode.PAPER_IMPORT_NOTHING_TO_IMPORT)
     try:
         _validate_temp_references(
             questions=importable_questions,
@@ -360,7 +406,8 @@ async def preview_paper_import(
                 visibility=raw.get("visibility") or QuestionVisibility.PUBLIC,
             )
     except (PaperImportError, ValidationError, ValueError) as exc:
-        preview.blocking_reason = preview.blocking_reason or str(exc)
+        if not preview.has_blocking_issue:
+            preview.block(str(exc), getattr(exc, "code", None), getattr(exc, "params", None))
 
     return preview
 
@@ -580,7 +627,7 @@ async def commit_paper_import(
     """在单一工作单元内完成建任务、建题、建稿、写 AST。调用方负责 commit。"""
     questions = _flatten_questions(questions)
     if not questions:
-        raise PaperImportError("没有选中任何题目。")
+        raise PaperImportError("没有选中任何题目。", ErrorCode.PAPER_IMPORT_NO_QUESTIONS)
 
     _validate_subject_ids(questions, subject_id)
     _validate_temp_references(
@@ -596,7 +643,8 @@ async def commit_paper_import(
 
     if save_as_composition and scope_type is ScopeType.SHARED and _has_private_question(questions):
         raise PaperImportError(
-            "本次导入包含私有题，私有题不能加入共享稿件；请改存到个人空间，或先调整题目可见性。"
+            "本次导入包含私有题，私有题不能加入共享稿件；请改存到个人空间，或先调整题目可见性。",
+            ErrorCode.PAPER_IMPORT_PRIVATE_IN_SHARED,
         )
 
     # 阶段 1：纯内存构造，先把"哪些题能建"定下来。
@@ -618,10 +666,14 @@ async def commit_paper_import(
         plans.append((raw, question_in))
 
     if not plans:
-        raise PaperImportError("选中的题目均未能入库，未创建任何内容。")
+        raise PaperImportError(
+            "选中的题目均未能入库，未创建任何内容。", ErrorCode.PAPER_IMPORT_NONE_IMPORTABLE
+        )
     if skipped and not proceed_with_partial:
         raise PaperImportError(
-            f"有 {len(skipped)} 道题目未能入库。请确认是否仅用已成功的题目继续创建稿件。"
+            f"有 {len(skipped)} 道题目未能入库。请确认是否仅用已成功的题目继续创建稿件。",
+            ErrorCode.PAPER_IMPORT_PARTIAL_SKIPPED,
+            {"count": len(skipped)},
         )
     _validate_temp_references(
         questions=[raw for raw, _question_in in plans],
@@ -642,7 +694,9 @@ async def commit_paper_import(
             )
         except (ValidationError, ValueError) as exc:
             raise PaperImportError(
-                f"材料 {raw.get('temp_id')!r} 内容无效：{exc}"
+                f"材料 {raw.get('temp_id')!r} 内容无效：{exc}",
+                ErrorCode.PAPER_IMPORT_STIMULUS_INVALID,
+                {"ref": str(raw.get("temp_id")), "error": str(exc)},
             ) from exc
         stimulus_plans.append((raw, stimulus_in))
 
@@ -766,7 +820,11 @@ async def commit_paper_import(
     try:
         nodes = build_nodes(specs)
     except AuthoringError as exc:
-        raise PaperImportError(f"整卷结构无法转换为稿件：{exc}") from exc
+        raise PaperImportError(
+            f"整卷结构无法转换为稿件：{exc}",
+            ErrorCode.PAPER_IMPORT_OUTLINE_CONVERT_FAILED,
+            {"error": str(exc)},
+        ) from exc
 
     comp = await composition_service.create_composition(
         db,

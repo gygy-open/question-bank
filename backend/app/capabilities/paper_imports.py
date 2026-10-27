@@ -96,6 +96,8 @@ class PreviewPaperImport(Capability[PaperImportPreviewInput, PaperImportPreviewR
             skipped=[vars(s) for s in preview.skipped],
             degraded=[vars(d) for d in preview.degraded],
             blocking_reason=preview.blocking_reason,
+            blocking_code=preview.blocking_code,
+            blocking_params=preview.blocking_params,
         )
 
 
@@ -147,7 +149,7 @@ class CommitPaperImport(Capability[PaperImportCommitInput, PaperImportCommitResp
             )
         except PaperImportError as exc:
             await ctx.db.rollback()
-            raise Unprocessable(str(exc)) from exc
+            raise Unprocessable(str(exc), exc.code, exc.params) from exc
         except Exception:
             await ctx.db.rollback()
             raise

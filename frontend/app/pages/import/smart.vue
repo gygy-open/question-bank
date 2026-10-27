@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { getApiErrorCodeMessage, getApiErrorDetail } from '@/lib/apiErrors'
 import { ref, computed, watch, onMounted } from 'vue'
 import { Upload, Loader2, FileText, CheckCircle2, AlertCircle, Sparkles, Trash2, Plus, Save, FileCode, Image as ImageIcon, BookOpen, Check, ChevronDown } from '@lucide/vue'
 import { Button } from '@/components/ui/button'
@@ -494,12 +495,16 @@ const handleImport = async (proceedWithPartial = false) => {
             importable_count: number
             skipped: { temp_id: string | null; message: string }[]
             blocking_reason: string | null
+            blocking_code?: string | null
+            blocking_params?: Record<string, unknown> | null
         }>(`/subjects/${globalSettings.value.subject_id}/paper-imports/preview`, {
             method: 'POST',
             body: { scope: compositionScope.value, ...structurePayload },
         })
         if (preview.blocking_reason) {
-            toast.error(t('importSmart.review.previewFailed'), { description: preview.blocking_reason })
+            toast.error(t('importSmart.review.previewFailed'), {
+                description: getApiErrorCodeMessage({ data: { code: preview.blocking_code, params: preview.blocking_params } }) || preview.blocking_reason,
+            })
             return
         }
         if (preview.skipped.length > 0 && !proceedWithPartial) {
@@ -545,12 +550,11 @@ const handleImport = async (proceedWithPartial = false) => {
         step.value = 'success'
     } catch (e: any) {
         // 422 且尚未决定如何处理部分失败时，交由用户选择继续或取消。
-        const detail = e?.data?.detail
-        if (typeof detail === 'string' && detail.includes('未能入库') && !proceedWithPartial) {
-            partialFailureDetail.value = detail
+        if (e?.data?.code === 'paper_import.partial_skipped' && !proceedWithPartial) {
+            partialFailureDetail.value = getApiErrorDetail(e, e.message)
             return
         }
-        toast.error(t('importSmart.review.importFailed'), { description: detail || e.message })
+        toast.error(t('importSmart.review.importFailed'), { description: getApiErrorDetail(e, e.message) })
     } finally {
         isImporting.value = false
     }

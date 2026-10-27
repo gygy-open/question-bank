@@ -105,6 +105,8 @@ class PaperImportPreviewResponse(BaseModel):
     skipped: List[SkippedQuestionRead] = Field(default_factory=list)
     degraded: List[DegradedItemRead] = Field(default_factory=list)
     blocking_reason: Optional[str] = None
+    blocking_code: Optional[str] = None
+    blocking_params: Optional[Dict[str, Any]] = None
 
 
 class PaperImportCommitRequest(BaseModel):

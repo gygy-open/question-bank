@@ -1,11 +1,12 @@
 from typing import Any, List, Optional
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Query
+from fastapi import APIRouter, Depends, UploadFile, File, Query
 from fastapi.responses import FileResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, update, func
 from sqlalchemy.orm import selectinload
 from app import models, schemas
 from app.api import deps
+from app.core.api_errors import ApiError, ErrorCode
 from app.core import permissions, storage
 from app.core.file_paths import VIRTUAL_SOURCE, import_source_file, task_source_file
 from app.core.permissions import Permission
@@ -151,12 +152,12 @@ async def create_import_tasks(
     Upload multiple files for processing. Each file becomes an ImportTask.
     """
     if not files:
-        raise HTTPException(status_code=400, detail="No files provided")
+        raise ApiError(400, ErrorCode.IMPORT_TASK_NO_FILES, "No files provided")
 
     # 学科在创建时确定:抽取出的图片与题目都归属它,不受之后切换学科影响。
     subject_id = current_user.last_active_subject_id
     if subject_id is None:
-        raise HTTPException(status_code=400, detail="请先选择所属学科")
+        raise ApiError(400, ErrorCode.IMPORT_TASK_SUBJECT_REQUIRED, "请先选择所属学科")
     deps.require(current_user, Permission.EDIT_QUESTION, subject_id=subject_id)
     sink = ImportImageSink(db, subject_id=subject_id, actor_id=current_user.id)
 
@@ -211,7 +212,9 @@ async def create_import_tasks(
         _new_task(sha256, file.filename, file_type)
     
     if not created_tasks:
-         raise HTTPException(status_code=400, detail="No valid files found (supported: .docx, .md, .zip)")
+         raise ApiError(
+            400, ErrorCode.IMPORT_TASK_NO_VALID_FILES, "No valid files found (supported: .docx, .md, .zip)"
+        )
 
     await db.commit()
     
@@ -275,10 +278,10 @@ async def get_import_task_status(
     task = result.scalar_one_or_none()
     
     if not task:
-        raise HTTPException(status_code=404, detail="Task not found")
+        raise ApiError(404, ErrorCode.IMPORT_TASK_NOT_FOUND, "Task not found")
         
     if task.user_id != current_user.id and not current_user.is_superuser:
-        raise HTTPException(status_code=403, detail="Not enough permissions")
+        raise ApiError(403, ErrorCode.IMPORT_TASK_FORBIDDEN, "Not enough permissions")
         
     return {
         "id": task.id,
@@ -306,13 +309,13 @@ async def cancel_import_task(
     task = result.scalar_one_or_none()
     
     if not task:
-        raise HTTPException(status_code=404, detail="Task not found")
+        raise ApiError(404, ErrorCode.IMPORT_TASK_NOT_FOUND, "Task not found")
         
     if task.user_id != current_user.id and not current_user.is_superuser:
-        raise HTTPException(status_code=403, detail="Not enough permissions")
+        raise ApiError(403, ErrorCode.IMPORT_TASK_FORBIDDEN, "Not enough permissions")
         
     if task.status in [ImportTaskStatus.COMPLETED, ImportTaskStatus.FAILED, ImportTaskStatus.CANCELLED]:
-        raise HTTPException(status_code=400, detail="Task already finished")
+        raise ApiError(400, ErrorCode.IMPORT_TASK_ALREADY_FINISHED, "Task already finished")
         
     # Update task status
     task.status = ImportTaskStatus.CANCELLED
@@ -335,10 +338,10 @@ async def retry_import_task(
     task = result.scalar_one_or_none()
     
     if not task:
-        raise HTTPException(status_code=404, detail="Task not found")
+        raise ApiError(404, ErrorCode.IMPORT_TASK_NOT_FOUND, "Task not found")
         
     if task.user_id != current_user.id and not current_user.is_superuser:
-        raise HTTPException(status_code=403, detail="Not enough permissions")
+        raise ApiError(403, ErrorCode.IMPORT_TASK_FORBIDDEN, "Not enough permissions")
         
     # Check if retry is allowed
     can_retry = False
@@ -355,7 +358,11 @@ async def retry_import_task(
             pass
 
     if not can_retry:
-        raise HTTPException(status_code=400, detail="Only failed, cancelled, or empty completed tasks can be retried")
+        raise ApiError(
+            400,
+            ErrorCode.IMPORT_TASK_NOT_RETRYABLE,
+            "Only failed, cancelled, or empty completed tasks can be retried",
+        )
         
     # Reset task status
     task.status = ImportTaskStatus.PENDING
@@ -382,10 +389,10 @@ async def delete_import_task(
     task = result.scalar_one_or_none()
     
     if not task:
-        raise HTTPException(status_code=404, detail="Task not found")
+        raise ApiError(404, ErrorCode.IMPORT_TASK_NOT_FOUND, "Task not found")
         
     if task.user_id != current_user.id and not current_user.is_superuser:
-        raise HTTPException(status_code=403, detail="Not enough permissions")
+        raise ApiError(403, ErrorCode.IMPORT_TASK_FORBIDDEN, "Not enough permissions")
         
     # Delete file if exists
     source = import_source_file(task.file_path)
@@ -433,10 +440,10 @@ async def download_import_source(
 ) -> FileResponse:
     task = await db.get(ImportTask, task_id)
     if task is None or not await _can_view_import_source(db, task, current_user):
-        raise HTTPException(status_code=404, detail="Task not found")
+        raise ApiError(404, ErrorCode.IMPORT_TASK_NOT_FOUND, "Task not found")
     source = task_source_file(task.file_path, task.source_sha256)
     if source is None:
-        raise HTTPException(status_code=404, detail="Source file not available")
+        raise ApiError(404, ErrorCode.IMPORT_TASK_SOURCE_UNAVAILABLE, "Source file not available")
     filename = Path(task.original_filename or source.name).name
     return FileResponse(
         source,
