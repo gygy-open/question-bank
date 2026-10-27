@@ -99,6 +99,26 @@
       "stimulus_invalid": "材料 {ref} 内容无效：{error}",
       "outline_convert_failed": "整卷结构无法转换为稿件：{error}"
     },
+    "composition": {
+      "not_found": "稿件不存在",
+      "folder_not_found": "文件夹不存在",
+      "parent_folder_not_found": "上级文件夹不存在",
+      "node_not_found": "稿件节点不存在",
+      "subject_not_found": "学科不存在",
+      "folder_self_parent": "文件夹不能移动到自身下面",
+      "folder_cycle": "不能把文件夹移动到它的子文件夹下面",
+      "folder_not_empty": "文件夹不为空，请先移走或删除其中的内容",
+      "revision_mismatch": "稿件已被其他人修改，请刷新后重试",
+      "finalize_deleted": "已删除的稿件不能定稿",
+      "version_conflict": "版本号冲突，请重试",
+      "scoring_requires_numbering": "开启计分需要先开启题号",
+      "question_unavailable": "题目 {question} 不存在或已被删除",
+      "question_other_subject": "题目 {question} 属于其他学科",
+      "private_question_in_shared": "私有题目 {question} 不能加入共享稿件",
+      "question_needs_group": "题目 {question} 依赖材料 {stimulus}，必须放在题组中添加",
+      "stimulus_unavailable": "材料 {stimulus} 不存在或属于其他学科",
+      "private_stimulus": "私有材料 {stimulus} 不能加入该稿件"
+    },
     "import_task": {
       "no_files": "请选择要导入的文件",
       "subject_required": "请先选择所属学科",

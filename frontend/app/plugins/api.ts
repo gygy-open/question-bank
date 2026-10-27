@@ -1,4 +1,5 @@
 import { toast } from 'vue-sonner'
+import { getApiErrorCodeMessage } from '@/lib/apiErrors'
 
 export default defineNuxtPlugin((nuxtApp) => {
   const api = $fetch.create({
@@ -23,6 +24,9 @@ export default defineNuxtPlugin((nuxtApp) => {
         nuxtApp.runWithContext(() => navigateTo('/setup'))
         return
       }
+      // 带错误码的响应：把 detail 换成本地化文案，这样各处直接读取 e.data.detail 的代码也能显示当前语言。
+      const localized = getApiErrorCodeMessage({ data: response._data })
+      if (localized && response._data) response._data.detail = localized
       if (response.status === 401) {
         nuxtApp.runWithContext(() => {
           useCookie('token').value = null

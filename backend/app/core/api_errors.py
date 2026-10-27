@@ -74,6 +74,25 @@ class ErrorCode(StrEnum):
     IMPORT_TASK_ALREADY_FINISHED = "import_task.already_finished"
     IMPORT_TASK_NOT_RETRYABLE = "import_task.not_retryable"
     IMPORT_TASK_SOURCE_UNAVAILABLE = "import_task.source_unavailable"
+    # composition
+    COMPOSITION_NOT_FOUND = "composition.not_found"
+    COMPOSITION_FOLDER_NOT_FOUND = "composition.folder_not_found"
+    COMPOSITION_PARENT_FOLDER_NOT_FOUND = "composition.parent_folder_not_found"
+    COMPOSITION_NODE_NOT_FOUND = "composition.node_not_found"
+    COMPOSITION_SUBJECT_NOT_FOUND = "composition.subject_not_found"
+    COMPOSITION_FOLDER_SELF_PARENT = "composition.folder_self_parent"
+    COMPOSITION_FOLDER_CYCLE = "composition.folder_cycle"
+    COMPOSITION_FOLDER_NOT_EMPTY = "composition.folder_not_empty"
+    COMPOSITION_REVISION_MISMATCH = "composition.revision_mismatch"
+    COMPOSITION_FINALIZE_DELETED = "composition.finalize_deleted"
+    COMPOSITION_VERSION_CONFLICT = "composition.version_conflict"
+    COMPOSITION_SCORING_REQUIRES_NUMBERING = "composition.scoring_requires_numbering"
+    COMPOSITION_QUESTION_UNAVAILABLE = "composition.question_unavailable"
+    COMPOSITION_QUESTION_OTHER_SUBJECT = "composition.question_other_subject"
+    COMPOSITION_PRIVATE_QUESTION_IN_SHARED = "composition.private_question_in_shared"
+    COMPOSITION_QUESTION_NEEDS_GROUP = "composition.question_needs_group"
+    COMPOSITION_STIMULUS_UNAVAILABLE = "composition.stimulus_unavailable"
+    COMPOSITION_PRIVATE_STIMULUS = "composition.private_stimulus"
 
 
 class ApiError(HTTPException):

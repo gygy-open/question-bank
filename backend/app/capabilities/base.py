@@ -19,6 +19,7 @@ from typing import Any, ClassVar, Generic, TypeVar
 from pydantic import BaseModel
 
 from app.core import permissions
+from app.core.api_errors import ErrorCode
 from app.core.permissions import Permission
 
 from .context import ExecutionContext
@@ -62,7 +63,7 @@ class Capability(ABC, Generic[TInput, TOutput]):
         assert self.permission is not None
         subject_id = self.subject_for(ctx, inp, target) if self.scope is Scope.SUBJECT else None
         if not permissions.can(ctx.actor, self.permission, subject_id=subject_id):
-            raise Forbidden(FORBIDDEN_DETAIL)
+            raise Forbidden(FORBIDDEN_DETAIL, ErrorCode.AUTH_FORBIDDEN)
 
     def subject_for(self, ctx: ExecutionContext, inp: TInput, target: Any) -> int | None:
         """判权用的学科:优先实体自身的,其次入参的,最后回落上下文。"""

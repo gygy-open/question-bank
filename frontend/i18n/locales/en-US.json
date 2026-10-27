@@ -99,6 +99,26 @@
       "stimulus_invalid": "Material {ref} is invalid: {error}",
       "outline_convert_failed": "The full-paper outline could not be converted to a composition: {error}"
     },
+    "composition": {
+      "not_found": "Composition not found.",
+      "folder_not_found": "Folder not found.",
+      "parent_folder_not_found": "Parent folder not found.",
+      "node_not_found": "Composition node not found.",
+      "subject_not_found": "Subject not found.",
+      "folder_self_parent": "A folder can't be moved into itself.",
+      "folder_cycle": "A folder can't be moved into one of its subfolders.",
+      "folder_not_empty": "The folder isn't empty. Move or delete its contents first.",
+      "revision_mismatch": "This composition was modified by someone else. Refresh and try again.",
+      "finalize_deleted": "A deleted composition can't be finalized.",
+      "version_conflict": "Version conflict. Please try again.",
+      "scoring_requires_numbering": "Turn on question numbering before enabling scoring.",
+      "question_unavailable": "Question {question} doesn't exist or has been deleted.",
+      "question_other_subject": "Question {question} belongs to a different subject.",
+      "private_question_in_shared": "Private question {question} can't be added to a shared composition.",
+      "question_needs_group": "Question {question} depends on material {stimulus} and must be added within a group.",
+      "stimulus_unavailable": "Material {stimulus} doesn't exist or belongs to a different subject.",
+      "private_stimulus": "Private material {stimulus} can't be added to this composition."
+    },
     "import_task": {
       "no_files": "Select files to import.",
       "subject_required": "Select a subject first.",

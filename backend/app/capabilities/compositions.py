@@ -16,6 +16,7 @@ from typing import Any, Dict, List, Optional
 from pydantic import BaseModel, Field, model_validator
 
 from app import crud
+from app.core.api_errors import ErrorCode
 from app.core.permissions import Permission
 from app.crud import crud_composition
 from app.models.composition import Composition, Folder, ScopeType
@@ -42,7 +43,7 @@ class CompositionScopeInput(BaseModel):
 
 async def _ensure_subject(ctx: ExecutionContext, subject_id: int) -> None:
     if not await crud.subject.get(ctx.db, id=subject_id):
-        raise NotFound("Subject not found")
+        raise NotFound("Subject not found", ErrorCode.COMPOSITION_SUBJECT_NOT_FOUND)
 
 
 async def _load_scoped_folder(ctx: ExecutionContext, inp: "FolderRefInput") -> Folder:
@@ -55,7 +56,7 @@ async def _load_scoped_folder(ctx: ExecutionContext, inp: "FolderRefInput") -> F
         owner_id=inp.owner_id,
     )
     if folder is None:
-        raise NotFound("Folder not found")
+        raise NotFound("Folder not found", ErrorCode.COMPOSITION_FOLDER_NOT_FOUND)
     return folder
 
 
@@ -75,7 +76,7 @@ async def _load_scoped_composition(
         include_deleted=include_deleted,
     )
     if comp is None:
-        raise NotFound("Composition not found")
+        raise NotFound("Composition not found", ErrorCode.COMPOSITION_NOT_FOUND)
     return comp
 
 
@@ -402,7 +403,7 @@ class RestoreComposition(Capability[CompositionRevisionInput, Composition]):
     async def load(self, ctx: ExecutionContext, inp: CompositionRevisionInput) -> Composition:
         comp = await _load_scoped_composition(ctx, inp, include_deleted=True)
         if comp.deleted_at is None:
-            raise NotFound("Composition not found")
+            raise NotFound("Composition not found", ErrorCode.COMPOSITION_NOT_FOUND)
         return comp
 
     async def execute(

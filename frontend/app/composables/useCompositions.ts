@@ -41,7 +41,7 @@ import {
 
 /**
  * 409 冲突的可识别错误：
- * - kind='revision'：乐观锁失败（组稿被他人改动），detail 含 "revision mismatch"
+ * - kind='revision'：乐观锁失败（组稿被他人改动），code 为 composition.revision_mismatch
  * - kind='folder-not-empty'：删除非空目录
  * - kind='other'：其它 409
  */
@@ -50,12 +50,13 @@ export class CompositionConflictError extends Error {
   readonly kind: 'revision' | 'folder-not-empty' | 'other'
   readonly detail: string
 
-  constructor(detail: string) {
+  constructor(detail: string, code?: string) {
     super(detail || 'conflict')
     this.name = 'CompositionConflictError'
     this.detail = detail
-    if (/revision/i.test(detail)) this.kind = 'revision'
-    else if (/not empty/i.test(detail)) this.kind = 'folder-not-empty'
+    // 优先按错误码判断；detail 可能已被本地化，文本匹配只作为没有 code 时的回退。
+    if (code === 'composition.revision_mismatch' || (!code && /revision/i.test(detail))) this.kind = 'revision'
+    else if (code === 'composition.folder_not_empty' || (!code && /not empty/i.test(detail))) this.kind = 'folder-not-empty'
     else this.kind = 'other'
   }
 }
@@ -73,9 +74,17 @@ function extractDetail(err: unknown): string {
   return e?.data?.detail ?? e?.response?._data?.detail ?? ''
 }
 
+function extractCode(err: unknown): string | undefined {
+  const e = err as {
+    data?: { code?: string }
+    response?: { _data?: { code?: string } }
+  }
+  return e?.data?.code ?? e?.response?._data?.code
+}
+
 function mapConflict(err: unknown): never {
   if (extractStatus(err) === 409) {
-    throw new CompositionConflictError(extractDetail(err))
+    throw new CompositionConflictError(extractDetail(err), extractCode(err))
   }
   throw err
 }

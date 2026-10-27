@@ -25,6 +25,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.capabilities.errors import Conflict, Invalid, NotFound, Unprocessable
+from app.core.api_errors import ErrorCode
 from app.crud import crud_composition
 from app.models.composition import (
     BODY_SLOT,
@@ -61,20 +62,26 @@ SNAPSHOT_SCHEMA_VERSION = 3
 # --------------------------------------------------------------------------- #
 # 内部工具
 # --------------------------------------------------------------------------- #
-def _not_found(what: str) -> NotFound:
-    return NotFound(f"{what} not found")
+def _not_found(what: str, code: Optional[str] = None) -> NotFound:
+    return NotFound(f"{what} not found", code)
 
 
-def _conflict(detail: str) -> Conflict:
-    return Conflict(detail)
+def _conflict(
+    detail: str, code: Optional[str] = None, params: Optional[Dict[str, Any]] = None
+) -> Conflict:
+    return Conflict(detail, code, params)
 
 
-def _bad_request(detail: str) -> Invalid:
-    return Invalid(detail)
+def _bad_request(
+    detail: str, code: Optional[str] = None, params: Optional[Dict[str, Any]] = None
+) -> Invalid:
+    return Invalid(detail, code, params)
 
 
-def _unprocessable(detail: str) -> Unprocessable:
-    return Unprocessable(detail)
+def _unprocessable(
+    detail: str, code: Optional[str] = None, params: Optional[Dict[str, Any]] = None
+) -> Unprocessable:
+    return Unprocessable(detail, code, params)
 
 
 async def _resolve_scoped_parent(
@@ -94,7 +101,7 @@ async def _resolve_scoped_parent(
         owner_id=owner_id,
     )
     if parent is None:
-        raise _not_found("Parent folder")
+        raise _not_found("Parent folder", ErrorCode.COMPOSITION_PARENT_FOLDER_NOT_FOUND)
     return parent
 
 
@@ -210,7 +217,7 @@ async def update_folder(
     if parent_id_provided:
         if parent_id is not None:
             if parent_id == folder.id:
-                raise _bad_request("A folder cannot be its own parent")
+                raise _bad_request("A folder cannot be its own parent", ErrorCode.COMPOSITION_FOLDER_SELF_PARENT)
             await _resolve_scoped_parent(
                 db,
                 parent_id=parent_id,
@@ -226,7 +233,7 @@ async def update_folder(
                 scope_type=folder.scope_type,
                 owner_id=folder.owner_id,
             ):
-                raise _bad_request("Moving folder would create a cycle")
+                raise _bad_request("Moving folder would create a cycle", ErrorCode.COMPOSITION_FOLDER_CYCLE)
         folder.parent_id = parent_id
 
     folder.updated_by = actor.id
@@ -247,7 +254,7 @@ async def delete_folder(
         db, folder_id=folder.id
     )
     if active_children > 0:
-        raise _conflict("Folder is not empty")
+        raise _conflict("Folder is not empty", ErrorCode.COMPOSITION_FOLDER_NOT_EMPTY)
     folder.deleted_at = datetime.utcnow()
     folder.updated_by = actor.id
     db.add(folder)
@@ -273,7 +280,7 @@ async def _validate_folder_ref(
         owner_id=owner_id,
     )
     if ref is None:
-        raise _not_found("Folder")
+        raise _not_found("Folder", ErrorCode.COMPOSITION_FOLDER_NOT_FOUND)
 
 
 async def create_composition(
@@ -439,7 +446,7 @@ async def _guarded_write(
         stmt = stmt.where(Composition.deleted_at.is_(None))
     result = await db.execute(stmt)
     if result.rowcount == 0:
-        raise _conflict("Composition revision mismatch")
+        raise _conflict("Composition revision mismatch", ErrorCode.COMPOSITION_REVISION_MISMATCH)
     return expected_revision + 1
 
 
@@ -472,7 +479,9 @@ async def update_composition(
     effective_numbering = numbering_enabled if numbering_enabled is not None else comp.numbering_enabled
     if scoring_enabled:
         if not effective_numbering:
-            raise _bad_request("scoring_enabled requires numbering_enabled")
+            raise _bad_request(
+                "scoring_enabled requires numbering_enabled", ErrorCode.COMPOSITION_SCORING_REQUIRES_NUMBERING
+            )
         values["scoring_enabled"] = True
     elif scoring_enabled is False:
         values["scoring_enabled"] = False
@@ -684,15 +693,29 @@ async def _load_scoped_question(
     )
     question = result.scalars().first()
     if question is None:
-        raise _unprocessable(f"question {question_id} not found or deleted")
+        raise _unprocessable(
+            f"question {question_id} not found or deleted",
+            ErrorCode.COMPOSITION_QUESTION_UNAVAILABLE,
+            {"question": question_id},
+        )
     if question.subject_id != subject_id:
-        raise _unprocessable(f"question {question_id} belongs to a different subject")
+        raise _unprocessable(
+            f"question {question_id} belongs to a different subject",
+            ErrorCode.COMPOSITION_QUESTION_OTHER_SUBJECT,
+            {"question": question_id},
+        )
     if scope_type == ScopeType.SHARED and question.visibility == QuestionVisibility.PRIVATE.value:
-        raise _unprocessable(f"private question {question_id} cannot be added to a shared composition")
+        raise _unprocessable(
+            f"private question {question_id} cannot be added to a shared composition",
+            ErrorCode.COMPOSITION_PRIVATE_QUESTION_IN_SHARED,
+            {"question": question_id},
+        )
     if question.stimulus_id is not None:
         raise _unprocessable(
             f"question {question_id} depends on stimulus {question.stimulus_id} "
-            "and must be added inside a question_group node"
+            "and must be added inside a question_group node",
+            ErrorCode.COMPOSITION_QUESTION_NEEDS_GROUP,
+            {"question": question_id, "stimulus": question.stimulus_id},
         )
     return question
 
@@ -718,11 +741,15 @@ async def _load_scoped_stimulus(
     )
     if stimulus is None or stimulus.subject_id != subject_id:
         raise _unprocessable(
-            f"stimulus {stimulus_id} not found or belongs to a different subject"
+            f"stimulus {stimulus_id} not found or belongs to a different subject",
+            ErrorCode.COMPOSITION_STIMULUS_UNAVAILABLE,
+            {"stimulus": stimulus_id},
         )
     if not _stimulus_accessible(stimulus, scope_type=scope_type, actor=actor):
         raise _unprocessable(
-            f"private stimulus {stimulus_id} cannot be added to this composition"
+            f"private stimulus {stimulus_id} cannot be added to this composition",
+            ErrorCode.COMPOSITION_PRIVATE_STIMULUS,
+            {"stimulus": stimulus_id},
         )
     return stimulus
 
@@ -748,7 +775,11 @@ async def _load_stimulus_members(
     for question_id in question_ids:
         question = questions.get(question_id)
         if question is None or question.subject_id != subject_id:
-            raise _unprocessable(f"question {question_id} not found or deleted")
+            raise _unprocessable(
+            f"question {question_id} not found or deleted",
+            ErrorCode.COMPOSITION_QUESTION_UNAVAILABLE,
+            {"question": question_id},
+        )
         if question.stimulus_id != stimulus_id:
             raise _unprocessable(
                 f"question {question_id} does not belong to stimulus {stimulus_id}"
@@ -758,7 +789,9 @@ async def _load_stimulus_members(
             and question.visibility == QuestionVisibility.PRIVATE.value
         ):
             raise _unprocessable(
-                f"private question {question_id} cannot be added to a shared composition"
+                f"private question {question_id} cannot be added to a shared composition",
+                ErrorCode.COMPOSITION_PRIVATE_QUESTION_IN_SHARED,
+                {"question": question_id},
             )
     return questions
 
@@ -1591,7 +1624,7 @@ async def sync_question_nodes(
     for nid in node_ids:
         node = existing_by_id.get(nid)
         if node is None:
-            raise _not_found("Node")
+            raise _not_found("Node", ErrorCode.COMPOSITION_NODE_NOT_FOUND)
         if node.node_type != NODE_TYPE_QUESTION:
             raise _unprocessable(f"node {nid} is not a question node")
         if node.parent_id is not None:
@@ -1611,10 +1644,16 @@ async def sync_question_nodes(
     for node in targets:
         question = questions_by_id.get(node.question_id) if node.question_id else None
         if question is None:
-            raise _unprocessable(f"question {node.question_id} not found or deleted")
+            raise _unprocessable(
+                f"question {node.question_id} not found or deleted",
+                ErrorCode.COMPOSITION_QUESTION_UNAVAILABLE,
+                {"question": node.question_id},
+            )
         if question.subject_id != comp.subject_id:
             raise _unprocessable(
-                f"question {node.question_id} belongs to a different subject"
+                f"question {node.question_id} belongs to a different subject",
+                ErrorCode.COMPOSITION_QUESTION_OTHER_SUBJECT,
+                {"question": node.question_id},
             )
         if question.stimulus_id is not None:
             raise _unprocessable(
@@ -1678,7 +1717,7 @@ async def sync_question_group_nodes(
     for node_id in node_ids:
         node = existing_by_id.get(node_id)
         if node is None:
-            raise _not_found("Node")
+            raise _not_found("Node", ErrorCode.COMPOSITION_NODE_NOT_FOUND)
         if node.node_type != NODE_TYPE_QUESTION_GROUP:
             raise _unprocessable(f"node {node_id} is not a question_group node")
         stimulus = await _load_scoped_stimulus(
@@ -2050,9 +2089,9 @@ async def finalize_version(
       拦截,局部安全重试一次后仍冲突则 409。
     """
     if comp.deleted_at is not None:
-        raise _conflict("Cannot finalize a deleted composition")
+        raise _conflict("Cannot finalize a deleted composition", ErrorCode.COMPOSITION_FINALIZE_DELETED)
     if comp.revision != expected_revision:
-        raise _conflict("Composition revision mismatch")
+        raise _conflict("Composition revision mismatch", ErrorCode.COMPOSITION_REVISION_MISMATCH)
 
     nodes = await crud_composition.composition.list_nodes(db, composition_id=comp.id)
     finalized_at = datetime.utcnow()
@@ -2085,7 +2124,7 @@ async def finalize_version(
             await db.rollback()
             if attempt == 0:
                 continue
-            raise _conflict("Version number conflict")
+            raise _conflict("Version number conflict", ErrorCode.COMPOSITION_VERSION_CONFLICT)
         await media_refs.sync_version_refs(db, version.id, snapshot)
         await _add_event(
             db,
@@ -2104,9 +2143,9 @@ async def finalize_version(
             await db.rollback()
             if attempt == 0:
                 continue
-            raise _conflict("Version number conflict")
+            raise _conflict("Version number conflict", ErrorCode.COMPOSITION_VERSION_CONFLICT)
         await db.refresh(version)
         return version
 
     # 不可达:循环内要么 return 要么在末次 raise。
-    raise _conflict("Version number conflict")
+    raise _conflict("Version number conflict", ErrorCode.COMPOSITION_VERSION_CONFLICT)
