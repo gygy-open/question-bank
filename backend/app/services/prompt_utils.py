@@ -12,7 +12,10 @@ def render_subject_prompt(template: Optional[str], subject: Optional[Subject]) -
         return template
     name = subject.name if subject and subject.name else ""
     desc = subject.description if subject and subject.description else ""
-    desc_text = f"（本学科说明：{desc}）" if desc else ""
+    desc_text = f" (Subject notes: {desc})" if desc else ""
+    if not name:
+        # 默认提示词里占位符后总跟一个空格；学科为空时一并去掉，避免出现双空格。
+        template = template.replace(f"{SUBJECT_NAME_PLACEHOLDER} ", "")
     return (
         template
         .replace(SUBJECT_NAME_PLACEHOLDER, name)

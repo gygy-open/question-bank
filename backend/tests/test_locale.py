@@ -95,3 +95,37 @@ def test_app_registers_locale_middleware():
     from app.main import app
 
     assert any(m.cls is LocaleMiddleware for m in app.user_middleware)
+
+
+def _ideographs(text: str) -> set[str]:
+    return {c for c in text if "\u4e00" <= c <= "\u9fff"}
+
+
+def test_default_prompt_bodies_are_english():
+    from app.services.prompts import _SCENE_HINTS, DEFAULT_EXTRACT_PROMPT, DEFAULT_SOLVE_PROMPT
+
+    assert not _ideographs(CHAT_SYSTEM_PROMPT)
+    assert not _ideographs("".join(_SCENE_HINTS.values()))
+    # 只允许作为"原文分隔符示例"出现的「或」。
+    assert _ideographs(DEFAULT_EXTRACT_PROMPT) <= {"或"}
+    assert not _ideographs(DEFAULT_SOLVE_PROMPT)
+
+
+def test_render_subject_prompt_without_subject_has_no_double_space():
+    from app.services.prompt_utils import render_subject_prompt
+    from app.services.prompts import DEFAULT_EXTRACT_PROMPT
+
+    first_line = render_subject_prompt(DEFAULT_EXTRACT_PROMPT, None).splitlines()[0]
+    assert first_line.startswith("You are an expert question extraction assistant. Analyze")
+    assert "  " not in first_line
+
+
+def test_render_subject_prompt_with_subject_and_description():
+    from types import SimpleNamespace
+
+    from app.services.prompt_utils import render_subject_prompt
+    from app.services.prompts import DEFAULT_SOLVE_PROMPT
+
+    subject = SimpleNamespace(name="数学", description="初中")
+    first_line = render_subject_prompt(DEFAULT_SOLVE_PROMPT, subject).splitlines()[0]
+    assert first_line.startswith("You are a senior 数学 teacher. (Subject notes: 初中) Analyze")
