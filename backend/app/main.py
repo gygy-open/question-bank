@@ -90,7 +90,11 @@ async def api_error_handler(_request: Request, exc: ApiError) -> JSONResponse:
 
 _SETUP_PREFIX = f"{settings.API_V1_STR}/setup"
 # Endpoints that must work even before first-run setup (e.g. version/update check).
-_SETUP_EXEMPT = (_SETUP_PREFIX, f"{settings.API_V1_STR}/system/version")
+_SETUP_EXEMPT = (
+    _SETUP_PREFIX,
+    f"{settings.API_V1_STR}/system/version",
+    f"{settings.API_V1_STR}/system/desktop-locale",
+)
 
 
 @app.middleware("http")

@@ -31,6 +31,8 @@ export default defineNuxtPlugin({
     nuxtApp.hook('i18n:localeSwitched', ({ newLocale }) => {
       setCurrentLocale(newLocale)
       localeCookie.value = newLocale
+      // 桌面版托盘菜单跟随用户的显式选择；后端只接受本机请求，网页版/局域网访问时是空操作。
+      $fetch('/api/v1/system/desktop-locale', { method: 'PUT', body: { locale: newLocale } }).catch(() => {})
     })
 
     z.setErrorMap(createZodErrorMap((key, params) => i18n.t(key, params ?? {})))

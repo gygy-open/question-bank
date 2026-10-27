@@ -24,6 +24,7 @@ import urllib.request
 import webbrowser
 
 from app import channel
+from app.desktop_i18n import display_name, tr
 
 DEFAULT_PORT = int(os.getenv("PORT", str(channel.DEFAULT_PORT)))
 _PORT_SCAN = 10  # 默认端口被别的程序占用时,往后最多再试这么多个
@@ -160,7 +161,7 @@ def _open_when_ready(url: str) -> None:
     from app.core.config import settings
 
     channel.message_box(
-        f"服务未能启动。\n\n请把日志发给我们排查：\n{settings.DATA_DIR / 'logs' / 'app.log'}",
+        tr("error.start_failed", log=settings.DATA_DIR / "logs" / "app.log"),
         channel.MB_ICONERROR,
     )
 
@@ -283,9 +284,11 @@ def run_tray() -> None:
     import pystray
     from pystray import Menu, MenuItem
 
+    from app import desktop_i18n
     from app.core.config import get_lan_share, set_lan_share
 
     ensure_std_streams()
+    desktop_i18n.load_saved_preference()
 
     # Bring the existing instance's UI forward instead of starting a second one.
     # 端口是机器级的唯一资源,互斥量只到会话级(快速用户切换/多用户登录各有一份)。
@@ -304,13 +307,12 @@ def run_tray() -> None:
     port = _resolve_port("0.0.0.0" if lan else "127.0.0.1")
     if port is None:
         channel.message_box(
-            f"端口 {DEFAULT_PORT}~{DEFAULT_PORT + _PORT_SCAN} 都被其他程序占用，无法启动。\n\n"
-            "请关闭占用这些端口的程序后重试。",
+            tr("error.ports_busy", first=DEFAULT_PORT, last=DEFAULT_PORT + _PORT_SCAN),
             channel.MB_ICONERROR,
         )
         return
     if port != DEFAULT_PORT:
-        channel.message_box(f"端口 {DEFAULT_PORT} 已被其他程序占用，本次改用 {port}。")
+        channel.message_box(tr("info.port_fallback", default=DEFAULT_PORT, port=port))
     PORT = port
 
     server = _Server()
@@ -319,11 +321,11 @@ def run_tray() -> None:
     # Auto-open the UI once on launch.
     threading.Thread(target=_open_when_ready, args=(_url(),), daemon=True).start()
 
-    icon = pystray.Icon("question-bank", _make_image(), channel.DISPLAY_NAME)
+    icon = pystray.Icon("question-bank", _make_image(), display_name())
 
     def _notify(message: str) -> None:
         try:
-            icon.notify(message, channel.DISPLAY_NAME)
+            icon.notify(message, display_name())
         except Exception:  # noqa: BLE001 - notifications are best-effort
             pass
 
@@ -340,23 +342,33 @@ def run_tray() -> None:
         icon.update_menu()
         if enabled:
             hostname = mdns.current_hostname()
-            extra = f" 或 http://{hostname}:{PORT}/" if hostname else ""
-            _notify(f"局域网共享已开启\nhttp://{_lan_ip()}:{PORT}/{extra}")
+            url = f"http://{_lan_ip()}:{PORT}/"
+            if hostname:
+                _notify(tr("notify.lan_on_with_host", url=url, host_url=f"http://{hostname}:{PORT}/"))
+            else:
+                _notify(tr("notify.lan_on", url=url))
         else:
-            _notify("局域网共享已关闭")
+            _notify(tr("notify.lan_off"))
 
     def on_restart(_icon, _item) -> None:
         server.restart(get_lan_share())
-        _notify("已重启")
+        _notify(tr("notify.restarted"))
 
     def on_quit(_icon, _item) -> None:
         server.stop()
         icon.stop()
 
+    # 文字用 callable:网页端切换语言后 update_menu() 即可刷新,无需重启托盘。
     icon.menu = Menu(
-        MenuItem("打开题库", on_open, default=True),
-        MenuItem("局域网共享", on_toggle_lan, checked=lambda _i: get_lan_share()),
-        MenuItem("重启", on_restart),
-        MenuItem("退出", on_quit),
+        MenuItem(lambda _i: tr("menu.open"), on_open, default=True),
+        MenuItem(lambda _i: tr("menu.lan_share"), on_toggle_lan, checked=lambda _i: get_lan_share()),
+        MenuItem(lambda _i: tr("menu.restart"), on_restart),
+        MenuItem(lambda _i: tr("menu.quit"), on_quit),
     )
+
+    def _on_locale_change() -> None:
+        icon.title = display_name()
+        icon.update_menu()
+
+    desktop_i18n.on_change(_on_locale_change)
     icon.run()

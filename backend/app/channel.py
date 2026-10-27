@@ -1,6 +1,6 @@
 """发布通道:带预发布后缀(如 1.5.0-alpha.1)的打包桌面版是"测试版",与正式版完全隔离。
 
-隔离项:数据目录、单实例锁、默认端口、托盘名称、局域网主机名。安装包侧的隔离见
+隔离项:数据目录、单实例锁、默认端口、托盘名称(见 app.desktop_i18n.display_name)、局域网主机名。安装包侧的隔离见
 deploy/windows/installer.iss 的 Preview 开关。
 
 本模块在 app.core.config 之前被使用(config 导入时就会在数据目录写 config.json),
@@ -38,7 +38,6 @@ DEFAULT_PORT = 8001 if PREVIEW else 8000
 # 必须用 Local\:Global\ 命名空间需要 SeCreateGlobalPrivilege,普通(未提权)启动的桌面程序没有这项
 # 权限,CreateMutexW 会直接失败,单实例判断形同虚设。跨用户会话的实例由端口探测兜底(app.tray)。
 INSTANCE_MUTEX = "Local\\QuestionBankTrayPreview" if PREVIEW else "Local\\QuestionBankTray"
-DISPLAY_NAME = "QuestionBank 测试版" if PREVIEW else "QuestionBank"
 MDNS_HOST = "questionbank-preview" if PREVIEW else "questionbank"
 # 与 deploy/windows/installer.iss 的 MyFwRule / MyLegacyFwRule 保持一致。
 FIREWALL_RULE = "QuestionBank Preview" if PREVIEW else "QuestionBank"
@@ -57,8 +56,10 @@ def message_box(text: str, flags: int = MB_ICONINFO) -> int:
         return 0
     import ctypes
 
+    from app.desktop_i18n import display_name
+
     mb_setforeground = 0x10000
-    return ctypes.windll.user32.MessageBoxW(None, text, DISPLAY_NAME, flags | mb_setforeground)
+    return ctypes.windll.user32.MessageBoxW(None, text, display_name(), flags | mb_setforeground)
 
 
 def desktop_data_root() -> Path:

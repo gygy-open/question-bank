@@ -1,4 +1,7 @@
-from fastapi import APIRouter, Depends
+from typing import Optional
+
+from fastapi import APIRouter, Depends, Request
+from pydantic import BaseModel
 
 from app._version import __version__
 from app.api import deps
@@ -67,3 +70,28 @@ async def get_network_info(
         "lan_hostname": hostname,
         "lan_hostname_url": f"http://{hostname}:{port}/" if hostname else None,
     }
+
+
+class DesktopLocaleIn(BaseModel):
+    locale: str
+
+
+_LOOPBACK = {"127.0.0.1", "::1", "localhost"}
+
+
+@router.put("/desktop-locale")
+async def set_desktop_locale(body: DesktopLocaleIn, request: Request) -> dict:
+    """Let the desktop shell (tray menu, dialogs) follow the language chosen in the UI.
+
+    Public, because the language can be switched on the login / setup pages too.
+    Only requests from this machine are applied: with LAN sharing on, colleagues
+    switching their own UI language must not change the host's tray language.
+    Behind a reverse proxy (docker) the client is never loopback, so it is a no-op.
+    """
+    from app.desktop_i18n import save_preference
+
+    client_host: Optional[str] = request.client.host if request.client else None
+    if client_host not in _LOOPBACK:
+        return {"applied": False, "locale": None}
+    locale = save_preference(body.locale)
+    return {"applied": locale is not None, "locale": locale}

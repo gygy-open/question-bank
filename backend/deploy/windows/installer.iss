@@ -6,6 +6,11 @@
 ; Uninstall (via Windows "Apps") closes the tray, removes the autostart entry
 ; and any firewall rule; application data in %APPDATA%\QuestionBank is preserved.
 ;
+; The wizard is bilingual (Simplified Chinese / English, picked from the Windows UI
+; language; a chooser is shown only when it matches neither). The chosen language
+; is written to HKLM\Software\<MyAppDir>\InstallerLanguage so the tray starts in
+; the same language until the user picks one in the web UI (see app/desktop_i18n.py).
+;
 ; Local-network sharing is OFF by default and is toggled from the tray menu
 ; (which adds/removes the firewall rule on demand) -- the installer no longer
 ; opens the firewall or installs a background service.
@@ -27,7 +32,6 @@
 
 #ifdef Preview
   #define MyAppId "{{5C1E7B2A-4D3F-4E8B-9A6C-2F7D1B3E5A90}"
-  #define MyAppName "QuestionBank 测试版"
   #define MyAppDir "QuestionBank Preview"
   #define MyAppExe "question-bank-preview.exe"
   #define MyRunKey "QuestionBankPreview"
@@ -35,25 +39,35 @@
   #define MyLegacyFwRule "QuestionBank (8001)"
 #else
   #define MyAppId "{{8F3A2B14-9C7E-4D6A-B1F2-3E5C7A9D0B11}"
-  #define MyAppName "QuestionBank"
   #define MyAppDir "QuestionBank"
   #define MyAppExe "question-bank.exe"
   #define MyRunKey "QuestionBank"
   #define MyFwRule "QuestionBank"
   #define MyLegacyFwRule "QuestionBank (8000)"
 #endif
-; Keep in sync with app/channel.py FIREWALL_RULE / LEGACY_FIREWALL_RULE.
+; Keep in sync with app/channel.py FIREWALL_RULE / LEGACY_FIREWALL_RULE, and MyAppDir
+; with app/desktop_i18n.py _REGISTRY_KEYS. These identifiers are never localized.
+
+; Inno Setup only ships Simplified Chinese officially since 7.1; older compilers
+; (CI runners have 6.x) use the vendored copy of the unofficial translation.
+#if FileExists(AddBackslash(CompilerPath) + "Languages\ChineseSimplified.isl")
+  #define ChineseMessages "compiler:Languages\ChineseSimplified.isl"
+#else
+  #define ChineseMessages "ChineseSimplified.isl"
+#endif
 
 [Setup]
 AppId={#MyAppId}
-AppName={#MyAppName}
+AppName={cm:QBAppName}
 AppVersion={#MyAppVersion}
 AppPublisher=gygy-open
 DefaultDirName={autopf}\{#MyAppDir}
-DefaultGroupName={#MyAppName}
+DefaultGroupName={cm:QBAppName}
 DisableProgramGroupPage=yes
 UninstallDisplayIcon={app}\{#MyAppExe}
-UninstallDisplayName={#MyAppName} {#MyAppVersion}
+UninstallDisplayName={cm:QBAppName} {#MyAppVersion}
+VersionInfoProductName=QuestionBank
+VersionInfoDescription=QuestionBank Setup
 OutputBaseFilename=QuestionBank-Setup-{#MyAppVersion}
 Compression=lzma2
 SolidCompression=yes
@@ -61,13 +75,38 @@ PrivilegesRequired=admin
 ArchitecturesAllowed=x64compatible
 ArchitecturesInstallIn64BitMode=x64compatible
 WizardStyle=modern
+ShowLanguageDialog=auto
+UsePreviousLanguage=yes
 
 [Languages]
+; Names double as the language code stored for the tray (app/desktop_i18n.py normalize()).
+Name: "zh"; MessagesFile: "{#ChineseMessages}"
 Name: "en"; MessagesFile: "compiler:Default.isl"
 
+[CustomMessages]
+#ifdef Preview
+zh.QBAppName=QuestionBank 测试版
+en.QBAppName=QuestionBank Preview
+#else
+zh.QBAppName=QuestionBank
+en.QBAppName=QuestionBank
+#endif
+zh.QBAutostart=开机自动启动题库(登录时显示托盘图标)
+en.QBAutostart=Start QuestionBank when I sign in (shows the tray icon)
+zh.QBStartupGroup=启动选项:
+en.QBStartupGroup=Startup options:
+zh.QBDesktopIcon=创建桌面快捷方式
+en.QBDesktopIcon=Create a desktop shortcut
+zh.QBOpenApp=打开题库
+en.QBOpenApp=Open QuestionBank
+zh.QBUninstallApp=卸载题库
+en.QBUninstallApp=Uninstall QuestionBank
+zh.QBLaunchNow=立即启动题库
+en.QBLaunchNow=Launch QuestionBank now
+
 [Tasks]
-Name: "autostart"; Description: "开机自动启动题库(登录时显示托盘图标)"; GroupDescription: "启动选项:"
-Name: "desktopicon"; Description: "创建桌面快捷方式"; Flags: unchecked
+Name: "autostart"; Description: "{cm:QBAutostart}"; GroupDescription: "{cm:QBStartupGroup}"
+Name: "desktopicon"; Description: "{cm:QBDesktopIcon}"; Flags: unchecked
 
 [Files]
 Source: "{#PayloadDir}\*"; DestDir: "{app}"; Flags: recursesubdirs ignoreversion
@@ -75,21 +114,34 @@ Source: "{#PayloadDir}\*"; DestDir: "{app}"; Flags: recursesubdirs ignoreversion
 [InstallDelete]
 ; Older versions shipped a localhost:<port> internet shortcut; the port is now resolved at runtime.
 Type: files; Name: "{app}\QuestionBank.url"
+; Shortcut names follow the installer language; drop the other language's copies on upgrade.
+Type: files; Name: "{group}\打开题库.lnk"
+Type: files; Name: "{group}\卸载题库.lnk"
+Type: files; Name: "{group}\Open QuestionBank.lnk"
+Type: files; Name: "{group}\Uninstall QuestionBank.lnk"
+#ifdef Preview
+Type: files; Name: "{group}\QuestionBank 测试版.lnk"
+Type: files; Name: "{group}\QuestionBank Preview.lnk"
+Type: files; Name: "{autodesktop}\QuestionBank 测试版.lnk"
+Type: files; Name: "{autodesktop}\QuestionBank Preview.lnk"
+#endif
 
 [Icons]
-Name: "{group}\{#MyAppName}"; Filename: "{app}\{#MyAppExe}"
+Name: "{group}\{cm:QBAppName}"; Filename: "{app}\{#MyAppExe}"
 ; Running the exe again just opens the UI of the already-running instance on its actual port.
-Name: "{group}\打开题库"; Filename: "{app}\{#MyAppExe}"
-Name: "{group}\卸载题库"; Filename: "{uninstallexe}"
-Name: "{autodesktop}\{#MyAppName}"; Filename: "{app}\{#MyAppExe}"; Tasks: desktopicon
+Name: "{group}\{cm:QBOpenApp}"; Filename: "{app}\{#MyAppExe}"
+Name: "{group}\{cm:QBUninstallApp}"; Filename: "{uninstallexe}"
+Name: "{autodesktop}\{cm:QBAppName}"; Filename: "{app}\{#MyAppExe}"; Tasks: desktopicon
 
 [Registry]
 ; Login autostart for all users (single-PC server model). Removed on uninstall.
 Root: HKLM; Subkey: "Software\Microsoft\Windows\CurrentVersion\Run"; ValueType: string; ValueName: "{#MyRunKey}"; ValueData: """{app}\{#MyAppExe}"""; Flags: uninsdeletevalue; Tasks: autostart
+; Default language for the tray until the user chooses one in the web UI.
+Root: HKLM; Subkey: "Software\{#MyAppDir}"; ValueType: string; ValueName: "InstallerLanguage"; ValueData: "{language}"; Flags: uninsdeletekey
 
 [Run]
 ; Launch the tray now (as the signed-in user, not the elevated installer).
-Filename: "{app}\{#MyAppExe}"; Description: "立即启动题库"; Flags: nowait postinstall skipifsilent runasoriginaluser
+Filename: "{app}\{#MyAppExe}"; Description: "{cm:QBLaunchNow}"; Flags: nowait postinstall skipifsilent runasoriginaluser
 
 [UninstallRun]
 ; Close the running tray so its files can be removed, and drop any firewall rule.
