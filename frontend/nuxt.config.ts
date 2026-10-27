@@ -60,8 +60,8 @@ export default defineNuxtConfig({
       { code: 'zh-CN', language: 'zh-CN', name: '简体中文', file: 'zh-CN.json' },
       { code: 'en-US', language: 'en-US', name: 'English', file: 'en-US.json' },
     ],
-    // 翻译未覆盖全站前不按浏览器语言自动切换，避免英文环境下出现中英混杂；
-    // 用户手动选择的语言由 app/plugins/i18n.ts 写入 cookie 持久化。
+    // 不用模块自带的检测，避免和 qb_locale cookie 形成两套机制；
+    // 首次访问按浏览器语言选择、手动切换后的持久化都在 app/plugins/i18n.ts。
     detectBrowserLanguage: false,
     vueI18n: './i18n.config.ts',
   },

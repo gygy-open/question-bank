@@ -1,6 +1,6 @@
 import { z } from 'zod'
 import { createZodErrorMap } from '@/lib/zodErrorMap'
-import { DEFAULT_LOCALE, LOCALE_COOKIE_KEY, isSupportedLocale, setCurrentLocale, setTranslator } from '@/lib/locale'
+import { LOCALE_COOKIE_KEY, detectBrowserLocale, isSupportedLocale, setCurrentLocale, setTranslator } from '@/lib/locale'
 
 export default defineNuxtPlugin({
   name: 'app-i18n',
@@ -12,15 +12,24 @@ export default defineNuxtPlugin({
       sameSite: 'lax',
     })
 
+    // cookie 只要存在就代表用户做过选择（包括选中文），不再按浏览器语言覆盖。
     const saved = localeCookie.value
-    if (isSupportedLocale(saved) && saved !== i18n.locale.value) {
-      await i18n.setLocale(saved)
+    const initial = isSupportedLocale(saved)
+      ? saved
+      : import.meta.client
+        ? detectBrowserLocale(navigator.languages ?? [navigator.language])
+        : null
+    if (initial && initial !== i18n.locale.value) {
+      await i18n.setLocale(initial)
+    }
+    if (!isSupportedLocale(saved) && initial) {
+      localeCookie.value = initial
     }
     setCurrentLocale(i18n.locale.value)
 
     nuxtApp.hook('i18n:localeSwitched', ({ newLocale }) => {
       setCurrentLocale(newLocale)
-      localeCookie.value = newLocale === DEFAULT_LOCALE ? null : newLocale
+      localeCookie.value = newLocale
     })
 
     z.setErrorMap(createZodErrorMap((key, params) => i18n.t(key, params ?? {})))

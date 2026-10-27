@@ -4,7 +4,7 @@ import { resolve } from 'node:path'
 import { check, resolvePaths } from '../../../scripts/i18n-core.mts'
 import { checkHardcoded } from '../../../scripts/i18n-hardcoded.mts'
 import { createZodErrorMap } from '@/lib/zodErrorMap'
-import { currentLocale, formatDate, setCurrentLocale } from '@/lib/locale'
+import { currentLocale, detectBrowserLocale, formatDate, setCurrentLocale } from '@/lib/locale'
 import { formatRelativeTime } from '@/lib/utils'
 
 describe('locale files', () => {
@@ -60,5 +60,19 @@ describe('locale-aware formatting', () => {
   it('falls back to the default locale for unsupported codes', () => {
     setCurrentLocale('fr-FR')
     expect(currentLocale.value).toBe('zh-CN')
+  })
+})
+
+describe('detectBrowserLocale', () => {
+  it('picks the first supported language by primary subtag', () => {
+    expect(detectBrowserLocale(['en-GB', 'zh-CN'])).toBe('en-US')
+    expect(detectBrowserLocale(['fr-FR', 'zh-TW', 'en'])).toBe('zh-CN')
+    expect(detectBrowserLocale(['EN'])).toBe('en-US')
+  })
+
+  it('returns null when nothing matches', () => {
+    expect(detectBrowserLocale(['fr-FR', 'de'])).toBeNull()
+    expect(detectBrowserLocale([])).toBeNull()
+    expect(detectBrowserLocale(undefined)).toBeNull()
   })
 })

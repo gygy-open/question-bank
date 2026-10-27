@@ -16,6 +16,16 @@ export function isSupportedLocale(value: unknown): value is AppLocale {
   return typeof value === 'string' && (SUPPORTED_LOCALES as readonly string[]).includes(value)
 }
 
+/** 按浏览器语言偏好顺序，选出第一个受支持的语言（只比较主语言子标签，如 en-GB → en-US）。 */
+export function detectBrowserLocale(languages: readonly string[] | undefined | null): AppLocale | null {
+  for (const lang of languages ?? []) {
+    const primary = lang.split('-')[0]?.toLowerCase()
+    const match = SUPPORTED_LOCALES.find((l) => l.split('-')[0]!.toLowerCase() === primary)
+    if (match) return match
+  }
+  return null
+}
+
 /**
  * 当前界面语言的响应式镜像，供 lib/ 下的纯函数使用（它们拿不到 useI18n）。
  * 在渲染期间读取会被追踪，因此切换语言后模板里的格式化结果会自动刷新。
