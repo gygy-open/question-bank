@@ -1,7 +1,8 @@
 import tailwindcss from '@tailwindcss/vite'
 
 const appName = 'QuestionBank'
-const appSlogan = 'AI原生的题库系统'
+// 静态兜底标题，只在 JS 加载完成前显示（打包时写死，无法翻译）；之后由 app.vue 按界面语言覆盖。
+const appSlogan = 'AI-Native Question Bank'
 
 // https://nuxt.com/docs/api/configuration/nuxt-config
 export default defineNuxtConfig({
