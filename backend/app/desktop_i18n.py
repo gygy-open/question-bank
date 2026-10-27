@@ -36,6 +36,9 @@ MESSAGES: Dict[str, Dict[str, str]] = {
         "notify.lan_on_with_host": "局域网共享已开启\n{url} 或 {host_url}",
         "notify.lan_off": "局域网共享已关闭",
         "notify.restarted": "已重启",
+        "notify.starting": "正在启动，请稍候…\n首次启动可能需要一两分钟，准备好后会自动打开。",
+        "notify.still_starting": "仍在启动中，请稍候…",
+        "tray.starting": "{name}（正在启动…）",
         "error.start_failed": "服务未能启动。\n\n请把日志发给我们排查：\n{log}",
         "error.ports_busy": "端口 {first}~{last} 都被其他程序占用，无法启动。\n\n请关闭占用这些端口的程序后重试。",
         "info.port_fallback": "端口 {default} 已被其他程序占用，本次改用 {port}。",
@@ -63,6 +66,9 @@ MESSAGES: Dict[str, Dict[str, str]] = {
         "notify.lan_on_with_host": "LAN sharing is on\n{url} or {host_url}",
         "notify.lan_off": "LAN sharing is off",
         "notify.restarted": "Restarted",
+        "notify.starting": "Starting, please wait…\nThe first launch can take a minute or two; it will open automatically when ready.",
+        "notify.still_starting": "Still starting, please wait…",
+        "tray.starting": "{name} (starting…)",
         "error.start_failed": "The service failed to start.\n\nPlease send us the log file:\n{log}",
         "error.ports_busy": (
             "Ports {first}-{last} are all in use by other programs, so QuestionBank cannot start.\n\n"

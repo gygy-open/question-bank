@@ -41,3 +41,11 @@ def make_icon(size: int = 256) -> "Image.Image":
 def save_ico(path: str, sizes=(16, 24, 32, 48, 64, 128, 256)) -> None:
     """Write a multi-resolution Windows ``.ico`` at ``path``."""
     make_icon(256).save(path, format="ICO", sizes=[(s, s) for s in sizes])
+
+
+def save_splash(path: str, width: int = 460, height: int = 200) -> None:
+    """Write the startup splash background (logo on white); the text is drawn by the bootloader."""
+    img = Image.new("RGB", (width, height), (255, 255, 255))
+    logo = make_icon(96)
+    img.paste(logo, ((width - 96) // 2, 28), logo)
+    img.save(path, format="PNG")

@@ -50,10 +50,21 @@ MB_ICONINFO = 0x40
 IDYES = 6
 
 
+def close_splash() -> None:
+    """关闭 PyInstaller 启动画面;未打包或构建时没启用 Splash 时什么都不做。"""
+    try:
+        import pyi_splash  # type: ignore
+
+        pyi_splash.close()
+    except Exception:  # noqa: BLE001
+        pass
+
+
 def message_box(text: str, flags: int = MB_ICONINFO) -> int:
     """Windows 原生对话框;其他平台(桌面版只发 Windows)返回 0。"""
     if os.name != "nt":
         return 0
+    close_splash()  # 启动画面会盖住对话框
     import ctypes
 
     from app.desktop_i18n import display_name

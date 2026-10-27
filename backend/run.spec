@@ -28,6 +28,30 @@ try:
 except Exception:
     _ICON = None  # fall back to the default PyInstaller icon
 
+# Startup splash: the onefile bootloader unpacks hundreds of MB before Python even starts (minutes on
+# a first launch with antivirus scanning), during which nothing else is visible. The splash is shown
+# by the bootloader and closed from app.tray once the server is ready. Needs Tcl/Tk at build time.
+_SPLASH = None
+try:
+    import tkinter  # noqa: F401
+
+    from app.branding import save_splash
+
+    _splash_img = os.path.abspath(os.path.join("build", "splash.png"))
+    save_splash(_splash_img)
+    _SPLASH = Splash(
+        _splash_img,
+        binaries=[],
+        datas=[],
+        text_pos=(30, 150),
+        text_size=11,
+        text_color="#374151",
+        text_default="QuestionBank 正在启动（首次较慢，请稍候）· Starting…",
+        always_on_top=False,
+    )
+except Exception:
+    _SPLASH = None  # build without a splash rather than failing
+
 datas, binaries, hiddenimports = [], [], []
 
 # Packages that ship data files / native libs / dynamically imported submodules
@@ -98,6 +122,7 @@ pyz = PYZ(a.pure)
 exe = EXE(
     pyz,
     a.scripts,
+    *([_SPLASH, _SPLASH.binaries] if _SPLASH else []),
     a.binaries,
     a.datas,
     [],

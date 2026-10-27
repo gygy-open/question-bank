@@ -20,8 +20,10 @@ import socket
 import sys
 import threading
 import time
+import traceback
 import urllib.request
 import webbrowser
+from typing import Callable
 
 from app import channel
 from app.desktop_i18n import display_name, tr
@@ -143,21 +145,26 @@ def ensure_std_streams() -> None:
         sys.stderr = stream
 
 
-def _wait_for_port(host: str, port: int, timeout: float = 30.0) -> bool:
+def _wait_for_port(
+    host: str,
+    port: int,
+    timeout: float = 30.0,
+    alive: "Callable[[], bool] | None" = None,
+) -> bool:
+    """等端口可连;alive 返回 False(服务线程已退出)时提前放弃。"""
     deadline = time.time() + timeout
     while time.time() < deadline:
         try:
             with socket.create_connection((host, port), timeout=1):
                 return True
         except OSError:
+            if alive is not None and not alive():
+                return False
             time.sleep(0.5)
     return False
 
 
-def _open_when_ready(url: str) -> None:
-    if _wait_for_port("127.0.0.1", PORT):
-        webbrowser.open(url)
-        return
+def _show_start_failed() -> None:
     from app.core.config import settings
 
     channel.message_box(
@@ -255,6 +262,9 @@ class _Server:
         self._thread = threading.Thread(target=self._server.run, daemon=True)
         self._thread.start()
 
+    def is_alive(self) -> bool:
+        return self._thread is not None and self._thread.is_alive()
+
     def stop(self) -> None:
         from app.services import mdns
 
@@ -316,12 +326,14 @@ def run_tray() -> None:
     PORT = port
 
     server = _Server()
-    server.start(lan)
+    # 迁移、导入应用和启动 uvicorn 都很慢(首次启动尤甚),放到后台线程,先让托盘图标和提示出现。
+    ready = threading.Event()
+    quitting = threading.Event()
 
-    # Auto-open the UI once on launch.
-    threading.Thread(target=_open_when_ready, args=(_url(),), daemon=True).start()
+    def _title() -> str:
+        return display_name() if ready.is_set() else tr("tray.starting", name=display_name())
 
-    icon = pystray.Icon("question-bank", _make_image(), display_name())
+    icon = pystray.Icon("question-bank", _make_image(), _title())
 
     def _notify(message: str) -> None:
         try:
@@ -329,12 +341,42 @@ def run_tray() -> None:
         except Exception:  # noqa: BLE001 - notifications are best-effort
             pass
 
+    def _boot() -> None:
+        try:
+            server.start(lan)
+            # 首次启动(解压、杀毒扫描、全量迁移)可能很慢,所以给足时间;服务线程崩溃则立刻放弃。
+            started = _wait_for_port("127.0.0.1", PORT, timeout=300, alive=server.is_alive)
+        except Exception:  # noqa: BLE001
+            traceback.print_exc()
+            started = False
+        if quitting.is_set():
+            return
+        if not started:
+            _show_start_failed()
+            icon.stop()
+            return
+        ready.set()
+        icon.title = _title()
+        channel.close_splash()
+        webbrowser.open(_url())
+
+    def _setup(_icon) -> None:
+        icon.visible = True
+        _notify(tr("notify.starting"))
+        threading.Thread(target=_boot, daemon=True).start()
+
     def on_open(_icon, _item) -> None:
+        if not ready.is_set():
+            _notify(tr("notify.still_starting"))
+            return
         webbrowser.open(_url())
 
     def on_toggle_lan(_icon, _item) -> None:
         from app.services import mdns
 
+        if not ready.is_set():
+            _notify(tr("notify.still_starting"))
+            return
         enabled = not get_lan_share()
         set_lan_share(enabled)
         _set_firewall_rule(enabled)
@@ -351,10 +393,14 @@ def run_tray() -> None:
             _notify(tr("notify.lan_off"))
 
     def on_restart(_icon, _item) -> None:
+        if not ready.is_set():
+            _notify(tr("notify.still_starting"))
+            return
         server.restart(get_lan_share())
         _notify(tr("notify.restarted"))
 
     def on_quit(_icon, _item) -> None:
+        quitting.set()
         server.stop()
         icon.stop()
 
@@ -367,8 +413,8 @@ def run_tray() -> None:
     )
 
     def _on_locale_change() -> None:
-        icon.title = display_name()
+        icon.title = _title()
         icon.update_menu()
 
     desktop_i18n.on_change(_on_locale_change)
-    icon.run()
+    icon.run(setup=_setup)

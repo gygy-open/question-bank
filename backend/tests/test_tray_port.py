@@ -2,6 +2,7 @@
 import json
 import socket
 import threading
+import time
 from contextlib import contextmanager
 from http.server import BaseHTTPRequestHandler, HTTPServer
 
@@ -87,3 +88,9 @@ def test_firewall_rule_follows_program_not_port_and_cleans_legacy_rule():
     assert f'program="{exe}"' in enable[2] and "localport" not in enable[2]
 
     assert tray._firewall_command(False, exe).split(" & ") == enable[:2]
+
+
+def test_wait_for_port_gives_up_when_server_thread_died(default_port):
+    start = time.time()
+    assert tray._wait_for_port("127.0.0.1", default_port, timeout=30, alive=lambda: False) is False
+    assert time.time() - start < 5
