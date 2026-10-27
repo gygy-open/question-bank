@@ -11,7 +11,7 @@
 export const LANG_STORAGE_KEY = 'qb-docs-locale'
 
 // Sections that exist in both languages; keep in sync with SCOPE in scripts/i18n-docs.mjs.
-const BILINGUAL = '^(en/)?(|index(\\.html)?|(guide|desktop|server|admin|features)/.*)$'
+const BILINGUAL = '^(en/)?(|index(\\.html)?|(guide|desktop|server|admin|features|development)/.*)$'
 
 /** 'en' | 'zh' for pages available in both languages, otherwise null. */
 export function bilingualLocale(pathname: string, base: string): 'en' | 'zh' | null {

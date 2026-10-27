@@ -17,8 +17,8 @@ import { fileURLToPath } from 'node:url'
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const LOCALES = ['en']
-// Developer docs (development/), specs and design notes stay Chinese-only.
-const SCOPE = ['index.md', 'guide', 'desktop', 'server', 'admin', 'features']
+// specs/ and design/ are internal and not translated.
+const SCOPE = ['index.md', 'guide', 'desktop', 'server', 'admin', 'features', 'development']
 const LOCK_PATH = join(ROOT, '.translation-lock.json')
 
 const sha = (text) => createHash('sha256').update(text).digest('hex').slice(0, 16)

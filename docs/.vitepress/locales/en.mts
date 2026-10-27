@@ -38,8 +38,7 @@ export const en: LocaleSpecificConfig<DefaultTheme.Config> = {
       },
       { text: 'Configuration', link: '/en/admin/ai-config', activeMatch: '/en/admin/' },
       { text: 'Features', link: '/en/features/import', activeMatch: '/en/features/' },
-      // Developer docs are maintained in Chinese only.
-      { text: 'Development (中文)', link: '/development/architecture' }
+      { text: 'Development', link: '/en/development/architecture', activeMatch: '/en/development/' }
     ],
 
     sidebar: {
@@ -81,6 +80,19 @@ export const en: LocaleSpecificConfig<DefaultTheme.Config> = {
             { text: 'System Settings', link: '/en/admin/system-settings' },
             { text: 'Users', link: '/en/admin/users' },
             { text: 'Permissions & Roles', link: '/en/admin/permissions' }
+          ]
+        }
+      ],
+
+      '/en/development/': [
+        {
+          text: 'Development',
+          items: [
+            { text: 'Architecture', link: '/en/development/architecture' },
+            { text: 'Local Development', link: '/en/development/local-setup' },
+            { text: 'Backend Conventions', link: '/en/development/backend' },
+            { text: 'Frontend Conventions', link: '/en/development/frontend' },
+            { text: 'Contributing', link: '/en/development/contributing' }
           ]
         }
       ]
