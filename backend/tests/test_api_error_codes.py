@@ -61,3 +61,28 @@ async def test_ai_config_domain_errors_carry_code_and_ref_params(db_session):
     with pytest.raises(Invalid) as missing:
         await validate_active_model(db_session, key="AI_TEXT_MODEL_ID", value="999999")
     assert missing.value.code == ErrorCode.AI_CONFIG_ACTIVE_MODEL_NOT_FOUND
+
+
+async def test_missing_authorization_header_has_code(client):
+    resp = await client.get(f"{API}/users/me")
+    assert resp.status_code == 401
+    body = resp.json()
+    assert body["code"] == ErrorCode.AUTH_NOT_AUTHENTICATED
+    assert body["detail"] == "Not authenticated"
+    assert resp.headers["www-authenticate"] == "Bearer"
+
+
+async def test_validation_error_has_code_and_never_echoes_input(client):
+    resp = await client.post(
+        f"{API}/login/access-token",
+        data={"username": "someone"},
+    )
+    assert resp.status_code == 422
+    body = resp.json()
+    assert body["code"] == ErrorCode.VALIDATION_FAILED
+    assert isinstance(body["detail"], list)
+    first = body["detail"][0]
+    assert first["type"] == "missing"
+    assert first["loc"][-1] == "password"
+    assert "input" not in first
+

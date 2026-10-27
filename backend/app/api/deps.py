@@ -17,7 +17,19 @@ from app.db.session import SessionLocal
 from app.models.user import User
 from app.schemas.token import TokenPayload
 
-reusable_oauth2 = OAuth2PasswordBearer(
+class _OAuth2Bearer(OAuth2PasswordBearer):
+    """缺少 Authorization 头时返回带错误码的 401(FastAPI 默认只有英文 detail)。"""
+
+    def make_not_authenticated_error(self) -> ApiError:
+        return ApiError(
+            status.HTTP_401_UNAUTHORIZED,
+            ErrorCode.AUTH_NOT_AUTHENTICATED,
+            "Not authenticated",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+
+reusable_oauth2 = _OAuth2Bearer(
     tokenUrl=f"{settings.API_V1_STR}/login/access-token"
 )
 

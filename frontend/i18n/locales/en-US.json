@@ -52,6 +52,38 @@
     "forbidden": "You do not have permission to perform this action"
   },
   "apiErrors": {
+    "validation": {
+      "failed": "The submitted content is invalid.",
+      "separator": "; ",
+      "invalid": "“{field}” has an invalid value",
+      "invalidNoField": "The submitted content is invalid.",
+      "types": {
+        "missing": "“{field}” is required",
+        "string_too_short": "“{field}” must be at least {min_length} characters",
+        "string_too_long": "“{field}” must be at most {max_length} characters",
+        "string_type": "“{field}” must be text",
+        "string_pattern_mismatch": "“{field}” has an incorrect format",
+        "int_parsing": "“{field}” must be an integer",
+        "int_type": "“{field}” must be an integer",
+        "float_parsing": "“{field}” must be a number",
+        "float_type": "“{field}” must be a number",
+        "bool_parsing": "“{field}” must be Yes or No",
+        "bool_type": "“{field}” must be Yes or No",
+        "greater_than": "“{field}” must be greater than {gt}",
+        "greater_than_equal": "“{field}” must be at least {ge}",
+        "less_than": "“{field}” must be less than {lt}",
+        "less_than_equal": "“{field}” must be at most {le}",
+        "too_short": "“{field}” must have at least {min_length} items",
+        "too_long": "“{field}” must have at most {max_length} items",
+        "literal_error": "“{field}” has a value that is not allowed",
+        "enum": "“{field}” has a value that is not allowed",
+        "list_type": "“{field}” must be a list",
+        "dict_type": "“{field}” has an incorrect format",
+        "json_invalid": "The submitted content is not valid JSON",
+        "url_parsing": "“{field}” is not a valid URL",
+        "uuid_parsing": "“{field}” is not a valid ID"
+      }
+    },
     "auth": {
       "invalid_credentials": "Incorrect username or password.",
       "inactive_pending": "Your account is not activated yet. Please wait for administrator approval.",

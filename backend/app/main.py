@@ -7,12 +7,13 @@ from contextlib import asynccontextmanager
 sys.path.append(str(Path(__file__).resolve().parent.parent))
 
 from fastapi import FastAPI, Request
+from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
 from app._version import __version__
 from app.api import legacy_media
 from app.api.v1.api import api_router
-from app.core.api_errors import ApiError
+from app.core.api_errors import ApiError, ErrorCode
 from app.core.locale import LocaleMiddleware
 from app.capabilities.errors import DomainError, status_for
 from app.core.config import settings, is_configured
@@ -51,6 +52,31 @@ async def domain_error_handler(_request: Request, exc: DomainError) -> JSONRespo
         if exc.params:
             content["params"] = exc.params
     return JSONResponse(status_code=status_for(exc), content=content)
+
+
+def _clean_validation_error(error: dict) -> dict:
+    """只保留前端翻译需要的字段。``input`` 可能含密码等敏感值,不能原样回显。"""
+    cleaned: dict = {"type": error.get("type"), "loc": list(error.get("loc", ())), "msg": error.get("msg")}
+    ctx = {
+        k: v
+        for k, v in (error.get("ctx") or {}).items()
+        if isinstance(v, (str, int, float, bool))
+    }
+    if ctx:
+        cleaned["ctx"] = ctx
+    return cleaned
+
+
+@app.exception_handler(RequestValidationError)
+async def validation_error_handler(_request: Request, exc: RequestValidationError) -> JSONResponse:
+    """422:``detail`` 仍是 pydantic 错误列表(兼容旧客户端),另附 ``code`` 让前端按 ``type`` 翻译。"""
+    return JSONResponse(
+        status_code=422,
+        content={
+            "detail": [_clean_validation_error(e) for e in exc.errors()],
+            "code": ErrorCode.VALIDATION_FAILED,
+        },
+    )
 
 
 @app.exception_handler(ApiError)

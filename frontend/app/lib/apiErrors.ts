@@ -9,7 +9,45 @@ export function isRevisionConflict(error: unknown): boolean {
   return getApiErrorStatus(error) === 409
 }
 
-type ApiErrorBody = { detail?: unknown, code?: unknown, params?: unknown }
+type ApiErrorBody = { detail?: unknown, code?: unknown, params?: unknown, errors?: unknown }
+
+const VALIDATION_CODE = 'validation.failed'
+const LOCATION_PREFIXES = new Set(['body', 'query', 'path', 'header', 'cookie'])
+const MAX_VALIDATION_MESSAGES = 3
+
+type ValidationItem = { type?: unknown, loc?: unknown, msg?: unknown, ctx?: unknown }
+
+function validationField(loc: unknown): string {
+  if (!Array.isArray(loc)) return ''
+  const names = loc.filter((part): part is string => typeof part === 'string' && !LOCATION_PREFIXES.has(part))
+  return names.at(-1) ?? ''
+}
+
+function validationMessage(item: ValidationItem): string {
+  const field = validationField(item.loc)
+  const ctx = item.ctx && typeof item.ctx === 'object' ? item.ctx as Record<string, unknown> : {}
+  if (typeof item.type === 'string') {
+    const key = `apiErrors.validation.types.${item.type}`
+    const text = translate(key, { ...ctx, field })
+    if (text && text !== key) return text
+    // 自定义校验器（value_error）的 msg 是业务文案，直接展示。
+    if (item.type === 'value_error' && typeof item.msg === 'string') {
+      return item.msg.replace(/^Value error, /, '')
+    }
+  }
+  return field
+    ? translate('apiErrors.validation.invalid', { field })
+    : translate('apiErrors.validation.invalidNoField')
+}
+
+/** 把 422 的 pydantic 错误列表翻译成当前语言；列表为空或格式不对时返回 undefined。 */
+export function formatValidationErrors(items: unknown): string | undefined {
+  if (!Array.isArray(items) || items.length === 0) return undefined
+  const messages = items
+    .slice(0, MAX_VALIDATION_MESSAGES)
+    .map(item => validationMessage((item ?? {}) as ValidationItem))
+  return [...new Set(messages)].join(translate('apiErrors.validation.separator'))
+}
 
 function getApiErrorBody(error: unknown): ApiErrorBody | undefined {
   const candidate = error as { data?: ApiErrorBody, response?: { _data?: ApiErrorBody } }
@@ -42,6 +80,11 @@ function resolveRefParams(params: Record<string, unknown> | undefined): Record<s
 export function getApiErrorCodeMessage(error: unknown): string | undefined {
   const body = getApiErrorBody(error)
   if (typeof body?.code !== 'string') return undefined
+  if (body.code === VALIDATION_CODE) {
+    // api.ts 会把 detail 换成已翻译的字符串，原始列表保留在 errors 里。
+    const items = Array.isArray(body.detail) ? body.detail : body.errors
+    return formatValidationErrors(items) ?? translate('apiErrors.validation.failed')
+  }
   const key = `apiErrors.${body.code}`
   const rawParams = body.params && typeof body.params === 'object' ? body.params as Record<string, unknown> : undefined
   const message = translate(key, resolveRefParams(rawParams))

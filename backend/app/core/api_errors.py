@@ -14,6 +14,8 @@ from fastapi import HTTPException
 
 
 class ErrorCode(StrEnum):
+    # validation(请求体/查询参数校验失败,detail 保持 pydantic 错误列表,前端按 type 逐条翻译)
+    VALIDATION_FAILED = "validation.failed"
     # auth
     AUTH_INVALID_CREDENTIALS = "auth.invalid_credentials"
     AUTH_INACTIVE_PENDING = "auth.inactive_pending"

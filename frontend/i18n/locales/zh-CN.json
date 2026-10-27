@@ -52,6 +52,38 @@
     "forbidden": "您没有权限执行此操作"
   },
   "apiErrors": {
+    "validation": {
+      "failed": "提交的内容不符合要求",
+      "separator": "；",
+      "invalid": "「{field}」的值无效",
+      "invalidNoField": "提交的内容无效",
+      "types": {
+        "missing": "「{field}」为必填项",
+        "string_too_short": "「{field}」至少需要 {min_length} 个字符",
+        "string_too_long": "「{field}」最多 {max_length} 个字符",
+        "string_type": "「{field}」必须是文本",
+        "string_pattern_mismatch": "「{field}」的格式不正确",
+        "int_parsing": "「{field}」必须是整数",
+        "int_type": "「{field}」必须是整数",
+        "float_parsing": "「{field}」必须是数字",
+        "float_type": "「{field}」必须是数字",
+        "bool_parsing": "「{field}」必须为“是”或“否”",
+        "bool_type": "「{field}」必须为“是”或“否”",
+        "greater_than": "「{field}」必须大于 {gt}",
+        "greater_than_equal": "「{field}」不能小于 {ge}",
+        "less_than": "「{field}」必须小于 {lt}",
+        "less_than_equal": "「{field}」不能大于 {le}",
+        "too_short": "「{field}」至少需要 {min_length} 项",
+        "too_long": "「{field}」最多 {max_length} 项",
+        "literal_error": "「{field}」的值不在允许的范围内",
+        "enum": "「{field}」的值不在允许的范围内",
+        "list_type": "「{field}」必须是列表",
+        "dict_type": "「{field}」格式不正确",
+        "json_invalid": "提交的内容不是有效的 JSON",
+        "url_parsing": "「{field}」不是有效的网址",
+        "uuid_parsing": "「{field}」不是有效的标识"
+      }
+    },
     "auth": {
       "invalid_credentials": "用户名或密码错误",
       "inactive_pending": "账号尚未激活，请等待管理员审批",
