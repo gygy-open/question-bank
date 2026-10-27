@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import AiPanelToggle from '~/components/chat/AiPanelToggle.vue'
 import { ArrowLeft } from '@lucide/vue'
 
 defineProps<{
@@ -19,6 +20,7 @@ const router = useRouter()
         </Breadcrumb>
     <div class="ml-auto flex items-center gap-2">
       <slot name="actions" />
+      <AiPanelToggle />
     </div>
   </header>
 </template>

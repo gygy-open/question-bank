@@ -540,6 +540,7 @@ const viewStructure = (question: Question) => {
   <!-- Header -->
   <PageHeader :title="t('nav.questionBank')">
     <template #actions>
+      <QuestionBasketButton @click="basketPanelOpen = true" />
       <DropdownMenu v-if="canEditCurrentSubject">
         <DropdownMenuTrigger as-child>
           <Button size="sm">
@@ -906,6 +907,5 @@ const viewStructure = (question: Question) => {
     @added="onCompositionPickerAdded"
   />
 
-  <QuestionBasketButton @click="basketPanelOpen = true" />
   <QuestionBasketPanel v-model:open="basketPanelOpen" :subjects="subjects" />
 </template>

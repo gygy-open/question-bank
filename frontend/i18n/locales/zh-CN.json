@@ -2239,9 +2239,12 @@
       "backToChat": "返回聊天",
       "history": "历史对话",
       "multiSelect": "多选消息",
-      "resetLayout": "重置位置与大小",
       "expand": "展开",
-      "minimize": "最小化"
+      "collapse": "还原"
+    },
+    "panel": {
+      "toggle": "AI 助手（{shortcut}）",
+      "resize": "拖动调整宽度，双击恢复默认"
     },
     "message": {
       "deleteConfirm": "确定要删除这条消息吗？",

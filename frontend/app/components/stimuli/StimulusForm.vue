@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import AiPanelToggle from '~/components/chat/AiPanelToggle.vue'
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { onBeforeRouteLeave } from 'vue-router'
 import draggable from 'vuedraggable'
@@ -311,6 +312,7 @@ const submit = async () => {
           <FilePlus2 class="mr-2 size-4" />{{ t('stimuli.form.addToComposition') }}
         </Button>
         <Button :disabled="saving || loading || !canEdit || subjectMismatch || (isEdit && !dirty)" @click="submit"><Loader2 v-if="saving" class="mr-2 size-4 animate-spin" /><Save v-else class="mr-2 size-4" />{{ t('common.save') }}</Button>
+        <AiPanelToggle />
       </div>
     </header>
 

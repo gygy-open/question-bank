@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import AiPanelToggle from '~/components/chat/AiPanelToggle.vue'
 // 组稿版本只读预览：加载 GET version detail，仅消费不可变 snapshot 渲染，绝不提供编辑入口。
 import { ref, computed, onMounted, watch } from 'vue'
 import { Button } from '@/components/ui/button'
@@ -110,6 +111,7 @@ function doExport(format: CompositionExportFormat) {
       <Download v-else class="mr-2 h-4 w-4" />
       {{ t('compositionVersions.export.latex') }}
     </Button>
+    <AiPanelToggle />
   </header>
 
   <div class="flex flex-1 flex-col px-4 py-6">

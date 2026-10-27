@@ -29,7 +29,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import UserProfileDialog from '~/components/UserProfileDialog.vue'
 import ChangePasswordDialog from '~/components/ChangePasswordDialog.vue'
 import { useColorMode } from '@vueuse/core'
-import { BookOpen, ChevronsUpDown, Images, ListTree, LogOut, Settings, Sparkles, User, Users, Tags, Library, KeyRound, Activity, Layers, Info, Moon, Sun, Bot, Lock, Languages, Check } from '@lucide/vue'
+import { BookOpen, ChevronsUpDown, Images, ListTree, LogOut, Settings, Sparkles, User, Users, Tags, Library, KeyRound, Activity, Layers, Info, Moon, Sun, Lock, Languages, Check } from '@lucide/vue'
 
 const props = withDefaults(defineProps<SidebarProps>(), {
   collapsible: "icon",
@@ -40,7 +40,6 @@ const { t, locale, locales, setLocale } = useI18n()
 const { user, logout } = useAuth()
 const { isAdmin, isManagerSomewhere } = usePermissions()
 const router = useRouter()
-const chat = useGlobalChat()
 const isProfileOpen = ref(false)
 const isChangePasswordOpen = ref(false)
 const colorMode = useColorMode()
@@ -74,30 +73,6 @@ const navActiveClass = 'border-l-2 border-transparent data-[active=true]:border-
       </SidebarMenu>
     </SidebarHeader>
     <SidebarContent>
-      <SidebarGroup>
-        <SidebarGroupContent class="flex flex-col gap-2">
-          <SidebarMenu>
-            <SidebarMenuItem>
-              <SidebarMenuButton
-                :is-active="chat.isOpen.value && !chat.isMinimized.value"
-                :aria-pressed="chat.isOpen.value"
-                :tooltip="t('nav.aiAssistant')"
-                class="relative min-w-8 border border-primary text-primary duration-200 ease-linear hover:bg-primary hover:text-primary-foreground data-[active=true]:bg-primary data-[active=true]:text-primary-foreground"
-                @click="chat.toggle()"
-              >
-                <Bot />
-                <span>{{ t('nav.aiAssistant') }}</span>
-                <span
-                  v-if="chat.hasUnread.value && !(chat.isOpen.value && !chat.isMinimized.value)"
-                  class="absolute right-2 top-1.5 h-2 w-2 rounded-full bg-destructive"
-                  :class="chat.loading.value ? 'animate-pulse' : ''"
-                />
-              </SidebarMenuButton>
-            </SidebarMenuItem>
-          </SidebarMenu>
-        </SidebarGroupContent>
-      </SidebarGroup>
-
       <SidebarGroup>
         <SidebarGroupContent class="flex flex-col gap-3">
           <div>

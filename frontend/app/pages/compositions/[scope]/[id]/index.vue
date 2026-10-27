@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import AiPanelToggle from '~/components/chat/AiPanelToggle.vue'
 import { ref, computed, onMounted, onActivated, onBeforeUnmount, watch } from 'vue'
 import { onBeforeRouteLeave } from 'vue-router'
 import { useDebounceFn } from '@vueuse/core'
@@ -773,6 +774,7 @@ onBeforeRouteLeave(() => {
         <TooltipContent>{{ dirty ? t('compositionEditor.finalize.savingHint') : t('compositionEditor.finalize.tooltip') }}</TooltipContent>
       </Tooltip>
     </TooltipProvider>
+    <AiPanelToggle />
   </header>
 
   <div class="flex flex-1 flex-col px-4 py-6">

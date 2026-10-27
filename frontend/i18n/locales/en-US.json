@@ -2239,9 +2239,12 @@
       "backToChat": "Back to Chat",
       "history": "Chat History",
       "multiSelect": "Select Messages",
-      "resetLayout": "Reset Position and Size",
       "expand": "Expand",
-      "minimize": "Minimize"
+      "collapse": "Restore"
+    },
+    "panel": {
+      "toggle": "AI Assistant ({shortcut})",
+      "resize": "Drag to resize, double-click to reset"
     },
     "message": {
       "deleteConfirm": "Delete this message?",

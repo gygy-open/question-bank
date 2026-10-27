@@ -12,15 +12,17 @@ const { count } = useQuestionBasket()
 
 <template>
   <Button
-    v-if="count > 0"
-    size="icon"
-    class="fixed bottom-24 right-6 z-40 h-12 w-12 rounded-full shadow-lg"
+    variant="outline"
+    size="sm"
+    class="gap-1.5"
     :title="t('basket.title')"
     @click="$emit('click')"
   >
-    <ShoppingBasket class="h-5 w-5" />
+    <ShoppingBasket class="h-4 w-4" />
+    <span class="hidden sm:inline">{{ t('basket.title') }}</span>
     <span
-      class="absolute -top-1 -right-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-destructive px-1 text-xs font-medium text-destructive-foreground"
+      v-if="count > 0"
+      class="flex h-5 min-w-5 items-center justify-center rounded-full bg-primary px-1 text-xs font-medium text-primary-foreground"
     >
       {{ count }}
     </span>

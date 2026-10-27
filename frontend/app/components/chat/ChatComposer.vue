@@ -126,6 +126,7 @@ const onEnter = (e: KeyboardEvent) => {
 
       <Textarea
         v-model="chat.input.value"
+        data-chat-input
         :placeholder="chat.isVisionCapable.value ? t('chat.composer.placeholderVision') : t('chat.composer.placeholder')"
         class="max-h-[160px] min-h-[38px] resize-none"
         rows="1"

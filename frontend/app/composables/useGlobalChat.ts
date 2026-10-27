@@ -1,6 +1,6 @@
 // Global AI assistant chat state.
 // Module-scoped singletons (not useState) so File objects and in-flight
-// streaming requests survive component unmount — closing the floating widget
+// streaming requests survive component unmount — closing the side panel
 // must NOT interrupt an ongoing generation.
 import { useLocalStorage } from '@vueuse/core'
 import {
@@ -38,8 +38,10 @@ const SESSION_LIMIT = 20
 const MESSAGE_LIMIT = 20
 
 // --- UI state ---
-const isOpen = ref(false)
-const isMinimized = ref(false)
+// Persisted so the panel stays docked across reloads.
+const isOpen = useLocalStorage('qb-chat-panel-open', false)
+// Expanded: the docked panel overlays the whole content area.
+const isExpanded = ref(false)
 const view = ref<'chat' | 'history'>('chat')
 const isSelectionMode = ref(false)
 const selectedMessageIndices = ref<Set<number>>(new Set())
@@ -48,9 +50,9 @@ const isPromptManagerOpen = ref(false)
 const previewImage = ref<string | null>(null)
 const isPreviewOpen = ref(false)
 
-// Persisted geometry
-const position = useLocalStorage('qb-chat-widget-position', { x: -1, y: -1 })
-const size = useLocalStorage('qb-chat-widget-size', { width: 400, height: 600 })
+// Persisted width of the docked side panel
+export const CHAT_PANEL_DEFAULT_WIDTH = 400
+const panelWidth = useLocalStorage('qb-chat-panel-width', CHAT_PANEL_DEFAULT_WIDTH)
 
 // --- Data state ---
 const sessions = ref<ChatSession[]>([])
@@ -320,7 +322,7 @@ const handlePromptSelect = (content: string) => {
 // --- Send message (streaming) ---
 // This runs entirely at module scope; it does not depend on any component
 // instance, so an in-flight generation keeps updating `messages` even after
-// the widget is closed/unmounted.
+// the panel is closed/unmounted.
 const sendMessage = async () => {
     const nuxtApp = useNuxtApp()
     const { $api } = nuxtApp
@@ -448,8 +450,8 @@ const sendMessage = async () => {
         }
 
         fetchSessions()
-        // Surface an unread indicator if the user closed the widget mid-stream.
-        if (!isOpen.value || isMinimized.value) hasUnread.value = true
+        // Surface an unread indicator if the user closed the panel mid-stream.
+        if (!isOpen.value) hasUnread.value = true
     } catch (e) {
         console.error('Chat error', e)
         if (messages.value.length > 0) {
@@ -507,7 +509,6 @@ const notifyAIConfigChanged = () => {
 
 const open = () => {
     isOpen.value = true
-    isMinimized.value = false
     hasUnread.value = false
     if (isInitialized.value) {
         refreshModels().catch(e => console.error('Failed to refresh chat models', e))
@@ -518,34 +519,22 @@ const open = () => {
 
 const close = () => {
     isOpen.value = false
+    isExpanded.value = false
 }
 
 const toggle = () => {
-    if (isOpen.value && !isMinimized.value) {
-        close()
-    } else {
-        open()
-    }
+    if (isOpen.value) close()
+    else open()
 }
 
-const minimize = () => {
-    isMinimized.value = true
-}
-
-const restore = () => {
-    isMinimized.value = false
-    hasUnread.value = false
-}
-
-const resetGeometry = () => {
-    position.value = { x: -1, y: -1 }
-    size.value = { width: 400, height: 600 }
+const toggleExpanded = () => {
+    isExpanded.value = !isExpanded.value
 }
 
 export const useGlobalChat = () => ({
     // UI state
     isOpen,
-    isMinimized,
+    isExpanded,
     view,
     isSelectionMode,
     selectedMessageIndices,
@@ -553,8 +542,7 @@ export const useGlobalChat = () => ({
     isPromptManagerOpen,
     previewImage,
     isPreviewOpen,
-    position,
-    size,
+    panelWidth,
     // Data state
     sessions,
     hasMoreSessions,
@@ -601,7 +589,5 @@ export const useGlobalChat = () => ({
     open,
     close,
     toggle,
-    minimize,
-    restore,
-    resetGeometry,
+    toggleExpanded,
 })
