@@ -190,10 +190,8 @@ const copyContent = () => {
 
 <template>
     <div :class="[
-        'group relative px-4 py-2 rounded-lg max-w-[80%] text-sm',
-        role === 'user'
-            ? 'bg-primary text-primary-foreground'
-            : 'bg-muted border'
+        'group relative min-w-0 text-sm',
+        role === 'user' ? 'max-w-[80%] rounded-lg bg-muted px-3 py-2' : 'flex-1'
     ]">
         <!-- Images -->
         <div v-if="images && images.length" class="flex flex-wrap gap-2 mb-2">

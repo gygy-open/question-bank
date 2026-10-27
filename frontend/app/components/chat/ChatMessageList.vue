@@ -1,8 +1,7 @@
 <script setup lang="ts">
-import { ArrowDown, Bot, User, Loader2 } from '@lucide/vue'
+import { ArrowDown, Bot, Loader2 } from '@lucide/vue'
 import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
-import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import ChatMessage from '@/components/ChatMessage.vue'
 import {
@@ -46,21 +45,14 @@ const chat = useGlobalChat()
             :scroll-anchor="msg.role === 'user'"
             class="flex items-start gap-2"
           >
-            <div v-if="chat.isSelectionMode.value" class="shrink-0 pt-2">
+            <div v-if="chat.isSelectionMode.value" class="shrink-0 pt-0.5">
               <Checkbox
                 :model-value="chat.selectedMessageIndices.value.has(index)"
                 @update:model-value="chat.toggleMessageSelection(index)"
               />
             </div>
 
-            <div :class="['flex flex-1 gap-2', msg.role === 'user' ? 'flex-row-reverse' : '']">
-              <Avatar class="h-7 w-7">
-                <AvatarFallback :class="msg.role === 'user' ? 'bg-primary text-primary-foreground' : 'bg-muted'">
-                  <User v-if="msg.role === 'user'" class="h-3.5 w-3.5" />
-                  <Bot v-else class="h-3.5 w-3.5" />
-                </AvatarFallback>
-              </Avatar>
-
+            <div :class="['flex min-w-0 flex-1', msg.role === 'user' ? 'justify-end' : '']">
               <ChatMessage
                 :id="msg.id"
                 :role="msg.role as any"

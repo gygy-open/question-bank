@@ -2210,8 +2210,8 @@
     }
   },
   "chat": {
-    "newSession": "新对话",
-    "untitled": "对话",
+    "newSession": "新会话",
+    "untitled": "会话",
     "copyMarkdown": "复制 Markdown",
     "composer": {
       "myModels": "我的模型",
@@ -2224,8 +2224,8 @@
     },
     "history": {
       "rename": "重命名",
-      "empty": "暂无对话",
-      "deleteConfirm": "确定要删除这个对话吗？"
+      "empty": "暂无会话",
+      "deleteConfirm": "确定要删除这个会话吗？"
     },
     "messages": {
       "loadMoreHistory": "加载更多历史消息",
@@ -2236,8 +2236,7 @@
       "count": "已选择 {count} 条"
     },
     "header": {
-      "backToChat": "返回聊天",
-      "history": "历史对话",
+      "history": "历史会话",
       "multiSelect": "多选消息",
       "expand": "展开",
       "collapse": "还原"
