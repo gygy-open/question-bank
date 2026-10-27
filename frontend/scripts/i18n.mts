@@ -2,7 +2,8 @@
  * i18n 翻译文件维护 CLI。
  *
  *   pnpm i18n:sync   以 zh-CN 为准重排/清理其他语言文件，导出缺失或过期条目到 i18n/.pending/<locale>.json
- *   pnpm i18n:apply  校验 i18n/.pending/<locale>.out.json 中的译文并合并，更新 lock
+ *                    加 --split <n> 时再按顶层命名空间拆成 <locale>.part<k>.json，供多个翻译方并行处理
+ *   pnpm i18n:apply  校验 i18n/.pending/<locale>.out.json（及 <locale>.part<k>.out.json）中的译文并合并，更新 lock
  *   pnpm i18n:check  只读校验（含硬编码中文检查），有问题时以非 0 退出（供 CI 使用）
  *   pnpm i18n:merge  把 i18n/.fragments/*.json（并行批次新增的 zh-CN key）合并进 zh-CN.json
  *   pnpm i18n:baseline  把 app/ 中现有的非注释中文行登记为有意保留的内容语言
@@ -20,8 +21,14 @@ const preview = (keys: string[], n = 10) =>
   keys.slice(0, n).join(', ') + (keys.length > n ? `, ... (+${keys.length - n})` : '')
 
 function runSync(): number {
+  const splitArg = process.argv.indexOf('--split')
+  const split = splitArg > -1 ? Number(process.argv[splitArg + 1]) : 0
+  if (splitArg > -1 && !(Number.isInteger(split) && split > 1)) {
+    console.error('--split expects an integer >= 2')
+    return 2
+  }
   let pendingTotal = 0
-  for (const r of sync(paths)) {
+  for (const r of sync(paths, { split })) {
     const count = r.missing.length + r.stale.length
     pendingTotal += count
     console.log(`[${r.locale}] missing ${r.missing.length}, stale ${r.stale.length}, removed ${r.removed.length}`)
@@ -29,6 +36,7 @@ function runSync(): number {
     if (r.stale.length) console.log(`  stale:   ${preview(r.stale)}`)
     if (r.removed.length) console.log(`  removed: ${preview(r.removed)}`)
     if (count) console.log(`  -> translate ${rel(pendingFile(paths, r.locale))} into ${rel(outFile(paths, r.locale))}, then run i18n:apply`)
+    if (r.parts) console.log(`  -> or translate the ${r.parts} shard(s) i18n/.pending/${r.locale}.part<k>.json into ${r.locale}.part<k>.out.json in parallel`)
   }
   if (!pendingTotal) console.log('All locales are up to date.')
   return 0

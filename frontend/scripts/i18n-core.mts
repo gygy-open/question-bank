@@ -171,13 +171,51 @@ export function outFile(paths: I18nPaths, locale: string): string {
   return join(paths.pendingDir, `${locale}.out.json`)
 }
 
-function writePending(paths: I18nPaths, locale: string, entries: Record<string, string>): void {
+export function partFile(paths: I18nPaths, locale: string, n: number, out = false): string {
+  return join(paths.pendingDir, `${locale}.part${n}${out ? '.out' : ''}.json`)
+}
+
+/** 目录里属于某语言的分片文件（待翻译或译文）。 */
+function listPartFiles(paths: I18nPaths, locale: string, out: boolean): string[] {
+  if (!existsSync(paths.pendingDir)) return []
+  const re = new RegExp(`^${locale.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\.part(\\d+)${out ? '\\.out' : ''}\\.json$`)
+  return readdirSync(paths.pendingDir)
+    .filter(f => re.test(f))
+    .sort((a, b) => Number(re.exec(a)![1]) - Number(re.exec(b)![1]))
+    .map(f => join(paths.pendingDir, f))
+}
+
+/**
+ * 把待翻译条目按顶层命名空间拆成最多 n 份（先放最大的组，每次放进最小的一份），
+ * 同一命名空间的条目不会被拆开，方便翻译方保持措辞一致。
+ */
+export function splitByNamespace(entries: Record<string, string>, n: number): Record<string, string>[] {
+  const groups = new Map<string, Record<string, string>>()
+  for (const [key, value] of Object.entries(entries)) {
+    const ns = key.split('.')[0]!
+    if (!groups.has(ns)) groups.set(ns, {})
+    groups.get(ns)![key] = value
+  }
+  const bins: Record<string, string>[] = Array.from({ length: Math.max(1, Math.min(n, groups.size)) }, () => ({}))
+  const size = (b: Record<string, string>) => Object.keys(b).length
+  for (const group of [...groups.values()].sort((a, b) => size(b) - size(a))) {
+    const smallest = bins.reduce((m, b) => (size(b) < size(m) ? b : m))
+    Object.assign(smallest, group)
+  }
+  return bins.filter(b => size(b) > 0)
+}
+
+function writePending(paths: I18nPaths, locale: string, entries: Record<string, string>, split = 0): void {
+  for (const f of [...listPartFiles(paths, locale, false), ...listPartFiles(paths, locale, true)]) rmSync(f, { force: true })
   if (Object.keys(entries).length === 0) {
     rmSync(pendingFile(paths, locale), { force: true })
     return
   }
   mkdirSync(paths.pendingDir, { recursive: true })
   writeJson(pendingFile(paths, locale), entries)
+  if (split > 1) {
+    splitByNamespace(entries, split).forEach((part, i) => writeJson(partFile(paths, locale, i + 1), part))
+  }
 }
 
 // ---------- 命令 ----------
@@ -187,13 +225,14 @@ export interface SyncResult {
   missing: string[]
   stale: string[]
   removed: string[]
+  parts: number
 }
 
 /**
  * 以基准语言为准重建所有目标语言文件（顺序、删除多余 key），并把缺失/过期条目导出到 .pending。
  * 过期译文暂时保留在文件中，重译前仍可作为兜底显示。
  */
-export function sync(paths: I18nPaths): SyncResult[] {
+export function sync(paths: I18nPaths, options: { split?: number } = {}): SyncResult[] {
   const base = loadLocale(paths, BASE_LOCALE)
   saveLocale(paths, BASE_LOCALE, base)
   const lock = loadLock(paths)
@@ -203,7 +242,7 @@ export function sync(paths: I18nPaths): SyncResult[] {
     const target = loadLocale(paths, locale)
     const localeLock = (lock[locale] ??= {})
     const pending: Record<string, string> = {}
-    const result: SyncResult = { locale, missing: [], stale: [], removed: [] }
+    const result: SyncResult = { locale, missing: [], stale: [], removed: [], parts: 0 }
 
     for (const [key, source] of base) {
       const status = entryStatus(source, target.get(key), localeLock[key])
@@ -218,7 +257,8 @@ export function sync(paths: I18nPaths): SyncResult[] {
     result.removed = [...target.keys()].filter(k => !base.has(k))
 
     saveLocale(paths, locale, orderLike(base, target))
-    writePending(paths, locale, pending)
+    writePending(paths, locale, pending, options.split)
+    result.parts = listPartFiles(paths, locale, false).length
     results.push(result)
   }
 
@@ -242,10 +282,12 @@ export function apply(paths: I18nPaths): ApplyResult[] {
 
   for (const locale of listTargetLocales(paths)) {
     const outPath = outFile(paths, locale)
-    if (!existsSync(outPath)) continue
+    const outFiles = [outPath, ...listPartFiles(paths, locale, true)].filter(f => existsSync(f))
+    if (!outFiles.length) continue
 
     const pending = readJson<Record<string, string>>(pendingFile(paths, locale), {})
-    const out = readJson<Record<string, unknown>>(outPath, {})
+    const out: Record<string, unknown> = {}
+    for (const f of outFiles) Object.assign(out, readJson<Record<string, unknown>>(f, {}))
     const target = loadLocale(paths, locale)
     const localeLock = (lock[locale] ??= {})
     const result: ApplyResult = { locale, applied: [], rejected: [], ignored: [], remaining: 0 }
@@ -275,7 +317,7 @@ export function apply(paths: I18nPaths): ApplyResult[] {
 
     saveLocale(paths, locale, orderLike(base, target))
     writePending(paths, locale, stillPending)
-    rmSync(outPath, { force: true })
+    for (const f of outFiles) rmSync(f, { force: true })
     result.remaining = Object.keys(stillPending).length
     results.push(result)
   }

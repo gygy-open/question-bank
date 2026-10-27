@@ -8,9 +8,11 @@ import {
   mergeFragments,
   MergeConflictError,
   outFile,
+  partFile,
   pendingFile,
   placeholdersOf,
   resolvePaths,
+  splitByNamespace,
   sync,
   syntaxIssue,
   validateTranslation,
@@ -159,5 +161,48 @@ describe('mergeFragments', () => {
     expect((error as MergeConflictError).conflicts.map(c => c.key)).toEqual(['common.save', 'x.child', 'z'])
     expect(readLocale('zh-CN')).toEqual({ common: { save: '保存' }, x: '叶子' })
     expect(existsSync(join(paths.fragmentsDir, 'b1.json'))).toBe(true)
+  })
+})
+
+describe('split shards', () => {
+  it('splitByNamespace keeps a namespace together and balances bins', () => {
+    const parts = splitByNamespace({ 'a.1': 'x', 'a.2': 'x', 'a.3': 'x', 'b.1': 'x', 'c.1': 'x' }, 2)
+    expect(parts).toHaveLength(2)
+    expect(parts.find(p => 'a.1' in p)).toEqual({ 'a.1': 'x', 'a.2': 'x', 'a.3': 'x' })
+    expect(Object.keys(parts.flatMap(Object.keys)).length).toBe(5)
+    expect(splitByNamespace({ 'a.1': 'x' }, 4)).toHaveLength(1)
+  })
+
+  it('sync --split writes shards; apply merges all part outputs and cleans up', () => {
+    writeLocale('zh-CN', { a: { x: '甲', y: '乙' }, b: { x: '丙' }, c: '丁' })
+    writeLocale('en-US', {})
+
+    const [r] = sync(paths, { split: 2 })
+    expect(r.parts).toBe(2)
+    const p1 = read(partFile(paths, 'en-US', 1))
+    const p2 = read(partFile(paths, 'en-US', 2))
+    expect({ ...p1, ...p2 }).toEqual(read(pendingFile(paths, 'en-US')))
+
+    const tr = (p: Record<string, string>) => Object.fromEntries(Object.keys(p).map(k => [k, `T:${k}`]))
+    write(partFile(paths, 'en-US', 1, true), tr(p1))
+    write(partFile(paths, 'en-US', 2, true), tr(p2))
+    const [applied] = apply(paths)
+    expect(applied).toMatchObject({ rejected: [], remaining: 0 })
+    expect(applied.applied.sort()).toEqual(['a.x', 'a.y', 'b.x', 'c'])
+    expect(existsSync(partFile(paths, 'en-US', 1))).toBe(false)
+    expect(existsSync(partFile(paths, 'en-US', 1, true))).toBe(false)
+    expect(check(paths)).toEqual([])
+  })
+
+  it('a partial shard output leaves the rest pending and clears stale shards', () => {
+    writeLocale('zh-CN', { a: '甲', b: '乙' })
+    writeLocale('en-US', {})
+    sync(paths, { split: 2 })
+    const p1 = read(partFile(paths, 'en-US', 1))
+    write(partFile(paths, 'en-US', 1, true), Object.fromEntries(Object.keys(p1).map(k => [k, 'T'])))
+    const [applied] = apply(paths)
+    expect(applied.remaining).toBe(1)
+    expect(existsSync(partFile(paths, 'en-US', 2))).toBe(false)
+    expect(Object.keys(read(pendingFile(paths, 'en-US')))).toHaveLength(1)
   })
 })
