@@ -318,6 +318,7 @@
   },
   "nav": {
     "aiAssistant": "AI Assistant",
+    "dashboard": "Dashboard",
     "questionBank": "Question Bank",
     "compositionWorkbench": "Compositions",
     "sharedSpace": "Shared",
@@ -335,6 +336,66 @@
     "subjects": "Subjects",
     "systemSettings": "System Settings",
     "settings": "Settings"
+  },
+  "dashboard": {
+    "refresh": "Refresh",
+    "retry": "Retry",
+    "loadFailed": "Failed to load statistics",
+    "noSubject": "Select a subject first",
+    "empty": {
+      "title": "No questions in this subject yet",
+      "description": "Once you import or create questions, this page will show the structure, trends, and coverage of your question bank."
+    },
+    "overview": {
+      "totalQuestions": "Total Questions",
+      "newThisWeek": "New in last 7 days: {count}",
+      "publishedRatio": "Published: {percent}%",
+      "pendingHint": "Awaiting review approval",
+      "stimuli": "Materials",
+      "compositions": "Compositions",
+      "tags": "Tags"
+    },
+    "trend": {
+      "title": "Question Growth",
+      "description": "New questions in last 30 days: {count}",
+      "created": "Daily New",
+      "total": "Cumulative"
+    },
+    "distribution": {
+      "typeTitle": "Question Types",
+      "typeDescription": "Number and share of questions by type",
+      "questions": "Questions",
+      "qualityTitle": "Status & Difficulty",
+      "qualityDescription": "Review progress, difficulty spread, and visibility",
+      "statusTitle": "Review Status",
+      "difficultyTitle": "Difficulty Distribution",
+      "averageDifficulty": "Average difficulty: {value}",
+      "level": "Level {level}",
+      "visibilityTitle": "Visibility",
+      "public": "Public",
+      "private": "Private"
+    },
+    "coverage": {
+      "title": "Knowledge Point Coverage",
+      "description": "How well knowledge points are covered by questions, to help spot gaps",
+      "noKnowledgePoints": "No knowledge points in this subject yet",
+      "manage": "Manage knowledge points",
+      "rate": "Coverage",
+      "covered": "Knowledge points with questions: {covered} / {total}",
+      "topTitle": "Most-Used Knowledge Points",
+      "noLinked": "No questions are linked to knowledge points yet",
+      "uncoveredTitle": "Knowledge points without questions: {count}",
+      "withoutKp": "Questions without knowledge points",
+      "withoutTag": "Questions without tags"
+    },
+    "contributors": {
+      "title": "Top Contributors",
+      "description": "Questions created and reviewed by members in this subject",
+      "days": "{days} days",
+      "created": "Created: {count}",
+      "reviewed": "Reviewed: {count}",
+      "empty": "No questions created or reviewed in this period"
+    }
   },
   "userMenu": {
     "profile": "Profile",

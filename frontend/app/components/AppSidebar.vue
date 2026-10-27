@@ -29,7 +29,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import UserProfileDialog from '~/components/UserProfileDialog.vue'
 import ChangePasswordDialog from '~/components/ChangePasswordDialog.vue'
 import { useColorMode } from '@vueuse/core'
-import { BookOpen, ChevronsUpDown, Images, ListTree, LogOut, Settings, Sparkles, User, Users, Tags, Library, KeyRound, Activity, Layers, Info, Moon, Sun, Lock, Languages, Check } from '@lucide/vue'
+import { BookOpen, ChevronsUpDown, Images, ListTree, LogOut, Settings, Sparkles, User, Users, Tags, Library, KeyRound, Activity, Layers, Info, Moon, Sun, Lock, Languages, Check, LayoutDashboard } from '@lucide/vue'
 
 const props = withDefaults(defineProps<SidebarProps>(), {
   collapsible: "icon",
@@ -77,6 +77,14 @@ const navActiveClass = 'border-l-2 border-transparent data-[active=true]:border-
         <SidebarGroupContent class="flex flex-col gap-3">
           <div>
             <SidebarMenu>
+              <SidebarMenuItem>
+                <SidebarMenuButton as-child :is-active="route.path === '/'" :class="navActiveClass">
+                  <NuxtLink to="/">
+                    <LayoutDashboard />
+                    <span>{{ t('nav.dashboard') }}</span>
+                  </NuxtLink>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
               <SidebarMenuItem>
                 <SidebarMenuButton
                   as-child

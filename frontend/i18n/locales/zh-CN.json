@@ -318,6 +318,7 @@
   },
   "nav": {
     "aiAssistant": "AI 助手",
+    "dashboard": "概览",
     "questionBank": "题库",
     "compositionWorkbench": "组稿工作台",
     "sharedSpace": "共享空间",
@@ -335,6 +336,66 @@
     "subjects": "学科管理",
     "systemSettings": "系统设置",
     "settings": "设置"
+  },
+  "dashboard": {
+    "refresh": "刷新",
+    "retry": "重试",
+    "loadFailed": "统计数据加载失败",
+    "noSubject": "请先选择一个学科",
+    "empty": {
+      "title": "当前学科还没有题目",
+      "description": "导入或创建题目后，这里会显示题库的结构、趋势和覆盖情况。"
+    },
+    "overview": {
+      "totalQuestions": "题目总数",
+      "newThisWeek": "近 7 天新增 {count}",
+      "publishedRatio": "发布率 {percent}%",
+      "pendingHint": "等待审核通过",
+      "stimuli": "材料",
+      "compositions": "稿件",
+      "tags": "标签"
+    },
+    "trend": {
+      "title": "题目增长",
+      "description": "近 30 天新增 {count} 道题",
+      "created": "每日新增",
+      "total": "累计总数"
+    },
+    "distribution": {
+      "typeTitle": "题型分布",
+      "typeDescription": "各题型的题目数量与占比",
+      "questions": "题目数",
+      "qualityTitle": "状态与难度",
+      "qualityDescription": "审核进度、难度梯度与可见范围",
+      "statusTitle": "审核状态",
+      "difficultyTitle": "难度分布",
+      "averageDifficulty": "平均难度 {value}",
+      "level": "难度 {level}",
+      "visibilityTitle": "可见性",
+      "public": "公开",
+      "private": "私有"
+    },
+    "coverage": {
+      "title": "知识点覆盖",
+      "description": "知识点被题目覆盖的情况，帮助发现出题空白",
+      "noKnowledgePoints": "当前学科还没有知识点",
+      "manage": "去管理知识点",
+      "rate": "覆盖率",
+      "covered": "{covered} / {total} 个知识点已有题目",
+      "topTitle": "题目最多的知识点",
+      "noLinked": "还没有题目关联知识点",
+      "uncoveredTitle": "尚无题目的知识点：{count}",
+      "withoutKp": "未关联知识点的题目",
+      "withoutTag": "未打标签的题目"
+    },
+    "contributors": {
+      "title": "贡献排行",
+      "description": "成员在本学科的出题与审核数量",
+      "days": "{days} 天",
+      "created": "出题 {count}",
+      "reviewed": "审核 {count}",
+      "empty": "这段时间还没有出题或审核记录"
+    }
   },
   "userMenu": {
     "profile": "个人资料",
