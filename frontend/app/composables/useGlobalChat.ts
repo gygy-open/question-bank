@@ -13,7 +13,7 @@ import {
 import { applyChatMessageMeta, nextChatMessageUiId } from '@/lib/chatMessages'
 import type { AIProvider, UserAIPreference } from '@/types/ai-config'
 import { pickChatModel } from '@/lib/ai-config'
-import { translate } from '@/lib/locale'
+import { currentLocale, translate } from '@/lib/locale'
 
 export interface ChatMessage {
     // Stable client-side identity, assigned at creation and never changed — used
@@ -370,6 +370,8 @@ const sendMessage = async () => {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
+                // 原生 fetch 不经过 plugins/api.ts，需自行带上界面语言（决定 AI 回复语言）。
+                'Accept-Language': currentLocale.value,
                 ...(token ? { Authorization: `Bearer ${token}` } : {}),
             },
             body: JSON.stringify({

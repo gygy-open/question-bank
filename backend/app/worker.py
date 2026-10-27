@@ -9,6 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 # Add backend directory to path so we can import app modules
 sys.path.append(str(Path(__file__).parent.parent))
 
+from app.core.locale import set_locale
 from app.db.session import SessionLocal
 from app.core.config import get_db_url, is_configured
 from app.core.file_paths import task_source_file
@@ -38,6 +39,7 @@ async def process_task(db: AsyncSession, task: ImportTask):
         logger.info(f"Task {task.id} status updated to PROCESSING")
         
         # Process file
+        set_locale(task.locale)
         file_path = task_source_file(task.file_path, task.source_sha256)
         if file_path is None:
             raise FileNotFoundError(f"Source file not found for task {task.id}")

@@ -123,6 +123,8 @@ DEFAULT_EXTRACT_PROMPT = r"""你是一个专业的{subject_name}题目提取助�
   }
   ```
 
+{output_language}
+
 ## 待处理 Markdown 内容:
 ```markdown
 {content}
@@ -165,6 +167,8 @@ DEFAULT_SOLVE_PROMPT = r"""你是一位资深的{subject_name}老师。{subject_
 ```
 {tags}
 ```
+
+{output_language}
 
 ## 待处理 Markdown 内容:
 ```markdown

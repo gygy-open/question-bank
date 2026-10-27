@@ -8,6 +8,7 @@ from app import models, schemas
 from app.api import deps
 from app.core.api_errors import ApiError, ErrorCode
 from app.core import permissions, storage
+from app.core.locale import get_locale
 from app.core.file_paths import VIRTUAL_SOURCE, import_source_file, task_source_file
 from app.core.permissions import Permission
 from app.crud.crud_question import is_question_visible
@@ -175,6 +176,7 @@ async def create_import_tasks(
             source="batch_upload",
             description=f"Import {original_filename}",
             mode=mode,
+            locale=get_locale(),
         )
         db.add(task)
         created_tasks.append(task)

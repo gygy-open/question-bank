@@ -35,6 +35,8 @@ class ImportTask(Base):
     original_filename = Column(String(255), nullable=False)
     file_type = Column(String(20), nullable=False) # docx, markdown
     mode = Column(String(20), default="extract") # extract, solve
+    # 创建任务时的界面语言;worker 没有请求头,靠它决定 AI 解析的输出语言。
+    locale = Column(String(16), nullable=True)
     
     status = Column(SQLEnum(ImportTaskStatus, values_callable=lambda x: [e.value for e in x]), default=ImportTaskStatus.PENDING, index=True)
     error_message = Column(Text, nullable=True)

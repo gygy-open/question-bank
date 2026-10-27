@@ -13,6 +13,7 @@ from app._version import __version__
 from app.api import legacy_media
 from app.api.v1.api import api_router
 from app.core.api_errors import ApiError
+from app.core.locale import LocaleMiddleware
 from app.capabilities.errors import DomainError, status_for
 from app.core.config import settings, is_configured
 from app.core import storage
@@ -38,6 +39,7 @@ async def lifespan(app: FastAPI):
     # Shutdown
 
 app = FastAPI(title="QuestionBank API", version=__version__, lifespan=lifespan)
+app.add_middleware(LocaleMiddleware)
 
 
 @app.exception_handler(DomainError)

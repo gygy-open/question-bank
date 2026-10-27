@@ -16,7 +16,7 @@ from app.ai.contracts import AgentScene
 from app.ai import client_channel
 from app.models.agent import AgentRun
 from app.capabilities.context import ExecutionContext, Surface
-from app.services.prompt_utils import render_subject_prompt
+from app.services.prompt_utils import apply_output_language, render_subject_prompt
 from app.services.prompts import CHAT_SYSTEM_PROMPT, render_scene_context
 from app.models.subject import Subject
 from fastapi.responses import StreamingResponse
@@ -117,7 +117,7 @@ async def build_provider_messages(
     更早的截断成一行占位,避免历史无限膨胀。
     """
     # 工具调用策略与已注册工具强耦合，硬编码随代码演进，不做成用户可编辑配置。
-    system_prompt = render_subject_prompt(CHAT_SYSTEM_PROMPT, subject)
+    system_prompt = apply_output_language(render_subject_prompt(CHAT_SYSTEM_PROMPT, subject), "chat")
     scene_block = render_scene_context(scene, scene_context)
     if scene_block:
         system_prompt = f"{system_prompt}\n\n{scene_block}"

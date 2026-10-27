@@ -14,7 +14,7 @@ from app.crud.crud_subject_prompt import subject_prompt as crud_subject_prompt
 from app.models.subject import Subject
 from app.models.tag import Tag
 from app.models.tag_category import TagCategory
-from app.services.prompt_utils import render_subject_prompt
+from app.services.prompt_utils import apply_output_language, render_subject_prompt
 from app.services.prompts import get_default_prompt
 
 logger = logging.getLogger(__name__)
@@ -44,7 +44,7 @@ class PromptBuilder:
         except Exception as e:
             logger.warning(f"Failed to fetch tag context for AI prompt: {e}")
 
-        return prompt
+        return apply_output_language(prompt, "solve" if mode == "solve" else "extract")
 
     async def _build_tag_context(self, db: AsyncSession) -> str:
         stmt_cat = (
