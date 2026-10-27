@@ -48,7 +48,7 @@ const { data } = await useAPI('/endpoint')
 
 ## 国际化
 
-界面文案不要硬编码，统一用 `t()` 引用 `frontend/i18n/locales/zh-CN.json` 中的 key，翻译通过 `pnpm i18n:*` 脚本维护。详见 [国际化（i18n）](./i18n)。
+界面文案不要硬编码，统一用 `t()` 引用 `frontend/i18n/locales/zh-CN.json` 中的 key，翻译通过 `pnpm i18n:*` 脚本维护（流程见 `.github/copilot-instructions.md` 的 i18n 小节）。
 
 ## 路径别名
 

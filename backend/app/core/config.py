@@ -114,7 +114,7 @@ class Settings(BaseSettings):
 
     @property
     def STORAGE_DIR(self) -> Path:
-        """内容寻址的持久文件区(objects/ 与 derived/),见 docs/development/media-assets.md。"""
+        """内容寻址的持久文件区(objects/ 与 derived/)。"""
         return self.DATA_DIR / "storage"
 
     @property
