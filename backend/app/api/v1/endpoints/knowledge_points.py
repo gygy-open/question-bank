@@ -94,14 +94,14 @@ async def get_vector_status(
 
     if not embedding_configured:
         needs_reindex = False
-        reason = "未配置向量模型，语义检索不可用"
+        reason_code, reason, diff = "not_configured", "未配置向量模型，语义检索不可用", 0
     elif db_count != vector_count:
         needs_reindex = True
         diff = abs(db_count - vector_count)
-        reason = f"{diff} 个知识点尚未同步向量索引"
+        reason_code, reason = "out_of_sync", f"{diff} 个知识点尚未同步向量索引"
     else:
         needs_reindex = False
-        reason = "向量索引已是最新"
+        reason_code, reason, diff = "up_to_date", "向量索引已是最新", 0
 
     return schemas.VectorStatus(
         embedding_configured=embedding_configured,
@@ -109,6 +109,8 @@ async def get_vector_status(
         vector_count=vector_count,
         needs_reindex=needs_reindex,
         reason=reason,
+        reason_code=reason_code,
+        count=diff,
     )
 
 

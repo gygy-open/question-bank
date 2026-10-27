@@ -1535,7 +1535,12 @@
       "notConfigured": "{reason}. To automatically match knowledge points during Smart Import, configure an Embedding model first. Otherwise, you can ignore this message.",
       "goToSettings": "Go to Settings",
       "needsReindex": "{reason}. Rebuild the vector index to enable semantic search.",
-      "reindex": "Rebuild Vector Index"
+      "reindex": "Rebuild Vector Index",
+      "reason": {
+        "not_configured": "No vector model configured. Semantic search is unavailable.",
+        "out_of_sync": "Knowledge points not yet synced to the vector index: {count}",
+        "up_to_date": "The vector index is up to date."
+      }
     },
     "toast": {
       "rootCreated": "Root created.",

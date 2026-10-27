@@ -234,6 +234,11 @@ watch(newRootName, (val) => {
 // --- Batch import & vector sync ---
 const showImportDialog = ref(false)
 const vectorStatus = ref<VectorStatus | null>(null)
+const vectorReason = computed(() =>
+  vectorStatus.value
+    ? t(`kpManager.vector.reason.${vectorStatus.value.reason_code}`, { count: vectorStatus.value.count })
+    : '',
+)
 const isReindexing = ref(false)
 
 const fetchVectorStatus = async () => {
@@ -296,7 +301,7 @@ onMounted(fetchVectorStatus)
           <Alert v-if="isSuperuser && vectorStatus && !vectorStatus.embedding_configured" class="mb-4 items-center [&>svg]:translate-y-0">
             <Database class="h-4 w-4" />
             <AlertDescription class="flex items-center justify-between gap-2">
-              <span class="text-sm">{{ t('kpManager.vector.notConfigured', { reason: vectorStatus.reason }) }}</span>
+              <span class="text-sm">{{ t('kpManager.vector.notConfigured', { reason: vectorReason }) }}</span>
               <Button size="sm" variant="outline" as-child>
                 <NuxtLink to="/settings">{{ t('kpManager.vector.goToSettings') }}</NuxtLink>
               </Button>
@@ -305,7 +310,7 @@ onMounted(fetchVectorStatus)
           <Alert v-else-if="isSuperuser && vectorStatus?.needs_reindex" class="mb-4 items-center [&>svg]:translate-y-0">
             <Database class="h-4 w-4" />
             <AlertDescription class="flex items-center justify-between gap-2">
-              <span class="text-sm">{{ t('kpManager.vector.needsReindex', { reason: vectorStatus.reason }) }}</span>
+              <span class="text-sm">{{ t('kpManager.vector.needsReindex', { reason: vectorReason }) }}</span>
               <Button size="sm" variant="outline" :disabled="isReindexing" @click="handleReindex">
                 <RefreshCw class="w-4 h-4 mr-2" :class="{ 'animate-spin': isReindexing }" />
                 {{ t('kpManager.vector.reindex') }}

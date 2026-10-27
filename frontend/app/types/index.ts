@@ -127,6 +127,8 @@ export interface VectorStatus {
   vector_count: number
   needs_reindex: boolean
   reason: string
+  reason_code: 'not_configured' | 'out_of_sync' | 'up_to_date'
+  count: number
 }
 
 export interface ReindexResult {

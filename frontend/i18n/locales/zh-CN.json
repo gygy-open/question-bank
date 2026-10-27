@@ -1535,7 +1535,12 @@
       "notConfigured": "{reason}，如果您需要在智能导入题目时自动匹配知识点，请先配置 Embedding 模型，否则可以忽略此提示。",
       "goToSettings": "前往配置",
       "needsReindex": "{reason}，建议重建向量索引以启用语义检索。",
-      "reindex": "重建向量索引"
+      "reindex": "重建向量索引",
+      "reason": {
+        "not_configured": "未配置向量模型，语义检索不可用",
+        "out_of_sync": "{count} 个知识点尚未同步向量索引",
+        "up_to_date": "向量索引已是最新"
+      }
     },
     "toast": {
       "rootCreated": "根目录创建成功",

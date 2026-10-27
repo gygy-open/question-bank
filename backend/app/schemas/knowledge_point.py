@@ -33,6 +33,8 @@ class VectorStatus(BaseModel):
     vector_count: int
     needs_reindex: bool
     reason: str
+    reason_code: str = "up_to_date"
+    count: int = 0
 
 
 class ReindexResult(BaseModel):
