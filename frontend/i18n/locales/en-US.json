@@ -117,7 +117,8 @@
       "private_question_in_shared": "Private question {question} can't be added to a shared composition.",
       "question_needs_group": "Question {question} depends on material {stimulus} and must be added within a group.",
       "stimulus_unavailable": "Material {stimulus} doesn't exist or belongs to a different subject.",
-      "private_stimulus": "Private material {stimulus} can't be added to this composition."
+      "private_stimulus": "Private material {stimulus} can't be added to this composition.",
+      "version_not_found": "Version not found."
     },
     "refs": {
       "separator": ", ",
@@ -182,6 +183,94 @@
       "only_markdown": "Only .md files are supported.",
       "only_zip": "Only .zip archives are supported.",
       "only_image": "Only image files are supported."
+    },
+    "subject": {
+      "not_found": "Subject not found.",
+      "member_not_found": "Member not found.",
+      "answer_space_invalid_lines": "The maximum number of lines cannot be less than the minimum."
+    },
+    "question": {
+      "not_found": "Question not found.",
+      "invalid_review_action": "Invalid review action.",
+      "none_found": "The selected questions were not found."
+    },
+    "stimulus": {
+      "not_found": "Material not found.",
+      "public_members_block_private": "This material has public sub-questions, so it cannot be made private.",
+      "revision_mismatch": "This material was modified by someone else. Refresh and try again.",
+      "has_members": "This material still has sub-questions and cannot be deleted.",
+      "subject_mismatch": "The material and its sub-questions must belong to the same subject.",
+      "public_under_private": "A public question cannot belong to a private material.",
+      "question_taken": "Question {question} already belongs to another material.",
+      "content_required": "Enter the material content."
+    },
+    "question_relation": {
+      "self": "A question cannot be linked to itself.",
+      "subject_mismatch": "Linked questions must belong to the same subject.",
+      "exists": "This link already exists.",
+      "cycle": "This link would create a cycle.",
+      "not_found": "Link not found."
+    },
+    "media": {
+      "audio_unrecognized": "Unrecognized audio file.",
+      "image_only": "Only images can be uploaded here.",
+      "image_format_unsupported": "Unsupported image format. Upload a PNG, JPEG, GIF, or WebP file.",
+      "file_unrecognized": "Unrecognized file. Upload a PNG, JPEG, GIF, or WebP image.",
+      "subject_required": "Images in question content must belong to a subject.",
+      "owner_required": "Personal media must belong to a user.",
+      "file_too_large": "File is too large (limit: {limit_mb} MB).",
+      "file_empty": "The file is empty.",
+      "image_too_large": "Image is too large (limit: {limit_mb} MB).",
+      "not_found": "Media not found.",
+      "not_accessible": "You don't have access to this media.",
+      "file_missing": "The media file is missing.",
+      "replace_content_only": "Only question content media can be replaced.",
+      "replace_target_invalid": "The new file must be another file in this subject's media library.",
+      "replace_type_mismatch": "Files can only be replaced with the same type (image with image, audio with audio).",
+      "replace_not_referenced": "The selected content doesn't use this image.",
+      "replace_forbidden_partial": "You don't have permission to modify some of the selected content.",
+      "edit_forbidden": "You don't have permission to edit this image.",
+      "in_use": "This image is still used in {count} place(s) and cannot be deleted.",
+      "nothing_to_download": "No images to download.",
+      "add_to_subject_content_only": "Only images in question content can be added to a subject.",
+      "add_to_subject_forbidden": "You don't have permission to add images to the target subject.",
+      "refs_invalid": "The image doesn't exist or doesn't belong to this subject (assets: {assets}).",
+      "import_subject_required": "Select a subject before importing a document with images."
+    },
+    "common": {
+      "xlsx_only": "Only .xlsx files are supported.",
+      "import_file_too_large": "File is too large. Make sure it is smaller than 5MB."
+    },
+    "user": {
+      "last_superuser": "You can't delete, demote, or deactivate the last active super administrator.",
+      "incorrect_password": "The current password is incorrect.",
+      "password_unchanged": "The new password must be different from the current password."
+    },
+    "knowledge_point": {
+      "embedding_not_configured": "Configure and activate an Embedding model under AI providers and models first.",
+      "invalid_import_mode": "Invalid import mode.",
+      "slug_exists": "A knowledge point with the same identifier already exists in this subject.",
+      "not_found": "Knowledge point not found.",
+      "reindex_failed": "Vector rebuild failed: {error}"
+    },
+    "tag": {
+      "name_exists": "Tag name already exists.",
+      "not_found": "Tag not found."
+    },
+    "tag_category": {
+      "subject_required": "A subject must be specified.",
+      "name_exists": "A tag category with this name already exists in this subject.",
+      "not_found": "Tag category not found."
+    },
+    "system_setting": {
+      "managed": "This setting is managed by the system and cannot be changed."
+    },
+    "activity_log": {
+      "superuser_only": "Only super administrators can access this."
+    },
+    "tools": {
+      "invalid_template_path": "Invalid template path.",
+      "template_not_found": "Template {template} not found."
     }
   },
   "validation": {

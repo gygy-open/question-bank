@@ -1,7 +1,7 @@
 import math
 from typing import Any, Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
+from fastapi import APIRouter, Depends, Query, Response, status
 
 from app import models
 from app.api import deps
@@ -21,6 +21,7 @@ from app.schemas.stimulus import (
     StimulusUpdate,
 )
 from app.services import stimulus_service
+from app.core.api_errors import ApiError, ErrorCode
 
 
 router = APIRouter()
@@ -28,7 +29,7 @@ router = APIRouter()
 
 async def _require_subject(db: deps.SessionDep, subject_id: int) -> None:
     if await crud_subject.get(db, id=subject_id) is None:
-        raise HTTPException(status_code=404, detail="Subject not found")
+        raise ApiError(404, ErrorCode.SUBJECT_NOT_FOUND, "Subject not found")
 
 
 async def _scoped_stimulus(
@@ -36,7 +37,7 @@ async def _scoped_stimulus(
 ) -> models.Stimulus:
     stimulus = await stimulus_service.get_stimulus(db, stimulus_id, actor)
     if stimulus.subject_id != subject_id:
-        raise HTTPException(status_code=404, detail="Stimulus not found")
+        raise ApiError(404, ErrorCode.STIMULUS_NOT_FOUND, "Stimulus not found")
     return stimulus
 
 
@@ -52,7 +53,7 @@ async def create_stimulus(
     await _require_subject(db, subject_id)
     deps.require(current_user, Permission.EDIT_QUESTION, subject_id=subject_id)
     if payload.content is None:
-        raise HTTPException(status_code=422, detail="Stimulus content is required")
+        raise ApiError(422, ErrorCode.STIMULUS_CONTENT_REQUIRED, "Stimulus content is required")
     return await stimulus_service.create_stimulus(
         db,
         subject_id=subject_id,
@@ -232,7 +233,7 @@ async def restore_stimulus(
     deps.require(current_user, Permission.EDIT_QUESTION, subject_id=subject_id)
     stimulus = await stimulus_service.get_deleted_stimulus(db, stimulus_id, current_user)
     if stimulus.subject_id != subject_id:
-        raise HTTPException(status_code=404, detail="Stimulus not found")
+        raise ApiError(404, ErrorCode.STIMULUS_NOT_FOUND, "Stimulus not found")
     return await stimulus_service.restore_stimulus(
         db, stimulus=stimulus, expected_revision=payload.expected_revision, actor=current_user
     )

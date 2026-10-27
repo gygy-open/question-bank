@@ -1,11 +1,12 @@
 import math
 from typing import Any, List, Optional
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
+from fastapi import APIRouter, Depends, UploadFile, File
 from fastapi.responses import StreamingResponse
 from app import crud, schemas, models
 from app.api import deps
 from app.core.permissions import Permission
 from app.services import tag_import_service
+from app.core.api_errors import ApiError, ErrorCode
 
 router = APIRouter()
 
@@ -49,7 +50,7 @@ async def create_tag(
         db, name=tag_in.name, subject_id=tag_in.subject_id
     )
     if existing:
-        raise HTTPException(status_code=400, detail="Tag with this name already exists")
+        raise ApiError(400, ErrorCode.TAG_NAME_EXISTS, "Tag with this name already exists")
 
     tag = await crud.tag.create(db=db, obj_in=tag_in, user_id=current_user.id)
     return tag
@@ -79,11 +80,11 @@ async def import_tags(
     """Batch import tags from an .xlsx file for a subject."""
     deps.require(current_user, Permission.MANAGE_SUBJECT, subject_id=subject_id)
     if not file.filename or not file.filename.lower().endswith(".xlsx"):
-        raise HTTPException(status_code=400, detail="仅支持 .xlsx 格式的文件")
+        raise ApiError(400, ErrorCode.COMMON_XLSX_ONLY, "仅支持 .xlsx 格式的文件")
 
     content = await file.read()
     if len(content) > MAX_IMPORT_SIZE:
-        raise HTTPException(status_code=400, detail="文件过大，请确保文件小于 5MB")
+        raise ApiError(400, ErrorCode.COMMON_IMPORT_FILE_TOO_LARGE, "文件过大，请确保文件小于 5MB")
 
     return await tag_import_service.import_excel(
         db, subject_id=subject_id, file_bytes=content, user_id=current_user.id
@@ -99,7 +100,7 @@ async def update_tag(
 ) -> Any:
     tag = await crud.tag.get(db=db, id=id)
     if not tag:
-        raise HTTPException(status_code=404, detail="Tag not found")
+        raise ApiError(404, ErrorCode.TAG_NOT_FOUND, "Tag not found")
     deps.require(current_user, Permission.MANAGE_SUBJECT, subject_id=tag.subject_id)
     tag = await crud.tag.update(db=db, db_obj=tag, obj_in=tag_in, user_id=current_user.id)
     return tag
@@ -113,7 +114,7 @@ async def read_tag(
 ) -> Any:
     tag = await crud.tag.get(db=db, id=id)
     if not tag:
-        raise HTTPException(status_code=404, detail="Tag not found")
+        raise ApiError(404, ErrorCode.TAG_NOT_FOUND, "Tag not found")
     deps.require(current_user, Permission.VIEW_QUESTION, subject_id=tag.subject_id)
     return tag
 
@@ -126,7 +127,7 @@ async def delete_tag(
 ) -> Any:
     tag = await crud.tag.get(db=db, id=id)
     if not tag:
-        raise HTTPException(status_code=404, detail="Tag not found")
+        raise ApiError(404, ErrorCode.TAG_NOT_FOUND, "Tag not found")
     deps.require(current_user, Permission.MANAGE_SUBJECT, subject_id=tag.subject_id)
     tag = await crud.tag.remove(db=db, id=id, user_id=current_user.id)
     return tag

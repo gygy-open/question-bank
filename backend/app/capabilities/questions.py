@@ -27,6 +27,7 @@ from app.services.question_relation_service import (
     delete_question_relation,
 )
 from app.services.question_service import question_service
+from app.core.api_errors import ErrorCode
 
 from .base import Authz, Capability, Scope
 from .context import ExecutionContext
@@ -46,7 +47,7 @@ def can_delete_question(question: Question, user: models.User) -> bool:
 async def _load_visible_question(ctx: ExecutionContext, question_id: int) -> Question:
     question = await crud.question.get(db=ctx.db, id=question_id)
     if not question or not is_question_visible(question, ctx.actor):
-        raise NotFound("Question not found")
+        raise NotFound("Question not found", ErrorCode.QUESTION_NOT_FOUND)
     return question
 
 
@@ -176,7 +177,7 @@ class CreateDerivedQuestion(Capability[DerivedQuestionCreateInput, Question]):
             await ctx.db.commit()
             created = await crud.question.get(ctx.db, id=question.id)
             if created is None:
-                raise NotFound("Question not found")
+                raise NotFound("Question not found", ErrorCode.QUESTION_NOT_FOUND)
             return created
         except Exception:
             await ctx.db.rollback()
@@ -199,7 +200,7 @@ class BatchCreateQuestions(Capability[schemas.QuestionBatchCreate, List[Question
             item = pending.pop()
             subject_id = item.subject_id or ctx.actor.last_active_subject_id
             if not permissions.can(ctx.actor, Permission.EDIT_QUESTION, subject_id=subject_id):
-                raise Forbidden("The user doesn't have enough privileges")
+                raise Forbidden("The user doesn't have enough privileges", ErrorCode.AUTH_FORBIDDEN)
             pending.extend(item.children or [])
 
     async def execute(
@@ -283,7 +284,7 @@ class UpdateQuestion(Capability[QuestionUpdateInput, Question]):
                 subject_id=inp.data.subject_id,
             )
         ):
-            raise Forbidden("The user doesn't have enough privileges")
+            raise Forbidden("The user doesn't have enough privileges", ErrorCode.AUTH_FORBIDDEN)
 
     async def execute(self, ctx: ExecutionContext, inp: QuestionUpdateInput, target: Question) -> Question:
         return await crud.question.update_with_tags(
@@ -352,7 +353,7 @@ class DeleteQuestion(Capability[QuestionIdInput, Question]):
 
     async def authorize(self, ctx: ExecutionContext, inp: QuestionIdInput, target: Question) -> None:
         if not can_delete_question(target, ctx.actor):
-            raise Forbidden("Not enough permissions")
+            raise Forbidden("Not enough permissions", ErrorCode.AUTH_FORBIDDEN)
 
     async def execute(self, ctx: ExecutionContext, inp: QuestionIdInput, target: Question) -> Question:
         question = await crud.question.remove(db=ctx.db, id=inp.id)
@@ -466,14 +467,14 @@ class BatchConfirmQuestions(Capability[schemas.QuestionBatchConfirm, dict]):
 
     async def execute(self, ctx: ExecutionContext, inp: schemas.QuestionBatchConfirm, target: Any) -> dict:
         if inp.action not in ["approve", "reject"]:
-            raise Invalid("Invalid action. Must be 'approve' or 'reject'.")
+            raise Invalid("Invalid action. Must be 'approve' or 'reject'.", ErrorCode.QUESTION_INVALID_REVIEW_ACTION)
 
         if not inp.question_ids:
             return {"message": "No question IDs provided."}
 
         questions = await _load_questions_by_ids(ctx, inp.question_ids)
         if not questions:
-            raise NotFound("No questions found with provided IDs.")
+            raise NotFound("No questions found with provided IDs.", ErrorCode.QUESTION_NONE_FOUND)
 
         processed_count = 0
         for question in questions:

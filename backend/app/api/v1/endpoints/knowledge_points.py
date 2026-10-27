@@ -8,6 +8,7 @@ from app.api import deps
 from app.core.permissions import Permission
 from app.core.vector_store import VectorStore
 from app.services import kp_import_service
+from app.core.api_errors import ApiError, ErrorCode
 
 router = APIRouter()
 
@@ -122,10 +123,7 @@ async def reindex_vectors(
     Rebuild the knowledge point vector index from the database.
     """
     if not VectorStore.is_available():
-        raise HTTPException(
-            status_code=400,
-            detail="请先在 AI 供应商与模型中配置并激活 Embedding 模型",
-        )
+        raise ApiError(400, ErrorCode.KNOWLEDGE_POINT_EMBEDDING_NOT_CONFIGURED, "请先在 AI 供应商与模型中配置并激活 Embedding 模型")
     import time
     started = time.perf_counter()
     try:
@@ -133,7 +131,7 @@ async def reindex_vectors(
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
-        raise HTTPException(status_code=502, detail=f"向量重建失败：{e}")
+        raise ApiError(502, ErrorCode.KNOWLEDGE_POINT_REINDEX_FAILED, f"向量重建失败：{e}", {"error": str(e)})
     return schemas.ReindexResult(
         status="success",
         reindexed=count,
@@ -168,7 +166,7 @@ async def import_preflight(
     """Impact assessment for the rebuild mode (existing count, affected questions)."""
     result = await kp_import_service.preflight(db, subject_id)
     if result is None:
-        raise HTTPException(status_code=404, detail="Subject not found")
+        raise ApiError(404, ErrorCode.SUBJECT_NOT_FOUND, "Subject not found")
     return result
 
 
@@ -182,13 +180,13 @@ async def import_knowledge_points(
 ) -> Any:
     """Batch import knowledge points from an .xlsx file."""
     if not file.filename or not file.filename.lower().endswith(".xlsx"):
-        raise HTTPException(status_code=400, detail="仅支持 .xlsx 格式的文件")
+        raise ApiError(400, ErrorCode.COMMON_XLSX_ONLY, "仅支持 .xlsx 格式的文件")
     if mode not in ("incremental", "rebuild"):
-        raise HTTPException(status_code=400, detail="无效的导入模式")
+        raise ApiError(400, ErrorCode.KNOWLEDGE_POINT_INVALID_IMPORT_MODE, "无效的导入模式")
 
     content = await file.read()
     if len(content) > MAX_IMPORT_SIZE:
-        raise HTTPException(status_code=400, detail="文件过大，请确保文件小于 5MB")
+        raise ApiError(400, ErrorCode.COMMON_IMPORT_FILE_TOO_LARGE, "文件过大，请确保文件小于 5MB")
 
     result = await kp_import_service.import_excel(
         db, file_bytes=content, mode=mode, user_id=current_user.id
@@ -208,7 +206,7 @@ async def create_knowledge_point(
         knowledge_point = await crud.knowledge_point.create(db=db, obj_in=knowledge_point_in, user_id=current_user.id)
         return knowledge_point
     except IntegrityError:
-        raise HTTPException(status_code=400, detail="Knowledge point with this slug already exists in this subject")
+        raise ApiError(400, ErrorCode.KNOWLEDGE_POINT_SLUG_EXISTS, "Knowledge point with this slug already exists in this subject")
 
 @router.put("/{id}", response_model=schemas.KnowledgePoint)
 async def update_knowledge_point(
@@ -220,7 +218,7 @@ async def update_knowledge_point(
 ) -> Any:
     knowledge_point = await crud.knowledge_point.get(db=db, id=id)
     if not knowledge_point:
-        raise HTTPException(status_code=404, detail="Knowledge point not found")
+        raise ApiError(404, ErrorCode.KNOWLEDGE_POINT_NOT_FOUND, "Knowledge point not found")
     deps.require(current_user, Permission.MANAGE_SUBJECT, subject_id=knowledge_point.subject_id)
     knowledge_point = await crud.knowledge_point.update(db=db, db_obj=knowledge_point, obj_in=knowledge_point_in, user_id=current_user.id)
     return knowledge_point
@@ -237,7 +235,7 @@ async def read_knowledge_point(
     """
     knowledge_point = await crud.knowledge_point.get(db=db, id=id)
     if not knowledge_point:
-        raise HTTPException(status_code=404, detail="Knowledge point not found")
+        raise ApiError(404, ErrorCode.KNOWLEDGE_POINT_NOT_FOUND, "Knowledge point not found")
     deps.require(current_user, Permission.VIEW_QUESTION, subject_id=knowledge_point.subject_id)
     return knowledge_point
 
@@ -253,7 +251,7 @@ async def delete_knowledge_point(
     """
     knowledge_point = await crud.knowledge_point.get(db=db, id=id)
     if not knowledge_point:
-        raise HTTPException(status_code=404, detail="Knowledge point not found")
+        raise ApiError(404, ErrorCode.KNOWLEDGE_POINT_NOT_FOUND, "Knowledge point not found")
     deps.require(current_user, Permission.MANAGE_SUBJECT, subject_id=knowledge_point.subject_id)
     knowledge_point = await crud.knowledge_point.remove(db=db, id=id, user_id=current_user.id)
     return knowledge_point

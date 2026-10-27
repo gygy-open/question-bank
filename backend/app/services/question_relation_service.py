@@ -11,6 +11,7 @@ from app.crud.crud_question import is_question_visible
 from app.models.question import Question
 from app.models.question_relation import QuestionRelation, QuestionRelationType
 from app.models.user import User
+from app.core.api_errors import ErrorCode
 from app.schemas.question_relation import (
     QuestionRelationPeerRead,
     QuestionRelationQuestionRead,
@@ -35,7 +36,7 @@ async def create_question_relation(
     SQLite's single-writer transaction provides the conservative fallback.
     """
     if source_question_id == target_question_id:
-        raise Invalid("Question relation cannot reference itself")
+        raise Invalid("Question relation cannot reference itself", ErrorCode.QUESTION_RELATION_SELF)
     result = await db.execute(
         select(Question).where(
             Question.id.in_([source_question_id, target_question_id]),
@@ -44,14 +45,14 @@ async def create_question_relation(
     )
     questions = list(result.scalars().all())
     if len(questions) != 2:
-        raise NotFound("Question not found")
+        raise NotFound("Question not found", ErrorCode.QUESTION_NOT_FOUND)
     if questions[0].subject_id != questions[1].subject_id:
-        raise Unprocessable("Question relation endpoints must share a subject")
+        raise Unprocessable("Question relation endpoints must share a subject", ErrorCode.QUESTION_RELATION_SUBJECT_MISMATCH)
     subject_id = questions[0].subject_id
     if not permissions.can(actor, Permission.EDIT_QUESTION, subject_id=subject_id):
-        raise Forbidden("The user doesn't have enough privileges")
+        raise Forbidden("The user doesn't have enough privileges", ErrorCode.AUTH_FORBIDDEN)
     if any(not is_question_visible(question, actor) for question in questions):
-        raise NotFound("Question not found")
+        raise NotFound("Question not found", ErrorCode.QUESTION_NOT_FOUND)
 
     # Existing graph writes serialize by subject so concurrent multi-edge writes
     # cannot bypass cycle detection. A target created in this transaction cannot
@@ -73,10 +74,10 @@ async def create_question_relation(
     )
     locked_by_id = {question.id: question for question in locked_questions}
     if source_question_id not in locked_by_id or target_question_id not in locked_by_id:
-        raise Unprocessable("Question relation endpoints must share a subject")
+        raise Unprocessable("Question relation endpoints must share a subject", ErrorCode.QUESTION_RELATION_SUBJECT_MISMATCH)
     questions = [locked_by_id[source_question_id], locked_by_id[target_question_id]]
     if any(not is_question_visible(question, actor) for question in questions):
-        raise NotFound("Question not found")
+        raise NotFound("Question not found", ErrorCode.QUESTION_NOT_FOUND)
     duplicate = await db.scalar(
         select(QuestionRelation.id).where(
             QuestionRelation.source_question_id == source_question_id,
@@ -86,7 +87,7 @@ async def create_question_relation(
         )
     )
     if duplicate is not None:
-        raise Conflict("Question relation already exists")
+        raise Conflict("Question relation already exists", ErrorCode.QUESTION_RELATION_EXISTS)
     if not new_target:
         edge_result = await db.execute(
             select(
@@ -105,7 +106,7 @@ async def create_question_relation(
         while pending:
             current = pending.pop()
             if current == source_question_id:
-                raise Invalid("Question relation would create a directed cycle")
+                raise Invalid("Question relation would create a directed cycle", ErrorCode.QUESTION_RELATION_CYCLE)
             if current not in visited:
                 visited.add(current)
                 pending.extend(adjacency.get(current, set()))
@@ -139,13 +140,13 @@ async def delete_question_relation(
     )
     questions = {question.id: question for question in result.scalars().all()}
     if source_question_id not in questions or target_question_id not in questions:
-        raise NotFound("Question not found")
+        raise NotFound("Question not found", ErrorCode.QUESTION_NOT_FOUND)
     source = questions[source_question_id]
     target = questions[target_question_id]
     if not permissions.can(actor, Permission.EDIT_QUESTION, subject_id=source.subject_id):
-        raise Forbidden("The user doesn't have enough privileges")
+        raise Forbidden("The user doesn't have enough privileges", ErrorCode.AUTH_FORBIDDEN)
     if not is_question_visible(source, actor) or not is_question_visible(target, actor):
-        raise NotFound("Question not found")
+        raise NotFound("Question not found", ErrorCode.QUESTION_NOT_FOUND)
 
     relation = await db.scalar(
         select(QuestionRelation).where(
@@ -156,7 +157,7 @@ async def delete_question_relation(
         )
     )
     if relation is None:
-        raise NotFound("Question relation not found")
+        raise NotFound("Question relation not found", ErrorCode.QUESTION_RELATION_NOT_FOUND)
     await db.delete(relation)
     await db.flush()
     if commit:
@@ -176,7 +177,7 @@ async def get_question_relations(
         )
     )
     if question is None or not is_question_visible(question, actor):
-        raise NotFound("Question not found")
+        raise NotFound("Question not found", ErrorCode.QUESTION_NOT_FOUND)
 
     result = await db.scalars(
         select(QuestionRelation)

@@ -46,6 +46,7 @@ from app.services.exporting.composition_assemble import CompositionAssembler, Co
 from app.services.exporting.composition_registry import composition_renderer_for
 from app.services.exporting.images import ImageResolver
 from app.services import media_service
+from app.core.api_errors import ApiError, ErrorCode
 
 router = APIRouter()
 
@@ -65,7 +66,7 @@ async def _require_subject_access(
     """组稿读路径的统一门禁。与 capability 层同序:先 404 学科不存在,再 403 无成员身份。"""
     subject = await crud.subject.get(db, id=subject_id)
     if not subject:
-        raise HTTPException(status_code=404, detail="Subject not found")
+        raise ApiError(404, ErrorCode.SUBJECT_NOT_FOUND, "Subject not found")
     deps.require(current_user, Permission.VIEW_QUESTION, subject_id=subject_id)
 
 
@@ -232,7 +233,7 @@ async def get_composition(
         with_nodes=True,
     )
     if comp is None:
-        raise HTTPException(status_code=404, detail="Composition not found")
+        raise ApiError(404, ErrorCode.COMPOSITION_NOT_FOUND, "Composition not found")
     return comp
 
 
@@ -316,7 +317,7 @@ async def get_question_revisions(
         owner_id=owner_id,
     )
     if comp is None:
-        raise HTTPException(status_code=404, detail="Composition not found")
+        raise ApiError(404, ErrorCode.COMPOSITION_NOT_FOUND, "Composition not found")
     return await composition_service.question_revision_status(db, comp=comp)
 
 
@@ -341,7 +342,7 @@ async def get_question_group_revisions(
         owner_id=owner_id,
     )
     if comp is None:
-        raise HTTPException(status_code=404, detail="Composition not found")
+        raise ApiError(404, ErrorCode.COMPOSITION_NOT_FOUND, "Composition not found")
     return await composition_service.question_group_revision_status(
         db, comp=comp, actor=current_user
     )
@@ -504,7 +505,7 @@ async def _scoped_composition_for_versions(
         include_deleted=True,
     )
     if comp is None:
-        raise HTTPException(status_code=404, detail="Composition not found")
+        raise ApiError(404, ErrorCode.COMPOSITION_NOT_FOUND, "Composition not found")
     return comp
 
 
@@ -582,7 +583,7 @@ async def get_composition_version(
         db, composition_id=composition_id, version_no=version_no
     )
     if version is None:
-        raise HTTPException(status_code=404, detail="Version not found")
+        raise ApiError(404, ErrorCode.COMPOSITION_VERSION_NOT_FOUND, "Version not found")
     return version
 
 
@@ -607,7 +608,7 @@ async def export_composition_version(
         db, composition_id=composition_id, version_no=version_no
     )
     if version is None:
-        raise HTTPException(status_code=404, detail="Version not found")
+        raise ApiError(404, ErrorCode.COMPOSITION_VERSION_NOT_FOUND, "Version not found")
 
     try:
         export_doc = CompositionAssembler().assemble(version.snapshot)

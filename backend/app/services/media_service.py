@@ -24,6 +24,7 @@ from app.core.file_paths import resolve_within
 from app.core.permissions import Permission
 from app.models.media_asset import LegacyMediaPath, MediaAsset, MediaKind, MediaPurpose, MediaStatus
 from app.models.user import User
+from app.core.api_errors import ErrorCode
 
 MAX_IMAGE_BYTES = 10 * 1024 * 1024
 MAX_AUDIO_BYTES = 100 * 1024 * 1024
@@ -79,10 +80,10 @@ def _sniff_audio(data: bytes, mime: str) -> SniffResult:
     try:
         parsed = MutagenFile(io.BytesIO(data))
     except (MutagenError, ValueError, OSError) as exc:
-        raise Unprocessable("无法识别的音频文件") from exc
+        raise Unprocessable("无法识别的音频文件", ErrorCode.MEDIA_AUDIO_UNRECOGNIZED) from exc
     length = getattr(getattr(parsed, "info", None), "length", None)
     if not length or length <= 0:
-        raise Unprocessable("无法识别的音频文件")
+        raise Unprocessable("无法识别的音频文件", ErrorCode.MEDIA_AUDIO_UNRECOGNIZED)
     return SniffResult(kind=MediaKind.AUDIO.value, mime=mime, duration=round(float(length), 3))
 
 
@@ -101,12 +102,12 @@ def sniff(data: bytes, *, allow_legacy_formats: bool = False, allow_audio: bool 
     audio_mime = _sniff_audio_mime(data)
     if audio_mime is not None:
         if not allow_audio:
-            raise Unprocessable("这里只能上传图片")
+            raise Unprocessable("这里只能上传图片", ErrorCode.MEDIA_IMAGE_ONLY)
         return _sniff_audio(data, audio_mime)
     metafile = _sniff_metafile(data)
     if metafile is not None:
         if not allow_legacy_formats:
-            raise Unprocessable("不支持的图片格式，请上传 PNG、JPEG、GIF 或 WebP")
+            raise Unprocessable("不支持的图片格式，请上传 PNG、JPEG、GIF 或 WebP", ErrorCode.MEDIA_IMAGE_FORMAT_UNSUPPORTED)
         return SniffResult(kind=MediaKind.IMAGE.value, mime=metafile)
     try:
         with Image.open(io.BytesIO(data)) as img:
@@ -114,12 +115,12 @@ def sniff(data: bytes, *, allow_legacy_formats: bool = False, allow_audio: bool 
             width, height = img.size
             img.verify()
     except (UnidentifiedImageError, OSError, SyntaxError, ValueError) as exc:
-        raise Unprocessable("无法识别的文件，请上传 PNG、JPEG、GIF 或 WebP 图片") from exc
+        raise Unprocessable("无法识别的文件，请上传 PNG、JPEG、GIF 或 WebP 图片", ErrorCode.MEDIA_FILE_UNRECOGNIZED) from exc
     mime = _PIL_WEB_FORMATS.get(fmt)
     if mime is None and allow_legacy_formats:
         mime = _PIL_LEGACY_FORMATS.get(fmt)
     if mime is None:
-        raise Unprocessable("不支持的图片格式，请上传 PNG、JPEG、GIF 或 WebP")
+        raise Unprocessable("不支持的图片格式，请上传 PNG、JPEG、GIF 或 WebP", ErrorCode.MEDIA_IMAGE_FORMAT_UNSUPPORTED)
     return SniffResult(kind=MediaKind.IMAGE.value, mime=mime, width=width, height=height)
 
 
@@ -168,18 +169,26 @@ async def ingest(
     """识别、去重并登记一个资产;只 flush,由调用方决定何时提交。max_bytes 为图片上限。"""
     max_bytes = max_bytes or MAX_IMAGE_BYTES
     if purpose == MediaPurpose.CONTENT and subject_id is None:
-        raise Unprocessable("题目内容图片必须归属学科")
+        raise Unprocessable("题目内容图片必须归属学科", ErrorCode.MEDIA_SUBJECT_REQUIRED)
     if purpose != MediaPurpose.CONTENT and actor_id is None:
-        raise Unprocessable("个人媒体必须归属用户")
+        raise Unprocessable("个人媒体必须归属用户", ErrorCode.MEDIA_OWNER_REQUIRED)
     limit = max(max_bytes, MAX_AUDIO_BYTES) if allow_audio else max_bytes
     if len(data) > limit:
-        raise Unprocessable(f"文件过大（上限 {limit // (1024 * 1024)} MB）")
+        raise Unprocessable(
+            f"文件过大（上限 {limit // (1024 * 1024)} MB）",
+            ErrorCode.MEDIA_FILE_TOO_LARGE,
+            {"limit_mb": limit // (1024 * 1024)},
+        )
     if not data:
-        raise Unprocessable("文件为空")
+        raise Unprocessable("文件为空", ErrorCode.MEDIA_FILE_EMPTY)
 
     info = sniff(data, allow_legacy_formats=allow_legacy_formats, allow_audio=allow_audio)
     if info.kind == MediaKind.IMAGE.value and len(data) > max_bytes:
-        raise Unprocessable(f"图片过大（上限 {max_bytes // (1024 * 1024)} MB）")
+        raise Unprocessable(
+            f"图片过大（上限 {max_bytes // (1024 * 1024)} MB）",
+            ErrorCode.MEDIA_IMAGE_TOO_LARGE,
+            {"limit_mb": max_bytes // (1024 * 1024)},
+        )
     sha256 = await asyncio.to_thread(storage.put_bytes, data)
 
     owner_scope = None if purpose == MediaPurpose.CONTENT else actor_id
@@ -232,14 +241,14 @@ async def get_readable(db: AsyncSession, asset_id: int, user: User) -> MediaAsse
     # 资产内容不可变;软删除的资产仍可能被冻结稿件引用,对有权限者照常可读。
     asset = await db.get(MediaAsset, asset_id)
     if asset is None or not can_read(asset, user):
-        raise NotFound("Media not found")
+        raise NotFound("Media not found", ErrorCode.MEDIA_NOT_FOUND)
     return asset
 
 
 async def get_owned_chat_asset(db: AsyncSession, asset_id: int, user: User) -> MediaAsset:
     asset = await db.get(MediaAsset, asset_id)
     if asset is None or asset.purpose != MediaPurpose.CHAT.value or asset.owner_user_id != user.id:
-        raise Forbidden("Media not accessible")
+        raise Forbidden("Media not accessible", ErrorCode.MEDIA_NOT_ACCESSIBLE)
     return asset
 
 

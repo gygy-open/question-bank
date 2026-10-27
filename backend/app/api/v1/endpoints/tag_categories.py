@@ -1,11 +1,12 @@
 from typing import Any, List
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends
 from sqlalchemy import select, delete
 from app import crud, schemas, models
 from app.api import deps
 from app.core.permissions import Permission
 from app.models.tag import Tag
 from app.models.question import question_tags
+from app.core.api_errors import ApiError, ErrorCode
 
 router = APIRouter()
 
@@ -38,12 +39,12 @@ async def create_tag_category(
     Create new tag category.
     """
     if not tag_category_in.subject_id:
-        raise HTTPException(status_code=400, detail="subject_id is required")
+        raise ApiError(400, ErrorCode.TAG_CATEGORY_SUBJECT_REQUIRED, "subject_id is required")
     deps.require(current_user, Permission.MANAGE_SUBJECT, subject_id=tag_category_in.subject_id)
 
     existing = await crud.tag_category.get_by_name_in_subject(db, name=tag_category_in.name, subject_id=tag_category_in.subject_id)
     if existing:
-        raise HTTPException(status_code=400, detail="Tag category with this name already exists in this subject")
+        raise ApiError(400, ErrorCode.TAG_CATEGORY_NAME_EXISTS, "Tag category with this name already exists in this subject")
         
     tag_category = await crud.tag_category.create(db=db, obj_in=tag_category_in)
     return tag_category
@@ -61,7 +62,7 @@ async def update_tag_category(
     """
     tag_category = await crud.tag_category.get(db=db, id=id)
     if not tag_category:
-        raise HTTPException(status_code=404, detail="Tag category not found")
+        raise ApiError(404, ErrorCode.TAG_CATEGORY_NOT_FOUND, "Tag category not found")
     deps.require(current_user, Permission.MANAGE_SUBJECT, subject_id=tag_category.subject_id)
     tag_category = await crud.tag_category.update(db=db, db_obj=tag_category, obj_in=tag_category_in)
     return tag_category
@@ -78,7 +79,7 @@ async def delete_tag_category(
     """
     tag_category = await crud.tag_category.get(db=db, id=id)
     if not tag_category:
-        raise HTTPException(status_code=404, detail="Tag category not found")
+        raise ApiError(404, ErrorCode.TAG_CATEGORY_NOT_FOUND, "Tag category not found")
     deps.require(current_user, Permission.MANAGE_SUBJECT, subject_id=tag_category.subject_id)
     
     # Find all tags in this category

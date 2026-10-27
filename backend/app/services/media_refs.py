@@ -15,6 +15,7 @@ from app.models.composition import CompositionNode
 from app.models.media_asset import MediaAsset, MediaOwnerType, MediaPurpose, MediaReference
 # 模块引用而非 from-import:media_service → capabilities → crud_question → 本模块成环。
 from app.services import media_service
+from app.core.api_errors import ErrorCode
 
 
 def _parse(value: Any) -> Any:
@@ -46,7 +47,11 @@ async def _check_assets(db: AsyncSession, asset_ids: set[int], subject_id: Optio
     }
     invalid = sorted(asset_ids - valid)
     if invalid:
-        raise Unprocessable(f"图片不存在或不属于本学科(资产 {', '.join(map(str, invalid))})")
+        raise Unprocessable(
+            f"图片不存在或不属于本学科(资产 {', '.join(map(str, invalid))})",
+            ErrorCode.MEDIA_REFS_INVALID,
+            {"assets": ", ".join(map(str, invalid))},
+        )
 
 
 async def sync_refs(

@@ -3,6 +3,7 @@ from fastapi import APIRouter, BackgroundTasks, HTTPException
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
 from app.services.pandoc import convert_md_to_docx
+from app.core.api_errors import ApiError, ErrorCode
 
 router = APIRouter()
 
@@ -32,7 +33,7 @@ async def convert_markdown_to_docx(
         if request.template:
             # Basic security check
             if ".." in request.template:
-                raise HTTPException(status_code=400, detail="Invalid template path")
+                raise ApiError(400, ErrorCode.TOOLS_INVALID_TEMPLATE_PATH, "Invalid template path")
             
             # Check in app/templates
             possible_path = os.path.join("app/templates", request.template)
@@ -44,7 +45,7 @@ async def convert_markdown_to_docx(
             else:
                 # If template specified but not found, maybe warn or fail? 
                 # For now, let's fail if explicit template requested but missing
-                raise HTTPException(status_code=400, detail=f"Template '{request.template}' not found.")
+                raise ApiError(400, ErrorCode.TOOLS_TEMPLATE_NOT_FOUND, f"Template '{request.template}' not found.", {"template": request.template})
 
         output_path = convert_md_to_docx(request.content, template_path)
         

@@ -13,6 +13,7 @@ from app.capabilities.errors import Unprocessable
 from app.core.config import settings
 from app.models.media_asset import MediaPurpose
 from app.services import media_service
+from app.core.api_errors import ErrorCode
 
 logger = logging.getLogger(__name__)
 
@@ -29,7 +30,7 @@ class ImportImageSink:
 
     async def store(self, data: bytes, filename: str) -> Optional[str]:
         if self.subject_id is None:
-            raise Unprocessable("导入含图片的文档前请先选择学科")
+            raise Unprocessable("导入含图片的文档前请先选择学科", ErrorCode.MEDIA_IMPORT_SUBJECT_REQUIRED)
         try:
             asset = await media_service.ingest(
                 self.db,

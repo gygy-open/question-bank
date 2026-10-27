@@ -16,6 +16,7 @@ from sqlalchemy.exc import IntegrityError
 from app import crud
 from app.core import storage
 from app.core.permissions import Permission
+from app.core.api_errors import ErrorCode
 from app.models.composition import ScopeType
 from app.models.question import QuestionStatus
 from app.schemas.paper_import import (
@@ -61,7 +62,7 @@ class PaperImportCommitInput(PaperImportScopeInput):
 
 async def _ensure_subject(ctx: ExecutionContext, subject_id: int) -> None:
     if not await crud.subject.get(ctx.db, id=subject_id):
-        raise NotFound("Subject not found")
+        raise NotFound("Subject not found", ErrorCode.SUBJECT_NOT_FOUND)
 
 
 @register

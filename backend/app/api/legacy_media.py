@@ -4,12 +4,13 @@
 """
 from urllib.parse import quote
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends
 from fastapi.responses import FileResponse
 
 from app import models
 from app.api import deps
 from app.services import media_service
+from app.core.api_errors import ApiError, ErrorCode
 
 router = APIRouter()
 
@@ -27,7 +28,7 @@ async def read_legacy_media(
     )
     stored = resolved.get(key)
     if stored is None:
-        raise HTTPException(status_code=404, detail="Not found")
+        raise ApiError(404, ErrorCode.MEDIA_NOT_FOUND, "Not found")
     return FileResponse(
         stored.path,
         media_type=stored.mime,

@@ -1,6 +1,6 @@
 from typing import Any, List, Optional
 
-from fastapi import APIRouter, Body, Depends, HTTPException, UploadFile, File
+from fastapi import APIRouter, Body, Depends, UploadFile, File
 from fastapi.encoders import jsonable_encoder
 from fastapi.responses import StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -20,6 +20,7 @@ from app.schemas.subject_member import MyPermissions, SubjectMembershipMini
 from app.core import security
 from app.models.user import User as UserModel
 from app.services import setup_state, user_import_service
+from app.core.api_errors import ApiError, ErrorCode
 
 router = APIRouter()
 
@@ -41,10 +42,7 @@ async def _ensure_not_last_active_superuser(
         if not (demoted or deactivated):
             return
     if await setup_state.count_active_superusers(session) <= 1:
-        raise HTTPException(
-            status_code=400,
-            detail="Cannot remove, demote or deactivate the last active superuser",
-        )
+        raise ApiError(400, ErrorCode.USER_LAST_SUPERUSER, "Cannot remove, demote or deactivate the last active superuser")
 
 
 MAX_IMPORT_SIZE = 5 * 1024 * 1024  # 5 MB
@@ -74,10 +72,7 @@ async def create_user(
     """
     user = await crud_user.user.get_by_username(session, username=user_in.username)
     if user:
-        raise HTTPException(
-            status_code=400,
-            detail="The user with this username already exists in the system.",
-        )
+        raise ApiError(400, ErrorCode.AUTH_USERNAME_TAKEN, "The user with this username already exists in the system.")
     user = await crud_user.user.create(session, obj_in=user_in)
     return user
 
@@ -104,11 +99,11 @@ async def import_users(
 ) -> Any:
     """Batch import users from an .xlsx file."""
     if not file.filename or not file.filename.lower().endswith(".xlsx"):
-        raise HTTPException(status_code=400, detail="仅支持 .xlsx 格式的文件")
+        raise ApiError(400, ErrorCode.COMMON_XLSX_ONLY, "仅支持 .xlsx 格式的文件")
 
     content = await file.read()
     if len(content) > MAX_IMPORT_SIZE:
-        raise HTTPException(status_code=400, detail="文件过大，请确保文件小于 5MB")
+        raise ApiError(400, ErrorCode.COMMON_IMPORT_FILE_TOO_LARGE, "文件过大，请确保文件小于 5MB")
 
     return await user_import_service.import_excel(session, file_bytes=content)
 
@@ -192,11 +187,9 @@ async def update_password_me(
     Update own password.
     """
     if not security.verify_password(body.current_password, current_user.hashed_password):
-        raise HTTPException(status_code=400, detail="Incorrect password")
+        raise ApiError(400, ErrorCode.USER_INCORRECT_PASSWORD, "Incorrect password")
     if body.current_password == body.new_password:
-        raise HTTPException(
-            status_code=400, detail="New password cannot be the same as the current one"
-        )
+        raise ApiError(400, ErrorCode.USER_PASSWORD_UNCHANGED, "New password cannot be the same as the current one")
     
     user_in = UserUpdate(password=body.new_password)
     user = await crud_user.user.update(session, db_obj=current_user, obj_in=user_in)
@@ -215,9 +208,7 @@ async def read_user_by_id(
     if user == current_user:
         return user
     if not current_user.is_superuser:
-        raise HTTPException(
-            status_code=400, detail="The user doesn't have enough privileges"
-        )
+        raise ApiError(400, ErrorCode.AUTH_FORBIDDEN, "The user doesn't have enough privileges")
     return user
 
 @router.put("/{user_id}", response_model=User)
@@ -233,17 +224,11 @@ async def update_user(
     """
     user = await crud_user.user.get(session, id=user_id)
     if not user:
-        raise HTTPException(
-            status_code=404,
-            detail="The user with this username does not exist in the system",
-        )
+        raise ApiError(404, ErrorCode.AUTH_USER_NOT_FOUND, "The user with this username does not exist in the system")
     if user_in.username and user_in.username != user.username:
         existing_user = await crud_user.user.get_by_username(session, username=user_in.username)
         if existing_user:
-            raise HTTPException(
-                status_code=400,
-                detail="The user with this username already exists in the system.",
-            )
+            raise ApiError(400, ErrorCode.AUTH_USERNAME_TAKEN, "The user with this username already exists in the system.")
     await _ensure_not_last_active_superuser(session, user, removing=False, user_in=user_in)
     user = await crud_user.user.update(session, db_obj=user, obj_in=user_in)
     return user
@@ -260,10 +245,7 @@ async def delete_user(
     """
     user = await crud_user.user.get(session, id=user_id)
     if not user:
-        raise HTTPException(
-            status_code=404,
-            detail="The user with this username does not exist in the system",
-        )
+        raise ApiError(404, ErrorCode.AUTH_USER_NOT_FOUND, "The user with this username does not exist in the system")
     await _ensure_not_last_active_superuser(session, user, removing=True)
     user = await crud_user.user.remove(session, id=user_id)
     return user

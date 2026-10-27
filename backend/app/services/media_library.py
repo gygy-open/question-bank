@@ -30,6 +30,7 @@ from app.schemas.media import (
 )
 from app.services import media_service
 from app.services.question_content import parse_json_field
+from app.core.api_errors import ErrorCode
 
 MediaSort = Literal["newest", "oldest", "name", "size"]
 
@@ -43,7 +44,7 @@ async def _editable_asset(db: AsyncSession, asset_id: int, actor: User) -> Media
     else:
         allowed = actor.is_superuser or asset.owner_user_id == actor.id
     if not allowed:
-        raise Forbidden("没有编辑该图片的权限")
+        raise Forbidden("没有编辑该图片的权限", ErrorCode.MEDIA_EDIT_FORBIDDEN)
     return asset
 
 
@@ -64,7 +65,7 @@ async def delete_asset(db: AsyncSession, asset_id: int, actor: User) -> None:
         select(func.count(MediaReference.id)).where(MediaReference.asset_id == asset.id)
     )
     if in_use:
-        raise Conflict(f"图片仍被 {in_use} 处内容引用，不能删除")
+        raise Conflict(f"图片仍被 {in_use} 处内容引用，不能删除", ErrorCode.MEDIA_IN_USE, {"count": in_use})
     if asset.deleted_at is None:
         asset.deleted_at = datetime.utcnow()
         await db.commit()
@@ -121,7 +122,7 @@ async def archive_assets(db: AsyncSession, subject_id: int, ids: list[int]):
     """把所选资产打成 zip(仅存储不压缩,图片本身已压缩),返回位于开头的临时文件。"""
     assets = await _subject_assets(db, subject_id, ids)
     if not assets:
-        raise NotFound("没有可下载的图片")
+        raise NotFound("没有可下载的图片", ErrorCode.MEDIA_NOTHING_TO_DOWNLOAD)
 
     def build():
         spool = tempfile.SpooledTemporaryFile(max_size=32 * 1024 * 1024)
@@ -142,9 +143,9 @@ async def copy_to_subject(db: AsyncSession, asset_id: int, subject_id: int, acto
     """跨学科「加入本学科」:新建逻辑资产,物理文件共享;目标学科已有同一文件时直接复用。"""
     source = await media_service.get_readable(db, asset_id, actor)
     if source.purpose != MediaPurpose.CONTENT.value:
-        raise Unprocessable("只有题目内容图片可以加入学科")
+        raise Unprocessable("只有题目内容图片可以加入学科", ErrorCode.MEDIA_ADD_TO_SUBJECT_CONTENT_ONLY)
     if not permissions.can(actor, Permission.EDIT_QUESTION, subject_id=subject_id):
-        raise Forbidden("没有在目标学科添加图片的权限")
+        raise Forbidden("没有在目标学科添加图片的权限", ErrorCode.MEDIA_ADD_TO_SUBJECT_FORBIDDEN)
     existing = await db.scalar(
         select(MediaAsset)
         .where(

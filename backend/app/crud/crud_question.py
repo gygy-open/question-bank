@@ -22,6 +22,7 @@ from app.models.import_task import ImportTask
 from app.models.activity_log import ActivityLog
 from app.models.question_relation import QuestionRelation
 from app.models.stimulus import Stimulus
+from app.core.api_errors import ErrorCode
 
 
 async def _sync_media_refs(db: AsyncSession, question: Question) -> None:
@@ -478,7 +479,7 @@ class CRUDQuestion(CRUDBase[Question, QuestionCreate, QuestionUpdate]):
                 select(Stimulus.visibility).where(Stimulus.id == db_obj.stimulus_id)
             )
             if stimulus_visibility == QuestionVisibility.PRIVATE.value:
-                raise Unprocessable("公开题目不能挂在私有材料下")
+                raise Unprocessable("公开题目不能挂在私有材料下", ErrorCode.STIMULUS_PUBLIC_UNDER_PRIVATE)
 
         # Merge v2 content state (current DB row + overlay), then run full domain validation
         # before persisting. This is the authoritative net for partial updates.
@@ -618,7 +619,7 @@ class CRUDQuestion(CRUDBase[Question, QuestionCreate, QuestionUpdate]):
                 .with_for_update()
             )
             if stimulus_subject != new_subject_id:
-                raise Unprocessable("小题学科必须与所属题目材料一致")
+                raise Unprocessable("小题学科必须与所属题目材料一致", ErrorCode.STIMULUS_SUBJECT_MISMATCH)
 
         relations = await db.execute(
             select(
@@ -643,7 +644,7 @@ class CRUDQuestion(CRUDBase[Question, QuestionCreate, QuestionUpdate]):
                 .with_for_update()
             )
             if any(subject_id != new_subject_id for subject_id in peer_subjects):
-                raise Unprocessable("Question relation endpoints must share a subject")
+                raise Unprocessable("Question relation endpoints must share a subject", ErrorCode.QUESTION_RELATION_SUBJECT_MISMATCH)
 
     async def remove(self, db: AsyncSession, *, id: int, user_id: Optional[int] = None) -> Optional[Question]:
         obj = await self.get(db, id=id)

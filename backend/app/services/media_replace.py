@@ -23,6 +23,7 @@ from app.models.user import User
 from app.schemas.media import MediaReplaceRequest, MediaReplaceResult, MediaReplaceTarget
 from app.services import media_library, media_refs, media_service
 from app.services.composition_service import _add_event
+from app.core.api_errors import ErrorCode
 
 _QUESTION_FIELDS = ("content", "options", "answer", "thinking", "analysis", "summary")
 
@@ -75,7 +76,7 @@ async def replace_asset(
 ) -> MediaReplaceResult:
     old = await media_library._editable_asset(db, asset_id, actor)
     if old.purpose != MediaPurpose.CONTENT.value:
-        raise Unprocessable("只有题目内容媒体可以替换")
+        raise Unprocessable("只有题目内容媒体可以替换", ErrorCode.MEDIA_REPLACE_CONTENT_ONLY)
     new: Optional[MediaAsset] = await db.get(MediaAsset, request.new_asset_id)
     if (
         new is None
@@ -84,9 +85,9 @@ async def replace_asset(
         or new.purpose != MediaPurpose.CONTENT.value
         or new.subject_id != old.subject_id
     ):
-        raise Unprocessable("新文件必须是本学科媒体库中的另一个文件")
+        raise Unprocessable("新文件必须是本学科媒体库中的另一个文件", ErrorCode.MEDIA_REPLACE_TARGET_INVALID)
     if new.kind != old.kind:
-        raise Unprocessable("只能用同类型的文件替换(图片换图片、音频换音频)")
+        raise Unprocessable("只能用同类型的文件替换(图片换图片、音频换音频)", ErrorCode.MEDIA_REPLACE_TYPE_MISMATCH)
 
     refs = (
         await db.execute(
@@ -102,7 +103,7 @@ async def replace_asset(
     if explicit:
         wanted = {(t.owner_type, t.owner_id) for t in request.targets}
         if wanted - live:
-            raise Unprocessable("所选内容没有引用这张图片")
+            raise Unprocessable("所选内容没有引用这张图片", ErrorCode.MEDIA_REPLACE_NOT_REFERENCED)
     else:
         wanted = live
 
@@ -118,7 +119,7 @@ async def replace_asset(
     allowed_comps = [c for c in comps if _can_edit_composition(c, actor)]
     skipped = len(wanted) - len(allowed_questions) - len(allowed_stimuli) - len(allowed_comps)
     if explicit and skipped:
-        raise Forbidden("没有修改部分所选内容的权限")
+        raise Forbidden("没有修改部分所选内容的权限", ErrorCode.MEDIA_REPLACE_FORBIDDEN_PARTIAL)
 
     replaced: list[MediaReplaceTarget] = []
     # 替换前后的内容版本,用于让原本已同步的稿件节点保持同步。

@@ -1,6 +1,6 @@
 from typing import Any, Iterator, List, Literal, Optional
 
-from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile, status
+from fastapi import APIRouter, Depends, File, Query, UploadFile, status
 from fastapi.responses import FileResponse, StreamingResponse
 
 from app import models
@@ -22,6 +22,7 @@ from app.schemas.media import (
     MediaReplaceResult,
 )
 from app.services import media_library, media_replace, media_service
+from app.core.api_errors import ApiError, ErrorCode
 
 router = APIRouter()
 subject_router = APIRouter()
@@ -30,7 +31,12 @@ subject_router = APIRouter()
 async def _read_upload(file: UploadFile, limit: int = media_service.MAX_IMAGE_BYTES) -> bytes:
     data = await file.read(limit + 1)
     if len(data) > limit:
-        raise HTTPException(status_code=413, detail=f"文件过大（上限 {limit // (1024 * 1024)} MB）")
+        raise ApiError(
+            413,
+            ErrorCode.MEDIA_FILE_TOO_LARGE,
+            f"文件过大（上限 {limit // (1024 * 1024)} MB）",
+            {"limit_mb": limit // (1024 * 1024)},
+        )
     return data
 
 
@@ -44,7 +50,7 @@ async def upload_subject_media(
     current_user: models.User = Depends(deps.get_current_active_user),
 ) -> Any:
     if await crud_subject.get(db, id=subject_id) is None:
-        raise HTTPException(status_code=404, detail="Subject not found")
+        raise ApiError(404, ErrorCode.SUBJECT_NOT_FOUND, "Subject not found")
     deps.require(current_user, Permission.EDIT_QUESTION, subject_id=subject_id)
     asset = await media_service.ingest(
         db,
@@ -190,7 +196,7 @@ async def copy_media_to_subject(
     current_user: models.User = Depends(deps.get_current_active_user),
 ) -> Any:
     if await crud_subject.get(db, id=payload.subject_id) is None:
-        raise HTTPException(status_code=404, detail="Subject not found")
+        raise ApiError(404, ErrorCode.SUBJECT_NOT_FOUND, "Subject not found")
     return await media_library.copy_to_subject(db, asset_id, payload.subject_id, current_user)
 
 
@@ -214,7 +220,7 @@ async def read_media_content(
     asset = await media_service.get_readable(db, asset_id, current_user)
     path = storage.object_path(asset.sha256)
     if not path.is_file():
-        raise HTTPException(status_code=404, detail="Media file missing")
+        raise ApiError(404, ErrorCode.MEDIA_FILE_MISSING, "Media file missing")
     filename = asset.original_filename or f"media-{asset.id}{media_service.extension_for(asset.mime)}"
     return FileResponse(
         path,

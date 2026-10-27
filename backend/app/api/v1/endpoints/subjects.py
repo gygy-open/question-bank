@@ -1,9 +1,10 @@
 from typing import Any, List
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends
 from app import crud, schemas, models
 from app.api import deps
 from app.crud import crud_user
 from app.core.permissions import Permission
+from app.core.api_errors import ApiError, ErrorCode
 
 router = APIRouter()
 
@@ -40,7 +41,7 @@ async def update_subject(
 ) -> Any:
     subject = await crud.subject.get(db=db, id=id)
     if not subject:
-        raise HTTPException(status_code=404, detail="Subject not found")
+        raise ApiError(404, ErrorCode.SUBJECT_NOT_FOUND, "Subject not found")
     subject = await crud.subject.update(db=db, db_obj=subject, obj_in=subject_in, user_id=current_user.id)
     return subject
 
@@ -52,7 +53,7 @@ async def read_subject(
 ) -> Any:
     subject = await crud.subject.get(db=db, id=id)
     if not subject:
-        raise HTTPException(status_code=404, detail="Subject not found")
+        raise ApiError(404, ErrorCode.SUBJECT_NOT_FOUND, "Subject not found")
     return subject
 
 @router.delete("/{id}", response_model=schemas.Subject)
@@ -64,7 +65,7 @@ async def delete_subject(
 ) -> Any:
     subject = await crud.subject.get(db=db, id=id)
     if not subject:
-        raise HTTPException(status_code=404, detail="Subject not found")
+        raise ApiError(404, ErrorCode.SUBJECT_NOT_FOUND, "Subject not found")
     subject = await crud.subject.remove(db=db, id=id, user_id=current_user.id)
     return subject
 
@@ -104,10 +105,10 @@ async def set_subject_member(
     deps.require(current_user, Permission.MANAGE_MEMBERS, subject_id=subject_id)
     subject = await crud.subject.get(db=db, id=subject_id)
     if not subject:
-        raise HTTPException(status_code=404, detail="Subject not found")
+        raise ApiError(404, ErrorCode.SUBJECT_NOT_FOUND, "Subject not found")
     target = await crud_user.user.get(db, id=user_id)
     if not target:
-        raise HTTPException(status_code=404, detail="User not found")
+        raise ApiError(404, ErrorCode.AUTH_USER_NOT_FOUND, "User not found")
     await crud.subject_member.set_role(
         db, user_id=user_id, subject_id=subject_id, role=body.role
     )
@@ -126,5 +127,5 @@ async def remove_subject_member(
     deps.require(current_user, Permission.MANAGE_MEMBERS, subject_id=subject_id)
     ok = await crud.subject_member.remove_member(db, user_id=user_id, subject_id=subject_id)
     if not ok:
-        raise HTTPException(status_code=404, detail="Member not found")
+        raise ApiError(404, ErrorCode.SUBJECT_MEMBER_NOT_FOUND, "Member not found")
     return {"ok": True}

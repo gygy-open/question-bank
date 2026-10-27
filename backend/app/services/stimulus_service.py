@@ -13,6 +13,7 @@ from app.models.stimulus import Stimulus
 from app.models.user import User
 from app.services import media_refs
 from app.schemas.question import QuestionSummary
+from app.core.api_errors import ErrorCode
 from app.schemas.stimulus import (
     StimulusBundleCreate,
     StimulusBundleUpdate,
@@ -36,7 +37,7 @@ async def get_stimulus(db: AsyncSession, stimulus_id: int, actor: User) -> Stimu
         .execution_options(populate_existing=True)
     )
     if stimulus is None or _is_private_hidden(stimulus, actor):
-        raise NotFound("Stimulus not found")
+        raise NotFound("Stimulus not found", ErrorCode.STIMULUS_NOT_FOUND)
     return stimulus
 
 
@@ -47,7 +48,7 @@ async def get_deleted_stimulus(db: AsyncSession, stimulus_id: int, actor: User) 
         .execution_options(populate_existing=True)
     )
     if stimulus is None or _is_private_hidden(stimulus, actor):
-        raise NotFound("Stimulus not found")
+        raise NotFound("Stimulus not found", ErrorCode.STIMULUS_NOT_FOUND)
     return stimulus
 
 
@@ -165,7 +166,7 @@ async def _ensure_no_public_members(db: AsyncSession, stimulus_id: int) -> None:
         ).limit(1)
     )
     if public_question is not None:
-        raise Unprocessable("材料下有公开小题，不能设为私有")
+        raise Unprocessable("材料下有公开小题，不能设为私有", ErrorCode.STIMULUS_PUBLIC_MEMBERS_BLOCK_PRIVATE)
 
 
 async def _write_stimulus(
@@ -206,7 +207,7 @@ async def _write_stimulus(
         .values(**values, revision=Stimulus.revision + 1, content_revision=content_revision)
     )
     if result.rowcount == 0:
-        raise Conflict("Stimulus revision mismatch")
+        raise Conflict("Stimulus revision mismatch", ErrorCode.STIMULUS_REVISION_MISMATCH)
     await db.flush()
     return await get_stimulus(db, stimulus.id, actor)
 
@@ -221,7 +222,7 @@ async def _lock_active_stimulus(
         .execution_options(populate_existing=True)
     )
     if locked is None or locked.revision != expected_revision:
-        raise Conflict("Stimulus revision mismatch")
+        raise Conflict("Stimulus revision mismatch", ErrorCode.STIMULUS_REVISION_MISMATCH)
     return locked
 
 
@@ -230,7 +231,7 @@ async def delete_stimulus(
 ) -> None:
     locked = await _lock_active_stimulus(db, stimulus.id, expected_revision)
     if await list_stimulus_questions(db, locked.id):
-        raise Unprocessable("题目材料下仍有小题，不能删除")
+        raise Unprocessable("题目材料下仍有小题，不能删除", ErrorCode.STIMULUS_HAS_MEMBERS)
     locked.deleted_at = datetime.utcnow()
     locked.updated_by = actor.id
     locked.revision = locked.revision + 1
@@ -255,19 +256,19 @@ async def restore_stimulus(
         )
     )
     if result.rowcount == 0:
-        raise Conflict("Stimulus revision mismatch")
+        raise Conflict("Stimulus revision mismatch", ErrorCode.STIMULUS_REVISION_MISMATCH)
     await db.commit()
     return await get_stimulus(db, stimulus.id, actor)
 
 
 def check_question_attachable(question: Question, stimulus: Stimulus) -> None:
     if question.subject_id != stimulus.subject_id:
-        raise Unprocessable("材料与小题必须属于同一学科")
+        raise Unprocessable("材料与小题必须属于同一学科", ErrorCode.STIMULUS_SUBJECT_MISMATCH)
     if (
         question.visibility == QuestionVisibility.PUBLIC.value
         and stimulus.visibility == QuestionVisibility.PRIVATE.value
     ):
-        raise Unprocessable("公开题目不能挂在私有材料下")
+        raise Unprocessable("公开题目不能挂在私有材料下", ErrorCode.STIMULUS_PUBLIC_UNDER_PRIVATE)
 
 
 async def assign_positions(
@@ -314,9 +315,13 @@ async def _apply_membership(
         for question_id in question_ids:
             question = by_id.get(question_id)
             if question is None or not is_question_visible(question, actor):
-                raise NotFound("Question not found")
+                raise NotFound("Question not found", ErrorCode.QUESTION_NOT_FOUND)
             if question.stimulus_id not in (None, locked.id):
-                raise Unprocessable(f"题目 {question_id} 已属于其他材料")
+                raise Unprocessable(
+                    f"题目 {question_id} 已属于其他材料",
+                    ErrorCode.STIMULUS_QUESTION_TAKEN,
+                    {"question": question_id},
+                )
             check_question_attachable(question, locked)
             requested.append(question)
 
@@ -343,7 +348,7 @@ async def save_bundle(
 ) -> StimulusDetail:
     """在同一事务内保存材料、新建/更新小题并确定小题顺序;任一步失败整体回滚。"""
     if payload.content is None:
-        raise Unprocessable("请填写材料内容")
+        raise Unprocessable("请填写材料内容", ErrorCode.STIMULUS_CONTENT_REQUIRED)
     try:
         if stimulus is None:
             target = await create_stimulus(
@@ -391,12 +396,12 @@ async def save_bundle(
                     or existing.deleted_at is not None
                     or not is_question_visible(existing, actor)
                 ):
-                    raise NotFound("Question not found")
+                    raise NotFound("Question not found", ErrorCode.QUESTION_NOT_FOUND)
                 if existing.subject_id != subject_id or (
                     "subject_id" in item.update.model_fields_set
                     and item.update.subject_id != subject_id
                 ):
-                    raise Unprocessable("材料与小题必须属于同一学科")
+                    raise Unprocessable("材料与小题必须属于同一学科", ErrorCode.STIMULUS_SUBJECT_MISMATCH)
                 await crud_question.update_with_tags(
                     db, db_obj=existing, obj_in=item.update, user_id=actor.id, commit=False
                 )

@@ -1,5 +1,5 @@
 from typing import Any, List, Optional
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, Query
 from app import crud, schemas, models
 from app.api import deps
 from app import capabilities
@@ -12,6 +12,7 @@ from app.models.import_task import ImportTask, ImportTaskStatus
 from app.services.importing.contracts import ImportDefaults
 from app.services.importing.normalize import question_importer
 from app.services.question_relation_service import get_question_relations
+from app.core.api_errors import ApiError, ErrorCode
 
 router = APIRouter()
 
@@ -266,9 +267,9 @@ async def read_question(
 ) -> Any:
     question = await crud.question.get(db=db, id=id)
     if not question:
-        raise HTTPException(status_code=404, detail="Question not found")
+        raise ApiError(404, ErrorCode.QUESTION_NOT_FOUND, "Question not found")
     if not is_question_visible(question, current_user):
-        raise HTTPException(status_code=404, detail="Question not found")
+        raise ApiError(404, ErrorCode.QUESTION_NOT_FOUND, "Question not found")
     return question
 
 @router.put("/{id}", response_model=schemas.Question)

@@ -117,7 +117,8 @@
       "private_question_in_shared": "私有题目 {question} 不能加入共享稿件",
       "question_needs_group": "题目 {question} 依赖材料 {stimulus}，必须放在题组中添加",
       "stimulus_unavailable": "材料 {stimulus} 不存在或属于其他学科",
-      "private_stimulus": "私有材料 {stimulus} 不能加入该稿件"
+      "private_stimulus": "私有材料 {stimulus} 不能加入该稿件",
+      "version_not_found": "版本不存在"
     },
     "refs": {
       "separator": "、",
@@ -182,6 +183,94 @@
       "only_markdown": "仅支持 .md 文件",
       "only_zip": "仅支持 .zip 压缩包",
       "only_image": "仅支持图片文件"
+    },
+    "subject": {
+      "not_found": "学科不存在",
+      "member_not_found": "成员不存在",
+      "answer_space_invalid_lines": "最大行数不能小于最小行数"
+    },
+    "question": {
+      "not_found": "题目不存在",
+      "invalid_review_action": "无效的审核操作",
+      "none_found": "未找到所选题目"
+    },
+    "stimulus": {
+      "not_found": "材料不存在",
+      "public_members_block_private": "材料下有公开小题，不能设为私有",
+      "revision_mismatch": "材料已被他人修改，请刷新后重试",
+      "has_members": "材料下仍有小题，不能删除",
+      "subject_mismatch": "材料与小题必须属于同一学科",
+      "public_under_private": "公开题目不能挂在私有材料下",
+      "question_taken": "题目 {question} 已属于其他材料",
+      "content_required": "请填写材料内容"
+    },
+    "question_relation": {
+      "self": "题目不能关联自身",
+      "subject_mismatch": "关联的两道题必须属于同一学科",
+      "exists": "该关联已存在",
+      "cycle": "该关联会形成循环",
+      "not_found": "关联不存在"
+    },
+    "media": {
+      "audio_unrecognized": "无法识别的音频文件",
+      "image_only": "这里只能上传图片",
+      "image_format_unsupported": "不支持的图片格式，请上传 PNG、JPEG、GIF 或 WebP",
+      "file_unrecognized": "无法识别的文件，请上传 PNG、JPEG、GIF 或 WebP 图片",
+      "subject_required": "题目内容图片必须归属学科",
+      "owner_required": "个人媒体必须归属用户",
+      "file_too_large": "文件过大（上限 {limit_mb} MB）",
+      "file_empty": "文件为空",
+      "image_too_large": "图片过大（上限 {limit_mb} MB）",
+      "not_found": "媒体不存在",
+      "not_accessible": "无权访问该媒体",
+      "file_missing": "媒体文件已丢失",
+      "replace_content_only": "只有题目内容媒体可以替换",
+      "replace_target_invalid": "新文件必须是本学科媒体库中的另一个文件",
+      "replace_type_mismatch": "只能用同类型的文件替换（图片换图片、音频换音频）",
+      "replace_not_referenced": "所选内容没有引用这张图片",
+      "replace_forbidden_partial": "没有修改部分所选内容的权限",
+      "edit_forbidden": "没有编辑该图片的权限",
+      "in_use": "图片仍被 {count} 处内容引用，不能删除",
+      "nothing_to_download": "没有可下载的图片",
+      "add_to_subject_content_only": "只有题目内容图片可以加入学科",
+      "add_to_subject_forbidden": "没有在目标学科添加图片的权限",
+      "refs_invalid": "图片不存在或不属于本学科（资产 {assets}）",
+      "import_subject_required": "导入含图片的文档前请先选择学科"
+    },
+    "common": {
+      "xlsx_only": "仅支持 .xlsx 格式的文件",
+      "import_file_too_large": "文件过大，请确保文件小于 5MB"
+    },
+    "user": {
+      "last_superuser": "不能删除、降级或停用最后一个启用的超级管理员",
+      "incorrect_password": "当前密码不正确",
+      "password_unchanged": "新密码不能与当前密码相同"
+    },
+    "knowledge_point": {
+      "embedding_not_configured": "请先在 AI 供应商与模型中配置并激活 Embedding 模型",
+      "invalid_import_mode": "无效的导入模式",
+      "slug_exists": "该学科下已存在相同标识的知识点",
+      "not_found": "知识点不存在",
+      "reindex_failed": "向量重建失败：{error}"
+    },
+    "tag": {
+      "name_exists": "标签名称已存在",
+      "not_found": "标签不存在"
+    },
+    "tag_category": {
+      "subject_required": "必须指定学科",
+      "name_exists": "该学科下已存在同名标签分类",
+      "not_found": "标签分类不存在"
+    },
+    "system_setting": {
+      "managed": "该设置由系统管理，不可修改"
+    },
+    "activity_log": {
+      "superuser_only": "仅超级管理员可访问"
+    },
+    "tools": {
+      "invalid_template_path": "模板路径无效",
+      "template_not_found": "找不到模板 {template}"
     }
   },
   "validation": {

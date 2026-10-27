@@ -1,6 +1,6 @@
 from typing import Any, Dict
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends
 from pydantic import BaseModel, Field
 
 from app import models
@@ -9,6 +9,7 @@ from app.core.permissions import Permission
 from app.crud.crud_subject import subject as crud_subject
 from app.crud.crud_subject_setting import subject_setting as crud_subject_setting
 from app.schemas.composition import ANSWER_SPACE_MAX_LINES, ANSWER_SPACE_STYLES
+from app.core.api_errors import ApiError, ErrorCode
 from app.services.answer_space import (
     DEFAULT_RULES,
     SUBJECT_SETTING_KEY,
@@ -43,7 +44,7 @@ class AnswerSpaceRulesUpdate(BaseModel):
 
 async def _require_subject(db: Any, subject_id: int) -> None:
     if not await crud_subject.get(db, id=subject_id):
-        raise HTTPException(status_code=404, detail="Subject not found")
+        raise ApiError(404, ErrorCode.SUBJECT_NOT_FOUND, "Subject not found")
 
 
 def _out(override: Any) -> AnswerSpaceRulesOut:
@@ -80,7 +81,7 @@ async def update_answer_space_rules(
     for rule in payload.rules.values():
         rule._check_style()
         if rule.max_lines < rule.min_lines:
-            raise HTTPException(status_code=422, detail="max_lines must be >= min_lines")
+            raise ApiError(422, ErrorCode.SUBJECT_ANSWER_SPACE_INVALID_LINES, "max_lines must be >= min_lines")
     override = {
         q_type: rule.model_dump()
         for q_type, rule in payload.rules.items()

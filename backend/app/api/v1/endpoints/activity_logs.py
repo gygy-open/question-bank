@@ -1,11 +1,12 @@
 from typing import Any, List, Optional
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app import crud, schemas
 from app.api import deps
 from app.schemas.user import User
+from app.core.api_errors import ApiError, ErrorCode
 
 router = APIRouter()
 
@@ -21,7 +22,7 @@ async def read_activity_logs(
     Retrieve activity logs.
     """
     if current_user.id != 1:
-        raise HTTPException(status_code=403, detail="Only the super administrator can access this resource")
+        raise ApiError(403, ErrorCode.ACTIVITY_LOG_SUPERUSER_ONLY, "Only the super administrator can access this resource")
 
     skip = (page - 1) * size
     logs, total = await crud.activity_log.get_multi_with_user_and_count(db, skip=skip, limit=size, user_id=user_id)
