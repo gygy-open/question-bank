@@ -98,3 +98,42 @@ def test_mixed_locale_headers_are_accepted():
     wb.save(buf)
     df = xi.read_rows(buf.getvalue(), USER_SCHEMA)
     assert list(df.columns) == ["username", "full_name", "password"]
+
+
+def test_frontend_import_dialog_columns_match_template_headers():
+    """导入对话框展示的列名必须和后端生成的模板表头一致（两边各维护一份文案）。"""
+    import json
+    from pathlib import Path
+
+    from app.services import excel_import as xl
+
+    locales = Path(__file__).resolve().parents[2] / "frontend" / "i18n" / "locales"
+    expected = {
+        "userImport": {
+            "username": xl.header(xl.USER_SCHEMA, "username", "{loc}"),
+            "fullName": xl.header(xl.USER_SCHEMA, "full_name", "{loc}"),
+            "password": xl.header(xl.USER_SCHEMA, "password", "{loc}"),
+            "admin": xl.header(xl.USER_SCHEMA, "admin", "{loc}"),
+        },
+        "tagImport": {
+            "name": xl.header(xl.TAG_SCHEMA, "name", "{loc}"),
+            "category": xl.header(xl.TAG_SCHEMA, "category", "{loc}"),
+            "color": xl.header(xl.TAG_SCHEMA, "color", "{loc}"),
+        },
+        "kpImport": {
+            "subject": xl.header(xl.KP_SCHEMA, "subject", "{loc}"),
+            "level1": xl.header(xl.KP_SCHEMA, "level_1", "{loc}"),
+            "level2": xl.header(xl.KP_SCHEMA, "level_2", "{loc}"),
+            "level8": xl.header(xl.KP_SCHEMA, "level_8", "{loc}"),
+        },
+    }
+    for loc in ("zh-CN", "en-US"):
+        messages = json.loads((locales / f"{loc}.json").read_text(encoding="utf-8"))
+        for ns, columns in expected.items():
+            for name in columns:
+                want = xl.header(
+                    {"userImport": xl.USER_SCHEMA, "tagImport": xl.TAG_SCHEMA, "kpImport": xl.KP_SCHEMA}[ns],
+                    {"fullName": "full_name", "level1": "level_1", "level2": "level_2", "level8": "level_8"}.get(name, name),
+                    loc,
+                )
+                assert messages[ns]["columns"][name] == want, (loc, ns, name)

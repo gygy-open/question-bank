@@ -204,7 +204,7 @@ const modeName = computed(() => importMode.value === 'incremental' ? t('kpImport
                   <FileSpreadsheet class="w-9 h-9 text-green-600 shrink-0" />
                   <div class="flex-1 text-sm">
                     <p class="font-medium">knowledge_points_template.xlsx</p>
-                    <p class="text-muted-foreground mt-1">{{ t('kpImport.templateColumns', { subject: '学科名称', level1: '一级目录', level2: '二级目录', level8: '八级目录' }) }}</p>
+                    <p class="text-muted-foreground mt-1">{{ t('kpImport.templateColumns', { subject: t('kpImport.columns.subject'), level1: t('kpImport.columns.level1'), level2: t('kpImport.columns.level2'), level8: t('kpImport.columns.level8') }) }}</p>
                   </div>
                 </div>
                 <Button variant="outline" class="mt-3 w-full" @click="downloadTemplate">

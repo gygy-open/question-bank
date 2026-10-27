@@ -1352,6 +1352,13 @@
     "steps": {
       "fill": "填写{username}、{fullName}、{password}（{admin}列可选）"
     },
+    "columns": {
+      "username": "用户名",
+      "fullName": "姓名",
+      "password": "密码",
+      "admin": "管理员",
+      "yes": "是"
+    },
     "templateColumns": "模板列：{username}(必填)、{fullName}(必填)、{password}(必填，≥6位)、{admin}(可选，填“{yes}”)",
     "importing": "正在导入用户…",
     "resultSummary": "共 {total} 行，成功 {created} 个，失败 {failed} 个",
@@ -1440,6 +1447,11 @@
       "fill": "填写{name}、{category}（可选，不存在会自动创建）、{color}（可选）",
       "upload": "上传填写好的文件 —— 已存在的重名标签会被自动跳过（不影响其他标签导入），格式错误（如{name}为空）时才会整体拒绝，修正后重新上传即可"
     },
+    "columns": {
+      "name": "名称",
+      "category": "分类",
+      "color": "颜色"
+    },
     "templateColumns": "模板列：{name}(必填)、{category}(可选，不存在会自动创建)、{color}(可选，十六进制色值如 #4F81BD)",
     "importing": "正在导入标签…",
     "resultSummary": "共 {total} 行，成功创建 {created} 个，跳过重复 {skipped} 个",
@@ -1459,6 +1471,12 @@
     "intro": "本功能用于批量创建知识点树，支持八级嵌套。请按以下步骤操作：",
     "steps": {
       "fill": "在模板中填写知识点数据"
+    },
+    "columns": {
+      "subject": "学科名称",
+      "level1": "一级目录",
+      "level2": "二级目录",
+      "level8": "八级目录"
     },
     "templateColumns": "模板列：{subject}(必填)、{level1}(必填)、{level2}~{level8}(可选)",
     "next": "下一步",

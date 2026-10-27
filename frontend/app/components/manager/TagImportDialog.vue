@@ -143,7 +143,7 @@ const backToUpload = () => { step.value = 'upload' }
           <AlertDescription>
             <ol class="list-decimal list-inside space-y-0.5 text-sm">
               <li>{{ t('importDialog.stepDownload') }}</li>
-              <li>{{ t('tagImport.steps.fill', { name: '名称', category: '分类', color: '颜色' }) }}</li>
+              <li>{{ t('tagImport.steps.fill', { name: t('tagImport.columns.name'), category: t('tagImport.columns.category'), color: t('tagImport.columns.color') }) }}</li>
               <li>{{ t('tagImport.steps.upload', { name: '名称' }) }}</li>
             </ol>
           </AlertDescription>

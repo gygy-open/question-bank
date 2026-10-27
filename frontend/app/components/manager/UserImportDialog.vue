@@ -156,7 +156,7 @@ const backToUpload = () => { step.value = 'upload' }
                   <FileSpreadsheet class="w-9 h-9 text-green-600 shrink-0" />
                   <div class="flex-1 text-sm">
                     <p class="font-medium">users_template.xlsx</p>
-                    <p class="text-muted-foreground mt-1">{{ t('userImport.templateColumns', { username: '用户名', fullName: '姓名', password: '密码', admin: '管理员', yes: '是' }) }}</p>
+                    <p class="text-muted-foreground mt-1">{{ t('userImport.templateColumns', { username: t('userImport.columns.username'), fullName: t('userImport.columns.fullName'), password: t('userImport.columns.password'), admin: t('userImport.columns.admin'), yes: t('userImport.columns.yes') }) }}</p>
                   </div>
                 </div>
                 <Button variant="outline" class="mt-3 w-full" @click="downloadTemplate">

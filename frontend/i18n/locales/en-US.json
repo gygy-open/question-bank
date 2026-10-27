@@ -1352,6 +1352,13 @@
     "steps": {
       "fill": "Fill in the {username}, {fullName}, and {password} columns (the {admin} column is optional)"
     },
+    "columns": {
+      "username": "Username",
+      "fullName": "Full Name",
+      "password": "Password",
+      "admin": "Admin",
+      "yes": "Yes"
+    },
     "templateColumns": "Template columns: {username} (required), {fullName} (required), {password} (required, at least 6 characters), {admin} (optional, enter “{yes}”)",
     "importing": "Importing users…",
     "resultSummary": "{total} rows: {created} succeeded, {failed} failed",
@@ -1440,6 +1447,11 @@
       "fill": "Fill in the {name} column, the {category} column (optional; missing categories are created automatically), and the {color} column (optional)",
       "upload": "Upload the completed file. Tags with existing names are skipped automatically (other tags still import). The whole file is rejected only on format errors (e.g. an empty {name} column); just fix them and upload again"
     },
+    "columns": {
+      "name": "Name",
+      "category": "Category",
+      "color": "Color"
+    },
     "templateColumns": "Template columns: {name} (required), {category} (optional; created automatically if missing), {color} (optional; hex value such as #4F81BD)",
     "importing": "Importing tags…",
     "resultSummary": "{total} rows: {created} created, {skipped} duplicates skipped",
@@ -1459,6 +1471,12 @@
     "intro": "Use this feature to create knowledge point trees in bulk, with up to eight levels of nesting. Follow these steps:",
     "steps": {
       "fill": "Fill in the knowledge point data in the template"
+    },
+    "columns": {
+      "subject": "Subject Name",
+      "level1": "Level 1",
+      "level2": "Level 2",
+      "level8": "Level 8"
     },
     "templateColumns": "Template columns: {subject} (required), {level1} (required), {level2}–{level8} (optional)",
     "next": "Next",

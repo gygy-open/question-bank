@@ -59,17 +59,12 @@
   "app/components/composition/SnapshotRenderer.vue": [
     "<span v-if=\"resolvedQuestionScore(node, props.snapshot) != null\" class=\"ml-auto text-xs text-muted-foreground\">（{{ resolvedQuestionScore(node, props.snapshot) }} 分）</span>"
   ],
-  "app/components/manager/KnowledgePointImportDialog.vue": [
-    "<p class=\"text-muted-foreground mt-1\">{{ t('kpImport.templateColumns', { subject: '学科名称', level1: '一级目录', level2: '二级目录', level8: '八级目录' }) }}</p>"
-  ],
   "app/components/manager/TagImportDialog.vue": [
-    "<li>{{ t('tagImport.steps.fill', { name: '名称', category: '分类', color: '颜色' }) }}</li>",
     "<li>{{ t('tagImport.steps.upload', { name: '名称' }) }}</li>",
     "<p class=\"text-muted-foreground mt-1\">{{ t('tagImport.templateColumns', { name: '名称', category: '分类', color: '颜色' }) }}</p>"
   ],
   "app/components/manager/UserImportDialog.vue": [
-    "<li>{{ t('userImport.steps.fill', { username: '用户名', fullName: '姓名', password: '密码', admin: '管理员' }) }}</li>",
-    "<p class=\"text-muted-foreground mt-1\">{{ t('userImport.templateColumns', { username: '用户名', fullName: '姓名', password: '密码', admin: '管理员', yes: '是' }) }}</p>"
+    "<li>{{ t('userImport.steps.fill', { username: '用户名', fullName: '姓名', password: '密码', admin: '管理员' }) }}</li>"
   ],
   "app/components/rich-editor/richDoc.ts": [
     "parts.push(' [音频] ')"
