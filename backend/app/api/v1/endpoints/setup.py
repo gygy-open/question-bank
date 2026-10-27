@@ -13,13 +13,14 @@ These are the only API routes reachable until both stages are complete.
 import logging
 from typing import Literal, Optional
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends
 from pydantic import BaseModel, Field
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import create_async_engine
 from starlette.concurrency import run_in_threadpool
 
 from app.api import deps
+from app.core.api_errors import ApiError, ErrorCode
 from app.core.config import default_sqlite_url, is_configured, save_runtime_config
 from app.db.migrations import run_migrations
 from app.db.session import reset_engine
@@ -52,7 +53,7 @@ def _build_url(cfg: DBConfig) -> str:
     if cfg.db_type == "sqlite":
         return default_sqlite_url()
     if not cfg.mysql:
-        raise HTTPException(status_code=400, detail="mysql connection details are required")
+        raise ApiError(400, ErrorCode.SETUP_MYSQL_REQUIRED, "mysql connection details are required")
     m = cfg.mysql
     return f"mysql+aiomysql://{m.user}:{m.password}@{m.host}:{m.port}/{m.database}"
 
@@ -79,28 +80,34 @@ async def test_db(cfg: DBConfig) -> dict:
     try:
         await _test_connection(url)
     except Exception as exc:  # noqa: BLE001 - surface the driver error to the wizard
-        raise HTTPException(status_code=400, detail=f"Connection failed: {exc}") from exc
+        raise ApiError(
+            400, ErrorCode.SETUP_CONNECTION_FAILED, f"Connection failed: {exc}", {"error": str(exc)}
+        ) from exc
     return {"ok": True}
 
 
 @router.post("/database")
 async def configure_database(cfg: DBConfig) -> dict:
     if is_configured():
-        raise HTTPException(status_code=400, detail="Database is already configured")
+        raise ApiError(400, ErrorCode.SETUP_DB_ALREADY_CONFIGURED, "Database is already configured")
 
     url = _build_url(cfg)
 
     try:
         await _test_connection(url)
     except Exception as exc:  # noqa: BLE001
-        raise HTTPException(status_code=400, detail=f"Connection failed: {exc}") from exc
+        raise ApiError(
+            400, ErrorCode.SETUP_CONNECTION_FAILED, f"Connection failed: {exc}", {"error": str(exc)}
+        ) from exc
 
     # Migrate before persisting so a failure leaves the app in setup mode and
     # the wizard can simply be retried.
     try:
         await run_in_threadpool(run_migrations, url)
     except Exception as exc:  # noqa: BLE001
-        raise HTTPException(status_code=500, detail=f"Migration failed: {exc}") from exc
+        raise ApiError(
+            500, ErrorCode.SETUP_MIGRATION_FAILED, f"Migration failed: {exc}", {"error": str(exc)}
+        ) from exc
 
     save_runtime_config({"db_url": url, "db_type": cfg.db_type})
     await reset_engine(url)
@@ -111,22 +118,22 @@ async def configure_database(cfg: DBConfig) -> dict:
 
 def _require_db_configured() -> None:
     if not is_configured():
-        raise HTTPException(status_code=400, detail="Database is not configured yet")
+        raise ApiError(400, ErrorCode.SETUP_DB_NOT_CONFIGURED, "Database is not configured yet")
 
 
 @router.post("/admin", dependencies=[Depends(_require_db_configured)])
 async def create_first_admin(payload: AdminCreate, db: deps.SessionDep) -> dict:
     username = payload.username.strip()
     if not username:
-        raise HTTPException(status_code=400, detail="Username is required")
+        raise ApiError(400, ErrorCode.SETUP_USERNAME_REQUIRED, "Username is required")
     try:
         await setup_state.create_first_superuser(
             db, username=username, password=payload.password
         )
     except setup_state.AdminAlreadyInitialized as exc:
-        raise HTTPException(status_code=400, detail="Administrator is already initialized") from exc
+        raise ApiError(400, ErrorCode.SETUP_ADMIN_INITIALIZED, "Administrator is already initialized") from exc
     except setup_state.UsernameTaken as exc:
-        raise HTTPException(status_code=400, detail="Username already exists") from exc
+        raise ApiError(400, ErrorCode.SETUP_USERNAME_EXISTS, "Username already exists") from exc
 
     # 学科不再预置：首次登录后由前端引导页 (/onboarding) 让用户创建第一个学科。
     logger.info("First superuser created via setup wizard")

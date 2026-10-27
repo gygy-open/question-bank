@@ -51,6 +51,37 @@
   "errors": {
     "forbidden": "You do not have permission to perform this action"
   },
+  "apiErrors": {
+    "auth": {
+      "invalid_credentials": "Incorrect username or password.",
+      "inactive_pending": "Your account is not activated yet. Please wait for administrator approval.",
+      "token_invalid": "Your session is invalid. Please sign in again.",
+      "user_not_found": "User not found.",
+      "not_authenticated": "You are not signed in.",
+      "inactive_user": "This account has been deactivated.",
+      "forbidden": "You don't have permission to perform this action.",
+      "registration_closed": "Sign up is not available.",
+      "username_taken": "This username is already taken."
+    },
+    "setup": {
+      "mysql_required": "Please enter the MySQL connection details.",
+      "connection_failed": "Connection failed: {error}",
+      "migration_failed": "Database initialization failed: {error}",
+      "db_already_configured": "The database is already configured.",
+      "db_not_configured": "The database has not been configured yet.",
+      "username_required": "Please enter a username.",
+      "admin_initialized": "The administrator has already been initialized.",
+      "username_exists": "This username already exists."
+    },
+    "upload": {
+      "subject_not_found": "Subject not found.",
+      "file_required": "Please select a file.",
+      "only_docx": "Only .docx files are supported.",
+      "only_markdown": "Only .md files are supported.",
+      "only_zip": "Only .zip archives are supported.",
+      "only_image": "Only image files are supported."
+    }
+  },
   "validation": {
     "required": "This field is required",
     "minLength": "Must be at least {min} characters",

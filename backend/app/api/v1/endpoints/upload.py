@@ -12,6 +12,7 @@ from app import models
 from app.api import deps
 from app.capabilities.errors import DomainError
 from app.core import storage
+from app.core.api_errors import ApiError, ErrorCode
 from app.core.permissions import Permission
 from app.crud.crud_subject import subject as crud_subject
 from app.models.composition import Composition
@@ -29,7 +30,7 @@ async def _check_import_subject(db, user: models.User, subject_id: Optional[int]
     if subject_id is None:
         return
     if await crud_subject.get(db, id=subject_id) is None:
-        raise HTTPException(status_code=404, detail="Subject not found")
+        raise ApiError(404, ErrorCode.UPLOAD_SUBJECT_NOT_FOUND, "Subject not found")
     deps.require(user, Permission.EDIT_QUESTION, subject_id=subject_id)
 
 
@@ -96,7 +97,7 @@ async def upload_docx(
 ):
     """Upload and process a DOCX file."""
     if not file.filename.endswith('.docx'):
-        raise HTTPException(status_code=400, detail="Only .docx files are supported")
+        raise ApiError(400, ErrorCode.UPLOAD_ONLY_DOCX, "Only .docx files are supported")
     await _check_import_subject(db, current_user, subject_id)
 
     content = await file.read()
@@ -141,10 +142,10 @@ async def upload_markdown(
 ):
     """Process markdown content from file upload."""
     if not file:
-        raise HTTPException(status_code=400, detail="File is required")
+        raise ApiError(400, ErrorCode.UPLOAD_FILE_REQUIRED, "File is required")
     
     if not file.filename.endswith('.md'):
-        raise HTTPException(status_code=400, detail="Only .md files are supported")
+        raise ApiError(400, ErrorCode.UPLOAD_ONLY_MARKDOWN, "Only .md files are supported")
     await _check_import_subject(db, current_user, subject_id)
 
     markdown_content_bytes = await file.read()
@@ -199,7 +200,7 @@ async def upload_markdown_archive(
 ):
     """Process a zip archive containing markdown file(s) plus their local images."""
     if not file.filename.endswith('.zip'):
-        raise HTTPException(status_code=400, detail="Only .zip archives are supported")
+        raise ApiError(400, ErrorCode.UPLOAD_ONLY_ZIP, "Only .zip archives are supported")
     await _check_import_subject(db, current_user, subject_id)
 
     content = await file.read()
@@ -244,7 +245,7 @@ async def upload_image_recognition(
 ):
     """Upload and process an image file to extract questions using AI vision."""
     if not file.content_type.startswith('image/'):
-        raise HTTPException(status_code=400, detail="Only image files are supported")
+        raise ApiError(400, ErrorCode.UPLOAD_ONLY_IMAGE, "Only image files are supported")
     
     try:
         result = await doc_processor.process_image(file.file, db=db, mode=mode, subject_id=subject_id, user_id=current_user.id)

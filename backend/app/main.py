@@ -12,6 +12,7 @@ from fastapi.staticfiles import StaticFiles
 from app._version import __version__
 from app.api import legacy_media
 from app.api.v1.api import api_router
+from app.core.api_errors import ApiError
 from app.capabilities.errors import DomainError, status_for
 from app.core.config import settings, is_configured
 from app.core import storage
@@ -42,7 +43,21 @@ app = FastAPI(title="QuestionBank API", version=__version__, lifespan=lifespan)
 @app.exception_handler(DomainError)
 async def domain_error_handler(_request: Request, exc: DomainError) -> JSONResponse:
     """领域错误 → HTTP。端点因此可以直接 await capabilities.run(...) 而不用 try/except。"""
-    return JSONResponse(status_code=status_for(exc), content={"detail": exc.detail})
+    content: dict = {"detail": exc.detail}
+    if exc.code:
+        content["code"] = exc.code
+        if exc.params:
+            content["params"] = exc.params
+    return JSONResponse(status_code=status_for(exc), content=content)
+
+
+@app.exception_handler(ApiError)
+async def api_error_handler(_request: Request, exc: ApiError) -> JSONResponse:
+    """带错误码的 HTTPException:在原 ``detail`` 之外附带 ``code`` / ``params``。"""
+    content: dict = {"detail": exc.detail, "code": exc.code}
+    if exc.params:
+        content["params"] = exc.params
+    return JSONResponse(status_code=exc.status_code, content=content, headers=exc.headers)
 
 
 _SETUP_PREFIX = f"{settings.API_V1_STR}/setup"

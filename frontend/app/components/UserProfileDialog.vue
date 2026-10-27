@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { getApiErrorCodeMessage } from '@/lib/apiErrors'
 import { useAuth } from '~/composables/useAuth'
 import { toast } from 'vue-sonner'
 import {
@@ -62,7 +63,7 @@ const handleFileSelect = async (event: Event) => {
     formData.avatar_url = asset.url
     toast.success(t('profile.avatarUploaded'))
   } catch (error: any) {
-    const detail = error.data?.detail || t('common.uploadFailed')
+    const detail = getApiErrorCodeMessage(error) || error.data?.detail || t('common.uploadFailed')
     toast.error(detail)
   } finally {
     isUploading.value = false
@@ -89,7 +90,7 @@ const handleSubmit = async () => {
     toast.success(t('profile.updated'))
     emit('update:open', false)
   } catch (error: any) {
-    const detail = error.data?.detail || t('common.updateFailed')
+    const detail = getApiErrorCodeMessage(error) || error.data?.detail || t('common.updateFailed')
     toast.error(detail)
   } finally {
     isLoading.value = false

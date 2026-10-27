@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { getApiErrorCodeMessage } from '@/lib/apiErrors'
 import { toast } from 'vue-sonner'
 import {
   Dialog,
@@ -67,7 +68,7 @@ const handleSubmit = async () => {
     toast.success(t('changePassword.success'))
     emit('update:open', false)
   } catch (error: any) {
-    const detail = error.data?.detail || t('changePassword.failed')
+    const detail = getApiErrorCodeMessage(error) || error.data?.detail || t('changePassword.failed')
     toast.error(detail)
   } finally {
     isLoading.value = false

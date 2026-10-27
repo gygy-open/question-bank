@@ -1,13 +1,14 @@
 from typing import Generator, Annotated, AsyncGenerator
 from urllib.parse import unquote
 
-from fastapi import Depends, HTTPException, Request, status
+from fastapi import Depends, Request, status
 from fastapi.security import OAuth2PasswordBearer
 from jose import jwt, JWTError
 from pydantic import ValidationError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.capabilities.context import ExecutionContext, Surface
+from app.core.api_errors import ApiError, ErrorCode
 from app.core.config import settings
 from app.core import permissions
 from app.core.permissions import Permission
@@ -34,16 +35,17 @@ async def _user_from_token(session: AsyncSession, token: str) -> User:
         )
         token_data = TokenPayload(**payload)
     except (JWTError, ValidationError):
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Could not validate credentials",
+        raise ApiError(
+            status.HTTP_403_FORBIDDEN,
+            ErrorCode.AUTH_TOKEN_INVALID,
+            "Could not validate credentials",
         )
     if not token_data.sub:
-        raise HTTPException(status_code=404, detail="User not found")
+        raise ApiError(404, ErrorCode.AUTH_USER_NOT_FOUND, "User not found")
         
     user = await crud_user.user.get_with_memberships(session, id=int(token_data.sub))
     if not user:
-        raise HTTPException(status_code=404, detail="User not found")
+        raise ApiError(404, ErrorCode.AUTH_USER_NOT_FOUND, "User not found")
     return user
 
 
@@ -64,25 +66,26 @@ async def get_current_active_user_header_or_cookie(
     if not token:
         token = unquote(request.cookies.get("token") or "").strip('"')
     if not token:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Not authenticated",
+        raise ApiError(
+            status.HTTP_401_UNAUTHORIZED,
+            ErrorCode.AUTH_NOT_AUTHENTICATED,
+            "Not authenticated",
             headers={"WWW-Authenticate": "Bearer"},
         )
     user = await _user_from_token(session, token)
     if not user.is_active:
-        raise HTTPException(status_code=400, detail="Inactive user")
+        raise ApiError(400, ErrorCode.AUTH_INACTIVE_USER, "Inactive user")
     return user
 
 def get_current_active_user(current_user: CurrentUser) -> User:
     if not current_user.is_active:
-        raise HTTPException(status_code=400, detail="Inactive user")
+        raise ApiError(400, ErrorCode.AUTH_INACTIVE_USER, "Inactive user")
     return current_user
 
 def get_current_active_superuser(current_user: CurrentUser) -> User:
     if not current_user.is_superuser:
-        raise HTTPException(
-            status_code=400, detail="The user doesn't have enough privileges"
+        raise ApiError(
+            400, ErrorCode.AUTH_FORBIDDEN, "The user doesn't have enough privileges"
         )
     return current_user
 
@@ -96,9 +99,10 @@ def require(
 ) -> None:
     """权限断言:不满足则抛 403。端点内联调用,与现有 inline 鉴权风格一致。"""
     if not permissions.can(user, permission, subject_id=subject_id, resource=resource):
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="The user doesn't have enough privileges",
+        raise ApiError(
+            status.HTTP_403_FORBIDDEN,
+            ErrorCode.AUTH_FORBIDDEN,
+            "The user doesn't have enough privileges",
         )
 
 

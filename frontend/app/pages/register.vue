@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { getApiErrorCodeMessage } from '@/lib/apiErrors'
 import { useForm } from 'vee-validate'
 import { toTypedSchema } from '@vee-validate/zod'
 import * as z from 'zod'
@@ -67,7 +68,7 @@ const onSubmit = form.handleSubmit(async (values) => {
     }
     router.push('/login')
   } catch (error: any) {
-    toast.error(error.data?.detail || error.message || t('auth.register.failed'))
+    toast.error(getApiErrorCodeMessage(error) || error.data?.detail || error.message || t('auth.register.failed'))
   } finally {
     isLoading.value = false
   }

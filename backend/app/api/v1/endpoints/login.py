@@ -1,10 +1,11 @@
 from datetime import timedelta, datetime
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, Response, Request
+from fastapi import APIRouter, Depends, Response, Request
 from fastapi.security import OAuth2PasswordRequestForm
 
 from app.api import deps
+from app.core.api_errors import ApiError, ErrorCode
 from app.core import security
 from app.core.config import settings
 from app.crud import crud_user
@@ -37,9 +38,9 @@ async def login_access_token(
         session, username=form_data.username, password=form_data.password
     )
     if not user:
-        raise HTTPException(status_code=400, detail="Incorrect username or password")
+        raise ApiError(400, ErrorCode.AUTH_INVALID_CREDENTIALS, "Incorrect username or password")
     elif not user.is_active:
-        raise HTTPException(status_code=403, detail="Inactive user pending approval")
+        raise ApiError(403, ErrorCode.AUTH_INACTIVE_PENDING, "Inactive user pending approval")
 
     # Update user login stats
     user.last_login = datetime.utcnow()
@@ -97,11 +98,11 @@ async def registration_config(session: deps.SessionDep) -> RegistrationConfig:
 async def register(session: deps.SessionDep, payload: RegisterRequest) -> RegisterResult:
     """Self-service registration, gated by the USER_REGISTRATION_ENABLED setting."""
     if not await _setting_is_true(session, REGISTRATION_ENABLED_KEY):
-        raise HTTPException(status_code=403, detail="注册功能未开放")
+        raise ApiError(403, ErrorCode.AUTH_REGISTRATION_CLOSED, "注册功能未开放")
 
     existing = await crud_user.user.get_by_username(session, username=payload.username)
     if existing:
-        raise HTTPException(status_code=400, detail="该用户名已被注册")
+        raise ApiError(400, ErrorCode.AUTH_USERNAME_TAKEN, "该用户名已被注册")
 
     requires_approval = await _setting_is_true(session, REGISTRATION_APPROVAL_KEY)
     await crud_user.user.create(

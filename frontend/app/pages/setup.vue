@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { getApiErrorCodeMessage } from '@/lib/apiErrors'
 import { Loader2, Database, HardDrive, Server, Check } from '@lucide/vue'
 import { toast } from 'vue-sonner'
 import type { SetupStatus } from '@/types'
@@ -75,7 +76,7 @@ async function testConnection() {
     testPassed.value = true
     toast.success(t('setup.toast.dbConnected'))
   } catch (e: any) {
-    toast.error(e?.data?.detail || t('setup.toast.connectFailed'))
+    toast.error(getApiErrorCodeMessage(e) || e?.data?.detail || t('setup.toast.connectFailed'))
   } finally {
     testing.value = false
   }
@@ -92,7 +93,7 @@ async function configureDatabase() {
     toast.success(t('setup.toast.dbReady'))
     step.value = 2
   } catch (e: any) {
-    toast.error(e?.data?.detail || t('setup.toast.dbInitFailed'))
+    toast.error(getApiErrorCodeMessage(e) || e?.data?.detail || t('setup.toast.dbInitFailed'))
   } finally {
     submitting.value = false
   }
@@ -123,7 +124,7 @@ async function createAdmin() {
     toast.success(t('setup.toast.done'))
     router.replace('/login')
   } catch (e: any) {
-    toast.error(e?.data?.detail || t('setup.toast.initFailed'))
+    toast.error(getApiErrorCodeMessage(e) || e?.data?.detail || t('setup.toast.initFailed'))
   } finally {
     submitting.value = false
   }

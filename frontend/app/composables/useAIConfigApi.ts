@@ -1,3 +1,4 @@
+import { getApiErrorCodeMessage } from '@/lib/apiErrors'
 import { translate } from '@/lib/locale'
 import type {
   AIConfigScope,
@@ -10,6 +11,8 @@ import type {
 } from '~/types/ai-config'
 
 export const apiErrorMessage = (error: any): string => {
+  const coded = getApiErrorCodeMessage(error)
+  if (coded) return coded
   const detail = error?.data?.detail ?? error?.response?._data?.detail
   if (typeof detail === 'string') return detail
   if (Array.isArray(detail) && detail[0]?.msg) return detail[0].msg

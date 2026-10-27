@@ -8,13 +8,22 @@ detail 文案会原样出现在 HTTP 响应体的 `detail` 字段,改动等于�
 """
 from __future__ import annotations
 
+from typing import Any, Dict, Optional
+
 
 class DomainError(Exception):
     """所有领域错误的基类。"""
 
-    def __init__(self, detail: str) -> None:
+    def __init__(
+        self,
+        detail: str,
+        code: Optional[str] = None,
+        params: Optional[Dict[str, Any]] = None,
+    ) -> None:
         super().__init__(detail)
         self.detail = detail
+        self.code = code
+        self.params = params
 
 
 class NotFound(DomainError):

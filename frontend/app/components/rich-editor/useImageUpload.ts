@@ -1,3 +1,4 @@
+import { getApiErrorCodeMessage } from '@/lib/apiErrors'
 import { toast } from 'vue-sonner'
 import { useMedia, useMediaSubject } from '@/composables/useMedia'
 import { rememberRecentMedia } from '@/lib/recentMedia'
@@ -25,7 +26,7 @@ export function useImageUpload() {
             return { src: asset.url, assetId: asset.id }
         } catch (error: any) {
             // 403 已由 api 插件统一提示。
-            if (error?.response?.status !== 403) toast.error(error?.data?.detail || translate('richEditor.image.uploadFailed'))
+            if (error?.response?.status !== 403) toast.error(getApiErrorCodeMessage(error) || error?.data?.detail || translate('richEditor.image.uploadFailed'))
             return null
         }
     }

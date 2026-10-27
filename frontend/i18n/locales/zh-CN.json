@@ -51,6 +51,37 @@
   "errors": {
     "forbidden": "您没有权限执行此操作"
   },
+  "apiErrors": {
+    "auth": {
+      "invalid_credentials": "用户名或密码错误",
+      "inactive_pending": "账号尚未激活，请等待管理员审批",
+      "token_invalid": "登录状态无效，请重新登录",
+      "user_not_found": "用户不存在",
+      "not_authenticated": "尚未登录",
+      "inactive_user": "账号已被停用",
+      "forbidden": "您没有权限执行此操作",
+      "registration_closed": "注册功能未开放",
+      "username_taken": "该用户名已被注册"
+    },
+    "setup": {
+      "mysql_required": "请填写 MySQL 连接信息",
+      "connection_failed": "连接失败：{error}",
+      "migration_failed": "数据库初始化失败：{error}",
+      "db_already_configured": "数据库已配置",
+      "db_not_configured": "尚未配置数据库",
+      "username_required": "请输入用户名",
+      "admin_initialized": "管理员已初始化",
+      "username_exists": "用户名已存在"
+    },
+    "upload": {
+      "subject_not_found": "学科不存在",
+      "file_required": "请选择文件",
+      "only_docx": "仅支持 .docx 文件",
+      "only_markdown": "仅支持 .md 文件",
+      "only_zip": "仅支持 .zip 压缩包",
+      "only_image": "仅支持图片文件"
+    }
+  },
   "validation": {
     "required": "此项为必填项",
     "minLength": "至少需要 {min} 个字符",
