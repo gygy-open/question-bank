@@ -17,14 +17,24 @@ import sys
 # Make ``app`` importable so we can generate the brand icon below.
 sys.path.insert(0, os.path.abspath("."))
 
+# Channel of the build: pre-release versions are the preview app (app/channel.py).
+# Pass frozen=True because the spec itself doesn't run frozen.
+try:
+    from app.channel import is_preview
+
+    _PREVIEW = is_preview(frozen=True)
+except Exception:
+    _PREVIEW = False
+
 # Render the brand logo (frontend/public/logo.svg) to a multi-size .ico that is
 # embedded into the executable. Drawn with PIL, so no SVG renderer is required.
+# Preview builds get the amber variant. deploy/windows/installer.iss reuses this file.
 _ICON = os.path.abspath(os.path.join("build", "logo.ico"))
 os.makedirs(os.path.dirname(_ICON), exist_ok=True)
 try:
     from app.branding import save_ico
 
-    save_ico(_ICON)
+    save_ico(_ICON, preview=_PREVIEW)
 except Exception:
     _ICON = None  # fall back to the default PyInstaller icon
 
@@ -38,7 +48,7 @@ try:
     from app.branding import save_splash
 
     _splash_img = os.path.abspath(os.path.join("build", "splash.png"))
-    save_splash(_splash_img)
+    save_splash(_splash_img, preview=_PREVIEW)
     _SPLASH = Splash(
         _splash_img,
         binaries=[],

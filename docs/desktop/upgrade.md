@@ -23,6 +23,7 @@
 | | 正式版 | 测试版 |
 | --- | --- | --- |
 | 程序名称 | QuestionBank | QuestionBank 测试版 |
+| 图标颜色 | 青绿色 | 琥珀色 |
 | 数据目录 | `%APPDATA%\QuestionBank` | `%APPDATA%\QuestionBank-Preview` |
 | 访问地址 | `http://localhost:8000` | `http://localhost:8001` |
 

@@ -23,6 +23,7 @@ The Preview version (version numbers with `-alpha` / `-beta`, e.g. `1.5.0-alpha.
 | | Stable | Preview |
 | --- | --- | --- |
 | Program name | QuestionBank | QuestionBank Preview |
+| Icon color | Teal | Amber |
 | Data directory | `%APPDATA%\QuestionBank` | `%APPDATA%\QuestionBank-Preview` |
 | Address | `http://localhost:8000` | `http://localhost:8001` |
 
