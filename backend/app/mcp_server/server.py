@@ -33,7 +33,8 @@ You act with exactly the permissions of the user who owns the API key.
 Guidelines:
 1. Call list_subjects first to get the subject IDs you can access; most tools need a subject_id.
 2. scope_type for composition tools: shared = shared with the subject team, personal = visible only to the user.
-3. Before modifying a composition, read its latest revision with get_composition and pass it as expected_revision (optimistic locking).
+3. To build a paper: composition_create, then composition_write_nodes with headings, text and question IDs.
+   Before modifying a composition, read its latest revision with get_composition and pass it as expected_revision (optimistic locking).
 4. New questions are drafts by default and must be reviewed in the system before they are published.
    To include an image or audio in a question, get an upload URL with create_media_upload_url, upload the local file
    with curl, then put the returned node into the question content.

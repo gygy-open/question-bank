@@ -664,3 +664,88 @@ async def test_create_knowledge_point_requires_editor(mcp_client, ctx):
         result = await _call(mcp_client, key, tool, args)
         assert result["isError"] is True
         assert "auth.forbidden" in result["content"][0]["text"]
+
+
+# --------------------------------------------------------------------------- #
+# 组稿:高层写入
+# --------------------------------------------------------------------------- #
+async def _new_question(client, key, subject_id, text):
+    r = await _call(client, key, "question_create", {
+        "content": {"type": "doc", "content": [{"type": "paragraph", "content": [{"type": "text", "text": text}]}]},
+        "q_type": "free_response",
+        "subject_id": subject_id,
+    })
+    assert r["isError"] is False, r
+    return r["structuredContent"]["id"]
+
+
+async def test_composition_write_nodes(mcp_client, ctx):
+    key = await _create_key(mcp_client, ctx["alice"])
+    sid = ctx["math"].id
+    q1 = await _new_question(mcp_client, key, sid, "1+1=?")
+    q2 = await _new_question(mcp_client, key, sid, "2+2=?")
+    q3 = await _new_question(mcp_client, key, sid, "3+3=?")
+
+    comp = (await _call(mcp_client, key, "composition_create", {"subject_id": sid, "scope_type": "personal", "title": "周测"}))["structuredContent"]
+    base = {"subject_id": sid, "scope_type": "personal", "composition_id": comp["id"]}
+
+    first = await _call(mcp_client, key, "composition_write_nodes", {**base, "expected_revision": comp["revision"], "nodes": [
+        {"type": "heading", "text": "一、计算题", "level": 2},
+        {"type": "rich_text", "markdown": "每题 5 分。\n\n计算 $a+b$。"},
+        {"type": "question", "question_id": q1, "score": 5},
+        {"type": "question", "question_id": q2, "score": 5},
+        {"type": "question_details"},
+    ]})
+    assert first["isError"] is False, first
+    assert first["structuredContent"]["added_nodes"] == 6  # Markdown 两段拆成两个节点
+
+    detail = (await _call(mcp_client, key, "get_composition", {**base}))["structuredContent"]
+    roots = [n for n in detail["nodes"] if n["parent_id"] is None]
+    assert [n["node_type"] for n in roots] == ["heading", "rich_text", "rich_text", "question", "question", "question_details"]
+    old_q_ids = {n["id"] for n in roots if n["node_type"] == "question"}
+    answer_items = [n for n in detail["nodes"] if n["node_type"] == "answer_item"]
+    assert len(answer_items) == 2  # 服务端按模块范围派生
+
+    # append:原节点 id 保留,新题接在末尾,答案模块随之更新
+    appended = await _call(mcp_client, key, "composition_write_nodes", {
+        **base, "expected_revision": detail["revision"],
+        "nodes": [{"type": "page_break"}, {"type": "question", "question_id": q3}],
+    })
+    assert appended["isError"] is False, appended
+    detail2 = (await _call(mcp_client, key, "get_composition", {**base}))["structuredContent"]
+    roots2 = sorted([n for n in detail2["nodes"] if n["parent_id"] is None], key=lambda n: n["position"])
+    assert [n["node_type"] for n in roots2][-2:] == ["page_break", "question"]
+    assert old_q_ids <= {n["id"] for n in roots2}
+    assert len([n for n in detail2["nodes"] if n["node_type"] == "answer_item"]) == 3
+
+    # 过期 revision 冲突
+    stale = await _call(mcp_client, key, "composition_write_nodes", {**base, "expected_revision": detail["revision"], "nodes": [{"type": "page_break"}]})
+    assert stale["isError"] is True and '"status": 409' in stale["content"][0]["text"]
+
+    # replace:清掉原内容
+    replaced = await _call(mcp_client, key, "composition_write_nodes", {
+        **base, "expected_revision": detail2["revision"], "mode": "replace",
+        "nodes": [{"type": "heading", "text": "重写"}],
+    })
+    assert replaced["structuredContent"]["total_nodes"] == 1
+
+
+async def test_composition_write_nodes_validation(mcp_client, ctx):
+    key = await _create_key(mcp_client, ctx["alice"])
+    sid = ctx["math"].id
+    comp = (await _call(mcp_client, key, "composition_create", {"subject_id": sid, "scope_type": "shared", "title": "x"}))["structuredContent"]
+    base = {"subject_id": sid, "scope_type": "shared", "composition_id": comp["id"], "expected_revision": comp["revision"]}
+
+    bad = await _call(mcp_client, key, "composition_write_nodes", {**base, "nodes": [{"type": "bogus"}]})
+    assert bad["isError"] is True and "nodes[0].type" in bad["content"][0]["text"]
+    missing = await _call(mcp_client, key, "composition_write_nodes", {**base, "nodes": [{"type": "question"}]})
+    assert missing["isError"] is True and "question_id" in missing["content"][0]["text"]
+
+    # 他人的个人稿不可见
+    bob_key = await _create_key(mcp_client, ctx["bob"])
+    personal = (await _call(mcp_client, key, "composition_create", {"subject_id": sid, "scope_type": "personal", "title": "mine"}))["structuredContent"]
+    other = await _call(mcp_client, bob_key, "composition_write_nodes", {
+        "subject_id": sid, "scope_type": "personal", "composition_id": personal["id"],
+        "expected_revision": personal["revision"], "nodes": [{"type": "page_break"}],
+    })
+    assert other["isError"] is True

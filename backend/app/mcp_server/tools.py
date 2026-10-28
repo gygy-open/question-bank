@@ -225,6 +225,22 @@ def prepare_capability_input(cap: Capability, ctx: ExecutionContext, args: Dict[
     return cap.input_model.model_validate(data)
 
 
+# 少数 capability 的通用描述不足以让外部模型正确调用,这里补充面向模型的说明。
+_DESCRIPTION_OVERRIDES: Dict[str, str] = {
+    "composition.replace_nodes": (
+        "LOW-LEVEL: replace the entire node tree (AST) of a composition. Prefer composition_write_nodes, "
+        "which builds valid nodes for you; use this only to restructure nodes read via get_composition. "
+        "Every node not included is deleted. Rules: `id` is a client-generated UUID (keep existing ids to "
+        "keep nodes and their frozen question snapshots); top-level nodes have no parent_id and no slot; "
+        "child nodes set parent_id and slot='body'. node_kind/node_type pairs: block = rich_text | heading | "
+        "question | page_break | answer_space; module = question_details | question_group; "
+        "reference = answer_item (children of question_details, derived by the server). question nodes need "
+        "question_id; question_group needs stimulus_id and question children. Order in `items` is layout order. "
+        "Requires the current revision as expected_revision."
+    ),
+}
+
+
 def _capability_tool(cap: Capability) -> McpTool:
     output_type = CAPABILITY_OUTPUT_TYPES[cap.name]
 
@@ -238,7 +254,7 @@ def _capability_tool(cap: Capability) -> McpTool:
 
     return McpTool(
         name=tool_name_for(cap.name),
-        description=cap.description,
+        description=_DESCRIPTION_OVERRIDES.get(cap.name, cap.description),
         input_schema=_input_schema(cap),
         handler=handler,
         read_only=not cap.mutating,
@@ -432,6 +448,134 @@ async def _get_composition(ctx: ExecutionContext, args: Dict[str, Any]) -> Dict[
     return serialize(CompositionDetail, comp)
 
 
+async def _write_composition_nodes(ctx: ExecutionContext, args: Dict[str, Any]) -> Dict[str, Any]:
+    from app.capabilities.compositions import CompositionReplaceNodesInput
+    from app.schemas.composition import CompositionNodeInput
+    from app.services.composition_authoring import AuthoringError, build_nodes
+
+    subject_id = await _require_subject(ctx, args)
+    scope_type, owner_id = _scope_owner(ctx, args)
+    composition_id = _int_arg(args, "composition_id")
+    expected_revision = _int_arg(args, "expected_revision")
+    mode = args.get("mode") or "append"
+    if mode not in ("append", "replace"):
+        raise ToolError({"status": 422, "detail": "mode must be 'append' or 'replace'"})
+
+    try:
+        new_items = build_nodes(args.get("nodes") or [])
+    except AuthoringError as exc:
+        raise ToolError({"status": 422, "code": ErrorCode.VALIDATION_FAILED.value, "detail": str(exc)})
+    if not new_items:
+        raise ToolError({"status": 422, "detail": "nodes must not be empty"})
+
+    items = list(new_items)
+    if mode == "append":
+        comp = await crud_composition.composition.get_scoped(
+            ctx.db,
+            composition_id=composition_id,
+            subject_id=subject_id,
+            scope_type=scope_type,
+            owner_id=owner_id,
+            with_nodes=True,
+        )
+        if comp is None:
+            raise NotFound("Composition not found", ErrorCode.COMPOSITION_NOT_FOUND)
+        # 现有节点原样回写(保留 id → 保留题目冻结快照),新节点接在末尾。
+        # 只有正文/标题的 content 由客户端提供,其余节点的 content 是服务端冻结的快照,回写必须为空。
+        authored_content = {"rich_text", "heading"}
+        existing = sorted(comp.nodes, key=lambda n: (n.parent_id is not None, n.position))
+        kept = [
+            CompositionNodeInput(
+                id=n.id,
+                parent_id=n.parent_id,
+                slot=n.slot,
+                node_kind=n.node_kind,
+                node_type=n.node_type,
+                content=n.content if n.node_type in authored_content else None,
+                props=n.props if n.node_type != "page_break" else None,
+                schema_version=n.schema_version,
+                question_id=n.question_id,
+                stimulus_id=n.stimulus_id,
+                source_question_node_id=n.source_question_node_id,
+                anchor_before_node_id=n.anchor_before_node_id,
+            )
+            for n in existing
+        ]
+        roots = [it for it in kept if it.parent_id is None]
+        children = [it for it in kept if it.parent_id is not None]
+        new_roots = [it for it in new_items if it.parent_id is None]
+        new_children = [it for it in new_items if it.parent_id is not None]
+        items = roots + new_roots + children + new_children
+
+    result = await capabilities.run(
+        "composition.replace_nodes",
+        ctx.with_subject(subject_id),
+        CompositionReplaceNodesInput(
+            subject_id=subject_id,
+            scope_type=scope_type,
+            owner_id=owner_id,
+            composition_id=composition_id,
+            expected_revision=expected_revision,
+            items=items,
+        ),
+    )
+    return {
+        "composition_id": composition_id,
+        "revision": result.revision,
+        "mode": mode,
+        "added_nodes": len(new_items),
+        "total_nodes": len(result.nodes),
+    }
+
+
+_SHOW_FIELDS = {
+    "type": "object",
+    "properties": {k: {"type": "boolean"} for k in ("answer", "thinking", "analysis", "summary")},
+}
+
+_AUTHORING_NODE = {
+    "type": "object",
+    "properties": {
+        "type": {
+            "type": "string",
+            "enum": ["heading", "rich_text", "question", "question_group", "question_details", "answer_space", "page_break"],
+            "description": (
+                "heading = section title; rich_text = text paragraphs; question = a question from the bank; "
+                "question_group = a material/stimulus with its sub-questions; question_details = answer key module "
+                "(lists answers of the questions in the composition); answer_space = blank area for answers; "
+                "page_break = page break."
+            ),
+        },
+        "text": {"type": "string", "description": "heading only: plain-text title."},
+        "level": {"type": "integer", "minimum": 1, "maximum": 4, "description": "heading only: level, default 2."},
+        "markdown": {
+            "type": "string",
+            "description": (
+                "rich_text only: content in Markdown. Supports $inline math$, $$block math$$, lists and tables. "
+                "Multiple paragraphs become multiple nodes."
+            ),
+        },
+        "question_id": {"type": "integer", "description": "question only: question ID from search_questions."},
+        "score": {"type": "number", "description": "question only: points for this question."},
+        "number": {"type": "string", "description": "question only: custom question number."},
+        "show": {**_SHOW_FIELDS, "description": "question only: show these fields under the question, e.g. {\"analysis\": true} for worked examples."},
+        "stimulus_id": {"type": "integer", "description": "question_group only: the material (stimulus) ID."},
+        "question_ids": {
+            "type": "array", "items": {"type": "integer"},
+            "description": "question_group only: IDs of the sub-questions of that material, in order.",
+        },
+        "details_scope": {
+            "type": "string", "enum": ["all", "before"],
+            "description": "question_details only: include all questions or only those before the module. Default all.",
+        },
+        "details_fields": {**_SHOW_FIELDS, "description": "question_details only: fields to include. Default answer only."},
+        "lines": {"type": "integer", "description": "answer_space only: number of lines, default 4."},
+        "style": {"type": "string", "enum": ["blank", "lined"], "description": "answer_space only: default lined."},
+    },
+    "required": ["type"],
+}
+
+
 _SUBJECT_ID = {"type": "integer", "description": "Subject ID, see list_subjects."}
 _SCOPE_TYPE = {
     "type": "string",
@@ -529,6 +673,27 @@ def _read_tools() -> List[McpTool]:
             }, ["subject_id", "scope_type"]),
             handler=_list_compositions,
             read_only=True,
+        ),
+        McpTool(
+            name="composition_write_nodes",
+            description=(
+                "Add content to a composition (paper) using simple layout nodes: headings, Markdown text, questions "
+                "from the bank, material groups, answer spaces, page breaks and an answer key. The server builds the "
+                "internal node tree, IDs and question snapshots for you. mode='append' (default) keeps the existing "
+                "content and adds the nodes at the end; mode='replace' discards all existing content. "
+                "Typical flow: composition_create (revision 1) -> composition_write_nodes. "
+                "Requires the current revision as expected_revision; the new revision is returned."
+            ),
+            input_schema=_schema({
+                "subject_id": _SUBJECT_ID,
+                "scope_type": _SCOPE_TYPE,
+                "composition_id": {"type": "integer"},
+                "expected_revision": {"type": "integer", "description": "Current revision (a new composition starts at 1)."},
+                "mode": {"type": "string", "enum": ["append", "replace"], "default": "append"},
+                "nodes": {"type": "array", "items": _AUTHORING_NODE, "description": "Nodes in top-to-bottom layout order."},
+            }, ["subject_id", "scope_type", "composition_id", "expected_revision", "nodes"]),
+            handler=_write_composition_nodes,
+            read_only=False,
         ),
         McpTool(
             name="get_composition",
