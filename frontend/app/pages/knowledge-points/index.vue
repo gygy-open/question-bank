@@ -31,7 +31,7 @@ const isSuperuser = computed(() => !!currentUser.value?.is_superuser)
 // Subject is driven by the global subject context (sidebar selector).
 const { currentSubjectId, setSubject } = useSubjectContext()
 const { can } = usePermissions()
-const canManage = computed(() => can(Capability.MANAGE_SUBJECT, currentSubjectId.value))
+const canManage = computed(() => can(Capability.EDIT_TAXONOMY, currentSubjectId.value))
 const selectedSubjectId = computed<string>({
   get: () => (currentSubjectId.value != null ? String(currentSubjectId.value) : ''),
   set: (val) => {

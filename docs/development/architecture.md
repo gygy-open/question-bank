@@ -45,6 +45,8 @@
 - `schemas/` — Pydantic 模型
 - `services/` — 业务服务，如 `ai_provider.py`（AI 接口）、`doc_processor.py`（文档解析抽取）
 - `core/config.py` — 静态配置
+- `capabilities/` — 业务用例（Capability），REST、AI 对话、Worker、MCP 共用同一套鉴权与逻辑；调用入口记录在 `ExecutionContext.surface`（`api`/`chat`/`worker`/`mcp`）
+- `mcp_server/` — MCP 服务（`/api/mcp`，与 API 同端口）：API Key 鉴权中间件，把 Capability 与只读查询映射为 MCP 工具，见 [MCP 接入](/features/mcp)
 - `worker.py` — 后台任务处理
 
 **前端（`frontend/app/`）**

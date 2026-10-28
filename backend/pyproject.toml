@@ -37,6 +37,7 @@ dependencies = [
     "mathml2omml>=0.0.2",
     "mutagen>=1.48.1",
     "olefile>=0.47",
+    "mcp>=2.3.0",
 ]
 
 [dependency-groups]

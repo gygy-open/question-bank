@@ -4,6 +4,7 @@ from fastapi import APIRouter, Depends, UploadFile, File
 from fastapi.responses import StreamingResponse
 from app import crud, schemas, models
 from app.api import deps
+from app import capabilities
 from app.core.permissions import Permission
 from app.services import tag_import_service
 from app.core.api_errors import ApiError, ErrorCode
@@ -44,16 +45,9 @@ async def create_tag(
     tag_in: schemas.TagCreate,
     current_user: models.User = Depends(deps.get_current_active_user),
 ) -> Any:
-    deps.require(current_user, Permission.MANAGE_SUBJECT, subject_id=tag_in.subject_id)
-    # Check if tag exists within the same subject
-    existing = await crud.tag.get_by_name_in_subject(
-        db, name=tag_in.name, subject_id=tag_in.subject_id
+    return await capabilities.run(
+        "tag.create", deps.api_context(db, current_user, subject_id=tag_in.subject_id), tag_in
     )
-    if existing:
-        raise ApiError(400, ErrorCode.TAG_NAME_EXISTS, "Tag with this name already exists")
-
-    tag = await crud.tag.create(db=db, obj_in=tag_in, user_id=current_user.id)
-    return tag
 
 @router.get("/import-template")
 async def download_import_template(
@@ -101,7 +95,7 @@ async def update_tag(
     tag = await crud.tag.get(db=db, id=id)
     if not tag:
         raise ApiError(404, ErrorCode.TAG_NOT_FOUND, "Tag not found")
-    deps.require(current_user, Permission.MANAGE_SUBJECT, subject_id=tag.subject_id)
+    deps.require(current_user, Permission.EDIT_TAXONOMY, subject_id=tag.subject_id)
     tag = await crud.tag.update(db=db, db_obj=tag, obj_in=tag_in, user_id=current_user.id)
     return tag
 
@@ -128,6 +122,6 @@ async def delete_tag(
     tag = await crud.tag.get(db=db, id=id)
     if not tag:
         raise ApiError(404, ErrorCode.TAG_NOT_FOUND, "Tag not found")
-    deps.require(current_user, Permission.MANAGE_SUBJECT, subject_id=tag.subject_id)
+    deps.require(current_user, Permission.EDIT_TAXONOMY, subject_id=tag.subject_id)
     tag = await crud.tag.remove(db=db, id=id, user_id=current_user.id)
     return tag

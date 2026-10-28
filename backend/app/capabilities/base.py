@@ -46,6 +46,7 @@ class Authz(str, enum.Enum):
 
 class Capability(ABC, Generic[TInput, TOutput]):
     name: ClassVar[str]
+    # 面向模型(MCP 工具描述),统一用英文;不随界面语言翻译。
     description: ClassVar[str]
     input_model: ClassVar[type[BaseModel]]
     authz: ClassVar[Authz]

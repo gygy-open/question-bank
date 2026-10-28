@@ -2,6 +2,7 @@
 export const Capability = {
   VIEW_QUESTION: 'view_question',
   EDIT_QUESTION: 'edit_question',
+  EDIT_TAXONOMY: 'edit_taxonomy',
   MANAGE_SUBJECT: 'manage_subject',
   MANAGE_MEMBERS: 'manage_members',
   VIEW_PRIVATE_ANY: 'view_private_any',

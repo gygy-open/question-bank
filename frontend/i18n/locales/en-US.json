@@ -297,6 +297,10 @@
     "system_setting": {
       "managed": "This setting is managed by the system and cannot be changed."
     },
+    "api_key": {
+      "not_found": "API key not found or already revoked",
+      "limit_reached": "Each user can create at most {limit} API keys. Revoke keys you no longer use first."
+    },
     "activity_log": {
       "superuser_only": "Only super administrators can access this."
     },
@@ -1715,14 +1719,17 @@
       "update": "Update",
       "delete": "Delete",
       "restore": "Restore",
-      "review": "Review"
+      "review": "Review",
+      "mcpCall": "MCP call"
     },
     "resourceTypes": {
       "question": "Question",
       "knowledgePoint": "Knowledge Point",
       "subject": "Subject",
       "tag": "Tag",
-      "user": "User"
+      "user": "User",
+      "apiKey": "API Key",
+      "mcpTool": "MCP tool"
     }
   },
   "media": {
@@ -1889,7 +1896,8 @@
       "globalAi": "Global AI Models",
       "myAi": "My AI Models",
       "prompts": "Prompts",
-      "registration": "Sign-Up"
+      "registration": "Sign-Up",
+      "mcp": "MCP access"
     },
     "toast": {
       "fetchFailed": "Failed to load settings.",
@@ -1918,6 +1926,74 @@
       "enabledHint": "When enabled, the sign-in page shows a sign-up link and visitors can create their own accounts.",
       "approvalLabel": "Require Administrator Approval",
       "approvalHint": "When enabled, new users are disabled by default and can only sign in after an administrator enables them in User Management."
+    },
+    "mcp": {
+      "description": "Let external AI clients such as Claude, Cursor and VS Code connect to the Question Bank over MCP to search and edit questions and papers on your behalf.",
+      "loadFailed": "Failed to load MCP settings",
+      "status": {
+        "toggleLabel": "Enable MCP service",
+        "toggleHint": "When turned off, all API keys stop working immediately and work again once it is turned back on. Only administrators can change this.",
+        "disabledTitle": "MCP service is off",
+        "disabledHint": "An administrator has turned off the MCP service. Your API keys can't be used for now.",
+        "enabledToast": "MCP service turned on",
+        "disabledToast": "MCP service turned off"
+      },
+      "endpoint": {
+        "title": "Server URL",
+        "description": "Enter this URL in your AI client and choose the Streamable HTTP transport.",
+        "current": "Current URL",
+        "lan": "LAN URL",
+        "lanHostname": "LAN hostname",
+        "lanHint": "Clients on other computers should use a LAN URL."
+      },
+      "keys": {
+        "title": "My API keys",
+        "description": "Each key has exactly the same permissions as your account and can change or delete anything you are allowed to. Only give it to clients you trust and revoke it when no longer needed. Changes made through MCP are recorded in the activity logs.",
+        "create": "Create API key",
+        "emptyTitle": "No API keys yet",
+        "emptyDescription": "Create a key, then follow the instructions below to set up your AI client.",
+        "name": "Name",
+        "key": "Key",
+        "owner": "Owner",
+        "createdAt": "Created",
+        "lastUsed": "Last used",
+        "neverUsed": "Never",
+        "revoke": "Revoke",
+        "revokeTitle": "Revoke API key \"{name}\"?",
+        "revokeDescription": "Clients using this key will lose access immediately. This can't be undone.",
+        "revoked": "Revoked"
+      },
+      "create": {
+        "title": "Create API key",
+        "description": "Give the key a name so you can recognize it later, e.g. \"Claude on office PC\".",
+        "nameLabel": "Name",
+        "namePlaceholder": "e.g. My Cursor",
+        "nameRequired": "Please enter a name",
+        "nameMax": "Name can be at most {max} characters",
+        "submit": "Create",
+        "createdTitle": "API key created",
+        "createdWarning": "Copy it now and store it safely. You won't be able to see the full key again after closing this window.",
+        "done": "I've saved it"
+      },
+      "guide": {
+        "title": "Client setup",
+        "description": "Pick the AI client you use and copy its configuration.",
+        "replaceKey": "Replace {placeholder} with your API key.",
+        "generic": "Other clients",
+        "transport": "Transport",
+        "url": "URL",
+        "header": "Header",
+        "claudeCode": "Run in a terminal:",
+        "cursor": "Add to ~/.cursor/mcp.json (global) or .cursor/mcp.json in your project:",
+        "vscode": "Add to .vscode/mcp.json in your workspace:",
+        "workbuddy": "Add the following to WorkBuddy's MCP configuration, save it, then enable the server in the connector list:",
+        "stdio": "For clients that only support local commands (stdio), such as Claude Desktop. Install Node.js first, then add this to the client's config file:"
+      },
+      "admin": {
+        "title": "All users' API keys",
+        "description": "Administrators can view and revoke any user's keys, but cannot see the key values.",
+        "empty": "No API keys yet"
+      }
     }
   },
   "setup": {

@@ -15,8 +15,8 @@ Granted to teachers subject by subject under **Subjects → Manage Members**:
 | Role | Description |
 |------|------|
 | **Viewer** | Can only view the subject's questions, knowledge points, and tags; cannot make changes |
-| **Editor** | Can create / edit / delete questions in the subject |
-| **Manager** | Everything an Editor can do, plus manage the subject's **members**, knowledge points, tags, and tag categories |
+| **Editor** | Can create / edit / delete questions, knowledge points and tags in the subject |
+| **Manager** | Everything an Editor can do, plus manage the subject's **members** and tag categories, and bulk-import tags |
 
 A teacher can be granted **multiple subjects**, with a different role in each.
 
@@ -26,7 +26,8 @@ A teacher can be granted **multiple subjects**, with a different role in each.
 |------|:---------:|:---------:|:-----:|:----:|
 | View the subject's questions / knowledge points / tags | ✅ All subjects | ✅ Own subject | ✅ Own subject | ✅ Own subject |
 | Create / edit questions | ✅ | ✅ | ✅ | ❌ |
-| Manage knowledge points / tags / tag categories | ✅ | ✅ Own subject | ❌ | ❌ |
+| Create / edit / delete knowledge points and tags | ✅ | ✅ Own subject | ✅ Own subject | ❌ |
+| Manage tag categories / bulk-import tags | ✅ | ✅ Own subject | ❌ | ❌ |
 | Manage subject members (assign roles) | ✅ | ✅ Own subject | ❌ | ❌ |
 | Create / edit / delete **subjects** | ✅ | ❌ | ❌ | ❌ |
 | Rebuild knowledge point vectors / import | ✅ | ❌ | ❌ | ❌ |

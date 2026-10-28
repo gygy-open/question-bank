@@ -36,6 +36,7 @@ The server edition is configured through the `.env` file (read by `docker-compos
 | `IMAGE_TAG` | `latest` | Tag of the prebuilt images to pull; set to a specific version (e.g. `1.2.0`) to pin it |
 | `LOG_LEVEL` | `INFO` | Log level (`DEBUG`/`INFO`/`WARNING`/`ERROR`) |
 | `DATA_DIR` | `/data` | Writable backend data directory (uploads, static media, runtime config); preset in the image, usually no need to change |
+| `MCP_ALLOWED_ORIGINS` | empty | Comma-separated origins allowed to call the [MCP server](/en/features/mcp) cross-site from a browser (e.g. `https://inspector.example.com`). Native MCP clients need no configuration |
 
 Switching a server in mainland China to the Alibaba Cloud mirrors requires no extra variables — just one more file to download; see [Mainland China Mirrors](/en/server/docker#china-mirrors).
 

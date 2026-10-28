@@ -82,6 +82,7 @@ docker compose -f docker-compose.yml -f docker-compose.cn.yml up -d
 
 - Frontend: `http://<server-IP>` (port 80 by default)
 - Backend API docs (Swagger): `http://<server-IP>:8000/docs`
+- MCP server: `http://<server-IP>/api/mcp`, proxied to the backend by the frontend nginx; see [MCP Access](/en/features/mcp)
 
 ## Initial Setup
 

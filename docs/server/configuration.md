@@ -36,6 +36,7 @@
 | `IMAGE_TAG` | `latest` | 拉取的预构建镜像 tag，可设为具体版本号（如 `1.2.0`）以锁定版本 |
 | `LOG_LEVEL` | `INFO` | 日志级别（`DEBUG`/`INFO`/`WARNING`/`ERROR`） |
 | `DATA_DIR` | `/data` | 后端可写数据目录（上传、静态媒体、运行时配置），已在镜像中设定，通常无需修改 |
+| `MCP_ALLOWED_ORIGINS` | 空 | 允许从浏览器跨站访问 [MCP 服务](/features/mcp) 的来源，逗号分隔（如 `https://inspector.example.com`）。原生 MCP 客户端无需配置 |
 
 国内服务器换阿里云镜像源不需要任何额外变量，只需多下载一个文件，见 [中国大陆加速](/server/docker#中国大陆加速)。
 

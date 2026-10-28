@@ -82,6 +82,7 @@ docker compose -f docker-compose.yml -f docker-compose.cn.yml up -d
 
 - 前端：`http://<服务器IP>`（默认 80 端口）
 - 后端 API 文档（Swagger）：`http://<服务器IP>:8000/docs`
+- MCP 服务：`http://<服务器IP>/api/mcp`，经前端 nginx 转发到后端，见 [MCP 接入](/features/mcp)
 
 ## 首次配置
 

@@ -78,7 +78,7 @@ class DerivedQuestionCreateInput(BaseModel):
 @register
 class CreateQuestion(Capability[schemas.QuestionCreate, Question]):
     name = "question.create"
-    description = "新建一道题目。"
+    description = "Create a question. New questions are drafts unless a status is given; subject_id defaults to the user's last active subject."
     input_model = schemas.QuestionCreate
     authz = Authz.PERMISSION
     permission = Permission.EDIT_QUESTION
@@ -96,7 +96,7 @@ class CreateQuestion(Capability[schemas.QuestionCreate, Question]):
 @register
 class CreateQuestionRelation(Capability[QuestionRelationInput, QuestionRelation]):
     name = "question.relation.create"
-    description = "关联来源题与派生题。"
+    description = "Link a source question to a derived question."
     input_model = QuestionRelationInput
     authz = Authz.PERMISSION
     permission = Permission.EDIT_QUESTION
@@ -120,7 +120,7 @@ class CreateQuestionRelation(Capability[QuestionRelationInput, QuestionRelation]
 @register
 class DeleteQuestionRelation(Capability[QuestionRelationInput, None]):
     name = "question.relation.delete"
-    description = "解除来源题与派生题的关系，不删除题目。"
+    description = "Unlink a source question from a derived question. Neither question is deleted."
     input_model = QuestionRelationInput
     authz = Authz.PERMISSION
     permission = Permission.EDIT_QUESTION
@@ -144,7 +144,7 @@ class DeleteQuestionRelation(Capability[QuestionRelationInput, None]):
 @register
 class CreateDerivedQuestion(Capability[DerivedQuestionCreateInput, Question]):
     name = "question.derived.create"
-    description = "原子创建一道派生题及其来源关系。"
+    description = "Atomically create a derived question and link it to its source question."
     input_model = DerivedQuestionCreateInput
     authz = Authz.PERMISSION
     permission = Permission.EDIT_QUESTION
@@ -187,7 +187,7 @@ class CreateDerivedQuestion(Capability[DerivedQuestionCreateInput, Question]):
 @register
 class BatchCreateQuestions(Capability[schemas.QuestionBatchCreate, List[Question]]):
     name = "question.batch_create"
-    description = "批量创建题目(智能导入落库),同时登记一条已完成的导入任务。"
+    description = "Create questions in bulk and record a completed import task for them."
     input_model = schemas.QuestionBatchCreate
     authz = Authz.CUSTOM
     scope = Scope.SUBJECT
@@ -261,7 +261,7 @@ class BatchCreateQuestions(Capability[schemas.QuestionBatchCreate, List[Question
 @register
 class UpdateQuestion(Capability[QuestionUpdateInput, Question]):
     name = "question.update"
-    description = "更新一道题目的内容、标签与知识点。"
+    description = "Update a question's content, tags and knowledge points."
     input_model = QuestionUpdateInput
     authz = Authz.PERMISSION
     permission = Permission.EDIT_QUESTION
@@ -295,7 +295,7 @@ class UpdateQuestion(Capability[QuestionUpdateInput, Question]):
 @register
 class ReviewQuestion(Capability[QuestionReviewInput, Question]):
     name = "question.review"
-    description = "审核一道题目:通过则累加审核次数并按学科阈值决定是否发布;驳回则退回草稿。"
+    description = "Review a question. Approving increments its review count and publishes it once the subject's required review count is reached; rejecting sends it back to draft."
     input_model = QuestionReviewInput
     authz = Authz.PERMISSION
     permission = Permission.EDIT_QUESTION
@@ -342,7 +342,7 @@ class ReviewQuestion(Capability[QuestionReviewInput, Question]):
 @register
 class DeleteQuestion(Capability[QuestionIdInput, Question]):
     name = "question.delete"
-    description = "软删除一道题目。仅创建者、学科负责人或超管可执行。"
+    description = "Soft-delete a question. Only its creator, a subject manager or a superuser can do this."
     input_model = QuestionIdInput
     authz = Authz.CUSTOM
     scope = Scope.SUBJECT
@@ -377,7 +377,7 @@ async def _load_questions_by_ids(ctx: ExecutionContext, ids: List[int]) -> List[
 @register
 class BatchDeleteQuestions(Capability[schemas.QuestionBatchDelete, dict]):
     name = "question.batch_delete"
-    description = "批量软删除题目;无权删除的条目会被跳过而非报错。"
+    description = "Soft-delete questions in bulk. Questions the user may not delete are skipped instead of failing."
     input_model = schemas.QuestionBatchDelete
     authz = Authz.CUSTOM
     scope = Scope.SUBJECT
@@ -419,7 +419,7 @@ class BatchDeleteQuestions(Capability[schemas.QuestionBatchDelete, dict]):
 @register
 class BatchUpdateQuestions(Capability[schemas.QuestionBatchUpdate, dict]):
     name = "question.batch_update"
-    description = "批量更新题目来源;非本人创建的条目会被跳过。"
+    description = "Update the source of questions in bulk. Questions not created by the user are skipped."
     input_model = schemas.QuestionBatchUpdate
     authz = Authz.CUSTOM
     scope = Scope.SUBJECT
@@ -459,7 +459,7 @@ class BatchUpdateQuestions(Capability[schemas.QuestionBatchUpdate, dict]):
 @register
 class BatchConfirmQuestions(Capability[schemas.QuestionBatchConfirm, dict]):
     name = "question.batch_confirm"
-    description = "批量确认或驳回草稿题目:确认转待审,驳回则软删除;无权条目跳过。"
+    description = "Confirm or reject draft questions in bulk: confirming moves them to pending review, rejecting soft-deletes them. Questions the user may not change are skipped."
     input_model = schemas.QuestionBatchConfirm
     authz = Authz.CUSTOM
     scope = Scope.SUBJECT

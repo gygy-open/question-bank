@@ -13,13 +13,13 @@ from __future__ import annotations
 
 from typing import Any, Dict, List, Optional
 
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 from app import crud
 from app.core.api_errors import ErrorCode
 from app.core.permissions import Permission
 from app.crud import crud_composition
-from app.models.composition import Composition, Folder, ScopeType
+from app.models.composition import Composition, CompositionStatus, Folder, ScopeType
 from app.schemas.composition import (
     CompositionNodeInput,
     CompositionNodesReplaceResponse,
@@ -102,7 +102,7 @@ class FolderUpdateInput(FolderRefInput):
 @register
 class CreateFolder(Capability[FolderCreateInput, Folder]):
     name = "composition.create_folder"
-    description = "在指定学科与范围下新建组稿目录。"
+    description = "Create a composition folder in the given subject and scope."
     input_model = FolderCreateInput
     authz = Authz.PERMISSION
     permission = Permission.EDIT_QUESTION
@@ -127,7 +127,7 @@ class CreateFolder(Capability[FolderCreateInput, Folder]):
 @register
 class UpdateFolder(Capability[FolderUpdateInput, Folder]):
     name = "composition.update_folder"
-    description = "重命名组稿目录或将其移动到另一个父目录。"
+    description = "Rename a composition folder or move it under another parent folder (pass parent_id=null to move it to the root)."
     input_model = FolderUpdateInput
     authz = Authz.PERMISSION
     permission = Permission.EDIT_QUESTION
@@ -151,7 +151,7 @@ class UpdateFolder(Capability[FolderUpdateInput, Folder]):
 @register
 class DeleteFolder(Capability[FolderRefInput, None]):
     name = "composition.delete_folder"
-    description = "删除组稿目录;目录非空时拒绝。"
+    description = "Delete a composition folder. Fails if the folder is not empty."
     input_model = FolderRefInput
     authz = Authz.PERMISSION
     permission = Permission.EDIT_QUESTION
@@ -185,12 +185,20 @@ class CompositionCreateInput(CompositionScopeInput):
 class CompositionUpdateInput(CompositionRevisionInput):
     title: Optional[str] = None
     description: Optional[str] = None
-    status_value: Optional[str] = None
+    status_value: Optional[str] = Field(default=None, description="Composition status: draft or archived.")
     folder_id: Optional[int] = None
     folder_id_provided: bool = False
     numbering_enabled: Optional[bool] = None
     scoring_enabled: Optional[bool] = None
     question_display: Optional[Dict[str, bool]] = None
+
+    @field_validator("status_value")
+    @classmethod
+    def _check_status(cls, value: Optional[str]) -> Optional[str]:
+        # REST 由请求体的枚举把关;MCP 等入口直接构造本入参,这里兜底。
+        if value is not None:
+            CompositionStatus(value)
+        return value
 
 
 class CompositionReplaceNodesInput(CompositionRevisionInput):
@@ -221,7 +229,7 @@ class CompositionFinalizeInput(CompositionRevisionInput):
 @register
 class CreateComposition(Capability[CompositionCreateInput, Composition]):
     name = "composition.create"
-    description = "新建一份稿件(试卷草稿)。"
+    description = "Create a new composition (a draft paper)."
     input_model = CompositionCreateInput
     authz = Authz.PERMISSION
     permission = Permission.EDIT_QUESTION
@@ -249,7 +257,7 @@ class CreateComposition(Capability[CompositionCreateInput, Composition]):
 @register
 class UpdateComposition(Capability[CompositionUpdateInput, Composition]):
     name = "composition.update"
-    description = "更新稿件元信息(标题/描述/状态/所在目录/编号与分值开关/题目字段显示)。"
+    description = "Update composition metadata: title, description, status, folder (pass folder_id=null to move it to the root), numbering/scoring switches and question field display. Requires the current revision as expected_revision."
     input_model = CompositionUpdateInput
     authz = Authz.PERMISSION
     permission = Permission.EDIT_QUESTION
@@ -281,7 +289,7 @@ class UpdateComposition(Capability[CompositionUpdateInput, Composition]):
 @register
 class ReplaceCompositionNodes(Capability[CompositionReplaceNodesInput, CompositionNodesReplaceResponse]):
     name = "composition.replace_nodes"
-    description = "整份替换稿件的节点树(排版内容)。带乐观锁,revision 不匹配会冲突。"
+    description = "Replace the whole node tree (layout content) of a composition. Uses optimistic locking: fails with a conflict if expected_revision is stale."
     input_model = CompositionReplaceNodesInput
     authz = Authz.PERMISSION
     permission = Permission.EDIT_QUESTION
@@ -310,7 +318,7 @@ class SyncCompositionQuestionNodes(
     Capability[CompositionSyncNodesInput, CompositionQuestionNodesSyncResponse]
 ):
     name = "composition.sync_question_nodes"
-    description = "把稿件里已过期的题目节点重新同步为题库中的最新内容。"
+    description = "Re-sync outdated question nodes in a composition with the latest content from the question bank."
     input_model = CompositionSyncNodesInput
     authz = Authz.PERMISSION
     permission = Permission.EDIT_QUESTION
@@ -341,7 +349,7 @@ class SyncCompositionQuestionGroupNodes(
     ]
 ):
     name = "composition.sync_question_group_nodes"
-    description = "原子刷新稿件中题组、材料和全部成员题目的冻结快照及顺序。"
+    description = "Atomically refresh the frozen snapshots and order of question groups, their materials and all member questions in a composition."
     input_model = CompositionSyncQuestionGroupNodesInput
     authz = Authz.PERMISSION
     permission = Permission.EDIT_QUESTION
@@ -372,7 +380,7 @@ class SyncCompositionQuestionGroupNodes(
 @register
 class DeleteComposition(Capability[CompositionRevisionInput, None]):
     name = "composition.delete"
-    description = "软删除一份稿件。"
+    description = "Soft-delete a composition (it can be restored later)."
     input_model = CompositionRevisionInput
     authz = Authz.PERMISSION
     permission = Permission.EDIT_QUESTION
@@ -393,7 +401,7 @@ class DeleteComposition(Capability[CompositionRevisionInput, None]):
 @register
 class RestoreComposition(Capability[CompositionRevisionInput, Composition]):
     name = "composition.restore"
-    description = "从回收站恢复一份被软删除的稿件。"
+    description = "Restore a soft-deleted composition from the trash."
     input_model = CompositionRevisionInput
     authz = Authz.PERMISSION
     permission = Permission.EDIT_QUESTION
@@ -417,7 +425,7 @@ class RestoreComposition(Capability[CompositionRevisionInput, Composition]):
 @register
 class DuplicateComposition(Capability[CompositionRefInput, Composition]):
     name = "composition.duplicate"
-    description = "创建一份稿件的副本(节点内容按原样复制,不重新同步题目)。"
+    description = "Duplicate a composition. Nodes are copied as-is; questions are not re-synced."
     input_model = CompositionRefInput
     authz = Authz.PERMISSION
     permission = Permission.EDIT_QUESTION
@@ -438,7 +446,7 @@ class DuplicateComposition(Capability[CompositionRefInput, Composition]):
 @register
 class FinalizeCompositionVersion(Capability[CompositionFinalizeInput, Any]):
     name = "composition.finalize_version"
-    description = "定稿:冻结当前节点树为一个不可变版本快照。"
+    description = "Finalize a composition: freeze the current node tree into an immutable version snapshot."
     input_model = CompositionFinalizeInput
     authz = Authz.PERMISSION
     permission = Permission.EDIT_QUESTION

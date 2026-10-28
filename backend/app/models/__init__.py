@@ -1,5 +1,6 @@
 from .base import Base
 from .user import User
+from .api_key import ApiKey
 from .subject import Subject
 from .subject_member import SubjectMember
 from .knowledge_point import KnowledgePoint

@@ -12,10 +12,14 @@ const { t } = useI18n()
 const props = withDefaults(defineProps<{
     categories: TagCategory[]
     disabled?: boolean
+    /** 管理标签分类(新建/改名/删除) */
     canManage?: boolean
+    /** 在分类下新建标签 */
+    canCreateTag?: boolean
 }>(), {
     disabled: false,
     canManage: true,
+    canCreateTag: true,
 })
 
 const emit = defineEmits<{
@@ -127,7 +131,7 @@ const cancelAdd = () => {
                         <TooltipProvider :delay-duration="300">
                             <Tooltip>
                                 <TooltipTrigger as-child>
-                                    <Button v-if="canManage" variant="ghost" size="icon" class="h-6 w-6" :aria-label="t('tagCategories.createTagIn', { name: cat.name })" @click.stop="emit('create-tag', cat.id)">
+                                    <Button v-if="canCreateTag" variant="ghost" size="icon" class="h-6 w-6" :aria-label="t('tagCategories.createTagIn', { name: cat.name })" @click.stop="emit('create-tag', cat.id)">
                                         <Tag class="h-3 w-3" />
                                     </Button>
                                 </TooltipTrigger>

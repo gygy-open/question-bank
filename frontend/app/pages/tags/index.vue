@@ -55,7 +55,9 @@ const { t } = useI18n()
 const { $api } = useNuxtApp()
 const { currentSubjectId, currentSubject, hasSubjects } = useSubjectContext()
 const { can } = usePermissions()
+// 标签分类与批量导入需学科负责人;标签本身的增删改编辑者即可。
 const canManage = computed(() => can(Capability.MANAGE_SUBJECT, currentSubjectId.value))
+const canEditTags = computed(() => can(Capability.EDIT_TAXONOMY, currentSubjectId.value))
 
 const page = ref(1)
 const pageSize = ref(20)
@@ -299,7 +301,7 @@ const deleteCategory = async (id: number) => {
                 <Upload class="w-4 h-4 mr-2" />
                 {{ t('tags.batchImport') }}
             </Button>
-            <Button v-if="canManage" :disabled="!hasSubjects" @click="openCreateDialog">
+            <Button v-if="canEditTags" :disabled="!hasSubjects" @click="openCreateDialog">
                 <Plus class="w-4 h-4 mr-2" />
                 {{ t('tags.create') }}
             </Button>
@@ -318,6 +320,7 @@ const deleteCategory = async (id: number) => {
                     :categories="tagCategories || []"
                     :disabled="!hasSubjects"
                     :can-manage="canManage"
+                    :can-create-tag="canEditTags"
                     @create="createCategory"
                     @save-edit="saveCategory"
                     @delete="deleteCategory"
@@ -350,6 +353,7 @@ const deleteCategory = async (id: number) => {
                                     :categories="tagCategories || []"
                                     :disabled="!hasSubjects"
                                     :can-manage="canManage"
+                                    :can-create-tag="canEditTags"
                                     @create="createCategory"
                                     @save-edit="saveCategory"
                                     @delete="deleteCategory"
@@ -362,7 +366,7 @@ const deleteCategory = async (id: number) => {
                         {{ currentCategoryLabel }}
                     </h2>
                     <span class="hidden text-sm text-muted-foreground md:block">{{ t('tags.total', { count: total }) }}</span>
-                    <Button v-if="canManage && selectedTags.length > 0" variant="destructive" size="sm" @click="batchDelete">
+                    <Button v-if="canEditTags && selectedTags.length > 0" variant="destructive" size="sm" @click="batchDelete">
                         <Trash2 class="w-4 h-4 mr-2" />
                         {{ t('tags.batchDelete', { count: selectedTags.length }) }}
                     </Button>
@@ -412,10 +416,10 @@ const deleteCategory = async (id: number) => {
                                 </TableCell>
                                 <TableCell class="text-right">
                                     <div class="flex justify-end gap-2">
-                                        <Button v-if="canManage" variant="ghost" size="icon" @click="openEditDialog(tag)">
+                                        <Button v-if="canEditTags" variant="ghost" size="icon" @click="openEditDialog(tag)">
                                             <Pencil class="w-4 h-4" />
                                         </Button>
-                                        <Button v-if="canManage" variant="ghost" size="icon" class="text-destructive"
+                                        <Button v-if="canEditTags" variant="ghost" size="icon" class="text-destructive"
                                             @click="deleteTag(tag.id)">
                                             <Trash2 class="w-4 h-4" />
                                         </Button>

@@ -66,7 +66,8 @@ export const en: LocaleSpecificConfig<DefaultTheme.Config> = {
             { text: 'AI Assistant', link: '/en/features/chat' },
             { text: 'Subjects & Tags', link: '/en/features/subjects-and-tags' },
             { text: 'File Preview', link: '/en/features/preview' },
-            { text: 'Activity Logs', link: '/en/features/activity-logs' }
+            { text: 'Activity Logs', link: '/en/features/activity-logs' },
+            { text: 'MCP Access', link: '/en/features/mcp' }
           ]
         }
       ],

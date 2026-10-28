@@ -3,7 +3,7 @@
 Subjects and tags are the classification dimensions used to organize the question bank.
 
 ::: tip Management Permissions
-Creating / editing / deleting **subjects** is limited to Super Administrators; creating, editing, and deleting **knowledge points / tags / tag categories** requires the subject's **Manager** role; regular members can only view. See [Permissions & Roles](/en/admin/permissions).
+Creating / editing / deleting **subjects** is limited to Super Administrators; creating, editing, and deleting **knowledge points / tags** requires the **Editor** role or higher in the subject; managing **tag categories** and bulk-importing tags requires the subject's **Manager** role; viewers can only view. See [Permissions & Roles](/en/admin/permissions).
 :::
 
 ## Subjects

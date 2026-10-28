@@ -2,9 +2,10 @@ from typing import Any, List, Optional
 import asyncio
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form
 from fastapi.responses import StreamingResponse
-from sqlalchemy.exc import IntegrityError
 from app import crud, schemas, models
 from app.api import deps
+from app import capabilities
+from app.capabilities import library as library_caps
 from app.core.permissions import Permission
 from app.core.vector_store import VectorStore
 from app.services import kp_import_service
@@ -203,12 +204,11 @@ async def create_knowledge_point(
     knowledge_point_in: schemas.KnowledgePointCreate,
     current_user: models.User = Depends(deps.get_current_active_user),
 ) -> Any:
-    deps.require(current_user, Permission.MANAGE_SUBJECT, subject_id=knowledge_point_in.subject_id)
-    try:
-        knowledge_point = await crud.knowledge_point.create(db=db, obj_in=knowledge_point_in, user_id=current_user.id)
-        return knowledge_point
-    except IntegrityError:
-        raise ApiError(400, ErrorCode.KNOWLEDGE_POINT_SLUG_EXISTS, "Knowledge point with this slug already exists in this subject")
+    return await capabilities.run(
+        "knowledge_point.create",
+        deps.api_context(db, current_user, subject_id=knowledge_point_in.subject_id),
+        library_caps.KnowledgePointCreateInput(**knowledge_point_in.model_dump()),
+    )
 
 @router.put("/{id}", response_model=schemas.KnowledgePoint)
 async def update_knowledge_point(
@@ -221,7 +221,11 @@ async def update_knowledge_point(
     knowledge_point = await crud.knowledge_point.get(db=db, id=id)
     if not knowledge_point:
         raise ApiError(404, ErrorCode.KNOWLEDGE_POINT_NOT_FOUND, "Knowledge point not found")
-    deps.require(current_user, Permission.MANAGE_SUBJECT, subject_id=knowledge_point.subject_id)
+    deps.require(current_user, Permission.EDIT_TAXONOMY, subject_id=knowledge_point.subject_id)
+    target_subject_id = knowledge_point_in.subject_id
+    if target_subject_id is not None and target_subject_id != knowledge_point.subject_id:
+        # 移到别的学科:目标学科同样需要编辑权限
+        deps.require(current_user, Permission.EDIT_TAXONOMY, subject_id=target_subject_id)
     knowledge_point = await crud.knowledge_point.update(db=db, db_obj=knowledge_point, obj_in=knowledge_point_in, user_id=current_user.id)
     return knowledge_point
 
@@ -254,6 +258,6 @@ async def delete_knowledge_point(
     knowledge_point = await crud.knowledge_point.get(db=db, id=id)
     if not knowledge_point:
         raise ApiError(404, ErrorCode.KNOWLEDGE_POINT_NOT_FOUND, "Knowledge point not found")
-    deps.require(current_user, Permission.MANAGE_SUBJECT, subject_id=knowledge_point.subject_id)
+    deps.require(current_user, Permission.EDIT_TAXONOMY, subject_id=knowledge_point.subject_id)
     knowledge_point = await crud.knowledge_point.remove(db=db, id=id, user_id=current_user.id)
     return knowledge_point

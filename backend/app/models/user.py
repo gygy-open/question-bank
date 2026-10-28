@@ -55,6 +55,11 @@ class User(Base):
         "UserAIPreference", cascade="all, delete-orphan", uselist=False
     )
 
+    # MCP 接入用的 API Key(删除用户时一并删除)
+    api_keys = relationship(
+        "ApiKey", back_populates="user", cascade="all, delete-orphan", passive_deletes=True
+    )
+
     # 学科成员关系(承载学科作用域角色)
     subject_memberships = relationship(
         "SubjectMember", back_populates="user", cascade="all, delete-orphan"

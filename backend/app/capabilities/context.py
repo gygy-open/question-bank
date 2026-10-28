@@ -15,10 +15,11 @@ from app.models.user import User
 
 
 class Surface(str, enum.Enum):
-    """调用入口。MCP 尚未实现,等接入时再加值。"""
+    """调用入口。"""
     API = "api"
     CHAT = "chat"
     WORKER = "worker"
+    MCP = "mcp"
 
 
 @dataclass(frozen=True)

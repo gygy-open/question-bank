@@ -68,7 +68,7 @@ async def _ensure_subject(ctx: ExecutionContext, subject_id: int) -> None:
 @register
 class PreviewPaperImport(Capability[PaperImportPreviewInput, PaperImportPreviewResponse]):
     name = "paper_import.preview"
-    description = "预检整卷导入:哪些题目可入库、哪些结构会降级、是否存在阻断问题。不写库。"
+    description = "Dry-run a whole-paper import: which questions can be imported, which structures will be degraded, and whether anything blocks the import. Writes nothing."
     input_model = PaperImportPreviewInput
     authz = Authz.PERMISSION
     permission = Permission.EDIT_QUESTION
@@ -105,7 +105,7 @@ class PreviewPaperImport(Capability[PaperImportPreviewInput, PaperImportPreviewR
 @register
 class CommitPaperImport(Capability[PaperImportCommitInput, PaperImportCommitResponse]):
     name = "paper_import.commit"
-    description = "提交整卷导入:在同一事务内写入题目,并按需创建可继续编辑的稿件。"
+    description = "Commit a whole-paper import: write the questions in one transaction and optionally create an editable composition."
     input_model = PaperImportCommitInput
     authz = Authz.PERMISSION
     permission = Permission.EDIT_QUESTION

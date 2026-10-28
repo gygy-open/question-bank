@@ -297,6 +297,10 @@
     "system_setting": {
       "managed": "该设置由系统管理，不可修改"
     },
+    "api_key": {
+      "not_found": "API Key 不存在或已被撤销",
+      "limit_reached": "每位用户最多创建 {limit} 个 API Key，请先撤销不再使用的 Key"
+    },
     "activity_log": {
       "superuser_only": "仅超级管理员可访问"
     },
@@ -1715,14 +1719,17 @@
       "update": "更新",
       "delete": "删除",
       "restore": "恢复",
-      "review": "审核"
+      "review": "审核",
+      "mcpCall": "MCP 调用"
     },
     "resourceTypes": {
       "question": "题目",
       "knowledgePoint": "知识点",
       "subject": "学科",
       "tag": "标签",
-      "user": "用户"
+      "user": "用户",
+      "apiKey": "API Key",
+      "mcpTool": "MCP 工具"
     }
   },
   "media": {
@@ -1889,7 +1896,8 @@
       "globalAi": "全局 AI 模型",
       "myAi": "我的 AI 模型",
       "prompts": "提示词配置",
-      "registration": "注册设置"
+      "registration": "注册设置",
+      "mcp": "MCP 接入"
     },
     "toast": {
       "fetchFailed": "获取设置失败",
@@ -1918,6 +1926,74 @@
       "enabledHint": "开启后，登录页将显示注册入口，访客可自行创建账户。",
       "approvalLabel": "注册需管理员审核",
       "approvalHint": "开启后，新注册用户默认停用，需管理员在用户管理中启用后方可登录。"
+    },
+    "mcp": {
+      "description": "让 Claude、Cursor、VS Code 等外部 AI 客户端通过 MCP 协议接入题库，以你的身份查询和编辑题目、组卷。",
+      "loadFailed": "加载 MCP 设置失败",
+      "status": {
+        "toggleLabel": "启用 MCP 服务",
+        "toggleHint": "关闭后所有 API Key 立即失效，重新开启后恢复。只有管理员可以切换。",
+        "disabledTitle": "MCP 服务已关闭",
+        "disabledHint": "管理员已关闭 MCP 服务，你的 API Key 暂时无法使用。",
+        "enabledToast": "MCP 服务已开启",
+        "disabledToast": "MCP 服务已关闭"
+      },
+      "endpoint": {
+        "title": "接入地址",
+        "description": "在 AI 客户端中填写以下地址，传输方式选择 Streamable HTTP。",
+        "current": "当前地址",
+        "lan": "局域网地址",
+        "lanHostname": "局域网主机名",
+        "lanHint": "其他电脑上的客户端请使用局域网地址。"
+      },
+      "keys": {
+        "title": "我的 API Key",
+        "description": "每个 Key 拥有与你账号完全相同的权限，可以修改和删除你有权操作的内容。只交给信任的客户端，不用时及时撤销。通过 MCP 进行的写操作会记录在操作日志中。",
+        "create": "创建 API Key",
+        "emptyTitle": "还没有 API Key",
+        "emptyDescription": "创建一个 Key，再按下方的说明配置到 AI 客户端。",
+        "name": "名称",
+        "key": "Key",
+        "owner": "所属用户",
+        "createdAt": "创建时间",
+        "lastUsed": "最近使用",
+        "neverUsed": "从未使用",
+        "revoke": "撤销",
+        "revokeTitle": "撤销 API Key「{name}」？",
+        "revokeDescription": "使用该 Key 的客户端将立即无法访问。此操作不可恢复。",
+        "revoked": "已撤销"
+      },
+      "create": {
+        "title": "创建 API Key",
+        "description": "给 Key 起个名字，方便日后辨认，例如“办公室电脑的 Claude”。",
+        "nameLabel": "名称",
+        "namePlaceholder": "例如：我的 Cursor",
+        "nameRequired": "请输入名称",
+        "nameMax": "名称最多 {max} 个字符",
+        "submit": "创建",
+        "createdTitle": "API Key 已创建",
+        "createdWarning": "请立即复制并妥善保存。关闭此窗口后将无法再次查看完整的 Key。",
+        "done": "我已保存"
+      },
+      "guide": {
+        "title": "客户端配置",
+        "description": "选择你使用的 AI 客户端，复制对应的配置。",
+        "replaceKey": "将 {placeholder} 替换为你的 API Key。",
+        "generic": "其他客户端",
+        "transport": "传输方式",
+        "url": "地址",
+        "header": "请求头",
+        "claudeCode": "在终端中执行：",
+        "cursor": "写入 ~/.cursor/mcp.json（全局）或项目内的 .cursor/mcp.json：",
+        "vscode": "写入工作区的 .vscode/mcp.json：",
+        "workbuddy": "在 WorkBuddy 的 MCP 配置中加入以下内容，保存后在连接器列表中启用：",
+        "stdio": "适用于只支持本地命令（stdio）的客户端，例如 Claude Desktop。需要先安装 Node.js，然后写入客户端的配置文件："
+      },
+      "admin": {
+        "title": "所有用户的 API Key",
+        "description": "管理员可以查看并撤销任何用户的 Key，但看不到 Key 的内容。",
+        "empty": "暂无任何 API Key"
+      }
     }
   },
   "setup": {

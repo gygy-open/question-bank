@@ -20,6 +20,9 @@ from app.core.config import settings, is_configured
 from app.core import storage
 from app.services import setup_state
 from app.services.embedding import reload_embedding_function
+from app.mcp_server import MCP_PATH, mcp_asgi_app, run_mcp
+from app.mcp_server import uploads as mcp_uploads
+from starlette.routing import Route
 
 logging.basicConfig(level=settings.LOG_LEVEL)
 logger = logging.getLogger(__name__)
@@ -36,7 +39,9 @@ async def lifespan(app: FastAPI):
     else:
         logger.warning("No database configured yet - starting in setup mode.")
 
-    yield
+    # MCP 会话管理器不依赖数据库,setup 模式下也照常启动;请求会被 require_setup 拦下。
+    async with run_mcp():
+        yield
     # Shutdown
 
 app = FastAPI(title="QuestionBank API", version=__version__, lifespan=lifespan)
@@ -125,6 +130,15 @@ app.mount("/static", StaticFiles(directory=settings.STATIC_DIR), name="static")
 # 导入源文件是私有数据,不再静态挂载;经 GET /api/v1/imports/{id}/source 鉴权下载。
 
 app.include_router(api_router, prefix="/api/v1")
+
+# 外部 AI 客户端经 MCP 接入(与 API 同端口)。用 Route 而非 Mount:Mount 会把 /api/mcp
+# 307 重定向到 /api/mcp/,部分客户端的 POST 不跟随重定向。
+# 预签名上传(令牌在路径里,不经 MCP 鉴权中间件),见 app/mcp_server/uploads.py
+app.include_router(mcp_uploads.router, prefix=MCP_PATH + "/uploads", include_in_schema=False)
+for _mcp_path in (MCP_PATH, MCP_PATH + "/"):
+    app.router.routes.append(
+        Route(_mcp_path, endpoint=mcp_asgi_app, methods=["GET", "POST", "DELETE"], include_in_schema=False)
+    )
 
 
 def _resolve_frontend_dir() -> Path | None:

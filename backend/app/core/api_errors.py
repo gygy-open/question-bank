@@ -157,6 +157,8 @@ class ErrorCode(StrEnum):
     SUBJECT_MEMBER_NOT_FOUND = "subject.member_not_found"
     COMPOSITION_VERSION_NOT_FOUND = "composition.version_not_found"
     SYSTEM_SETTING_MANAGED = "system_setting.managed"
+    API_KEY_NOT_FOUND = "api_key.not_found"
+    API_KEY_LIMIT_REACHED = "api_key.limit_reached"
     ACTIVITY_LOG_SUPERUSER_ONLY = "activity_log.superuser_only"
     TOOLS_INVALID_TEMPLATE_PATH = "tools.invalid_template_path"
     TOOLS_TEMPLATE_NOT_FOUND = "tools.template_not_found"

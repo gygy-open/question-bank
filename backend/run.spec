@@ -80,6 +80,10 @@ for pkg in [
     "PIL",
     "latex2mathml",
     "mutagen",
+    # MCP 服务(/api/mcp):SDK 内部有按协议版本动态加载的模块,并在运行时读取包元数据
+    "mcp",
+    "mcp_types",
+    "sse_starlette",
 ]:
     try:
         d, b, h = collect_all(pkg)

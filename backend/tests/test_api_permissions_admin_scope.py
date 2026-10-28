@@ -78,26 +78,66 @@ async def test_subject_delete_admin_only(client, ctx):
 
 
 # --------------------------------------------------------------------------- #
-# 知识点 / 标签 / 标签分类:增改需 MANAGE_SUBJECT
+# 知识点 / 标签:增删改需 EDIT_TAXONOMY(编辑者即可);标签分类与导入仍需 MANAGE_SUBJECT
 # --------------------------------------------------------------------------- #
-async def test_knowledge_point_manage_requires_manager(client, ctx):
+async def test_knowledge_point_crud_allowed_for_editor(client, ctx):
     sid = ctx["math"].id
     payload = {"name": "函数", "slug": "func", "subject_id": sid}
 
-    r = await client.post(f"{API}/knowledge-points", json=payload, headers=_auth(ctx["editor"]))
+    r = await client.post(f"{API}/knowledge-points", json=payload, headers=_auth(ctx["viewer"]))
     assert r.status_code == 403, r.text
+    r = await client.post(f"{API}/knowledge-points", json=payload, headers=_auth(ctx["editor"]))
+    assert r.status_code == 200, r.text
+    assert r.json()["slug"] == "func"
+    kp_id = r.json()["id"]
+
     r = await client.post(f"{API}/knowledge-points", json=payload, headers=_auth(ctx["manager"]))
+    assert r.status_code == 400, r.text
+    assert r.json()["code"] == "knowledge_point.slug_exists"
+
+    r = await client.put(f"{API}/knowledge-points/{kp_id}", json={"name": "函数概念"}, headers=_auth(ctx["viewer"]))
+    assert r.status_code == 403, r.text
+    r = await client.put(f"{API}/knowledge-points/{kp_id}", json={"name": "函数概念"}, headers=_auth(ctx["editor"]))
+    assert r.status_code == 200, r.text
+    # 不能借更新把知识点移到自己没有编辑权的学科
+    r = await client.put(f"{API}/knowledge-points/{kp_id}", json={"subject_id": ctx["phys"].id}, headers=_auth(ctx["editor"]))
+    assert r.status_code == 403, r.text
+
+    r = await client.delete(f"{API}/knowledge-points/{kp_id}", headers=_auth(ctx["viewer"]))
+    assert r.status_code == 403, r.text
+    r = await client.delete(f"{API}/knowledge-points/{kp_id}", headers=_auth(ctx["editor"]))
     assert r.status_code == 200, r.text
 
 
-async def test_tag_manage_requires_manager(client, ctx):
+async def test_tag_crud_allowed_for_editor(client, ctx):
     sid = ctx["math"].id
     payload = {"name": "易错", "subject_id": sid}
 
-    r = await client.post(f"{API}/tags", json=payload, headers=_auth(ctx["editor"]))
+    r = await client.post(f"{API}/tags", json=payload, headers=_auth(ctx["viewer"]))
     assert r.status_code == 403, r.text
-    r = await client.post(f"{API}/tags", json=payload, headers=_auth(ctx["manager"]))
+    r = await client.post(f"{API}/tags", json=payload, headers=_auth(ctx["editor"]))
     assert r.status_code == 200, r.text
+    tag_id = r.json()["id"]
+
+    r = await client.post(f"{API}/tags", json=payload, headers=_auth(ctx["manager"]))
+    assert r.status_code == 400, r.text
+    assert r.json()["code"] == "tag.name_exists"
+
+    r = await client.put(f"{API}/tags/{tag_id}", json={"name": "高频易错"}, headers=_auth(ctx["viewer"]))
+    assert r.status_code == 403, r.text
+    r = await client.put(f"{API}/tags/{tag_id}", json={"name": "高频易错"}, headers=_auth(ctx["editor"]))
+    assert r.status_code == 200, r.text
+
+    r = await client.delete(f"{API}/tags/{tag_id}", headers=_auth(ctx["viewer"]))
+    assert r.status_code == 403, r.text
+    r = await client.delete(f"{API}/tags/{tag_id}", headers=_auth(ctx["editor"]))
+    assert r.status_code == 200, r.text
+
+
+async def test_tag_import_still_requires_manager(client, ctx):
+    files = {"file": ("tags.xlsx", b"not-an-xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")}
+    r = await client.post(f"{API}/tags/import?subject_id={ctx['math'].id}", files=files, headers=_auth(ctx["editor"]))
+    assert r.status_code == 403, r.text
 
 
 async def test_tag_category_manage_requires_manager(client, ctx):

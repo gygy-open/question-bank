@@ -29,7 +29,8 @@ class Permission(str, enum.Enum):
     """权限(动作)枚举。加新动作 = 加一个值,并在 ROLE_PERMISSIONS 里授予。"""
     VIEW_QUESTION = "view_question"
     EDIT_QUESTION = "edit_question"
-    MANAGE_SUBJECT = "manage_subject"    # 改学科配置/知识点/标签
+    EDIT_TAXONOMY = "edit_taxonomy"      # 增删改知识点与标签
+    MANAGE_SUBJECT = "manage_subject"    # 改学科配置/标签分类/批量导入
     MANAGE_MEMBERS = "manage_members"    # 在本学科内分配成员与角色
     VIEW_PRIVATE_ANY = "view_private_any"  # 查看他人私有题(v1 仅 admin)
 
@@ -37,11 +38,14 @@ class Permission(str, enum.Enum):
 # 唯一的角色→权限映射。admin 单独走全量,不在此表内。
 ROLE_PERMISSIONS: dict[SubjectRole, frozenset[Permission]] = {
     SubjectRole.VIEWER: frozenset({Permission.VIEW_QUESTION}),
-    SubjectRole.EDITOR: frozenset({Permission.VIEW_QUESTION, Permission.EDIT_QUESTION}),
+    SubjectRole.EDITOR: frozenset(
+        {Permission.VIEW_QUESTION, Permission.EDIT_QUESTION, Permission.EDIT_TAXONOMY}
+    ),
     SubjectRole.MANAGER: frozenset(
         {
             Permission.VIEW_QUESTION,
             Permission.EDIT_QUESTION,
+            Permission.EDIT_TAXONOMY,
             Permission.MANAGE_SUBJECT,
             Permission.MANAGE_MEMBERS,
         }

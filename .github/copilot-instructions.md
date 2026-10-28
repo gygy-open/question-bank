@@ -15,7 +15,7 @@
 - **CRUD Pattern**: Inherit from `CRUDBase` in `app/crud/base.py`.
   - *Example*: `class CRUDQuestion(CRUDBase[Question, QuestionCreate, QuestionUpdate])`
 - **API Layer**: Versioned under `app/api/v1/`.
-  - Router aggregated in `app/api/v1/api.py`; route modules in `app/api/v1/endpoints/` (e.g. `questions`, `chat`, `import_tasks`, `papers`, `knowledge_points`, `ai_config`, `subjects`, `tags`, `users`, `login`, `setup`, `upload`, `system`, `dashboard`).
+  - Router aggregated in `app/api/v1/api.py`; route modules in `app/api/v1/endpoints/` (e.g. `questions`, `chat`, `import_tasks`, `papers`, `knowledge_points`, `ai_config`, `subjects`, `tags`, `users`, `login`, `setup`, `upload`, `system`, `dashboard`, `api_keys`).
   - Shared dependencies (auth, DB session) in `app/api/deps.py`.
 - **Models**: SQLAlchemy models in `app/models/` (`question`, `subject`, `tag`, `tag_category`, `knowledge_point`, `chat`, `import_task`, `ai_config`, `activity_log`, `prompt`, `system_setting`, `user`); shared base in `app/models/base.py`.
 - **Services** (`app/services/`):
@@ -23,6 +23,7 @@
   - `doc_processor.py`: Document parsing/extraction. `structured_parser.py`: structured content parsing. `pandoc.py`: document conversion.
   - `embedding.py`: Vector embeddings (ChromaDB). `question_service.py`: question domain logic. `paper_generator.py`: paper generation.
   - `activity_logger.py`: activity logging. `dashboard_service.py`: dashboard aggregate stats (reuse `visible_questions_filter`). `tools.py`: shared utilities.
+- **MCP** (`app/mcp_server/`): MCP server mounted at `/api/mcp` (same port as the API; nginx proxies it in Docker). Auth via per-user API keys (`qb_` prefix, `api_keys` table, managed in Settings → MCP access); keys inherit the owner's permissions and are MCP-only. Every exposed capability is auto-mapped to a tool (`question.create` → `question_create`) — register its output type in `CAPABILITY_OUTPUT_TYPES` (`tools.py`) or add it to `EXCLUDED_CAPABILITIES`. Master switch: system setting `mcp.enabled`. Media uploads use presigned URLs (`create_media_upload_url` tool → `POST /api/mcp/uploads/{token}`, `app/mcp_server/uploads.py`) because the model running curl cannot see the API key. Model-facing text (tool descriptions, schemas, instructions) is English-only and not translated.
 - **Settings**: Static config in `app/core/config.py`. Dynamic business config in the `system_setting` table.
 
 ### Desktop App (`backend/`)

@@ -45,6 +45,8 @@ This page is for developers and deployers. It outlines the system's tech stack a
 - `schemas/` — Pydantic models
 - `services/` — business services, such as `ai_provider.py` (AI interface) and `doc_processor.py` (document parsing and extraction)
 - `core/config.py` — static configuration
+- `capabilities/` — business use cases (Capabilities) shared by REST, AI chat, the worker and MCP, with one set of authorization and logic; the entry point is recorded in `ExecutionContext.surface` (`api`/`chat`/`worker`/`mcp`)
+- `mcp_server/` — MCP server (`/api/mcp`, same port as the API): API key auth middleware that maps Capabilities and read-only queries to MCP tools; see [MCP Access](/en/features/mcp)
 - `worker.py` — background job processing
 
 **Frontend (`frontend/app/`)**

@@ -54,6 +54,8 @@ services:
       CHROMADB_HOST: ${CHROMADB_HOST:-chromadb}
       CHROMADB_PORT: ${CHROMADB_PORT:-8000}
       LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      # 允许从浏览器跨站访问 /api/mcp 的来源(逗号分隔);原生 MCP 客户端无需配置
+      MCP_ALLOWED_ORIGINS: ${MCP_ALLOWED_ORIGINS:-}
     volumes:
       # DATA_DIR=/data is baked into the image: uploads/, static/media/, config.json.
       - app_data:/data

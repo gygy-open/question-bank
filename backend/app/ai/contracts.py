@@ -17,7 +17,7 @@ from app.capabilities.context import ExecutionContext
 class AgentScene(str, enum.Enum):
     """前端发起对话的页面场景,决定这一轮暴露哪些工具。
 
-    与 `Surface`(api/chat/worker)正交:后者是「从哪个入口进来」,属于审计语义,不要混用。
+    与 `Surface`(api/chat/worker/mcp)正交:后者是「从哪个入口进来」,属于审计语义,不要混用。
 
     `UNSCOPED` 是「页面没声明场景」,此时暴露全部工具(与引入本机制前行为一致);
     只有页面显式声明了场景,才会按 `ToolSpec.scenes` 减面。

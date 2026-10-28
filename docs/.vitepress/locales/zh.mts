@@ -65,7 +65,8 @@ export const zh: LocaleSpecificConfig<DefaultTheme.Config> = {
             { text: 'AI 对话', link: '/features/chat' },
             { text: '学科与标签', link: '/features/subjects-and-tags' },
             { text: '文件预览', link: '/features/preview' },
-            { text: '操作审计', link: '/features/activity-logs' }
+            { text: '操作审计', link: '/features/activity-logs' },
+            { text: 'MCP 接入', link: '/features/mcp' }
           ]
         }
       ],

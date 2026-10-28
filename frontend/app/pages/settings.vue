@@ -1,11 +1,12 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, watchEffect } from 'vue'
 import { toast } from 'vue-sonner'
-import { Settings, Cpu, MessageSquareText, UserPlus, Sparkles } from '@lucide/vue'
+import { Settings, Cpu, MessageSquareText, UserPlus, Sparkles, Plug } from '@lucide/vue'
 import PageHeader from '~/components/PageHeader.vue'
 import AiSettings from '~/components/AiSettings.vue'
 import MyAiSettings from '~/components/MyAiSettings.vue'
 import AiPromptsConfig from '~/components/AiPromptsConfig.vue'
+import McpSettings from '~/components/mcp/McpSettings.vue'
 import {
   Card,
   CardContent,
@@ -176,6 +177,14 @@ onMounted(() => {
           {{ t('settings.nav.prompts') }}
         </Button>
         <Button
+          :variant="activeTab === 'mcp' ? 'secondary' : 'ghost'"
+          class="justify-start gap-2 whitespace-nowrap lg:w-full"
+          @click="updateActiveTab('mcp')"
+        >
+          <Plug class="w-4 h-4" />
+          {{ t('settings.nav.mcp') }}
+        </Button>
+        <Button
           v-if="isAdmin"
           :variant="activeTab === 'registration' ? 'secondary' : 'ghost'" 
           class="justify-start gap-2 whitespace-nowrap lg:w-full"
@@ -262,6 +271,15 @@ onMounted(() => {
           <p class="text-sm text-muted-foreground">{{ t('settings.prompts.description') }}</p>
         </div>
         <AiPromptsConfig />
+      </div>
+
+      <!-- MCP -->
+      <div v-if="activeTab === 'mcp'">
+        <div class="mb-6">
+          <h2 class="text-2xl font-bold tracking-tight">{{ t('settings.nav.mcp') }}</h2>
+          <p class="text-sm text-muted-foreground">{{ t('settings.mcp.description') }}</p>
+        </div>
+        <McpSettings />
       </div>
 
       <!-- Registration Settings -->
