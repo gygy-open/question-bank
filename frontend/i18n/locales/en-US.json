@@ -223,6 +223,7 @@
     },
     "question": {
       "not_found": "Question not found.",
+      "duplicate_suspected": "The question bank already has a duplicate or highly similar question. Please review before adding it.",
       "invalid_review_action": "Invalid review action.",
       "none_found": "The selected questions were not found."
     },
@@ -2426,6 +2427,44 @@
       "derived": "Derived Questions",
       "view": "View Question",
       "noDerived": "No derived questions yet."
+    }
+  },
+  "questionDedup": {
+    "level": {
+      "duplicate": "Duplicate",
+      "similar": "Similar {percent}%"
+    },
+    "variant": "Numbers or formulas differ, possibly a variant",
+    "view": "View",
+    "differences": "Differences (struck through = existing question, highlighted = this question)",
+    "confirm": {
+      "titleDuplicate": "The same question already exists",
+      "titleSimilar": "A highly similar question already exists",
+      "description": "Please review the questions below. If this is not the same question, you can save it anyway.",
+      "saveAnyway": "Save anyway"
+    },
+    "hint": {
+      "title": "Possible duplicates found",
+      "summary": "Duplicates: {duplicates}, highly similar: {similar}",
+      "expand": "Show",
+      "collapse": "Hide"
+    },
+    "import": {
+      "summary": "{total} questions in this import. Duplicates of existing questions: {existing}, highly similar to existing questions: {similar}, duplicate or similar within this import: {batch}. Duplicates have been unselected; keeping a question selected confirms importing it.",
+      "existing": "Related questions in the bank: {count}",
+      "similarShort": "Highly similar",
+      "batchQuestion": "question {number}",
+      "batchDuplicate": "Duplicate of {target} in this import",
+      "batchSimilar": "{percent}% similar to {target} in this import"
+    },
+    "task": {
+      "badge": "Possible duplicates: {count}",
+      "title": "Possible duplicate questions",
+      "description": "Background imports don't stop possible duplicates. Review them and delete the new questions you don't need.",
+      "empty": "No possible duplicates to review",
+      "newQuestion": "Newly imported question",
+      "deleteSelected": "Delete selected new questions ({count})",
+      "deleted": "Deleted: {count}"
     }
   },
   "answerEditor": {

@@ -166,6 +166,8 @@ class QuestionCreate(QuestionBase):
     subject_id: Optional[int] = None
     ai_suggested_tags: Optional[Dict[str, List[str]]] = None
     temp_id: Optional[str] = None
+    # 查重确认:为 True 时即使题库中已有重复/相似题也照常录入。不入库。
+    allow_duplicate: bool = Field(default=False, exclude=True)
 
     @model_validator(mode='after')
     def _validate_domain(self) -> 'QuestionCreate':
@@ -202,6 +204,7 @@ class QuestionUpdate(QuestionBase):
     knowledge_point_ids: Optional[List[int]] = None
     tag_ids: Optional[List[int]] = None
     subject_id: Optional[int] = None
+    allow_duplicate: bool = Field(default=False, exclude=True)
 
     @model_validator(mode='after')
     def _validate_partial_domain(self) -> 'QuestionUpdate':
@@ -276,6 +279,20 @@ class QuestionPage(BaseModel):
     page: int
     size: int
     pages: int
+
+
+class DuplicateCheckRequest(BaseModel):
+    """查重预检:与新建题目同形的草稿,只读不写库。"""
+    q_type: QuestionType
+    content: RichDoc = None
+    options: Optional[List[Dict[str, Any]]] = None
+    subject_id: Optional[int] = None
+    stimulus_id: Optional[int] = None
+    exclude_question_id: Optional[int] = None
+
+
+class DuplicateCheckResponse(BaseModel):
+    candidates: List[Dict[str, Any]] = Field(default_factory=list)
 
 
 class QuestionBatchConfirm(BaseModel):

@@ -223,6 +223,7 @@
     },
     "question": {
       "not_found": "题目不存在",
+      "duplicate_suspected": "题库中已有重复或高度相似的题目，请确认后再录入",
       "invalid_review_action": "无效的审核操作",
       "none_found": "未找到所选题目"
     },
@@ -2426,6 +2427,44 @@
       "derived": "派生题",
       "view": "查看此题",
       "noDerived": "暂无派生题"
+    }
+  },
+  "questionDedup": {
+    "level": {
+      "duplicate": "重复",
+      "similar": "相似 {percent}%"
+    },
+    "variant": "数字或公式不同，可能是变式题",
+    "view": "查看",
+    "differences": "差异（划线为已有题，高亮为当前题）",
+    "confirm": {
+      "titleDuplicate": "题库中已有相同的题目",
+      "titleSimilar": "题库中已有高度相似的题目",
+      "description": "请先核对下列题目。确认不是同一道题后，可以继续保存。",
+      "saveAnyway": "仍然保存"
+    },
+    "hint": {
+      "title": "发现可能重复的题目",
+      "summary": "重复：{duplicates}，高度相似：{similar}",
+      "expand": "展开",
+      "collapse": "收起"
+    },
+    "import": {
+      "summary": "本次共 {total} 题，其中与题库重复：{existing}，与题库高度相似：{similar}，与本次其他题目重复或相似：{batch}。重复的题已默认取消勾选；保留勾选即视为确认录入。",
+      "existing": "题库中有相关题目：{count}",
+      "similarShort": "高度相似",
+      "batchQuestion": "第 {number} 题",
+      "batchDuplicate": "与本次{target}重复",
+      "batchSimilar": "与本次{target}相似 {percent}%"
+    },
+    "task": {
+      "badge": "疑似重复：{count}",
+      "title": "疑似重复的题目",
+      "description": "后台导入不会拦截疑似重复的题目。请核对后删除不需要的新题。",
+      "empty": "没有需要处理的疑似重复题目",
+      "newQuestion": "新导入的题目",
+      "deleteSelected": "删除所选新题（{count}）",
+      "deleted": "已删除：{count}"
     }
   },
   "answerEditor": {

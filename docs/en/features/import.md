@@ -142,6 +142,15 @@ You can edit, delete, or adjust each question before confirming.
 
 After you confirm, the questions are written to the question bank in bulk and linked to this **Import Task**, so you can later filter and manage them by batch.
 
+### Duplicate Check
+
+On the review page, every question is automatically compared with the question bank and with the other questions in this import (same rules as [Question Bank · Duplicate Check](/en/features/questions#duplicate-check)):
+
+- A summary at the top shows how many questions are duplicates or highly similar; each question is marked "Duplicate / Similar xx%" and can be expanded to compare with existing questions.
+- Standalone questions that **duplicate** an existing question, or an earlier question in this import, are **unselected by default**; highly similar questions stay selected with a warning.
+- **Keeping a question selected confirms importing it.** Sub-questions of a material can't be unselected individually and are only marked.
+- The server checks again on submit; duplicates added by others during your review are skipped unless confirmed, and the result explains why.
+
 ## Import Task Status
 
 Each import creates an Import Task, with the following statuses:
@@ -159,6 +168,7 @@ Each import creates an Import Task, with the following statuses:
 - **Queue status**: view counts of queued / processing / completed / failed / cancelled tasks, plus active tasks.
 - **Import history**: browse past imports with pagination, filterable by status and user.
 - **Permissions**: Super Administrators can see all Import Tasks; regular users only see their own.
+- **Possible duplicates**: background batch imports run unattended, so possible duplicates are imported as usual and flagged as "Possible duplicates" in the task result. Open it to compare each question and delete the new ones you don't need.
 
 ## FAQ
 

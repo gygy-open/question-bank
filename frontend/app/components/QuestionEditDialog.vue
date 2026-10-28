@@ -43,6 +43,10 @@ import { toast } from 'vue-sonner'
 import KnowledgePointSelector from './KnowledgePointSelector.vue'
 import QuestionDraftEditor from './QuestionDraftEditor.vue'
 import StimulusTargetPickerDialog from './stimuli/StimulusTargetPickerDialog.vue'
+import DuplicateHint from './dedup/DuplicateHint.vue'
+import DuplicateConfirmDialog from './dedup/DuplicateConfirmDialog.vue'
+import { useDebounceFn } from '@vueuse/core'
+import { type DuplicateCandidate, duplicateCandidatesFromError } from '@/lib/questionDedup'
 import AnswerDisplay from './AnswerDisplay.vue'
 import RichContent from './rich-editor/RichContent.vue'
 import {
@@ -195,7 +199,50 @@ const handleSaveImport = () => {
   emit('update:open', false)
 }
 
-const handlePublish = async () => {
+// --- 查重 ---
+// 编辑时防抖预检,给出非阻塞提示;保存时后端仍会强制检查,命中返回 409 再让用户确认。
+const liveDuplicates = ref<DuplicateCandidate[]>([])
+const confirmDuplicates = ref<DuplicateCandidate[]>([])
+const confirmDuplicatesOpen = ref(false)
+let checkSeq = 0
+
+const dedupInput = computed(() => {
+  if (!props.open || isImportMode.value || !draft.value) return null
+  const d = draft.value
+  if (!d.content || !d.content.content?.length) return null
+  const question = props.question as Partial<Question> | null | undefined
+  return JSON.stringify({
+    q_type: d.q_type,
+    content: d.content,
+    options: hasOptionPool(d.q_type) ? d.options : null,
+    subject_id: d.subject_id ?? undefined,
+    stimulus_id: question?.stimulus_id ?? undefined,
+    exclude_question_id: props.mode === 'edit' && d.id ? d.id : undefined,
+  })
+})
+
+const runDuplicateCheck = useDebounceFn(async (body: string | null) => {
+  const seq = ++checkSeq
+  if (!body) {
+    liveDuplicates.value = []
+    return
+  }
+  try {
+    const res = await $api<{ candidates: DuplicateCandidate[] }>('/questions/duplicate-check', {
+      method: 'POST',
+      body: JSON.parse(body),
+    })
+    if (seq === checkSeq) liveDuplicates.value = res.candidates
+  } catch {
+    // 预检只是提示,失败时静默
+    if (seq === checkSeq) liveDuplicates.value = []
+  }
+}, 800)
+
+watch(dedupInput, (body) => { runDuplicateCheck(body) }, { immediate: true })
+watch(() => props.open, (isOpen) => { if (!isOpen) liveDuplicates.value = [] })
+
+const handlePublish = async (allowDuplicate = false) => {
   if (!draft.value) return
   const error = validateQuestionDraft(draft.value)
   if (error) {
@@ -204,7 +251,7 @@ const handlePublish = async () => {
   }
   isSubmitting.value = true
   try {
-    const payload = buildQuestionPayload(draft.value)
+    const payload = { ...buildQuestionPayload(draft.value), ...(allowDuplicate ? { allow_duplicate: true } : {}) }
     let saved: Question
     if (props.mode === 'edit' && draft.value.id) {
       saved = await $api<Question>(`/questions/${draft.value.id}`, { method: 'PUT', body: payload })
@@ -216,6 +263,12 @@ const handlePublish = async () => {
     emit('success', saved)
     emit('update:open', false)
   } catch (err: unknown) {
+    const candidates = duplicateCandidatesFromError(err)
+    if (candidates) {
+      confirmDuplicates.value = candidates
+      confirmDuplicatesOpen.value = true
+      return
+    }
     console.error(err)
     toast.error(t('common.saveFailed'), { description: err instanceof Error ? err.message : undefined })
   } finally {
@@ -269,7 +322,7 @@ const toggleTag = (tagId: number) => {
               <Layers3 class="mr-2 h-4 w-4" />
               {{ t('stimuli.targetPicker.title') }}
             </Button>
-            <Button v-if="!isImportMode" size="sm" @click="handlePublish" :disabled="isSubmitting">
+            <Button v-if="!isImportMode" size="sm" @click="handlePublish()" :disabled="isSubmitting">
               <Loader2 v-if="isSubmitting" class="mr-2 h-4 w-4 animate-spin" />
               <Save v-else class="mr-2 h-4 w-4" />
               {{ mode === 'create' ? t('common.save') : t('questionEditor.update') }}
@@ -288,6 +341,8 @@ const toggleTag = (tagId: number) => {
             <!-- Editor (Left) -->
             <section class="border-b border-border/50 bg-background px-6 py-6 lg:border-b-0 lg:border-r lg:h-full lg:overflow-y-auto">
               <div class="mx-auto max-w-3xl space-y-6">
+
+                <DuplicateHint v-if="!isImportMode" :candidates="liveDuplicates" />
 
                 <QuestionDraftEditor v-if="draft" :model-value="draft">
                   <template v-if="!isImportMode" #meta>
@@ -462,5 +517,10 @@ const toggleTag = (tagId: number) => {
     :subject-id="(question as Partial<Question>).subject_id"
     :question-visibility="(question as Partial<Question>).visibility ?? 'public'"
     @select="joinStimulus"
+  />
+  <DuplicateConfirmDialog
+    v-model:open="confirmDuplicatesOpen"
+    :candidates="confirmDuplicates"
+    @confirm="handlePublish(true)"
   />
 </template>

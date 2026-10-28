@@ -46,6 +46,22 @@ class Unprocessable(DomainError):
     """语义上无法处理(引用的题目缺失、跨学科引用)。"""
 
 
+class DuplicateSuspected(Conflict):
+    """题库中已有重复或高度相似的题目;调用方确认后以 allow_duplicate 重试。
+
+    params 携带候选(单题为 ``candidates``,批量为 ``items``),供界面对比展示。
+    """
+
+    def __init__(self, params: Dict[str, Any]) -> None:
+        from app.core.api_errors import ErrorCode
+
+        super().__init__(
+            "Duplicate or highly similar questions already exist",
+            ErrorCode.QUESTION_DUPLICATE_SUSPECTED,
+            params,
+        )
+
+
 # 单点映射表。新增 DomainError 子类必须在这里登记,否则 handler 会退化成 500。
 DOMAIN_ERROR_STATUS: dict[type[DomainError], int] = {
     NotFound: 404,

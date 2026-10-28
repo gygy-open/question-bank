@@ -258,6 +258,36 @@ async def create_derived_question(
     )
 
 
+@router.post("/duplicate-check", response_model=schemas.DuplicateCheckResponse)
+async def check_duplicates(
+    *,
+    db: deps.SessionDep,
+    body: schemas.DuplicateCheckRequest,
+    current_user: models.User = Depends(deps.get_current_active_user),
+) -> Any:
+    """录入前查重(只读):返回同学科内当前用户可见的重复 / 高度相似题。"""
+    from app.services import question_dedup
+
+    subject_id = body.subject_id or current_user.last_active_subject_id
+    if subject_id is None:
+        return {"candidates": []}
+    deps.require(current_user, Permission.VIEW_QUESTION, subject_id=subject_id)
+    key = question_dedup.key_from_payload(
+        q_type=body.q_type,
+        content=body.content,
+        options=body.options,
+        stimulus_content=await question_dedup.stimulus_content(db, body.stimulus_id, subject_id=subject_id),
+    )
+    found = await question_dedup.find_duplicates(
+        db,
+        viewer=current_user,
+        subject_id=subject_id,
+        key=key,
+        exclude_ids=(body.exclude_question_id,) if body.exclude_question_id else (),
+    )
+    return {"candidates": question_dedup.candidates_payload(found)}
+
+
 @router.get("/{id}", response_model=schemas.Question)
 async def read_question(
     *,

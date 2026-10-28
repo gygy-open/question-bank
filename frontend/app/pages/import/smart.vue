@@ -29,6 +29,9 @@ import { Separator } from '@/components/ui/separator'
 import { Stepper, StepperItem, StepperIndicator, StepperTitle, StepperSeparator } from '@/components/ui/stepper'
 import QuestionListItem from '@/components/QuestionListItem.vue'
 import QuestionGroupReview from '@/components/import/QuestionGroupReview.vue'
+import ImportDuplicateNotice from '@/components/dedup/ImportDuplicateNotice.vue'
+import type { DuplicateCandidate, IntraBatchDuplicate } from '@/lib/questionDedup'
+import { useDebounceFn } from '@vueuse/core'
 import QuestionEditDialog from '@/components/QuestionEditDialog.vue'
 import StructuredTemplateGuideDialog from '@/components/StructuredTemplateGuideDialog.vue'
 import PageHeader from '@/components/PageHeader.vue'
@@ -304,6 +307,9 @@ const acceptExtraction = (data: any) => {
         return
     }
     importList.value = drafts
+    duplicates.value = {}
+    batchDuplicates.value = {}
+    duplicatesApplied.value = false
     stimuli.value = data.stimuli ?? []
     questionGroups.value = data.question_groups ?? []
     const groupedQuestionIds = new Set(questionGroups.value.flatMap((group) => group.question_temp_ids))
@@ -444,6 +450,97 @@ const handleUploadImage = async () => {
 // 抽取结果由 /upload/* 直接返回 v2 草稿项，无需再单独转换。
 
 
+// 逐条应用全局设置；缺答案的题降级为草稿（与后端 adapter 对齐）。
+const toPayloadQuestion = (item: ImportDraft) => {
+    const d: ImportDraft = JSON.parse(JSON.stringify(item))
+    d.subject_id = d.subject_id || globalSettings.value.subject_id
+    d.source = globalSettings.value.source || ''
+    d.status = d.answer ? globalSettings.value.status : 'draft'
+    return {
+        ...buildQuestionPayload(d),
+        ai_suggested_tags: d.ai_suggested_tags,
+        temp_id: d.temp_id,
+        parent_temp_id: d.parent_temp_id,
+    }
+}
+
+// --- 查重 ---
+// 进入审核页后对全部题目预检(与题库比对 + 批内互查)。命中「重复」的独立题在每次解析后
+// 默认取消勾选一次;之后以用户勾选为准 —— 勾选即视为确认录入。材料题的小题不能单独取消,只做标记。
+const duplicates = ref<Record<string, DuplicateCandidate[]>>({})
+const batchDuplicates = ref<Record<string, IntraBatchDuplicate[]>>({})
+const duplicatesApplied = ref(false)
+
+const groupedTempIds = computed(() => new Set(questionGroups.value.flatMap((group) => group.question_temp_ids)))
+const questionNumberOf = (ref: string) => {
+    const index = importList.value.findIndex((item) => item.temp_id === ref)
+    return index >= 0 ? index + 1 : undefined
+}
+const isFlagged = (item: ImportDraft) =>
+    !!item.temp_id && !!(duplicates.value[item.temp_id]?.length || batchDuplicates.value[item.temp_id]?.length)
+const duplicateSummary = computed(() => {
+    let existing = 0
+    let similar = 0
+    let batch = 0
+    for (const item of importList.value) {
+        if (!item.temp_id) continue
+        const found = duplicates.value[item.temp_id] ?? []
+        if (found.some((c) => c.level === 'duplicate')) existing++
+        else if (found.length) similar++
+        if (batchDuplicates.value[item.temp_id]?.length) batch++
+    }
+    return { existing, similar, batch, flagged: existing + similar + batch }
+})
+
+const dedupSignature = computed(() => step.value === 'review' && globalSettings.value.subject_id
+    ? JSON.stringify([
+        globalSettings.value.subject_id,
+        importList.value.map((item) => [item.temp_id, item.q_type, item.content, item.options]),
+        stimuli.value,
+        questionGroups.value,
+    ])
+    : null)
+
+const refreshDuplicates = useDebounceFn(async (signature: string | null) => {
+    if (!signature || !globalSettings.value.subject_id) {
+        duplicates.value = {}
+        batchDuplicates.value = {}
+        return
+    }
+    try {
+        const structurePayload = buildImportStructurePayload(
+            importList.value.map(toPayloadQuestion),
+            importList.value,
+            stimuli.value,
+            questionGroups.value,
+            paper.value,
+        )
+        const res = await $api<{
+            duplicates: Record<string, DuplicateCandidate[]>
+            intra_batch_duplicates: Record<string, IntraBatchDuplicate[]>
+        }>(`/subjects/${globalSettings.value.subject_id}/paper-imports/preview`, {
+            method: 'POST',
+            body: { scope: compositionScope.value, ...structurePayload },
+        })
+        if (signature !== dedupSignature.value) return
+        duplicates.value = res.duplicates ?? {}
+        batchDuplicates.value = res.intra_batch_duplicates ?? {}
+        if (!duplicatesApplied.value) {
+            duplicatesApplied.value = true
+            for (const item of importList.value) {
+                if (!item.temp_id || groupedTempIds.value.has(item.temp_id)) continue
+                const exact = duplicates.value[item.temp_id]?.some((c) => c.level === 'duplicate')
+                    || batchDuplicates.value[item.temp_id]?.some((b) => b.level === 'duplicate')
+                if (exact) item.selected = false
+            }
+        }
+    } catch {
+        // 预检失败不影响导入,提交时后端仍会复核
+    }
+}, 600)
+
+watch(dedupSignature, (signature) => { refreshDuplicates(signature) })
+
 const handleImport = async (proceedWithPartial = false) => {
     if (!globalSettings.value.subject_id) {
         toast.error(t('importSmart.upload.selectSubjectFirst'))
@@ -467,19 +564,7 @@ const handleImport = async (proceedWithPartial = false) => {
 
     isImporting.value = true
     try {
-        // 逐条应用全局设置；缺答案的题降级为草稿（与后端 adapter 对齐）。
-        const payloadQuestions = selectedItems.map((item) => {
-            const d: ImportDraft = JSON.parse(JSON.stringify(item))
-            d.subject_id = d.subject_id || globalSettings.value.subject_id
-            d.source = globalSettings.value.source || ''
-            d.status = d.answer ? globalSettings.value.status : 'draft'
-            return {
-                ...buildQuestionPayload(d),
-                ai_suggested_tags: d.ai_suggested_tags,
-                temp_id: d.temp_id,
-                parent_temp_id: d.parent_temp_id,
-            }
-        })
+        const payloadQuestions = selectedItems.map(toPayloadQuestion)
 
         // 幂等键绑定本次提交：网络重试不会重复建题建稿。
         idempotencyKey.value ||= generateTempId()
@@ -528,6 +613,8 @@ const handleImport = async (proceedWithPartial = false) => {
             source_ref: sourceRef.value,
             content_sha256: contentSha256.value,
             idempotency_key: idempotencyKey.value,
+            // 用户仍勾选的疑似重复题视为已确认
+            allow_duplicate_temp_ids: selectedItems.filter(isFlagged).map((item) => item.temp_id),
         }
 
         const res = await $api<any>(
@@ -956,8 +1043,20 @@ const reset = () => {
                 <div v-if="importList.length === 0" class="text-center py-8 text-muted-foreground">
                     {{ t('importSmart.review.empty') }}
                 </div>
+                <Alert v-if="duplicateSummary.flagged" class="border-amber-500/50 bg-amber-500/5">
+                    <AlertCircle class="h-4 w-4 text-amber-600" />
+                    <AlertDescription>
+                        {{ t('questionDedup.import.summary', { total: importList.length, existing: duplicateSummary.existing, similar: duplicateSummary.similar, batch: duplicateSummary.batch }) }}
+                    </AlertDescription>
+                </Alert>
 
                 <template v-for="entry in visibleReviewEntries" :key="entry.kind === 'question' ? entry.question.uid : entry.group.temp_id">
+                    <ImportDuplicateNotice
+                        v-if="entry.kind === 'question' && entry.question.temp_id"
+                        :candidates="duplicates[entry.question.temp_id]"
+                        :batch="batchDuplicates[entry.question.temp_id]"
+                        :number-of="questionNumberOf"
+                    />
                     <QuestionListItem
                         v-if="entry.kind === 'question'"
                         :item="entry.question"
@@ -973,6 +1072,9 @@ const reset = () => {
                     <QuestionGroupReview
                         v-else
                         :entry="entry"
+                        :duplicates="duplicates"
+                        :batch-duplicates="batchDuplicates"
+                        :number-of="questionNumberOf"
                         :all-knowledge-points="knowledgePoints"
                         @edit="editItem"
                     />

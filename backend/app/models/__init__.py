@@ -6,7 +6,7 @@ from .subject_member import SubjectMember
 from .knowledge_point import KnowledgePoint
 from .tag import Tag
 from .tag_category import TagCategory
-from .question import Question
+from .question import Question, QuestionDedupBand
 from .stimulus import Stimulus
 from .question_relation import QuestionRelation
 from .question_relation_audit import LegacyQuestionParentAudit
@@ -31,3 +31,6 @@ from .composition import (
     CompositionVersion,
     CompositionEvent,
 )
+
+# 题目查重签名的 flush 钩子:随模型一起加载,保证任何写入路径都会维护签名。
+from app.services import question_dedup as _question_dedup  # noqa: E402,F401

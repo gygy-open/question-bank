@@ -328,6 +328,27 @@ async def _create_media_upload_url(ctx: ExecutionContext, args: Dict[str, Any]) 
     }
 
 
+async def _check_duplicates(ctx: ExecutionContext, args: Dict[str, Any]) -> Dict[str, Any]:
+    from app.services import question_dedup
+
+    subject_id = await _require_subject(ctx, args)
+    if not args.get("q_type"):
+        raise ToolError({"status": 422, "detail": "q_type is required"})
+    key = question_dedup.key_from_payload(
+        q_type=args["q_type"],
+        content=args.get("content"),
+        options=args.get("options"),
+        stimulus_content=await question_dedup.stimulus_content(
+            ctx.db, _optional_int(args, "stimulus_id"), subject_id=subject_id
+        ),
+    )
+    exclude = _optional_int(args, "exclude_question_id")
+    found = await question_dedup.find_duplicates(
+        ctx.db, viewer=ctx.actor, subject_id=subject_id, key=key, exclude_ids=(exclude,) if exclude else ()
+    )
+    return {"candidates": question_dedup.candidates_payload(found)}
+
+
 async def _list_subjects(ctx: ExecutionContext, args: Dict[str, Any]) -> Dict[str, Any]:
     subjects = (await ctx.db.execute(select(Subject).order_by(Subject.id))).scalars().all()
     accessible = permissions.accessible_subject_ids(ctx.actor)
@@ -619,6 +640,25 @@ def _read_tools() -> List[McpTool]:
             description="Get the full content of a question by ID: stem, options, answer, explanation, knowledge points and tags.",
             input_schema=_schema({"id": {"type": "integer"}}, ["id"]),
             handler=_get_question,
+            read_only=True,
+        ),
+        McpTool(
+            name="check_question_duplicates",
+            description=(
+                "Check whether the bank already has duplicate or highly similar questions for a draft, without "
+                "creating anything. Formatting differences (spaces, punctuation, numbering, LaTeX spacing, option "
+                "order) are ignored. level=duplicate means the same question; level=similar with variant=true "
+                "means only numbers/formulas differ."
+            ),
+            input_schema=_schema({
+                "subject_id": _SUBJECT_ID,
+                "q_type": {"type": "string", "enum": [t.value for t in QuestionType]},
+                "content": {"type": "object", "description": "Question stem as a RichDoc (same as question_create)."},
+                "options": {"type": "array", "items": {"type": "object"}, "description": "Options as in question_create."},
+                "stimulus_id": {"type": "integer", "description": "Material the question belongs to, if any."},
+                "exclude_question_id": {"type": "integer", "description": "Ignore this question (when editing it)."},
+            }, ["subject_id", "q_type", "content"]),
+            handler=_check_duplicates,
             read_only=True,
         ),
         McpTool(

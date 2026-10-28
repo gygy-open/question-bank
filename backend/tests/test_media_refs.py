@@ -87,9 +87,11 @@ async def _refs(db_session, owner_type: MediaOwnerType, owner_id: int) -> set[in
 
 
 async def _create_question(client, user, subject_id: int, content: dict, visibility="public"):
+    # 这里的测试会故意建内容相同的题(不同用户/可见性),与查重无关
     return await client.post(
         f"{API}/questions",
-        json={"content": content, "q_type": "free_response", "subject_id": subject_id, "visibility": visibility},
+        json={"content": content, "q_type": "free_response", "subject_id": subject_id,
+              "visibility": visibility, "allow_duplicate": True},
         headers=_auth(user),
     )
 

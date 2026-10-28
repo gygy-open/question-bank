@@ -116,6 +116,8 @@ class PaperImportResult:
     temp_id_map: Dict[str, int] = field(default_factory=dict)
     stimulus_temp_id_map: Dict[str, int] = field(default_factory=dict)
     reused_existing: bool = False
+    # 无人值守导入(worker)记录的疑似重复:新题 id(str) → 候选
+    duplicates: Dict[str, List[Dict[str, Any]]] = field(default_factory=dict)
 
 
 def file_sha256(data: bytes) -> str:
@@ -577,6 +579,7 @@ async def _result_from_task(db: AsyncSession, task: ImportTask) -> PaperImportRe
             for key, value in summary.get("stimulus_temp_id_map", {}).items()
         },
         reused_existing=True,
+        duplicates=summary.get("duplicates") or {},
     )
     if result.composition_id is None and task.composition_state is CompositionImportState.CREATED:
         comp = await _composition_of_task(db, task.id)
@@ -596,9 +599,86 @@ def _store_result_summary(task: ImportTask, result: PaperImportResult) -> None:
             "composition_title": result.composition_title,
             "temp_id_map": result.temp_id_map,
             "stimulus_temp_id_map": result.stimulus_temp_id_map,
+            "duplicates": result.duplicates,
         },
         ensure_ascii=False,
     )
+
+
+def _stimulus_content_by_question(
+    stimuli: Sequence[Mapping[str, Any]], question_groups: Sequence[Mapping[str, Any]]
+) -> Dict[str, Any]:
+    """题目 temp_id → 所属材料内容(查重要把材料一起比,否则「(1) 求 x」这类小题全都撞车)。"""
+    contents: Dict[str, Any] = {}
+    for raw in stimuli:
+        content = raw.get("content")
+        if content is None:
+            content = markdown_to_rich_doc(str(raw.get("markdown") or ""))
+        contents[str(raw.get("temp_id"))] = content
+    out: Dict[str, Any] = {}
+    for group in question_groups:
+        content = contents.get(str(group.get("stimulus_temp_id")))
+        for ref in group.get("question_temp_ids") or []:
+            out[str(ref)] = content
+    return out
+
+
+async def _detect_duplicates(
+    db: AsyncSession,
+    *,
+    actor,
+    subject_id: int,
+    entries: Sequence[tuple[str, schemas.QuestionCreate]],
+    stimuli: Sequence[Mapping[str, Any]],
+    question_groups: Sequence[Mapping[str, Any]],
+):
+    from app.services import question_dedup
+
+    stimulus_of = _stimulus_content_by_question(stimuli, question_groups)
+    items = [
+        question_dedup.BatchItem(
+            ref,
+            question_dedup.key_from_payload(
+                q_type=question_in.q_type,
+                content=question_in.content,
+                options=question_in.options,
+                stimulus_content=stimulus_of.get(ref),
+            ),
+        )
+        for ref, question_in in entries
+    ]
+    return await question_dedup.find_duplicates_batch(db, viewer=actor, subject_id=subject_id, items=items)
+
+
+def _question_ref(raw: Mapping[str, Any], index: int) -> str:
+    return str(raw.get("temp_id") or f"#{index}")
+
+
+async def preview_duplicates(
+    db: AsyncSession,
+    *,
+    actor,
+    subject_id: int,
+    questions: Sequence[Mapping[str, Any]],
+    stimuli: Sequence[Mapping[str, Any]],
+    question_groups: Sequence[Mapping[str, Any]],
+) -> tuple[Dict[str, List[Dict[str, Any]]], Dict[str, List[Dict[str, Any]]]]:
+    """预检:每道题(按 temp_id)与题库的重复候选,以及批内互相重复。无法解析的题跳过。"""
+    from app.services import question_dedup
+
+    entries = []
+    for index, raw in enumerate(_flatten_questions(questions)):
+        try:
+            question_in = _build_question_create(
+                raw, subject_id=subject_id, default_status=QuestionStatus.DRAFT, source=None
+            )
+        except (ValidationError, ValueError):
+            continue
+        entries.append((_question_ref(raw, index), question_in))
+    existing, intra = await _detect_duplicates(
+        db, actor=actor, subject_id=subject_id, entries=entries, stimuli=stimuli, question_groups=question_groups
+    )
+    return question_dedup.mapping_payload(existing), intra
 
 
 async def commit_paper_import(
@@ -623,8 +703,14 @@ async def commit_paper_import(
     content_sha256: Optional[str] = None,
     idempotency_key: Optional[str] = None,
     import_task: Optional[ImportTask] = None,
+    duplicate_check: bool = True,
+    allow_duplicate_refs: Sequence[str] = (),
 ) -> PaperImportResult:
-    """在单一工作单元内完成建任务、建题、建稿、写 AST。调用方负责 commit。"""
+    """在单一工作单元内完成建任务、建题、建稿、写 AST。调用方负责 commit。
+
+    duplicate_check 时,与题库重复/高度相似(或批内重复)且不在 allow_duplicate_refs 中的题
+    按「跳过」处理 —— 预检之后、提交之前别人新录入的重复题也会被拦下。
+    """
     questions = _flatten_questions(questions)
     if not questions:
         raise PaperImportError("没有选中任何题目。", ErrorCode.PAPER_IMPORT_NO_QUESTIONS)
@@ -664,6 +750,34 @@ async def commit_paper_import(
             )
             continue
         plans.append((raw, question_in))
+
+    if duplicate_check and plans:
+        allowed = {str(ref) for ref in allow_duplicate_refs}
+        index_of = {id(raw): index for index, raw in enumerate(questions)}
+        refs = {id(raw): _question_ref(raw, index_of[id(raw)]) for raw, _ in plans}
+        existing_dups, intra_dups = await _detect_duplicates(
+            db,
+            actor=actor,
+            subject_id=subject_id,
+            entries=[(refs[id(raw)], question_in) for raw, question_in in plans],
+            stimuli=stimuli,
+            question_groups=question_groups,
+        )
+        kept = []
+        for raw, question_in in plans:
+            ref = refs[id(raw)]
+            hits = [c.question_id for c in existing_dups.get(ref, [])]
+            twins = [item["ref"] for item in intra_dups.get(ref, [])]
+            if (hits or twins) and ref not in allowed:
+                detail = ", ".join([f"#{qid}" for qid in hits] + [f"本批 {t}" for t in twins])
+                skipped.append(SkippedQuestion(
+                    index=index_of[id(raw)],
+                    temp_id=raw.get("temp_id"),
+                    message=f"与已有题目重复或高度相似({detail}),未确认录入",
+                ))
+                continue
+            kept.append((raw, question_in))
+        plans = kept
 
     if not plans:
         raise PaperImportError(
@@ -883,7 +997,7 @@ async def commit_extracted_paper_import(
     questions = extracted_to_v2_review(
         extraction.get("questions") or [], subject_id=subject_id
     )
-    return await commit_paper_import(
+    result = await commit_paper_import(
         db,
         actor=actor,
         subject_id=subject_id,
@@ -898,8 +1012,35 @@ async def commit_extracted_paper_import(
         proceed_with_partial=True,
         default_status=QuestionStatus.PENDING,
         filename=import_task.original_filename,
+        # 无人值守:照常入库,事后在任务结果里列出疑似重复(见 _record_duplicates)
+        duplicate_check=False,
         import_task=import_task,
     )
+    await _record_duplicates(db, actor=actor, subject_id=subject_id, result=result)
+    _store_result_summary(import_task, result)
+    return result
+
+
+async def _record_duplicates(db: AsyncSession, *, actor, subject_id: int, result: PaperImportResult) -> None:
+    """事后查重:每道新题与题库及本批更早的题比对(排除自己和本批之后的题)。"""
+    from app.services import question_dedup
+
+    await db.flush()
+    created = result.created_questions
+    created_ids = [q.id for q in created]
+    for index, question in enumerate(created):
+        if not question.dedup_text:
+            continue
+        key = question_dedup.DedupKey(
+            q_type=getattr(question.q_type, "value", question.q_type),
+            text=question.dedup_text,
+            stem_length=len(question.dedup_text),
+        )
+        found = await question_dedup.find_duplicates(
+            db, viewer=actor, subject_id=subject_id, key=key, exclude_ids=created_ids[index:]
+        )
+        if found:
+            result.duplicates[str(question.id)] = question_dedup.candidates_payload(found)
 
 
 async def _composition_of_task(db: AsyncSession, task_id: int):

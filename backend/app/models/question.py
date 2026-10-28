@@ -1,6 +1,6 @@
 from sqlalchemy import (
     Column, Integer, SmallInteger, Boolean, Text, ForeignKey, Table, Enum,
-    DateTime, JSON, String, text, CheckConstraint, UniqueConstraint,
+    DateTime, JSON, String, text, CheckConstraint, UniqueConstraint, Index, BigInteger,
 )
 from sqlalchemy.dialects.mysql import LONGTEXT
 from sqlalchemy.orm import relationship
@@ -52,6 +52,7 @@ class Question(Base):
     """题目表"""
     __tablename__ = 'questions'
     __table_args__ = (
+        Index("ix_questions_subject_dedup_fingerprint", "subject_id", "dedup_fingerprint"),
         # 软删除的小题 stimulus_position 置 NULL,不占用位置。
         UniqueConstraint("stimulus_id", "stimulus_position", name="uq_questions_stimulus_position"),
         CheckConstraint(
@@ -80,6 +81,11 @@ class Question(Base):
     content_revision = Column(Integer, nullable=False, default=1, server_default="1")
     # 迁移无法解析行的人工复核标记;不进入 API / pydantic schema。
     needs_review = Column(Boolean, nullable=False, default=False, server_default=text("0"))
+
+    # 查重签名(见 app/services/question_dedup.py):由 flush 钩子维护,不进入 API schema。
+    dedup_fingerprint = Column(String(64), nullable=True)
+    dedup_text = Column(_RichTextColumn, nullable=True)
+    dedup_version = Column(SmallInteger, nullable=True)
 
     deleted_at = Column(DateTime, nullable=True) # 软删除时间
     
@@ -134,3 +140,16 @@ class Question(Base):
 
     knowledge_points = relationship("KnowledgePoint", secondary=question_knowledge_points, back_populates="questions")
     tags = relationship("Tag", secondary=question_tags, back_populates="questions")
+
+
+class QuestionDedupBand(Base):
+    """题目查重的 MinHash-LSH 分桶:同桶即为近似重复的候选。由 flush 钩子维护。"""
+    __tablename__ = "question_dedup_bands"
+    __table_args__ = (
+        Index("ix_question_dedup_bands_lookup", "subject_id", "band", "hash"),
+    )
+
+    question_id = Column(Integer, ForeignKey("questions.id", ondelete="CASCADE"), primary_key=True)
+    band = Column(SmallInteger, primary_key=True)
+    subject_id = Column(Integer, nullable=True)
+    hash = Column(BigInteger, nullable=False)

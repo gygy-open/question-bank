@@ -51,6 +51,19 @@ The question list supports combining multiple filters:
 - Deleting a parent question also deletes its child questions (cascade).
 - Use cases: material questions with several sub-questions, question variants, sub-parts.
 
+## Duplicate Check
+
+When you create or edit a question, it is compared with the **questions you can see in the same subject**. If a duplicate or highly similar question exists, you are asked to confirm before it is saved.
+
+- **Formatting doesn't matter**: whitespace, line breaks, Chinese/English punctuation, full/half-width characters, question numbers (e.g. "1." or "(2)"), formula notation (e.g. `\dfrac` vs `\frac`) and option order are all ignored.
+- **What is compared**: question type, stem, options, and the material of material sub-questions; answers and explanations are not compared.
+- **Two levels**:
+  - **Duplicate**: identical after normalization.
+  - **Highly similar**: 90% similar or more (typos, a few missing words). Questions that differ only in numbers or formulas are marked "possibly a variant".
+- **Hints while editing**: the editor shows possible duplicates at the top as you type; expand to view and open them.
+- **Confirmation on save**: if a match is found on save, a comparison appears and you can choose "Save anyway" or cancel.
+- Smart Import, MCP and the AI Assistant check for duplicates too; see [Smart Import](/en/features/import#duplicate-check) and [MCP Access](/en/features/mcp).
+
 ## Soft Deletion
 
 - Deleting a question only sets a `deleted_at` timestamp; default queries exclude it automatically.

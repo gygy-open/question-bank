@@ -38,8 +38,14 @@ Guidelines:
 4. New questions are drafts by default and must be reviewed in the system before they are published.
    To include an image or audio in a question, get an upload URL with create_media_upload_url, upload the local file
    with curl, then put the returned node into the question content.
-5. Delete tools remove data from the user's view (questions and compositions can only be restored inside the system); confirm with the user before running them.
-6. Content (question text, titles, etc.) may be in any language; keep the user's language when writing content.
+5. Duplicate check: creating or editing a question fails with code question.duplicate_suspected when the
+   bank already has a duplicate or highly similar question (params.candidates lists them; `variant` means
+   numbers/formulas differ). Show the candidates to the user and ask. Only if the user confirms, retry with
+   allow_duplicate=true (inside `data` for question_update). Never set allow_duplicate on your own.
+   check_question_duplicates checks a draft in advance. If a candidate is the same question, prefer reusing
+   its ID (e.g. in a composition) instead of creating a copy.
+6. Delete tools remove data from the user's view (questions and compositions can only be restored inside the system); confirm with the user before running them.
+7. Content (question text, titles, etc.) may be in any language; keep the user's language when writing content.
 """
 
 

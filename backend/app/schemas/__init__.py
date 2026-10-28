@@ -9,7 +9,7 @@ from .knowledge_point import (
 )
 from .tag import Tag, TagCreate, TagUpdate, TagPage, TagImportRowError, TagImportResult
 from .tag_category import TagCategory, TagCategoryCreate, TagCategoryUpdate
-from .question import Question, QuestionCreate, QuestionUpdate, QuestionListItem, QuestionPage, QuestionBatchCreate, QuestionBatchItemCreate, QuestionReview, QuestionBatchConfirm, QuestionBatchDelete, QuestionBatchUpdate, LegacyQuestionCreate, LegacyQuestionBatchCreate, LegacyBatchError, LegacyBatchResult
+from .question import Question, QuestionCreate, QuestionUpdate, QuestionListItem, QuestionPage, QuestionBatchCreate, QuestionBatchItemCreate, DuplicateCheckRequest, DuplicateCheckResponse, QuestionReview, QuestionBatchConfirm, QuestionBatchDelete, QuestionBatchUpdate, LegacyQuestionCreate, LegacyQuestionBatchCreate, LegacyBatchError, LegacyBatchResult
 from .question_relation import (
     QuestionRelationCreate, QuestionRelationRead, QuestionRelationsRead,
 )

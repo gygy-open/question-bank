@@ -98,6 +98,7 @@ class ErrorCode(StrEnum):
     # common / question / stimulus / question_relation
     SUBJECT_NOT_FOUND = "subject.not_found"
     QUESTION_NOT_FOUND = "question.not_found"
+    QUESTION_DUPLICATE_SUSPECTED = "question.duplicate_suspected"
     QUESTION_INVALID_REVIEW_ACTION = "question.invalid_review_action"
     QUESTION_NONE_FOUND = "question.none_found"
     STIMULUS_NOT_FOUND = "stimulus.not_found"

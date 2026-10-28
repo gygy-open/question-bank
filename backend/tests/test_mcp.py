@@ -749,3 +749,30 @@ async def test_composition_write_nodes_validation(mcp_client, ctx):
         "expected_revision": personal["revision"], "nodes": [{"type": "page_break"}],
     })
     assert other["isError"] is True
+
+
+# --------------------------------------------------------------------------- #
+# 查重
+# --------------------------------------------------------------------------- #
+async def test_mcp_duplicate_flow(mcp_client, ctx):
+    key = await _create_key(mcp_client, ctx["alice"])
+    sid = ctx["math"].id
+    stem = "在三角形 ABC 中，已知角 A 等于六十度，边 BC 的长度为二，求三角形面积的最大值。"
+    first = await _new_question(mcp_client, key, sid, stem)
+
+    check = await _call(mcp_client, key, "check_question_duplicates", {
+        "subject_id": sid, "q_type": "free_response",
+        "content": {"type": "doc", "content": [{"type": "paragraph", "content": [{"type": "text", "text": "1. " + stem}]}]},
+    })
+    assert [c["question_id"] for c in check["structuredContent"]["candidates"]] == [first]
+
+    args = {
+        "content": {"type": "doc", "content": [{"type": "paragraph", "content": [{"type": "text", "text": stem}]}]},
+        "q_type": "free_response", "subject_id": sid,
+    }
+    blocked = await _call(mcp_client, key, "question_create", args)
+    assert blocked["isError"] is True
+    text = blocked["content"][0]["text"]
+    assert "question.duplicate_suspected" in text and f'"question_id": {first}' in text
+    allowed = await _call(mcp_client, key, "question_create", {**args, "allow_duplicate": True})
+    assert allowed["isError"] is False

@@ -38,6 +38,8 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import PageHeader from '@/components/PageHeader.vue'
+import ImportTaskDuplicatesDialog from '@/components/dedup/ImportTaskDuplicatesDialog.vue'
+import type { DuplicateCandidate } from '@/lib/questionDedup'
 import { toast } from 'vue-sonner'
 import { zipFolder } from '@/lib/zipFolder'
 import { formatDateTime } from '@/lib/locale'
@@ -358,14 +360,28 @@ const statusLabel = (status: string) => {
     return (TASK_STATUSES as readonly string[]).includes(status) ? t(`importTasks.statuses.${status}`) : status
 }
 
-const getResultCount = (summaryJson?: string) => {
-    if (!summaryJson) return 0
+const parseSummary = (summaryJson?: string): Record<string, any> => {
+    if (!summaryJson) return {}
     try {
-        const summary = JSON.parse(summaryJson)
-        return summary.count || 0
+        return JSON.parse(summaryJson) ?? {}
     } catch (e) {
-        return 0
+        return {}
     }
+}
+
+const getResultCount = (summaryJson?: string) => {
+    const summary = parseSummary(summaryJson)
+    return summary.count || summary.created_question_ids?.length || 0
+}
+
+// 后台导入不拦截疑似重复,只在结果里记录(新题 id → 候选),这里供用户核对并删除
+const getDuplicates = (summaryJson?: string): Record<string, DuplicateCandidate[]> =>
+    parseSummary(summaryJson).duplicates ?? {}
+const duplicatesOpen = ref(false)
+const duplicatesOf = ref<Record<string, DuplicateCandidate[]>>({})
+const openDuplicates = (summaryJson?: string) => {
+    duplicatesOf.value = getDuplicates(summaryJson)
+    duplicatesOpen.value = true
 }
 </script>
 
@@ -591,9 +607,20 @@ const getResultCount = (summaryJson?: string) => {
                                 </Badge>
                             </TableCell>
                             <TableCell>
-                                <div v-if="task.status === 'completed'" class="text-sm text-green-600 flex items-center gap-1">
-                                    <CheckCircle class="h-3 w-3" />
-                                    {{ t('importTasks.list.extracted', { count: getResultCount(task.result_summary) }) }}
+                                <div v-if="task.status === 'completed'" class="space-y-1">
+                                    <div class="text-sm text-green-600 flex items-center gap-1">
+                                        <CheckCircle class="h-3 w-3" />
+                                        {{ t('importTasks.list.extracted', { count: getResultCount(task.result_summary) }) }}
+                                    </div>
+                                    <button
+                                        v-if="Object.keys(getDuplicates(task.result_summary)).length"
+                                        type="button"
+                                        class="flex items-center gap-1 text-sm text-amber-600 hover:underline"
+                                        @click="openDuplicates(task.result_summary)"
+                                    >
+                                        <AlertCircle class="h-3 w-3" />
+                                        {{ t('questionDedup.task.badge', { count: Object.keys(getDuplicates(task.result_summary)).length }) }}
+                                    </button>
                                 </div>
                                 <div v-else-if="task.status === 'failed'" class="text-sm text-destructive flex items-center gap-1">
                                     <TooltipProvider>
@@ -669,5 +696,6 @@ const getResultCount = (summaryJson?: string) => {
                 </div>
             </CardContent>
         </Card>
+        <ImportTaskDuplicatesDialog v-model:open="duplicatesOpen" :duplicates="duplicatesOf" />
     </div>
 </template>

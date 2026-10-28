@@ -93,7 +93,7 @@ By default the desktop edition only listens on this computer, so the address loo
 
 | Category | Tools |
 |------|------|
-| Query | `list_subjects`, `search_questions`, `get_question`, `list_knowledge_points`, `list_tags`, `list_composition_folders`, `list_compositions`, `get_composition` |
+| Query | `list_subjects`, `search_questions`, `get_question`, `check_question_duplicates`, `list_knowledge_points`, `list_tags`, `list_composition_folders`, `list_compositions`, `get_composition` |
 | Media | `create_media_upload_url` |
 | Knowledge points & tags | `knowledge_point_create`, `tag_create` (require editor permission in the subject) |
 | Questions | `question_create`, `question_update`, `question_review`, `question_delete`, `question_batch_create`, `question_batch_update`, `question_batch_confirm`, `question_batch_delete`, `question_derived_create`, `question_relation_create`, `question_relation_delete` |
@@ -106,6 +106,7 @@ Tips:
 - Changing a composition requires `expected_revision` (optimistic locking); read the latest value with `get_composition` first.
 - Recommended flow for building a paper: create it with `composition_create`, then add simple nodes (headings, Markdown text, question IDs, etc.) with `composition_write_nodes`; the server builds the internal structure. It appends by default (`mode: append`); `mode: replace` discards the existing content. `composition_replace_nodes` is a low-level tool that rewrites the node tree directly and is rarely needed.
 - New questions are drafts and still go through the [review workflow](/en/features/review-workflow) before publishing.
+- Creating questions runs the [duplicate check](/en/features/questions#duplicate-check): when a duplicate or highly similar question exists, the tool returns `question.duplicate_suspected` with the candidates, and the AI should ask you before retrying with `allow_duplicate: true`. Use `check_question_duplicates` to check in advance.
 - To add images (or audio) to questions, see [Uploading images and audio](#uploading-images-and-audio) below.
 - Delete tools carry the `destructiveHint` annotation, so most clients ask for confirmation before running them.
 

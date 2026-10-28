@@ -455,6 +455,33 @@ async def _build_question_create(
     )
 
 
+async def _find_duplicates(ctx: ExecutionContext, obj_in: QuestionCreate) -> List[Dict[str, Any]]:
+    """提案本身就是待用户确认的草稿,所以不拦截,只把查重结果告诉模型由它转告用户。"""
+    from app.services import question_dedup
+
+    key = question_dedup.key_from_payload(q_type=obj_in.q_type, content=obj_in.content, options=obj_in.options)
+    found = await question_dedup.find_duplicates(
+        ctx.db, viewer=ctx.actor, subject_id=obj_in.subject_id, key=key
+    )
+    return question_dedup.candidates_payload(found)
+
+
+def _duplicate_note(duplicates: Dict[int, List[Dict[str, Any]]]) -> str:
+    if not duplicates:
+        return ""
+
+    def label(c: Dict[str, Any]) -> str:
+        if c["level"] == "duplicate":
+            return f"#{c['question_id']}(重复)"
+        return f"#{c['question_id']}(相似 {round(c['similarity'] * 100)}%)"
+
+    lines = [
+        f"- 草稿 {qid} 与题库已有题目 " + ", ".join(label(c) for c in cands)
+        for qid, cands in duplicates.items()
+    ]
+    return "\n\n注意:以下草稿在题库中已有重复或高度相似的题目,请提醒用户核对后再确认:\n" + "\n".join(lines)
+
+
 async def propose_question_draft(ctx: ExecutionContext, args: Dict[str, Any]) -> ToolResult:
     subject_id = ctx.subject_id or ctx.actor.last_active_subject_id
     try:
@@ -462,12 +489,15 @@ async def propose_question_draft(ctx: ExecutionContext, args: Dict[str, Any]) ->
     except LegacyQuestionError as adapt_err:
         return ToolResult.text(f"Failed to create proposal: {adapt_err}")
 
+    duplicates = await _find_duplicates(ctx, obj_in)
+    obj_in.allow_duplicate = True
     question = await capabilities.run("question.create", ctx, obj_in)
+    found = {question.id: duplicates} if duplicates else {}
 
     content_preview = str(args.get("content", ""))[:100].replace("\n", " ") + "..."
     return ToolResult(
-        content=f"Proposal created: {content_preview}\nPlease ask user to confirm.",
-        data={"question_ids": [question.id]},
+        content=f"Proposal created: {content_preview}\nPlease ask user to confirm." + _duplicate_note(found),
+        data={"question_ids": [question.id], "duplicates": found},
         ui=[proposal_directive("single", [question.id])],
     )
 
@@ -481,9 +511,12 @@ async def propose_questions_batch(ctx: ExecutionContext, args: Dict[str, Any]) -
     created_ids: List[int] = []
     summaries: List[str] = []
     failed_count = 0
+    duplicates: Dict[int, List[Dict[str, Any]]] = {}
 
     async def create_recursive(q_data: Dict[str, Any], parent_id: Optional[int] = None) -> List[int]:
         obj_in = await _build_question_create(ctx, q_data, subject_id=subject_id)
+        found = await _find_duplicates(ctx, obj_in)
+        obj_in.allow_duplicate = True
         if parent_id is None:
             question = await capabilities.run("question.create", ctx, obj_in)
         else:
@@ -492,6 +525,8 @@ async def propose_questions_batch(ctx: ExecutionContext, args: Dict[str, Any]) -
                 ctx,
                 DerivedQuestionCreateInput(source_question_id=parent_id, data=obj_in),
             )
+        if found:
+            duplicates[question.id] = found
         all_ids = [question.id]
         for child_data in q_data.get("children", []) or []:
             all_ids.extend(await create_recursive(child_data, parent_id=question.id))
@@ -514,9 +549,9 @@ async def propose_questions_batch(ctx: ExecutionContext, args: Dict[str, Any]) -
     return ToolResult(
         content=(
             f"Batch proposal created for {len(created_ids)} questions:\n{summary_text}\n\n"
-            "Please ask user to confirm."
+            "Please ask user to confirm." + _duplicate_note(duplicates)
         ),
-        data={"question_ids": created_ids},
+        data={"question_ids": created_ids, "duplicates": duplicates},
         ui=[proposal_directive("batch", created_ids)],
     )
 

@@ -21,6 +21,7 @@ from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncConnection, AsyncEngine, AsyncSession
 
 from app.models.system_setting import DATA_MIGRATION_KEY_PREFIX, SystemSetting
+from app.services.question_dedup_core import DEDUP_VERSION
 
 logger = logging.getLogger(__name__)
 
@@ -80,8 +81,17 @@ async def _legacy_media_assets(db: AsyncSession) -> str:
     return report.summary()
 
 
+async def _question_dedup(db: AsyncSession) -> str:
+    """为存量题目补算查重签名;规则版本变化时任务名随之变化,会再跑一遍。"""
+    from app.services.question_dedup import backfill
+
+    count = await backfill(db)
+    return f"backfilled {count} questions"
+
+
 DATA_MIGRATIONS: List[DataMigration] = [
     DataMigration("legacy_media_assets", _legacy_media_assets),
+    DataMigration(f"question_dedup_v{DEDUP_VERSION}", _question_dedup),
 ]
 
 

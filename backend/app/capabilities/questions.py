@@ -31,7 +31,7 @@ from app.core.api_errors import ErrorCode
 
 from .base import Authz, Capability, Scope
 from .context import ExecutionContext
-from .errors import Forbidden, Invalid, NotFound
+from .errors import DuplicateSuspected, Forbidden, Invalid, NotFound
 from .registry import register
 
 
@@ -49,6 +49,32 @@ async def _load_visible_question(ctx: ExecutionContext, question_id: int) -> Que
     if not question or not is_question_visible(question, ctx.actor):
         raise NotFound("Question not found", ErrorCode.QUESTION_NOT_FOUND)
     return question
+
+
+async def ensure_not_duplicate(
+    ctx: ExecutionContext,
+    *,
+    subject_id: Optional[int],
+    q_type: Any,
+    content: Any,
+    options: Any = None,
+    stimulus_id: Optional[int] = None,
+    exclude_ids: tuple = (),
+) -> None:
+    """题库中已有重复/高度相似题时抛 DuplicateSuspected;调用方确认后带 allow_duplicate 重试。"""
+    from app.services import question_dedup
+
+    key = question_dedup.key_from_payload(
+        q_type=q_type,
+        content=content,
+        options=options,
+        stimulus_content=await question_dedup.stimulus_content(ctx.db, stimulus_id),
+    )
+    found = await question_dedup.find_duplicates(
+        ctx.db, viewer=ctx.actor, subject_id=subject_id, key=key, exclude_ids=exclude_ids
+    )
+    if found:
+        raise DuplicateSuspected({"candidates": question_dedup.candidates_payload(found)})
 
 
 class QuestionIdInput(BaseModel):
@@ -90,6 +116,10 @@ class CreateQuestion(Capability[schemas.QuestionCreate, Question]):
 
     async def execute(self, ctx: ExecutionContext, inp: schemas.QuestionCreate, target: Any) -> Question:
         inp.subject_id = self.subject_for(ctx, inp, target)
+        if not inp.allow_duplicate:
+            await ensure_not_duplicate(
+                ctx, subject_id=inp.subject_id, q_type=inp.q_type, content=inp.content, options=inp.options
+            )
         return await crud.question.create_with_tags(db=ctx.db, obj_in=inp, user_id=ctx.actor.id)
 
 
@@ -159,6 +189,14 @@ class CreateDerivedQuestion(Capability[DerivedQuestionCreateInput, Question]):
     ) -> Question:
         question_in = inp.data.model_copy(deep=True)
         question_in.subject_id = target.subject_id
+        if not question_in.allow_duplicate:
+            await ensure_not_duplicate(
+                ctx,
+                subject_id=question_in.subject_id,
+                q_type=question_in.q_type,
+                content=question_in.content,
+                options=question_in.options,
+            )
         try:
             question = await question_service.create_question(
                 db=ctx.db,
@@ -208,6 +246,7 @@ class BatchCreateQuestions(Capability[schemas.QuestionBatchCreate, List[Question
     ) -> List[Question]:
         if not inp.questions:
             return []
+        await self._check_duplicates(ctx, inp)
 
         description = inp.filename if inp.filename else f"Batch import of {len(inp.questions)} questions"
         import_task = ImportTask(
@@ -257,6 +296,43 @@ class BatchCreateQuestions(Capability[schemas.QuestionBatchCreate, List[Question
         await ctx.db.commit()
         return created
 
+    async def _check_duplicates(self, ctx: ExecutionContext, inp: schemas.QuestionBatchCreate) -> None:
+        """整批检查(含批内互相重复);未放行的命中项一并报告,整批不写入。"""
+        from app.services import question_dedup
+
+        items: List[question_dedup.BatchItem] = []
+        allowed: dict = {}
+        subjects: dict = {}
+        pending = [(str(i), q) for i, q in enumerate(inp.questions)]
+        while pending:
+            ref, item = pending.pop(0)
+            ref = item.temp_id or ref
+            subjects[ref] = item.subject_id or ctx.actor.last_active_subject_id
+            allowed[ref] = item.allow_duplicate
+            items.append(question_dedup.BatchItem(
+                ref, question_dedup.key_from_payload(q_type=item.q_type, content=item.content, options=item.options)
+            ))
+            pending.extend((f"{ref}.{j}", child) for j, child in enumerate(item.children or []))
+
+        flagged: List[dict] = []
+        by_subject: dict = {}
+        for it in items:
+            by_subject.setdefault(subjects[it.ref], []).append(it)
+        for subject_id, group in by_subject.items():
+            existing, intra = await question_dedup.find_duplicates_batch(
+                ctx.db, viewer=ctx.actor, subject_id=subject_id, items=group
+            )
+            for it in group:
+                if allowed[it.ref] or (it.ref not in existing and it.ref not in intra):
+                    continue
+                flagged.append({
+                    "ref": it.ref,
+                    "candidates": question_dedup.candidates_payload(existing.get(it.ref, [])),
+                    "batch": intra.get(it.ref, []),
+                })
+        if flagged:
+            raise DuplicateSuspected({"items": flagged})
+
 
 @register
 class UpdateQuestion(Capability[QuestionUpdateInput, Question]):
@@ -287,6 +363,32 @@ class UpdateQuestion(Capability[QuestionUpdateInput, Question]):
             raise Forbidden("The user doesn't have enough privileges", ErrorCode.AUTH_FORBIDDEN)
 
     async def execute(self, ctx: ExecutionContext, inp: QuestionUpdateInput, target: Question) -> Question:
+        data = inp.data
+        fields = data.model_fields_set
+        if not data.allow_duplicate and fields & {"content", "options", "q_type", "subject_id"}:
+            from app.services import question_dedup
+
+            subject_id = data.subject_id if "subject_id" in fields else target.subject_id
+            q_type = data.q_type if "q_type" in fields and data.q_type is not None else target.q_type
+            content = data.content if "content" in fields and data.content is not None else target.content
+            options = data.options if "options" in fields else target.options
+            key = question_dedup.key_from_payload(
+                q_type=q_type,
+                content=content,
+                options=options,
+                stimulus_content=await question_dedup.stimulus_content(ctx.db, target.stimulus_id),
+            )
+            # 只有改动影响查重签名(或换了学科)时才检查,避免改个错别字之外的字段也被拦
+            if key.fingerprint != target.dedup_fingerprint or subject_id != target.subject_id:
+                await ensure_not_duplicate(
+                    ctx,
+                    subject_id=subject_id,
+                    q_type=q_type,
+                    content=content,
+                    options=options,
+                    stimulus_id=target.stimulus_id,
+                    exclude_ids=(target.id,),
+                )
         return await crud.question.update_with_tags(
             db=ctx.db, db_obj=target, obj_in=inp.data, user_id=ctx.actor.id
         )

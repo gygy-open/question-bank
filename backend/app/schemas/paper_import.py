@@ -107,6 +107,9 @@ class PaperImportPreviewResponse(BaseModel):
     blocking_reason: Optional[str] = None
     blocking_code: Optional[str] = None
     blocking_params: Optional[Dict[str, Any]] = None
+    # 查重:题目 temp_id → 题库中的重复/高度相似候选;批内互相重复(指向更早的 temp_id)
+    duplicates: Dict[str, List[Dict[str, Any]]] = Field(default_factory=dict)
+    intra_batch_duplicates: Dict[str, List[Dict[str, Any]]] = Field(default_factory=dict)
 
 
 class PaperImportCommitRequest(BaseModel):
@@ -126,6 +129,8 @@ class PaperImportCommitRequest(BaseModel):
     source_ref: Optional[str] = None
     content_sha256: Optional[str] = None
     idempotency_key: Optional[str] = None
+    # 用户已确认「仍然录入」的疑似重复题(temp_id);其余命中查重的题按跳过处理。
+    allow_duplicate_temp_ids: List[str] = Field(default_factory=list)
 
     @model_validator(mode="after")
     def _check_composition_fields(self) -> "PaperImportCommitRequest":

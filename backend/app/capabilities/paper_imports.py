@@ -58,6 +58,7 @@ class PaperImportCommitInput(PaperImportScopeInput):
     source_ref: Optional[str] = None
     content_sha256: Optional[str] = None
     idempotency_key: Optional[str] = None
+    allow_duplicate_temp_ids: List[str] = Field(default_factory=list)
 
 
 async def _ensure_subject(ctx: ExecutionContext, subject_id: int) -> None:
@@ -92,6 +93,14 @@ class PreviewPaperImport(Capability[PaperImportPreviewInput, PaperImportPreviewR
             question_groups=inp.question_groups,
             scope_type=inp.scope_type,
         )
+        duplicates, intra = await paper_import_service.preview_duplicates(
+            ctx.db,
+            actor=ctx.actor,
+            subject_id=inp.subject_id,
+            questions=inp.questions,
+            stimuli=inp.stimuli,
+            question_groups=inp.question_groups,
+        )
         return PaperImportPreviewResponse(
             importable_count=preview.importable_count,
             skipped=[vars(s) for s in preview.skipped],
@@ -99,6 +108,8 @@ class PreviewPaperImport(Capability[PaperImportPreviewInput, PaperImportPreviewR
             blocking_reason=preview.blocking_reason,
             blocking_code=preview.blocking_code,
             blocking_params=preview.blocking_params,
+            duplicates=duplicates,
+            intra_batch_duplicates=intra,
         )
 
 
@@ -147,6 +158,7 @@ class CommitPaperImport(Capability[PaperImportCommitInput, PaperImportCommitResp
                 source_sha256=source_sha256,
                 content_sha256=inp.content_sha256,
                 idempotency_key=inp.idempotency_key,
+                allow_duplicate_refs=inp.allow_duplicate_temp_ids,
             )
         except PaperImportError as exc:
             await ctx.db.rollback()

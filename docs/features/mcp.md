@@ -93,7 +93,7 @@ claude mcp add --transport http questionbank https://qb.example.com/api/mcp --he
 
 | 类别 | 工具 |
 |------|------|
-| 查询 | `list_subjects`、`search_questions`、`get_question`、`list_knowledge_points`、`list_tags`、`list_composition_folders`、`list_compositions`、`get_composition` |
+| 查询 | `list_subjects`、`search_questions`、`get_question`、`check_question_duplicates`、`list_knowledge_points`、`list_tags`、`list_composition_folders`、`list_compositions`、`get_composition` |
 | 媒体 | `create_media_upload_url` |
 | 知识点与标签 | `knowledge_point_create`、`tag_create`（需该学科的编辑权限） |
 | 题目 | `question_create`、`question_update`、`question_review`、`question_delete`、`question_batch_create`、`question_batch_update`、`question_batch_confirm`、`question_batch_delete`、`question_derived_create`、`question_relation_create`、`question_relation_delete` |
@@ -106,6 +106,7 @@ claude mcp add --transport http questionbank https://qb.example.com/api/mcp --he
 - 修改稿件需要传入 `expected_revision`（乐观锁），先用 `get_composition` 读取最新值。
 - 组卷推荐流程：`composition_create` 新建稿件，再用 `composition_write_nodes` 写入小标题、Markdown 正文和题目 ID 等简单节点，系统自动生成内部结构。默认追加到末尾（`mode: append`），`mode: replace` 会清空原有内容。`composition_replace_nodes` 是直接改写节点树的底层工具，一般不需要使用。
 - 新建的题目默认是草稿，仍需按 [审核工作流](/features/review-workflow) 发布。
+- 录题会自动[查重](/features/questions#录入查重)：命中重复或高度相似的题时工具返回 `question.duplicate_suspected` 和候选题，AI 应先向你确认，再带 `allow_duplicate: true` 重试。也可以先用 `check_question_duplicates` 预检。
 - 题目要配图（或音频）时，见下文 [上传图片与音频](#上传图片与音频)。
 - 删除类工具带有 `destructiveHint` 标记，多数客户端会在执行前请求确认。
 
