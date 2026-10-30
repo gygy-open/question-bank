@@ -19,7 +19,7 @@
 
 QuestionBank comes in two deployment editions. Read [Editions](/en/guide/editions) first to choose the one that fits you:
 
-- **Desktop edition** (Windows tray app): works out of the box and suits individuals or small teams; you can turn on [LAN sharing](/en/desktop/lan-sharing) from the tray with one click.
+- **Desktop edition** (Windows tray app / macOS menu-bar app): works out of the box and suits individuals or small teams; you can turn on [LAN sharing](/en/desktop/lan-sharing) from the tray with one click.
 - **Server edition** (Docker Compose): deployed on a server with MySQL, suited to teams and production environments.
 
 ## Next Steps

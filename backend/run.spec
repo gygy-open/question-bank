@@ -2,8 +2,10 @@
 #
 # Build with:  uv run pyinstaller run.spec --clean
 #
-# Produces a single windowed executable that shows a system-tray icon, runs
-# migrations, the API, the background worker and serves the bundled Nuxt SPA.
+# Produces a windowed app that shows a system-tray (menu-bar) icon, runs
+# migrations, the API, the background worker and serves the bundled Nuxt SPA:
+#   - Windows: a single-file dist/question-bank.exe (wrapped by deploy/windows/installer.iss)
+#   - macOS:   a dist/QuestionBank.app bundle (onedir; see deploy/macos/package.sh)
 #
 # Prerequisites:
 #   1. Build the frontend:  (cd ../frontend && pnpm generate)
@@ -12,7 +14,10 @@
 from PyInstaller.utils.hooks import collect_all, collect_submodules
 
 import os
+import re
 import sys
+
+IS_MAC = sys.platform == "darwin"
 
 # Make ``app`` importable so we can generate the brand icon below.
 sys.path.insert(0, os.path.abspath("."))
@@ -26,23 +31,30 @@ try:
 except Exception:
     _PREVIEW = False
 
-# Render the brand logo (frontend/public/logo.svg) to a multi-size .ico that is
-# embedded into the executable. Drawn with PIL, so no SVG renderer is required.
-# Preview builds get the amber variant. deploy/windows/installer.iss reuses this file.
-_ICON = os.path.abspath(os.path.join("build", "logo.ico"))
+# Render the brand logo (frontend/public/logo.svg) to the platform icon format
+# (.ico on Windows, .icns on macOS). Drawn with PIL, so no SVG renderer is required.
+# Preview builds get the amber variant. deploy/windows/installer.iss reuses the .ico.
+_ICON = os.path.abspath(os.path.join("build", "logo.icns" if IS_MAC else "logo.ico"))
 os.makedirs(os.path.dirname(_ICON), exist_ok=True)
 try:
-    from app.branding import save_ico
+    from app.branding import save_icns, save_ico
 
-    save_ico(_ICON, preview=_PREVIEW)
+    if IS_MAC:
+        save_icns(_ICON, preview=_PREVIEW)
+    else:
+        save_ico(_ICON, preview=_PREVIEW)
 except Exception:
     _ICON = None  # fall back to the default PyInstaller icon
 
 # Startup splash: the onefile bootloader unpacks hundreds of MB before Python even starts (minutes on
 # a first launch with antivirus scanning), during which nothing else is visible. The splash is shown
 # by the bootloader and closed from app.tray once the server is ready. Needs Tcl/Tk at build time.
+# Windows only: PyInstaller rejects Splash on macOS (SystemExit, not catchable below), and the
+# onedir .app starts quickly anyway because nothing has to be unpacked.
 _SPLASH = None
 try:
+    if IS_MAC:
+        raise ImportError("splash is not supported on macOS")
     import tkinter  # noqa: F401
 
     from app.branding import save_splash
@@ -116,7 +128,7 @@ hiddenimports += [
     "uvicorn.protocols.http.auto",
     "uvicorn.protocols.websockets.auto",
     "uvicorn.lifespan.on",
-    "pystray._win32",
+    "pystray._darwin" if IS_MAC else "pystray._win32",
 ]
 
 a = Analysis(
@@ -133,20 +145,77 @@ a = Analysis(
 
 pyz = PYZ(a.pure)
 
-exe = EXE(
-    pyz,
-    a.scripts,
-    *([_SPLASH, _SPLASH.binaries] if _SPLASH else []),
-    a.binaries,
-    a.datas,
-    [],
-    name="question-bank",
-    debug=False,
-    bootloader_ignore_signals=False,
-    strip=False,
-    upx=True,
-    console=False,  # tray app: no console window
-    disable_windowed_traceback=False,
-    argv_emulation=False,
-    icon=_ICON,
-)
+if IS_MAC:
+    from app._version import __version__
+
+    # Bundle identity mirrors the Windows installer's stable/preview split so both can be installed.
+    _APP_NAME = "QuestionBank Preview" if _PREVIEW else "QuestionBank"
+    _BUNDLE_ID = "io.github.gygy-open.questionbank" + (".preview" if _PREVIEW else "")
+    # CFBundleShortVersionString must be numeric (1.2.3); the full version stays in app/_version.py.
+    _match = re.match(r"\d+(?:\.\d+){0,2}", __version__)
+    _SHORT_VERSION = _match.group(0) if _match else "0.0.0"
+
+    exe = EXE(
+        pyz,
+        a.scripts,
+        [],
+        exclude_binaries=True,
+        name="question-bank",
+        debug=False,
+        bootloader_ignore_signals=False,
+        strip=False,
+        upx=False,  # UPX breaks code signatures on macOS
+        console=False,
+        disable_windowed_traceback=False,
+        argv_emulation=False,
+        target_arch=None,  # build for the host architecture (separate arm64 / x86_64 builds)
+        # Ad-hoc signed here; deploy/macos/package.sh re-signs with a Developer ID when available.
+        codesign_identity=None,
+        entitlements_file=None,
+    )
+    coll = COLLECT(exe, a.binaries, a.datas, strip=False, upx=False, name="question-bank")
+    app = BUNDLE(
+        coll,
+        name=f"{_APP_NAME}.app",
+        icon=_ICON,
+        bundle_identifier=_BUNDLE_ID,
+        version=_SHORT_VERSION,
+        info_plist={
+            "CFBundleName": _APP_NAME,
+            "CFBundleDisplayName": _APP_NAME,
+            "CFBundleShortVersionString": _SHORT_VERSION,
+            "CFBundleVersion": _SHORT_VERSION,
+            "QBFullVersion": __version__,
+            # onnxruntime wheels require macOS 13+.
+            "LSMinimumSystemVersion": "13.0",
+            "LSApplicationCategoryType": "public.app-category.education",
+            "NSHighResolutionCapable": True,
+            "NSHumanReadableCopyright": "Released under the project LICENSE.",
+            "CFBundleDevelopmentRegion": "zh_CN",
+            "CFBundleLocalizations": ["zh_CN", "en"],
+            # LAN sharing advertises an mDNS (Bonjour) service; macOS 15+ asks for Local Network access.
+            "NSLocalNetworkUsageDescription": (
+                "QuestionBank uses the local network to share the question bank with other devices "
+                "when LAN sharing is turned on."
+            ),
+            "NSBonjourServices": ["_http._tcp"],
+        },
+    )
+else:
+    exe = EXE(
+        pyz,
+        a.scripts,
+        *([_SPLASH, _SPLASH.binaries] if _SPLASH else []),
+        a.binaries,
+        a.datas,
+        [],
+        name="question-bank",
+        debug=False,
+        bootloader_ignore_signals=False,
+        strip=False,
+        upx=True,
+        console=False,  # tray app: no console window
+        disable_windowed_traceback=False,
+        argv_emulation=False,
+        icon=_ICON,
+    )

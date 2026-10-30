@@ -4,7 +4,7 @@
 
 1. 用户在网页里切换的语言(前端调 ``PUT /system/desktop-locale``,存入 config.json);
 2. 安装包选择的语言(installer.iss 写入 ``HKLM\\Software\\<AppDir>\\InstallerLanguage``);
-3. Windows 界面语言;
+3. 系统界面语言(Windows UI 语言 / macOS 首选语言 / LANG 等环境变量);
 4. ``FALLBACK``(与前端的回退语言一致)。
 
 与 ``app.channel`` 一样会在 ``app.core.config`` 之前被使用,模块级不得导入 config。
@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import functools
 import os
+import sys
 import threading
 from typing import Callable, Dict, List, Optional
 
@@ -32,6 +33,10 @@ MESSAGES: Dict[str, Dict[str, str]] = {
         "menu.lan_share": "局域网共享",
         "menu.restart": "重启",
         "menu.quit": "退出",
+        "menu.quit_app": "退出 {name}",
+        "dialog.ok": "好",
+        "dialog.yes": "是",
+        "dialog.no": "否",
         "notify.lan_on": "局域网共享已开启\n{url}",
         "notify.lan_on_with_host": "局域网共享已开启\n{url} 或 {host_url}",
         "notify.lan_off": "局域网共享已关闭",
@@ -67,6 +72,10 @@ MESSAGES: Dict[str, Dict[str, str]] = {
         "menu.lan_share": "LAN sharing",
         "menu.restart": "Restart",
         "menu.quit": "Quit",
+        "menu.quit_app": "Quit {name}",
+        "dialog.ok": "OK",
+        "dialog.yes": "Yes",
+        "dialog.no": "No",
         "notify.lan_on": "LAN sharing is on\n{url}",
         "notify.lan_on_with_host": "LAN sharing is on\n{url} or {host_url}",
         "notify.lan_off": "LAN sharing is off",
@@ -143,6 +152,17 @@ def system_locale() -> Optional[str]:
         except Exception:  # noqa: BLE001
             return None
         return "zh-CN" if langid & 0x3FF == _LANG_CHINESE else "en-US"
+    if sys.platform == "darwin":
+        # Finder/Dock 启动的 .app 没有 LANG 等环境变量,系统语言只能从偏好里读。
+        try:
+            from Foundation import NSLocale  # type: ignore
+
+            for tag in NSLocale.preferredLanguages() or []:
+                found = normalize(str(tag))
+                if found:
+                    return found
+        except Exception:  # noqa: BLE001
+            pass
     for var in ("LC_ALL", "LC_MESSAGES", "LANG"):
         found = normalize(os.environ.get(var))
         if found:

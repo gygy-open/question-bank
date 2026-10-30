@@ -47,11 +47,14 @@ MB_YESNO = 0x4
 MB_ICONERROR = 0x10
 MB_ICONQUESTION = 0x20
 MB_ICONINFO = 0x40
+IDOK = 1
 IDYES = 6
 
 
 def close_splash() -> None:
-    """关闭 PyInstaller 启动画面;未打包或构建时没启用 Splash 时什么都不做。"""
+    """关闭 PyInstaller 启动画面;未打包或构建时没启用 Splash(如 macOS)时什么都不做。"""
+    if "_PYI_SPLASH_IPC" not in os.environ:
+        return  # 没有启动画面时 import pyi_splash 会往日志里打一段 traceback
     try:
         import pyi_splash  # type: ignore
 
@@ -61,7 +64,9 @@ def close_splash() -> None:
 
 
 def message_box(text: str, flags: int = MB_ICONINFO) -> int:
-    """Windows 原生对话框;其他平台(桌面版只发 Windows)返回 0。"""
+    """原生对话框(Windows: MessageBoxW;macOS: osascript)。其他平台返回 0。"""
+    if sys.platform == "darwin":
+        return _mac_alert(text, flags)
     if os.name != "nt":
         return 0
     close_splash()  # 启动画面会盖住对话框
@@ -71,6 +76,41 @@ def message_box(text: str, flags: int = MB_ICONINFO) -> int:
 
     mb_setforeground = 0x10000
     return ctypes.windll.user32.MessageBoxW(None, text, display_name(), flags | mb_setforeground)
+
+
+def _mac_alert_script(flags: int) -> str:
+    """AppleScript 模板;所有文字走 argv 传入,不拼进脚本,避免引号转义问题。"""
+    style = "critical" if flags & MB_ICONERROR == MB_ICONERROR else "informational"
+    if flags & MB_YESNO:
+        buttons = "buttons {item 4 of argv, item 3 of argv} default button 2"
+    else:
+        buttons = "buttons {item 3 of argv} default button 1"
+    return (
+        "on run argv\n"
+        "activate\n"
+        f"set r to display alert (item 1 of argv) message (item 2 of argv) as {style} {buttons}\n"
+        "return button returned of r\n"
+        "end run"
+    )
+
+
+def _mac_alert(text: str, flags: int) -> int:
+    import subprocess
+
+    from app.desktop_i18n import display_name, tr
+
+    yes_no = bool(flags & MB_YESNO)
+    first = tr("dialog.yes") if yes_no else tr("dialog.ok")
+    args = ["osascript", "-e", _mac_alert_script(flags), display_name(), text, first, tr("dialog.no")]
+    try:
+        result = subprocess.run(args, capture_output=True, text=True)
+    except OSError:
+        return 0
+    if result.returncode != 0:
+        return 0
+    if yes_no:
+        return IDYES if result.stdout.strip() == first else 0
+    return IDOK
 
 
 def desktop_data_root() -> Path:

@@ -1,10 +1,11 @@
 # 安装与首次启动
 
-桌面版是一个 Windows 托盘应用，内置后端、前端与 SQLite 数据库，**无需安装数据库或 Docker**，双击安装即可使用。
+桌面版是一个 Windows 托盘应用 / macOS 菜单栏应用，内置后端、前端与 SQLite 数据库，**无需安装数据库或 Docker**，双击安装即可使用。
 
 ## 系统要求
 
 - Windows 10 / 11（64 位）
+- macOS 13 Ventura 及以上（Apple 芯片或 Intel 芯片）
 - AI 功能需要可访问的 AI 供应商，如：Gemini / OpenAI / 阿里云等。
 
 ## 下载与安装
@@ -18,6 +19,36 @@
    - **开机自启**：登录 Windows 后自动在后台启动。
    - **创建桌面快捷方式**。
 
+
+## macOS 安装
+
+1. 在 [GitHub Releases](https://github.com/gygy-open/question-bank/releases) 下载与你的电脑匹配的 DMG：
+   - Apple 芯片（M1 / M2 / M3 …）：`QuestionBank-x.y.z-macos-arm64.dmg`
+   - Intel 芯片：`QuestionBank-x.y.z-macos-x86_64.dmg`
+
+   不确定时，点左上角  →「关于本机」，看「芯片」或「处理器」一栏。
+2. 双击打开 DMG，把 **QuestionBank** 拖进「应用程序」文件夹。
+3. 在「应用程序」中双击 **QuestionBank** 启动。
+
+启动后，菜单栏右上角会出现题库图标，Dock 中也会显示应用图标：
+
+- 点击 **Dock 图标**（或再次双击应用）即可打开题库界面；
+- 点击**菜单栏图标**可使用「打开题库 / 局域网共享 / 重启 / 退出」菜单；
+- 按 <kbd>⌘Q</kbd> 或在 Dock 图标上右键 →「退出」会同时关闭内置服务。
+
+::: warning 提示「无法验证开发者」/「已损坏」？
+未经 Apple 公证的版本首次打开时会被系统拦截。请打开「系统设置 → 隐私与安全性」，在页面下方找到 QuestionBank 的提示，点击 **「仍要打开」** 并确认，之后即可正常使用。
+
+若仍提示「已损坏，无法打开」，在「终端」中执行下面的命令后再打开：
+
+```bash
+xattr -dr com.apple.quarantine /Applications/QuestionBank.app
+```
+:::
+
+::: tip 登录时自动启动
+macOS 版暂不提供安装时的「开机自启」选项。如需登录后自动运行，可在「系统设置 → 通用 → 登录项」中添加 QuestionBank。
+:::
 
 ## 首次启动
 
@@ -55,17 +86,18 @@
 桌面版的数据统一存放在：
 
 ```
-%APPDATA%\QuestionBank
+%APPDATA%\QuestionBank                          (Windows)
+~/Library/Application Support/QuestionBank     (macOS)
 ```
 
-在资源管理器地址栏粘贴上面的路径即可打开。常见内容：
+Windows 在资源管理器地址栏粘贴上面的路径即可打开；macOS 在访达中按 <kbd>⇧⌘G</kbd> 粘贴路径前往。常见内容：
 
 - `config.json` — 本地配置（含自动生成的 `SECRET_KEY`）
 - SQLite 数据库文件 — 你的题库数据
 - `logs\app.log` — 运行日志（排查问题时查看）
 
 ::: tip 备份很简单
-关闭应用后，直接复制整个 `%APPDATA%\QuestionBank` 目录即可完成备份。详见 [个人使用 · 备份与恢复](/desktop/personal#备份与恢复)。
+关闭应用后，直接复制整个数据目录即可完成备份。详见 [个人使用 · 备份与恢复](/desktop/personal#备份与恢复)。
 :::
 
 ## 下一步

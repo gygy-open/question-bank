@@ -6,7 +6,7 @@ QuestionBank 提供两种部署形态，**功能完全一致**，区别在于**�
 
 ```
 QuestionBank
-├── 桌面版 (Windows 托盘应用)
+├── 桌面版 (Windows 托盘应用 / macOS 菜单栏应用)
 │   ├── 个人使用      —— 绑定 127.0.0.1，仅本机访问，单人
 │   └── 局域网共享    —— 托盘开启，绑定 0.0.0.0 + 防火墙放行，同网段多人访问
 └── 服务器版 (Docker Compose)
@@ -17,7 +17,7 @@ QuestionBank
 
 | 维度 | 桌面版 · 个人使用 | 桌面版 · 局域网共享 | 服务器版 |
 |------|------------------|--------------------|----------|
-| 运行载体 | Windows 桌面 App | Windows 桌面 App | 服务器 / Docker |
+| 运行载体 | Windows / macOS 桌面 App | Windows / macOS 桌面 App | 服务器 / Docker |
 | 安装方式 | 安装包一键安装 | 安装包一键安装 | Docker Compose |
 | 数据库 | SQLite（内置） | SQLite（内置） | MySQL 8.0 |
 | 访问范围 | 仅本机 | 同一局域网 | 局域网 / 内网 / 公网（自配） |

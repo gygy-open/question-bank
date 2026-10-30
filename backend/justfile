@@ -20,10 +20,17 @@ sync-mathtype ref="HEAD":
 build-frontend:
     cd ../frontend && pnpm install && pnpm generate
 
-# Produce the single-file desktop executable (runs migrations + API + worker
-# + serves the bundled SPA). Requires `build-frontend` to have run first.
+# Produce the desktop build (runs migrations + API + worker + serves the bundled
+# SPA): dist/question-bank.exe on Windows, dist/QuestionBank.app on macOS.
 package: build-frontend
-    uv run --with pyinstaller pyinstaller run.spec --clean
+    uv run --with pyinstaller pyinstaller run.spec --clean --noconfirm
+
+# macOS: build the .app, then sign (Developer ID if MACOS_SIGN_IDENTITY is set,
+# otherwise ad-hoc), smoke test it and wrap it into a DMG. See deploy/macos/README.md.
+package-macos: package
+    deploy/macos/package.sh sign
+    deploy/macos/package.sh smoke
+    deploy/macos/package.sh dmg
 
 # Run the unified launcher locally (dev): migrations + worker + API + open UI.
 run-desktop:

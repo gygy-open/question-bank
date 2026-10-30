@@ -16,6 +16,8 @@
 
 安装程序在升级时会自动结束正在运行的旧版本进程，如遇「文件被占用」提示，请先手动退出应用再重试。
 
+**macOS**：按 <kbd>⌘Q</kbd> 退出应用，打开新版本的 DMG，把 QuestionBank 拖进「应用程序」并选择「替换」即可。数据目录 `~/Library/Application Support/QuestionBank` 不受影响。
+
 ## 试用测试版
 
 测试版（版本号带 `-alpha` / `-beta`，如 `1.5.0-alpha.1`）与正式版**完全隔离**，可以同时安装、同时运行：
@@ -24,7 +26,9 @@
 | --- | --- | --- |
 | 程序名称 | QuestionBank | QuestionBank 测试版 |
 | 图标颜色 | 青绿色 | 琥珀色 |
-| 数据目录 | `%APPDATA%\QuestionBank` | `%APPDATA%\QuestionBank-Preview` |
+| 数据目录（Windows） | `%APPDATA%\QuestionBank` | `%APPDATA%\QuestionBank-Preview` |
+| 数据目录（macOS） | `~/Library/Application Support/QuestionBank` | `~/Library/Application Support/QuestionBank-Preview` |
+| macOS 应用名 | QuestionBank.app | QuestionBank Preview.app |
 | 访问地址 | `http://localhost:8000` | `http://localhost:8001` |
 
 首次启动测试版时，如果检测到正式版的数据，会询问是否复制一份过来试用：
@@ -51,13 +55,19 @@
 - 移除程序文件与开机自启项；
 - 清理局域网共享添加的防火墙规则。
 
+### macOS
+
+1. 按 <kbd>⌘Q</kbd> 退出应用（或右键 Dock 图标 →「退出」）。
+2. 在「应用程序」中把 **QuestionBank** 拖到废纸篓。
+3. 如曾在「登录项」中添加过它，请一并移除。
+
 ## 卸载后是否保留数据？
 
-卸载**不会**自动删除你的数据目录 `%APPDATA%\QuestionBank`。
+卸载**不会**自动删除你的数据目录（Windows：`%APPDATA%\QuestionBank`；macOS：`~/Library/Application Support/QuestionBank`）。
 
 - 想彻底清除：手动删除该目录。
 - 想保留 / 迁移：先复制该目录再删除；重新安装后放回即可恢复。
 
 ::: warning 删除不可恢复
-手动删除 `%APPDATA%\QuestionBank` 会永久删除你的全部题库数据，操作前请确认已备份。
+手动删除数据目录会永久删除你的全部题库数据，操作前请确认已备份。
 :::

@@ -33,7 +33,7 @@
   - `server`: runs migrations + background worker + uvicorn in the foreground (dev and Docker).
   - Force a role with `--tray` / `--server` or `QB_ROLE=tray|server`.
 - **Worker**: `app/worker.py` runs background jobs (e.g. imports).
-- **Packaging**: `run.spec` builds a single-file executable with PyInstaller that bundles the generated SPA and runs migrations + API + worker.
+- **Packaging**: `run.spec` builds with PyInstaller (bundles the generated SPA; runs migrations + API + worker): a single-file `.exe` on Windows (Inno Setup installer in `deploy/windows/`), a `.app` bundle on macOS (signed/DMG via `deploy/macos/package.sh`; Dock integration in `app/macos_dock.py`). Must be built on the target OS.
 
 ### Frontend (`frontend/`)
 - **SPA Mode**: `ssr: false` is set in `nuxt.config.ts`. Static output via `pnpm generate` (bundled into the desktop build).
@@ -59,7 +59,7 @@
 
 ### Build & Package
 - **Frontend SPA**: `just build-frontend` (`cd ../frontend && pnpm install && pnpm generate`).
-- **Desktop executable**: `just package` (runs `build-frontend`, then `pyinstaller run.spec --clean`).
+- **Desktop executable**: `just package` (runs `build-frontend`, then `pyinstaller run.spec --clean`). macOS DMG: `just package-macos`. CI: `.github/workflows/desktop-build.yml` (Windows + macOS arm64/x86_64).
 
 ## Coding Conventions
 

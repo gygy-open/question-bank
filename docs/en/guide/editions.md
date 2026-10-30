@@ -6,7 +6,7 @@ QuestionBank comes in two deployment editions with **exactly the same features**
 
 ```
 QuestionBank
-├── Desktop edition (Windows tray app)
+├── Desktop edition (Windows tray app / macOS menu-bar app)
 │   ├── Personal use   —— binds to 127.0.0.1, local access only, single user
 │   └── LAN sharing    —— enabled from the tray, binds to 0.0.0.0 + firewall rule, multiple users on the same subnet
 └── Server edition (Docker Compose)
@@ -17,7 +17,7 @@ QuestionBank
 
 | Aspect | Desktop · Personal Use | Desktop · LAN Sharing | Server Edition |
 |------|------------------|--------------------|----------|
-| Runs on | Windows desktop app | Windows desktop app | Server / Docker |
+| Runs on | Windows / macOS desktop app | Windows / macOS desktop app | Server / Docker |
 | Installation | One-click installer | One-click installer | Docker Compose |
 | Database | SQLite (built in) | SQLite (built in) | MySQL 8.0 |
 | Access scope | This computer only | Same LAN | LAN / intranet / internet (self-configured) |

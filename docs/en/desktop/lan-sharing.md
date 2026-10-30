@@ -19,6 +19,10 @@ Data always stays in the SQLite database on **your computer**; others access you
 2. Windows shows a **UAC elevation prompt** (needed to add the firewall rule); click **Yes**.
 3. The service restarts automatically and binds to the LAN.
 
+::: tip macOS
+There is no UAC prompt on macOS. The first time you turn it on, macOS may ask whether QuestionBank may "find devices on your local network" or "accept incoming network connections"; choose **Allow**. If you declined earlier, re-enable it under **System Settings → Privacy & Security → Local Network** and **Network → Firewall → Options**.
+:::
+
 ## Getting the Access Address
 
 Once it is on, colleagues access it using **your computer's LAN IP**.

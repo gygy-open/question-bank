@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  Hardened-runtime entitlements for the Developer ID signed build (deploy/macos/package.sh).
+  The app is NOT sandboxed (it needs free access to its data dir, pandoc and the network).
+-->
+<plist version="1.0">
+<dict>
+    <!-- PyInstaller's bootloader / Python and native wheels (onnxruntime, …) map writable+executable memory. -->
+    <key>com.apple.security.cs.allow-unsigned-executable-memory</key>
+    <true/>
+    <!-- Bundled third-party dylibs are signed with our identity, but some wheels ship their own signatures. -->
+    <key>com.apple.security.cs.disable-library-validation</key>
+    <true/>
+</dict>
+</plist>

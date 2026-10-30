@@ -19,7 +19,7 @@
 
 QuestionBank 提供两种部署形态，请先阅读 [版本与选型](/guide/editions) 选择适合你的方式：
 
-- **桌面版**（Windows 托盘应用）：开箱即用，适合个人或小团队；可在托盘一键开启[局域网共享](/desktop/lan-sharing)。
+- **桌面版**（Windows 托盘应用 / macOS 菜单栏应用）：开箱即用，适合个人或小团队；可在托盘一键开启[局域网共享](/desktop/lan-sharing)。
 - **服务器版**（Docker Compose）：部署在服务器上，使用 MySQL，适合团队与生产环境。
 
 ## 下一步

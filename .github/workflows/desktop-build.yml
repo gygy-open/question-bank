@@ -1,14 +1,19 @@
 name: Build Desktop
 
-# Build the Windows desktop package and publish a draft GitHub Release.
-# Version is driven entirely by the git tag:
+# Build the desktop packages (Windows installer + macOS DMGs) and publish a
+# draft GitHub Release. Version is driven entirely by the git tag:
 #   git tag v0.2.0 && git push origin v0.2.0
 # The tag (minus the leading "v") is stamped into the app before packaging and
 # used to name the Release and its assets.
 #
-# NOTE: Currently Windows-only. macOS/Linux are intentionally not built yet
-# (the app code stays cross-platform; only the tray/installer tooling is
-# per-OS). To re-enable them later, add a matrix + platform packaging.
+# macOS builds are signed + notarized only when these repository secrets exist
+# (otherwise they are ad-hoc signed and users must allow them in Privacy &
+# Security on first launch; see backend/deploy/macos/README.md):
+#   MACOS_CERTIFICATE_P12       base64 of the "Developer ID Application" .p12
+#   MACOS_CERTIFICATE_PASSWORD  password of that .p12
+#   MACOS_SIGN_IDENTITY         e.g. "Developer ID Application: Name (TEAMID)"
+#   APPLE_API_KEY_P8            base64 of the App Store Connect API key (.p8)
+#   APPLE_API_KEY_ID / APPLE_API_ISSUER_ID
 
 on:
   push:
@@ -34,7 +39,7 @@ jobs:
           uv sync --group dev
           uv run pytest
 
-  build:
+  build-windows:
     needs: test
     runs-on: windows-latest
     steps:
@@ -124,8 +129,127 @@ jobs:
           path: ${{ steps.pkg.outputs.setup }}
           if-no-files-found: error
 
+  build-macos:
+    needs: test
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: macos-15        # Apple Silicon
+            arch: arm64
+          - runner: macos-15-intel  # last Intel image (GitHub supports it until 2027-08)
+            arch: x86_64
+    runs-on: ${{ matrix.runner }}
+    env:
+      MACOS_CERTIFICATE_P12: ${{ secrets.MACOS_CERTIFICATE_P12 }}
+      MACOS_CERTIFICATE_PASSWORD: ${{ secrets.MACOS_CERTIFICATE_PASSWORD }}
+      MACOS_SIGN_IDENTITY: ${{ secrets.MACOS_SIGN_IDENTITY }}
+      APPLE_API_KEY_P8: ${{ secrets.APPLE_API_KEY_P8 }}
+      APPLE_API_KEY_ID: ${{ secrets.APPLE_API_KEY_ID }}
+      APPLE_API_ISSUER_ID: ${{ secrets.APPLE_API_ISSUER_ID }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Resolve version
+        id: ver
+        shell: bash
+        run: |
+          if [[ "${GITHUB_REF_TYPE}" == "tag" ]]; then
+            echo "version=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
+          else
+            echo "version=0.0.0-dev+${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Stamp version
+        working-directory: backend
+        shell: bash
+        run: |
+          v="${{ steps.ver.outputs.version }}"
+          printf '__version__ = "%s"\n' "$v" > app/_version.py
+          # BSD sed has no "0,/re/" address; perl replaces only the first match.
+          perl -0pi -e "s/^version = .*\$/version = \"$v\"/m" pyproject.toml
+          echo "Stamped version $v"
+          cat app/_version.py
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: frontend/pnpm-lock.yaml
+      - name: Build frontend
+        working-directory: frontend
+        run: |
+          pnpm install --frozen-lockfile
+          pnpm generate
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          python-version: '3.13'
+      - name: Package backend (.app)
+        working-directory: backend
+        run: uv run --with pyinstaller pyinstaller run.spec --clean --noconfirm
+
+      - name: Import signing certificate
+        if: env.MACOS_CERTIFICATE_P12 != '' && env.MACOS_SIGN_IDENTITY != ''
+        shell: bash
+        run: |
+          keychain="$RUNNER_TEMP/build.keychain-db"
+          password="$(uuidgen)"
+          echo "$MACOS_CERTIFICATE_P12" | base64 --decode > "$RUNNER_TEMP/cert.p12"
+          security create-keychain -p "$password" "$keychain"
+          security set-keychain-settings -lut 21600 "$keychain"
+          security unlock-keychain -p "$password" "$keychain"
+          security import "$RUNNER_TEMP/cert.p12" -k "$keychain" -P "$MACOS_CERTIFICATE_PASSWORD" -T /usr/bin/codesign
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$password" "$keychain"
+          security list-keychains -d user -s "$keychain" $(security list-keychains -d user | tr -d '"')
+          rm -f "$RUNNER_TEMP/cert.p12"
+
+      - name: Prepare notarization key
+        if: env.APPLE_API_KEY_P8 != '' && env.MACOS_CERTIFICATE_P12 != '' && env.MACOS_SIGN_IDENTITY != ''
+        shell: bash
+        run: |
+          echo "$APPLE_API_KEY_P8" | base64 --decode > "$RUNNER_TEMP/notary.p8"
+          echo "APPLE_API_KEY_PATH=$RUNNER_TEMP/notary.p8" >> "$GITHUB_ENV"
+
+      # Signing needs BOTH the .p12 and the identity; otherwise clear the identity so package.sh
+      # falls back to ad-hoc (and skips notarization) instead of failing on half-configured secrets.
+      - name: Sign, smoke test, build DMG, notarize
+        id: pkg
+        working-directory: backend
+        shell: bash
+        env:
+          VERSION: ${{ steps.ver.outputs.version }}
+          ARCH: ${{ matrix.arch }}
+        run: |
+          if [[ -z "$MACOS_CERTIFICATE_P12" || -z "$MACOS_SIGN_IDENTITY" ]]; then
+            if [[ -n "$MACOS_CERTIFICATE_P12$MACOS_SIGN_IDENTITY" ]]; then
+              echo "::warning::MACOS_CERTIFICATE_P12 and MACOS_SIGN_IDENTITY must both be set; building ad-hoc signed"
+            fi
+            export MACOS_SIGN_IDENTITY=""
+          fi
+          deploy/macos/package.sh all
+          dmg="$(ls dist/*.dmg)"
+          echo "dmg=backend/$dmg" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: question-bank-macos-${{ matrix.arch }}
+          path: ${{ steps.pkg.outputs.dmg }}
+          if-no-files-found: error
+
+      - name: Clean up signing material
+        if: always()
+        shell: bash
+        run: |
+          security delete-keychain "$RUNNER_TEMP/build.keychain-db" 2>/dev/null || true
+          rm -f "$RUNNER_TEMP/notary.p8"
+
   release:
-    needs: build
+    needs: [build-windows, build-macos]
     if: github.ref_type == 'tag'
     runs-on: ubuntu-latest
     permissions:

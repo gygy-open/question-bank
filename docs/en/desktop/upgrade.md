@@ -16,6 +16,8 @@ On its first launch, a new version automatically tidies up old data in the backg
 
 The installer automatically ends the running old version during an upgrade. If you see a "file in use" message, quit the app manually first and try again.
 
+**macOS**: quit the app with <kbd>⌘Q</kbd>, open the new DMG, drag QuestionBank into **Applications** and choose **Replace**. The data directory `~/Library/Application Support/QuestionBank` is not affected.
+
 ## Trying the Preview Version
 
 The Preview version (version numbers with `-alpha` / `-beta`, e.g. `1.5.0-alpha.1`) is **fully isolated** from the stable version; you can install and run both at the same time:
@@ -24,7 +26,9 @@ The Preview version (version numbers with `-alpha` / `-beta`, e.g. `1.5.0-alpha.
 | --- | --- | --- |
 | Program name | QuestionBank | QuestionBank Preview |
 | Icon color | Teal | Amber |
-| Data directory | `%APPDATA%\QuestionBank` | `%APPDATA%\QuestionBank-Preview` |
+| Data directory (Windows) | `%APPDATA%\QuestionBank` | `%APPDATA%\QuestionBank-Preview` |
+| Data directory (macOS) | `~/Library/Application Support/QuestionBank` | `~/Library/Application Support/QuestionBank-Preview` |
+| macOS app name | QuestionBank.app | QuestionBank Preview.app |
 | Address | `http://localhost:8000` | `http://localhost:8001` |
 
 On its first launch, if the Preview version finds data from the stable version, it asks whether to copy it over for testing:
@@ -51,13 +55,19 @@ The uninstaller will:
 - Remove the program files and the startup entry;
 - Remove the firewall rule added by LAN sharing.
 
+### macOS
+
+1. Quit the app with <kbd>⌘Q</kbd> (or right-click the Dock icon → **Quit**).
+2. Drag **QuestionBank** from **Applications** to the Trash.
+3. If you added it to **Login Items**, remove it there as well.
+
 ## Is Data Kept After Uninstalling?
 
-Uninstalling does **not** automatically delete your data directory `%APPDATA%\QuestionBank`.
+Uninstalling does **not** automatically delete your data directory (Windows: `%APPDATA%\QuestionBank`; macOS: `~/Library/Application Support/QuestionBank`).
 
 - To remove everything: delete the directory manually.
 - To keep / migrate it: copy the directory first, then delete it; after reinstalling, put it back to restore your data.
 
 ::: warning Deletion is permanent
-Manually deleting `%APPDATA%\QuestionBank` permanently deletes all your question bank data. Make sure you have a backup before doing this.
+Manually deleting the data directory permanently deletes all your question bank data. Make sure you have a backup before doing this.
 :::

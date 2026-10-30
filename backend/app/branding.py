@@ -74,6 +74,40 @@ def save_ico(path: str, sizes=(16, 24, 32, 48, 64, 128, 256), preview: Optional[
     images[0].save(path, format="ICO", sizes=[(s, s) for s in sizes], append_images=images[1:])
 
 
+def make_app_icon(size: int = 1024, preview: Optional[bool] = None) -> "Image.Image":
+    """macOS app icon: the logo on a white rounded square, following Apple's icon grid.
+
+    Dock/Finder icons are expected to carry their own background plate (a bare transparent
+    glyph looks broken next to other apps), unlike the tray/menu-bar icon.
+    """
+    canvas = 1024
+    img = Image.new("RGBA", (canvas, canvas), (0, 0, 0, 0))
+    inset, radius = 100, 185  # 824px body with ~22.5% corner radius
+    box = [inset, inset, canvas - inset, canvas - inset]
+
+    shadow = Image.new("RGBA", (canvas, canvas), (0, 0, 0, 0))
+    ImageDraw.Draw(shadow).rounded_rectangle(
+        [box[0], box[1] + 12, box[2], box[3] + 12], radius=radius, fill=(0, 0, 0, 60)
+    )
+    from PIL import ImageFilter
+
+    img.alpha_composite(shadow.filter(ImageFilter.GaussianBlur(14)))
+    ImageDraw.Draw(img).rounded_rectangle(box, radius=radius, fill=(255, 255, 255, 255))
+
+    logo_size = 680
+    logo = make_icon(logo_size, preview)
+    offset = (canvas - logo_size) // 2
+    img.alpha_composite(logo, (offset, offset))
+    if size != canvas:
+        img = img.resize((size, size), Image.LANCZOS)
+    return img
+
+
+def save_icns(path: str, preview: Optional[bool] = None) -> None:
+    """Write the macOS ``.icns`` bundle icon (Pillow derives the smaller sizes)."""
+    make_app_icon(1024, _resolve(preview)).save(path, format="ICNS")
+
+
 def save_splash(path: str, width: int = 460, height: int = 200, preview: Optional[bool] = None) -> None:
     """Write the startup splash background (logo on white); the text is drawn by the bootloader."""
     img = Image.new("RGB", (width, height), (255, 255, 255))

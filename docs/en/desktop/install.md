@@ -1,10 +1,11 @@
 # Installation & First Launch
 
-The desktop edition is a Windows tray app with a built-in backend, frontend, and SQLite database. **No database or Docker installation is needed** — just run the installer and start using it.
+The desktop edition is a Windows tray app / macOS menu-bar app with a built-in backend, frontend, and SQLite database. **No database or Docker installation is needed** — just run the installer and start using it.
 
 ## System Requirements
 
 - Windows 10 / 11 (64-bit)
+- macOS 13 Ventura or later (Apple silicon or Intel)
 - AI features require access to an AI provider, such as Gemini / OpenAI / Alibaba Cloud.
 
 ## Download and Install
@@ -18,6 +19,36 @@ The desktop edition is a Windows tray app with a built-in backend, frontend, and
    - **Launch at startup**: starts automatically in the background after you sign in to Windows.
    - **Create a desktop shortcut**.
 
+
+## Installing on macOS
+
+1. From [GitHub Releases](https://github.com/gygy-open/question-bank/releases), download the DMG that matches your Mac:
+   - Apple silicon (M1 / M2 / M3 …): `QuestionBank-x.y.z-macos-arm64.dmg`
+   - Intel: `QuestionBank-x.y.z-macos-x86_64.dmg`
+
+   Not sure? Click  → **About This Mac** and check the **Chip** or **Processor** line.
+2. Open the DMG and drag **QuestionBank** into the **Applications** folder.
+3. Double-click **QuestionBank** in Applications to start it.
+
+Once started, the QuestionBank icon appears in the menu bar (top right) and in the Dock:
+
+- Click the **Dock icon** (or open the app again) to open the question bank;
+- Click the **menu-bar icon** for the Open QuestionBank / LAN sharing / Restart / Quit menu;
+- <kbd>⌘Q</kbd> or right-clicking the Dock icon → **Quit** also stops the built-in service.
+
+::: warning "Cannot verify the developer" / "is damaged"?
+Builds that are not notarized by Apple are blocked on first launch. Open **System Settings → Privacy & Security**, find the QuestionBank message near the bottom, click **Open Anyway** and confirm. It opens normally from then on.
+
+If it still says the app "is damaged and can't be opened", run this in Terminal and open it again:
+
+```bash
+xattr -dr com.apple.quarantine /Applications/QuestionBank.app
+```
+:::
+
+::: tip Start at login
+The macOS version has no installer-time "launch at startup" option yet. To run it automatically after you sign in, add QuestionBank under **System Settings → General → Login Items**.
+:::
 
 ## First Launch
 
@@ -55,17 +86,18 @@ Double-clicking the icon again does not start a second instance — when the app
 All desktop edition data is stored in:
 
 ```
-%APPDATA%\QuestionBank
+%APPDATA%\QuestionBank                          (Windows)
+~/Library/Application Support/QuestionBank     (macOS)
 ```
 
-Paste the path above into the File Explorer address bar to open it. Typical contents:
+On Windows, paste the path into the File Explorer address bar; on macOS, press <kbd>⇧⌘G</kbd> in Finder and paste it. Typical contents:
 
 - `config.json` — local configuration (including the auto-generated `SECRET_KEY`)
 - SQLite database file — your question bank data
 - `logs\app.log` — runtime log (check it when troubleshooting)
 
 ::: tip Backups are easy
-After closing the app, simply copy the entire `%APPDATA%\QuestionBank` directory to make a backup. See [Personal Use · Backup and Restore](/en/desktop/personal#backup-and-restore).
+After closing the app, simply copy the entire data directory to make a backup. See [Personal Use · Backup and Restore](/en/desktop/personal#backup-and-restore).
 :::
 
 ## Next Steps

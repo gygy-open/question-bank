@@ -33,6 +33,7 @@ _PORT_SCAN = 10  # 默认端口被别的程序占用时,往后最多再试这么
 # 启动时解析一次:默认端口可能被无关程序占着,此时顺延而不是直接崩在 WinError 10048。
 PORT = DEFAULT_PORT
 _MUTEX_HANDLE = None
+_STREAMS_REDIRECTED = False
 
 
 def _url() -> str:
@@ -123,10 +124,13 @@ def ensure_std_streams() -> None:
 
     A frozen ``console=False`` build has ``sys.stdout``/``sys.stderr`` set to
     ``None``, which crashes uvicorn's log formatter (``isatty``) and any
-    ``print()``. Redirect them to a log file under the data dir (or devnull).
+    ``print()``. A macOS ``.app`` launched from Finder/Dock instead gets
+    ``/dev/null``, which silently drops every log line. Redirect both cases to
+    a log file under the data dir (or devnull).
     """
-    if sys.stdout is not None and sys.stderr is not None:
+    if not _needs_log_redirect():
         return
+    mac_bundle = _is_mac_bundle()
     stream = None
     try:
         from app.core.config import settings
@@ -139,10 +143,28 @@ def ensure_std_streams() -> None:
             stream = open(os.devnull, "w")
         except OSError:
             return
-    if sys.stdout is None:
+    global _STREAMS_REDIRECTED
+    _STREAMS_REDIRECTED = True
+    if sys.stdout is None or mac_bundle:
         sys.stdout = stream
-    if sys.stderr is None:
+    if sys.stderr is None or mac_bundle:
         sys.stderr = stream
+
+
+def _is_mac_bundle() -> bool:
+    """打包的 macOS 程序且不是从终端启动(从终端运行时日志直接打到终端,方便排查)。"""
+    if sys.platform != "darwin" or not getattr(sys, "frozen", False):
+        return False
+    try:
+        return not (sys.stderr is not None and sys.stderr.isatty())
+    except (AttributeError, ValueError):
+        return True
+
+
+def _needs_log_redirect() -> bool:
+    if _STREAMS_REDIRECTED:
+        return False
+    return sys.stdout is None or sys.stderr is None or _is_mac_bundle()
 
 
 def _wait_for_port(
@@ -301,6 +323,18 @@ class _Server:
         self.stop()
         self.start(lan)
 
+    def shutdown(self) -> None:
+        """Stop the server AND the worker, for exits that skip Python's atexit hooks.
+
+        macOS ``-[NSApplication terminate:]`` (⌘Q, Dock "Quit", logout) ends the
+        process with C ``exit()``, so multiprocessing never reaps daemon children.
+        """
+        self.stop()
+        worker, self._worker = self._worker, None
+        if worker is not None and worker.is_alive():
+            worker.terminate()
+            worker.join(timeout=5)
+
 
 def _make_image():
     """Generate the tray icon at runtime (no bundled asset needed)."""
@@ -438,4 +472,20 @@ def run_tray() -> None:
         icon.update_menu()
 
     desktop_i18n.on_change(_on_locale_change)
+
+    if sys.platform == "darwin":
+        from app import macos_dock
+
+        def _on_terminate() -> None:
+            quitting.set()
+            server.shutdown()
+
+        macos_dock.install(
+            on_open=lambda: on_open(icon, None),
+            on_terminate=_on_terminate,
+            open_title=lambda: tr("menu.open"),
+            quit_title=lambda: tr("menu.quit_app", name=display_name()),
+        )
+        desktop_i18n.on_change(macos_dock.refresh)
+
     icon.run(setup=_setup)
