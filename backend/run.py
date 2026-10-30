@@ -15,6 +15,7 @@ import os
 import sys
 import threading
 import time
+import traceback
 from pathlib import Path
 
 # Ensure ``app`` is importable both in dev and when frozen.
@@ -107,6 +108,7 @@ def run_server() -> None:
             run_migrations(get_db_url())
         except Exception as exc:  # noqa: BLE001
             print(f"[launcher] migration failed: {exc}", file=sys.stderr)
+            traceback.print_exc()
 
     # Background worker (resilient: it waits internally until configured).
     proc = multiprocessing.Process(target=start_worker, daemon=True)

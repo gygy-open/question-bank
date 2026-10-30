@@ -40,6 +40,11 @@ MESSAGES: Dict[str, Dict[str, str]] = {
         "notify.still_starting": "仍在启动中，请稍候…",
         "tray.starting": "{name}（正在启动…）",
         "error.start_failed": "服务未能启动。\n\n请把日志发给我们排查：\n{log}",
+        "error.migration_failed": (
+            "数据库升级失败，部分功能可能无法正常使用（例如提示“表不存在”）。\n\n"
+            "原因：{error}\n\n"
+            "请完全退出后重新启动重试；仍然失败请把日志发给我们排查：\n{log}"
+        ),
         "error.ports_busy": "端口 {first}~{last} 都被其他程序占用，无法启动。\n\n请关闭占用这些端口的程序后重试。",
         "info.port_fallback": "端口 {default} 已被其他程序占用，本次改用 {port}。",
         "seed.ask": (
@@ -70,6 +75,11 @@ MESSAGES: Dict[str, Dict[str, str]] = {
         "notify.still_starting": "Still starting, please wait…",
         "tray.starting": "{name} (starting…)",
         "error.start_failed": "The service failed to start.\n\nPlease send us the log file:\n{log}",
+        "error.migration_failed": (
+            "The database upgrade failed, so some features may not work (for example \"table doesn't exist\" errors).\n\n"
+            "Reason: {error}\n\n"
+            "Please quit completely and start again; if it still fails, send us the log file:\n{log}"
+        ),
         "error.ports_busy": (
             "Ports {first}-{last} are all in use by other programs, so QuestionBank cannot start.\n\n"
             "Close the programs using these ports and try again."

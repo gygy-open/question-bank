@@ -73,16 +73,36 @@ def _include_object(object, name, type_, reflected, compare_to):
     return not (type_ == "table" and name in _MIGRATION_ONLY_TABLES)
 
 
-def do_run_migrations(connection):
-    context.configure(
-        connection=connection, 
-        target_metadata=target_metadata,
-        render_as_batch=True,
-        include_object=_include_object,
-    )
+_MYSQL_LOCK_NAME = "question_bank_alembic"
+_MYSQL_LOCK_TIMEOUT_SECONDS = 600
 
-    with context.begin_transaction():
-        context.run_migrations()
+
+def do_run_migrations(connection):
+    # MySQL DDL is non-transactional, so two processes migrating at once (e.g. a
+    # relaunch while the previous run is still going) corrupt each other. A
+    # named lock serializes them; the waiter then sees the already-upgraded head.
+    is_mysql = connection.dialect.name == "mysql"
+    if is_mysql:
+        acquired = connection.exec_driver_sql(
+            "SELECT GET_LOCK(%s, %s)", (_MYSQL_LOCK_NAME, _MYSQL_LOCK_TIMEOUT_SECONDS)
+        ).scalar()
+        connection.commit()
+        if acquired != 1:
+            raise RuntimeError("Timed out waiting for another migration to finish")
+    try:
+        context.configure(
+            connection=connection,
+            target_metadata=target_metadata,
+            render_as_batch=True,
+            include_object=_include_object,
+        )
+
+        with context.begin_transaction():
+            context.run_migrations()
+    finally:
+        if is_mysql:
+            connection.exec_driver_sql("SELECT RELEASE_LOCK(%s)", (_MYSQL_LOCK_NAME,))
+            connection.commit()
 
 
 async def run_migrations_online() -> None:

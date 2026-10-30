@@ -52,16 +52,39 @@ _QUESTION_GROUP_CHECK = (
 
 
 def upgrade() -> None:
-    """Upgrade schema."""
-    with op.batch_alter_table('composition_nodes', schema=None) as batch_op:
-        batch_op.add_column(sa.Column('stimulus_id', sa.Integer(), nullable=True))
-        batch_op.add_column(sa.Column('stimulus_revision', sa.Integer(), nullable=True))
-        batch_op.create_index(batch_op.f('ix_composition_nodes_stimulus_id'), ['stimulus_id'], unique=False)
-        batch_op.create_foreign_key(batch_op.f('fk_composition_nodes_stimulus_id_stimuli'), 'stimuli', ['stimulus_id'], ['id'])
-        batch_op.drop_constraint('kind_matches_type', type_='check')
+    """Upgrade schema.
+
+    MySQL DDL is not transactional: a failure midway (e.g. a CHECK rejected by
+    legacy rows) leaves the earlier ALTERs applied, so every step must be
+    skippable on re-run or the retry dies with "Duplicate column name".
+    """
+    insp = sa.inspect(op.get_bind())
+    table = 'composition_nodes'
+    columns = {c['name'] for c in insp.get_columns(table)}
+    indexes = {i['name'] for i in insp.get_indexes(table)}
+    fks = {fk['name'] for fk in insp.get_foreign_keys(table)}
+    checks = {c['name'] for c in insp.get_check_constraints(table)}
+
+    def _ck(name: str) -> bool:
+        return f'ck_{table}_{name}' in checks
+
+    with op.batch_alter_table(table, schema=None) as batch_op:
+        if 'stimulus_id' not in columns:
+            batch_op.add_column(sa.Column('stimulus_id', sa.Integer(), nullable=True))
+        if 'stimulus_revision' not in columns:
+            batch_op.add_column(sa.Column('stimulus_revision', sa.Integer(), nullable=True))
+        if 'ix_composition_nodes_stimulus_id' not in indexes:
+            batch_op.create_index(batch_op.f('ix_composition_nodes_stimulus_id'), ['stimulus_id'], unique=False)
+        if 'fk_composition_nodes_stimulus_id_stimuli' not in fks:
+            batch_op.create_foreign_key(batch_op.f('fk_composition_nodes_stimulus_id_stimuli'), 'stimuli', ['stimulus_id'], ['id'])
+        if _ck('kind_matches_type'):
+            batch_op.drop_constraint('kind_matches_type', type_='check')
         batch_op.create_check_constraint('kind_matches_type', _NEW_KIND_CHECK)
-        batch_op.drop_constraint('source_ref_matches_type', type_='check')
+        if _ck('source_ref_matches_type'):
+            batch_op.drop_constraint('source_ref_matches_type', type_='check')
         batch_op.create_check_constraint('source_ref_matches_type', _NEW_SOURCE_CHECK)
+        if _ck('question_group_ref_matches_type'):
+            batch_op.drop_constraint('question_group_ref_matches_type', type_='check')
         batch_op.create_check_constraint('question_group_ref_matches_type', _QUESTION_GROUP_CHECK)
 
 

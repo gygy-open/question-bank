@@ -173,6 +173,25 @@ def _show_start_failed() -> None:
     )
 
 
+def _show_migration_failed(exc: BaseException) -> None:
+    """迁移失败仍继续启动,但必须告知用户;对话框会阻塞,放到后台线程以免卡住启动。"""
+    from app.core.config import settings
+
+    reason = " ".join(str(exc).split())
+    if len(reason) > 300:
+        reason = reason[:300] + "…"
+    message = tr(
+        "error.migration_failed",
+        error=reason,
+        log=settings.DATA_DIR / "logs" / "app.log",
+    )
+    threading.Thread(
+        target=channel.message_box,
+        args=(message, channel.MB_ICONERROR),
+        daemon=True,
+    ).start()
+
+
 def _lan_ip() -> str:
     """Best-effort primary LAN IPv4 address (no packets are actually sent)."""
     try:
@@ -234,7 +253,9 @@ class _Server:
             try:
                 run_migrations(get_db_url())
             except Exception as exc:  # noqa: BLE001
-                print(f"[tray] migration failed: {exc}", file=sys.stderr)
+                print("[tray] migration failed:", file=sys.stderr)
+                traceback.print_exc()
+                _show_migration_failed(exc)
 
     def start(self, lan: bool) -> None:
         import uvicorn
