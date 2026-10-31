@@ -18,6 +18,7 @@ from app.crud.crud_subject import subject as crud_subject
 from app.models.composition import Composition
 from app.models.import_task import ImportTask
 from app.services.doc_processor import doc_processor
+from app.services.import_drafts import attach_draft_async, delete_draft_id, load_draft
 from app.services.importing.media import sign_source_ref
 from app.services.importing.review import extracted_stimuli_to_review, extracted_to_v2_review
 
@@ -118,6 +119,7 @@ async def upload_docx(
         _attach_source_ref(result, sha256, current_user)
         await _attach_duplicate_hint(result, db, content)
         await db.commit()
+        await attach_draft_async(result)
         return result
     except DomainError:
         raise
@@ -157,6 +159,7 @@ async def upload_markdown(
         _as_review(result, subject_id)
         _attach_source_ref(result, sha256, current_user)
         await _attach_duplicate_hint(result, db, markdown_content_bytes)
+        await attach_draft_async(result)
         return result
     except Exception as e:
         logger.exception(
@@ -178,6 +181,7 @@ async def upload_markdown_text(
     try:
         result = await doc_processor.process_markdown(request.content, db=db, filename=request.filename, mode=request.mode, method=request.method, subject_id=request.subject_id, user_id=current_user.id)
         _as_review(result, request.subject_id)
+        await attach_draft_async(result)
         return result
     except Exception as e:
         logger.exception(
@@ -220,6 +224,7 @@ async def upload_markdown_archive(
         _as_review(result, subject_id)
         _attach_source_ref(result, sha256, current_user)
         await db.commit()
+        await attach_draft_async(result)
         return result
     except DomainError:
         raise
@@ -250,6 +255,7 @@ async def upload_image_recognition(
     try:
         result = await doc_processor.process_image(file.file, db=db, mode=mode, subject_id=subject_id, user_id=current_user.id)
         _as_review(result, subject_id)
+        await attach_draft_async(result)
         return result
     except Exception as e:
         logger.exception(
@@ -259,3 +265,28 @@ async def upload_image_recognition(
             subject_id,
         )
         raise HTTPException(status_code=500, detail=str(e)) from e
+
+
+@router.get("/drafts/{draft_id}")
+async def get_import_draft(
+    draft_id: str,
+    current_user: models.User = Depends(deps.get_current_active_user),
+):
+    """取回上一次智能导入的抽取结果(页面刷新/关闭后继续审核用)。
+
+    草稿按内容哈希寻址,只保存 7 天;过期或不存在时返回 404,前端当作没有可恢复的导入。
+    """
+    payload = load_draft(draft_id)
+    if payload is None:
+        raise ApiError(404, ErrorCode.UPLOAD_DRAFT_NOT_FOUND, "Draft not found")
+    return payload
+
+
+@router.delete("/drafts/{draft_id}")
+async def discard_import_draft(
+    draft_id: str,
+    current_user: models.User = Depends(deps.get_current_active_user),
+):
+    """丢弃草稿(入库成功后调用,避免草稿堆积)。"""
+    delete_draft_id(draft_id)
+    return {"message": "Draft deleted"}

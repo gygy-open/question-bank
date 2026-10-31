@@ -42,6 +42,7 @@ class ErrorCode(StrEnum):
     UPLOAD_ONLY_MARKDOWN = "upload.only_markdown"
     UPLOAD_ONLY_ZIP = "upload.only_zip"
     UPLOAD_ONLY_IMAGE = "upload.only_image"
+    UPLOAD_DRAFT_NOT_FOUND = "upload.draft_not_found"
     # paper_import
     PAPER_IMPORT_GROUP_DUPLICATE_MEMBER = "paper_import.group_duplicate_member"
     PAPER_IMPORT_GROUP_EMPTY = "paper_import.group_empty"
