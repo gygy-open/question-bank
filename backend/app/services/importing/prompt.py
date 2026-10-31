@@ -1,7 +1,9 @@
 """抽取阶段:AI 抽取 prompt 组装。
 
 Prompt 分层:学科覆盖(subject_prompts) → 代码默认(prompts.py),再渲染学科占位符,
-最后把 tag/category 上下文注入 `{tags}` 占位符(无占位符则追加)。
+最后把 tag/category 上下文注入 `{tags}` 占位符;
+自定义提示词漏写该占位符时,插入到 `{content}` 之前而非追加到结尾,
+保证指令仍位于素材之前。
 """
 from __future__ import annotations
 
@@ -39,8 +41,19 @@ class PromptBuilder:
             tag_context = await self._build_tag_context(db)
             if "{tags}" in prompt:
                 prompt = prompt.replace("{tags}", tag_context)
+            elif "{content}" in prompt:
+                # A custom prompt may omit {tags}. Appending it would put the tag
+                # instructions *after* {content}, i.e. after the material they apply
+                # to, so insert them in front of the content block instead.
+                prompt = prompt.replace("{content}", tag_context + "\n\n{content}", 1)
+                logger.warning(
+                    "Prompt template has no {tags} placeholder; inserted tag context before {content}"
+                )
             else:
                 prompt += tag_context
+                logger.warning(
+                    "Prompt template has neither {tags} nor {content} placeholder; appended tag context at the end"
+                )
         except Exception as e:
             logger.warning(f"Failed to fetch tag context for AI prompt: {e}")
 
