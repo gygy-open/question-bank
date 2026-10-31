@@ -256,23 +256,27 @@ def _strip_cell_markup(cell: str) -> str:
 
 
 def _extract_answer_table(rows: List[List[str]]) -> Dict[str, str]:
-    """从形如 “题号|1|2|3” + “答案|B|B|C” 的两行表格中取 题号->答案。"""
+    """从形如 “题号|1|2|3” + “答案|B|B|C” 的表格中取 题号->答案。
+
+    长卷的答案表会沿“题号”行折成多块（一块只有几列宽），所以必须扫完所有块，
+    不能读到第一块答案行就返回——那样第二块之后的题号全部丢答案。
+    """
+    answers: Dict[str, str] = {}
     header_row: Optional[List[str]] = None
     for row in rows:
         if _is_table_separator_row(row):
             continue
-        if header_row is None:
-            if any("题号" in cell for cell in row):
-                header_row = row
+        if any("题号" in cell for cell in row):
+            header_row = row
             continue
-        answers: Dict[str, str] = {}
+        if header_row is None:
+            continue
         for num_cell, ans_cell in zip(header_row, row):
             num = _strip_cell_markup(num_cell)
             ans = _strip_cell_markup(ans_cell)
             if num.isdigit() and ans:
-                answers[num] = ans
-        return answers
-    return {}
+                answers.setdefault(num, ans)
+    return answers
 
 
 def _strip_leading_answer(text: str, answer: str) -> str:
