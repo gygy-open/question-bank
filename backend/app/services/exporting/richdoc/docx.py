@@ -8,6 +8,7 @@
 
 from __future__ import annotations
 
+import io
 import logging
 import math
 from typing import Any, Optional
@@ -35,6 +36,8 @@ _BLANK_WIDTH_MIN_EM = 2
 _BLANK_WIDTH_MAX_EM = 30
 _BLANK_WIDTH_DEFAULT_EM = 4
 _EMU_PER_PX = 9525  # 914400 EMU/in ÷ 96 px/in
+_IMAGE_MAX_WIDTH_EMU = int(6 * 914400)  # 默认页面正文宽度
+_IMAGE_MAX_HEIGHT_EMU = int(8 * 914400)
 
 
 class DocxRichRenderer:
@@ -240,15 +243,21 @@ class DocxRichRenderer:
             if alt:
                 paragraph.add_run(alt)
             return
-        path = resolved.path
-        width = attrs.get("width")
-        kwargs = {}
-        if isinstance(width, (int, float)) and not isinstance(width, bool) and math.isfinite(float(width)) and width > 0:
-            kwargs["width"] = Emu(int(float(width) * _EMU_PER_PX))
+        requested = attrs.get("width")
         try:
-            paragraph.add_run().add_picture(str(path), **kwargs)
+            # 以字节流嵌入:对象存储文件无扩展名,按路径传入会生成 "image1." 这样的非法部件名,Word 会判定文档损坏。
+            shape = paragraph.add_run().add_picture(io.BytesIO(resolved.path.read_bytes()))
         except Exception:
             logger.warning("failed to embed image %s, skipped", src)
+            return
+        width, height = int(shape.width), int(shape.height)
+        if isinstance(requested, (int, float)) and not isinstance(requested, bool) and math.isfinite(float(requested)) and requested > 0:
+            height = round(height * (requested * _EMU_PER_PX) / width)
+            width = int(requested * _EMU_PER_PX)
+        # 原图像素/DPI 可能远超页面,甚至超过 Word 的单图尺寸上限而导致文档无法打开。
+        scale = min(1.0, _IMAGE_MAX_WIDTH_EMU / width, _IMAGE_MAX_HEIGHT_EMU / height)
+        shape.width = Emu(max(1, int(width * scale)))
+        shape.height = Emu(max(1, int(height * scale)))
 
     def _add_table(self, parent: Any, node: dict[str, Any]) -> None:
         rows = [r for r in (node.get("content") or []) if isinstance(r, dict) and r.get("type") == "tableRow"]

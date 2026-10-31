@@ -165,6 +165,40 @@ def test_composition_latex_keeps_extension_for_migrated_legacy_images(tmp_path):
         os.remove(path)
 
 
+def test_composition_docx_embeds_extensionless_oversized_image_within_page(tmp_path):
+    # 对象存储文件无扩展名;大图(按 72 DPI 超过 Word 单图上限)必须缩放到页面内,否则 Word 报文档损坏。
+    import io
+    import re
+
+    from PIL import Image
+
+    from app.services.exporting.images import ImageResolver
+    from app.services.media_service import StoredImage
+
+    stored = tmp_path / ("c" * 64)
+    buf = io.BytesIO()
+    Image.new("RGB", (2400, 1200), "white").save(buf, "PNG")
+    stored.write_bytes(buf.getvalue())
+    doc = CompositionExportDoc(title="t", nodes=[
+        ExportRichTextNode(content={"type": "doc", "content": [
+            {"type": "image", "attrs": {"assetId": 7}},
+        ]}),
+    ])
+    path = CompositionDocxRenderer(
+        ImageResolver({7: StoredImage(path=stored, mime="image/png")})
+    ).render(doc)
+    try:
+        with zipfile.ZipFile(path) as zf:
+            media = [n for n in zf.namelist() if n.startswith("word/media/")]
+            assert media == ["word/media/image1.png"]
+            xml = zf.read("word/document.xml").decode()
+            cx, cy = map(int, re.search(r'<wp:extent cx="(\d+)" cy="(\d+)"', xml).groups())
+            assert cx <= 6 * 914400 and cy <= 8 * 914400
+            assert cx == 2 * cy
+    finally:
+        os.remove(path)
+
+
 def test_composition_registry_resolves_both_formats():
     assert isinstance(composition_renderer_for(OutputFormat.DOCX), CompositionDocxRenderer)
     assert isinstance(composition_renderer_for(OutputFormat.LATEX), CompositionLatexRenderer)
