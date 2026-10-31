@@ -125,3 +125,22 @@ def test_guard_raises_on_length():
 @pytest.mark.parametrize("reason", ["stop", "tool_calls", None])
 def test_guard_passes_through_normal_finish(reason):
     _guard_truncated(_Choice(reason))
+
+
+# --------------------------------------------------------------------------- #
+# 难度边界：前端星级与筛选按 1–5 硬编码，越界值必须被夹住
+# --------------------------------------------------------------------------- #
+@pytest.mark.parametrize("raw,expected", [(1, 1), (3, 3), (5, 5), (6, 5), (8, 5), (0, 1), (-2, 1)])
+def test_difficulty_is_clamped_to_1_5(raw, expected):
+    from app.schemas.question import QuestionCreate
+
+    schema = QuestionCreate(
+        content={
+            "type": "doc",
+            "content": [{"type": "paragraph", "content": [{"type": "text", "text": "题干"}]}],
+        },
+        q_type="free_response",
+        difficulty=raw,
+        subject_id=1,
+    )
+    assert schema.difficulty == expected

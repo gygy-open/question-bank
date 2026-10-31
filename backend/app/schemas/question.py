@@ -1,5 +1,8 @@
 from pydantic import BaseModel, BeforeValidator, ConfigDict, Field, field_validator, model_validator
 from typing import Optional, List, Any, Dict, Literal, Annotated, Union
+import logging
+
+logger = logging.getLogger(__name__)
 from datetime import datetime
 from app.models.question import QuestionType, QuestionStatus, QuestionVisibility
 from app.services.question_content import (
@@ -143,6 +146,23 @@ class QuestionBase(BaseModel):
     q_type: QuestionType
     status: QuestionStatus = QuestionStatus.DRAFT
     difficulty: int = 1
+
+    @field_validator("difficulty", mode="before")
+    @classmethod
+    def _clamp_difficulty(cls, v: Any) -> Any:
+        """难度只接受 1-5。
+
+        前端星级与筛选按 1-5 硬编码，越界值会显示异常或筛不出来。AI 抽取没有给
+        难度判据，实测会输出 6/7/8；这里统一夹到范围内并留日志，避免脏数据入库。
+        """
+        try:
+            value = int(v)
+        except (TypeError, ValueError):
+            return 1
+        if value < 1 or value > 5:
+            logger.warning("difficulty out of range (%s), clamped to 1-5", value)
+            return min(max(value, 1), 5)
+        return value
     visibility: QuestionVisibility = QuestionVisibility.PUBLIC
     source: Optional[str] = None
 
