@@ -69,6 +69,41 @@ _MD_IMAGE_RE = re.compile(
 )
 
 
+# HTML <img> 标签及其属性。富文本转换器(question_content_converter)只把 markdown 图片语法
+# 转成 image 节点:同一张图写成 ![图](url) 得到 image 节点,写成 <img src="url"> 得到一段
+# 纯文本。所以入口阶段就把它们归一成 markdown 语法,后面统一走入库与地址改写。
+_HTML_IMG_RE = re.compile(r"<img\b([^>]*?)/?>", re.IGNORECASE | re.DOTALL)
+_HTML_ATTR_RE = re.compile(r"""([\w:-]+)\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s"'>]+))""")
+
+
+def _html_img_attrs(raw: str) -> Dict[str, str]:
+    attrs: Dict[str, str] = {}
+    for match in _HTML_ATTR_RE.finditer(raw):
+        value = match.group(2)
+        if value is None:
+            value = match.group(3) if match.group(3) is not None else match.group(4)
+        attrs.setdefault(match.group(1).lower(), value)
+    return attrs
+
+
+def normalize_html_images(markdown: str) -> str:
+    """把 HTML `<img>` 归一为 markdown 图片语法。
+
+    只保留 src 与 alt:markdown-it 的 image 节点不吃 width/height 等属性。src 缺失、或
+    src 含空白的标签原样保留——带空格的 URL 无法用这种语法安全表达,后续改写阶段同样
+    匹配不到,保持原样比产出一个坏链接安全。
+    """
+    def _replace(match: re.Match[str]) -> str:
+        attrs = _html_img_attrs(match.group(1))
+        src = (attrs.get("src") or "").strip()
+        if not src or any(ch.isspace() for ch in src):
+            return match.group(0)
+        alt = re.sub(r"[\[\]]", "", attrs.get("alt") or "")
+        return f"![{alt}]({src})"
+
+    return _HTML_IMG_RE.sub(_replace, markdown)
+
+
 def _safe_extract_zip(zip_path: Path, dest: Path) -> None:
     """把 zip 解压到 dest,防 zip-slip(拒绝 ../ 或绝对路径逃逸)与 zip 炸弹(数量/体积上限)。"""
     dest_root = dest.resolve()
@@ -160,7 +195,7 @@ async def extract_markdown_archive(zip_path: Path, *, store: ImageStore) -> list
         for md_path in md_paths:
             content = await asyncio.to_thread(md_path.read_text, encoding="utf-8")
             rewritten = await _rewrite_local_images(
-                content,
+                normalize_html_images(content),
                 resolve=_local_image_resolver(md_path.parent, extract_root),
                 store=store,
             )
@@ -189,7 +224,11 @@ class MarkdownIngestor:
     async def ingest(
         self, content: str, *, task_id: Optional[str] = None, filename: Optional[str] = None
     ) -> CanonicalDoc:
-        return CanonicalDoc(task_id=_ensure_task_id(task_id), markdown=content, filename=filename)
+        return CanonicalDoc(
+            task_id=_ensure_task_id(task_id),
+            markdown=normalize_html_images(content),
+            filename=filename,
+        )
 
 
 # pandoc 转换 Word 公式时，把非 ASCII 希腊字母原样塞进 \text{}；KaTeX 的 text 模式
