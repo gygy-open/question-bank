@@ -69,6 +69,41 @@ _MD_IMAGE_RE = re.compile(
 )
 
 
+# markdown 表格块:表头行(以 | 开头)紧跟分隔行(| --- |)。
+_TABLE_ROW_PREFIX_RE = re.compile(r"^\s*\|")
+_TABLE_SEPARATOR_RE = re.compile(r"^[\s|:-]+$")
+_FENCE_RE = re.compile(r"^\s*(?:```|~~~)")
+
+
+def normalize_markdown_tables(markdown: str) -> str:
+    """在表格块之前保证有一个空行。
+
+    表格紧跟在 "1. …" 这类有序列表项之后时,markdown-it 会把表格行当成该列表项的
+    懒续行,整张表退化为纯文本(竖线保留成字面量、行间变成硬换行),而且没有任何提示;
+    补一个空行后表格恢复成 table 节点。围栏代码块内的内容不动。
+    """
+    lines = markdown.split("\n")
+    out: list[str] = []
+    in_fence = False
+    for index, line in enumerate(lines):
+        if _FENCE_RE.match(line):
+            in_fence = not in_fence
+            out.append(line)
+            continue
+        if not in_fence and _TABLE_ROW_PREFIX_RE.match(line):
+            next_line = lines[index + 1] if index + 1 < len(lines) else ""
+            is_header = bool(
+                _TABLE_ROW_PREFIX_RE.match(next_line)
+                and "|" in line
+                and _TABLE_SEPARATOR_RE.match(next_line)
+                and "-" in next_line
+            )
+            if is_header and out and out[-1].strip():
+                out.append("")
+        out.append(line)
+    return "\n".join(out)
+
+
 def _safe_extract_zip(zip_path: Path, dest: Path) -> None:
     """把 zip 解压到 dest,防 zip-slip(拒绝 ../ 或绝对路径逃逸)与 zip 炸弹(数量/体积上限)。"""
     dest_root = dest.resolve()
@@ -160,7 +195,7 @@ async def extract_markdown_archive(zip_path: Path, *, store: ImageStore) -> list
         for md_path in md_paths:
             content = await asyncio.to_thread(md_path.read_text, encoding="utf-8")
             rewritten = await _rewrite_local_images(
-                content,
+                normalize_markdown_tables(content),
                 resolve=_local_image_resolver(md_path.parent, extract_root),
                 store=store,
             )
@@ -189,7 +224,11 @@ class MarkdownIngestor:
     async def ingest(
         self, content: str, *, task_id: Optional[str] = None, filename: Optional[str] = None
     ) -> CanonicalDoc:
-        return CanonicalDoc(task_id=_ensure_task_id(task_id), markdown=content, filename=filename)
+        return CanonicalDoc(
+            task_id=_ensure_task_id(task_id),
+            markdown=normalize_markdown_tables(content),
+            filename=filename,
+        )
 
 
 # pandoc 转换 Word 公式时，把非 ASCII 希腊字母原样塞进 \text{}；KaTeX 的 text 模式
