@@ -18,7 +18,9 @@ from __future__ import annotations
 import re
 from typing import Any, Optional
 
+from app.services.question_content import collect_blank_ids
 from app.services.question_content_converter import (
+    blanks_to_underscores,
     convert_answer,
     make_option_id,
     markdown_to_rich_doc,
@@ -97,7 +99,11 @@ def adapt_legacy_question(
     qt = _q_type_value(q_type)
     status_value = _q_type_value(status)
 
-    content_doc = markdown_to_rich_doc(None if content is None else str(content))
+    # 填空题把下划线占位转成 blank 节点;其他题型的下划线保持文本。
+    content_doc = markdown_to_rich_doc(
+        None if content is None else str(content),
+        blanks=qt == "fill_in_the_blank",
+    )
     if content_doc is None:
         raise LegacyQuestionError("题干为空,无法导入")
 
@@ -121,6 +127,14 @@ def adapt_legacy_question(
     elif status_value in {"pending", "published"}:
         # 答案缺失不阻断导入;完整性交给消费端(发布/组卷/导出)校验。
         status_value = "draft"
+
+    if (
+        answer_spec is not None
+        and answer_spec.get("kind") == "fill_in_the_blank"
+        and len(collect_blank_ids(content_doc)) != len(answer_spec.get("blanks") or [])
+    ):
+        # 校验要求题干 blank 与答案 blanks 一一对应;对不上时退回下划线文本,不阻断导入。
+        content_doc = blanks_to_underscores(content_doc)
 
     return {
         "content": content_doc,

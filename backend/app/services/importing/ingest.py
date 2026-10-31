@@ -25,6 +25,7 @@ from app.core import storage
 # (图片字节, 原文件名) -> 替换后的 URL;返回 None 表示该图片保持原引用。
 ImageStore = Callable[[bytes, str], Awaitable[Optional[str]]]
 
+from .docx_blanks import preprocess_underline_blanks
 from .docx_math import (
     MathTypeResult,
     build_warnings,
@@ -226,14 +227,23 @@ class DocxIngestor:
     ) -> CanonicalDoc:
         """file_path 可以是无扩展名的存储对象,因此显式指定输入格式为 docx。"""
         with storage.job_dir() as job:
+            # Word/WPS 的下划线空白(填空横线)pandoc 会压成普通空格,先改写成 ``_`` 字符。
+            source_path = file_path
+            try:
+                source_path = await asyncio.to_thread(
+                    preprocess_underline_blanks, file_path, job / "underline_preprocessed.docx"
+                )
+            except Exception as e:  # noqa: BLE001 - 预处理失败不影响原有转换
+                logger.warning("Underline preprocessing failed for %s: %s", filename or file_path.name, e)
+
             # MathType/Equation 3.0 的 OLE 公式 pandoc 只能输出 WMF 预览图，先替换为占位符。
             try:
                 math_result = await asyncio.to_thread(
-                    preprocess_mathtype, file_path, job / "mathtype_preprocessed.docx"
+                    preprocess_mathtype, source_path, job / "mathtype_preprocessed.docx"
                 )
             except Exception as e:  # noqa: BLE001 - 预处理失败不影响原有转换
                 logger.warning("MathType preprocessing failed for %s: %s", filename or file_path.name, e)
-                math_result = MathTypeResult(docx_path=file_path)
+                math_result = MathTypeResult(docx_path=source_path)
 
             try:
                 content = await asyncio.to_thread(

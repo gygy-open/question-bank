@@ -89,6 +89,7 @@ Rank 2 never authorizes changing what an expression computes or means. When a ru
 - **Stem (content)**:
     - You **must** remove the leading question number (such as "1.", "2、", "(1)").
     - You **must** keep image placeholder tokens such as `@@IMG0@@` and `@@IMG1@@` (each stands for one image) exactly as they are, at the position where they appear in the source. **Do not** delete, translate, modify, or try to interpret them.
+    - Blank placeholders in fill-in-the-blank questions (runs of underscores such as `\_\_\_\_` or `____`) mark the blanks. Keep every one of them at its original position and length; never drop them or replace them with spaces.
 - **Options (options)**: for choice and option-matching questions, extract the option list (for option-matching questions, the full shared set of candidate options).
 - **Answer (answer)**:
     - **Option-matching questions**: give a string of option letters in blank order, such as `"CAGDE"`.
@@ -175,6 +176,7 @@ Rank 2 never authorizes changing what an expression computes or means. When a ru
 - **Stem (content)**:
     - You **must** remove the leading question number.
     - You **must** keep image placeholder tokens such as `@@IMG0@@` and `@@IMG1@@` (each stands for one image) exactly as they are, at the position where they appear in the source. **Do not** delete, translate, modify, or try to interpret them.
+    - Blank placeholders in fill-in-the-blank questions (runs of underscores such as `\_\_\_\_` or `____`) mark the blanks. Keep every one of them at its original position and length; never drop them or replace them with spaces.
 - **Options (options)**: for choice and option-matching questions, extract the option list (for option-matching questions, the full shared set of candidate options).
 - **Answer (answer)**:
     - **Solve every question yourself**; do not simply copy the marks that appear in the source.

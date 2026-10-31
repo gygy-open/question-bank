@@ -43,6 +43,11 @@ const html = computed(() => renderRichContentToHTML(props.content))
     margin-left: auto;
 }
 
+/* 下划线空格（旧数据/手工补的横线）：HTML 默认折叠连续空格，横线会缩成一个空格宽。 */
+.rich-content :deep(u) {
+    white-space: pre-wrap;
+}
+
 .rich-content :deep(.rich-blank) {
     display: inline-block;
     min-width: 2em;

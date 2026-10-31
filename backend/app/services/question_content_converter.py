@@ -45,6 +45,15 @@ _MD_PARSER = (
     .use(attrs_plugin, after=("image",), allowed=("width", "height"))
 )
 
+# pandoc 把 Word 下划线输出为 `[text]{.underline}`;转成 <u> 交给行内 HTML 处理。
+_PANDOC_UNDERLINE_RE = re.compile(r"\[([^\[\]\n]*)\]\{\.underline\}")
+# 填空占位:3 个以上连续下划线,或只含空白的下划线文本,都视为一个 blank。
+_BLANK_UNDERSCORES_RE = re.compile(r"_{3,}")
+_BLANK_EM_PER_CHAR = 0.5
+_BLANK_MIN_WIDTH_EM = 2
+_BLANK_MAX_WIDTH_EM = 30
+_BLANK_MIN_WHITESPACE_CHARS = 3
+
 _DETACHED_IMAGE_SIZE_RE = re.compile(
     r"(!\[[^\]\n]*\]\([^\n]*?\))[ \t]*\r?\n[ \t]*"
     r"(\{(?=[^{}]*(?:width|height)\s*=)[^{}]*\})",
@@ -70,13 +79,18 @@ _DEFAULT_IMAGE_WIDTH_PX = 300.0
 # --------------------------------------------------------------------------- #
 # Markdown → RichDoc
 # --------------------------------------------------------------------------- #
-def markdown_to_rich_doc(md: Optional[str]) -> RichDoc:
-    """把一段 Markdown 转成 Tiptap RichDoc;空/纯空白 → None。"""
-    doc, _ = markdown_to_rich_doc_with_review(md)
+def markdown_to_rich_doc(md: Optional[str], *, blanks: bool = False) -> RichDoc:
+    """把一段 Markdown 转成 Tiptap RichDoc;空/纯空白 → None。
+
+    blanks=True(填空题题干)时,把连续下划线/纯空白下划线文本转成 `blank` 节点。
+    """
+    doc, _ = markdown_to_rich_doc_with_review(md, blanks=blanks)
     return doc
 
 
-def markdown_to_rich_doc_with_review(md: Optional[str]) -> tuple[RichDoc, bool]:
+def markdown_to_rich_doc_with_review(
+    md: Optional[str], *, blanks: bool = False
+) -> tuple[RichDoc, bool]:
     """转换 Markdown,并返回是否因未知/异常输入需要人工复核。"""
     if md is None:
         return None, False
@@ -86,6 +100,7 @@ def markdown_to_rich_doc_with_review(md: Optional[str]) -> tuple[RichDoc, bool]:
     needs_review = [False]
     try:
         normalized_md = _DETACHED_IMAGE_SIZE_RE.sub(r"\1\2", md)
+        normalized_md = _PANDOC_UNDERLINE_RE.sub(r"<u>\1</u>", normalized_md)
         tokens = _MD_PARSER.parse(normalized_md)
         root = SyntaxTreeNode(tokens)
 
@@ -97,7 +112,93 @@ def markdown_to_rich_doc_with_review(md: Optional[str]) -> tuple[RichDoc, bool]:
 
     if not content:
         return {"type": "doc", "content": [_paragraph([_text(md)])]}, True
-    return {"type": "doc", "content": content}, needs_review[0]
+    doc: dict[str, Any] = {"type": "doc", "content": content}
+    if blanks:
+        _convert_blank_placeholders(doc)
+    return doc, needs_review[0]
+
+
+def _blank_width_em(char_count: int) -> int:
+    width = int(char_count * _BLANK_EM_PER_CHAR + 0.5)
+    return max(_BLANK_MIN_WIDTH_EM, min(_BLANK_MAX_WIDTH_EM, width))
+
+
+def _blank_node(index: int, char_count: int) -> Node:
+    return {
+        "type": "blank",
+        "attrs": {"blankId": f"blk_{index}", "widthEm": _blank_width_em(char_count)},
+    }
+
+
+def _split_text_into_blanks(node: Node, next_index: int) -> list[Node]:
+    """把一个 text 节点按填空占位切成 text / blank 节点;没有占位时原样返回。"""
+    text = node.get("text") or ""
+    marks = node.get("marks") or []
+    if any(m.get("type") == "underline" for m in marks) and text.strip() == "":
+        if len(text) >= _BLANK_MIN_WHITESPACE_CHARS:
+            return [_blank_node(next_index, len(text))]
+        return [node]
+
+    out: list[Node] = []
+    pos = 0
+    for m in _BLANK_UNDERSCORES_RE.finditer(text):
+        if m.start() > pos:
+            out.append(_text(text[pos : m.start()], marks))
+        out.append(_blank_node(next_index + sum(1 for n in out if n["type"] == "blank"), m.end() - m.start()))
+        pos = m.end()
+    if not out:
+        return [node]
+    if pos < len(text):
+        out.append(_text(text[pos:], marks))
+    return out
+
+
+def _convert_blank_placeholders(doc: Node) -> None:
+    """按文档顺序把填空占位替换为 blank 节点,blankId 依次为 blk_1、blk_2…
+
+    编号方式与 `_convert_fill_answer` 的 answer blank id 一致,题干与答案才能一一对应。
+    """
+    counter = [0]
+
+    def walk(node: Node) -> None:
+        children = node.get("content")
+        if not children:
+            return
+        new_children: list[Node] = []
+        for child in children:
+            if child.get("type") == "text":
+                pieces = _split_text_into_blanks(child, counter[0] + 1)
+                counter[0] += sum(1 for p in pieces if p["type"] == "blank")
+                new_children.extend(pieces)
+            else:
+                walk(child)
+                new_children.append(child)
+        node["content"] = new_children
+
+    walk(doc)
+
+
+def blanks_to_underscores(doc: RichDoc) -> RichDoc:
+    """把 blank 节点还原为下划线文本(题干 blank 与答案对不上时的降级)。"""
+    if doc is None:
+        return None
+
+    def walk(node: Node) -> None:
+        children = node.get("content")
+        if not children:
+            return
+        new_children: list[Node] = []
+        for child in children:
+            if child.get("type") == "blank":
+                width = (child.get("attrs") or {}).get("widthEm") or 4
+                new_children.append(_text("_" * max(3, int(width / _BLANK_EM_PER_CHAR))))
+            else:
+                walk(child)
+                new_children.append(child)
+        node["content"] = new_children
+
+    walk(doc)
+    return doc
 
 
 def _convert_block(node: SyntaxTreeNode, needs_review: list[bool]) -> list[Node]:
@@ -262,8 +363,14 @@ def _convert_inline(
 
 
 def _apply_html_inline(raw: str, html_marks: list[Mark]) -> bool:
-    """处理行内 HTML `<sup>`/`<sub>` 开闭标签,更新 mark 栈。返回是否已识别。"""
+    """处理行内 HTML `<u>`/`<sup>`/`<sub>` 开闭标签,更新 mark 栈。返回是否已识别。"""
     tag = raw.strip().lower()
+    if tag == "<u>":
+        html_marks.append({"type": "underline"})
+        return True
+    if tag == "</u>":
+        _pop_mark(html_marks, "underline")
+        return True
     if tag in ("<sup>",):
         html_marks.append({"type": "superscript"})
         return True

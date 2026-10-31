@@ -484,3 +484,51 @@ def test_merge_legacy_answer_empty_raw_returns_analysis():
     analysis = markdown_to_rich_doc("解析")
     assert merge_legacy_answer_into_analysis(analysis, "") == analysis
     assert merge_legacy_answer_into_analysis(None, "") is None
+
+
+# --------------------------------------------------------------------------- #
+# 下划线 / 填空占位
+# --------------------------------------------------------------------------- #
+def _inline(doc):
+    return doc["content"][0]["content"]
+
+
+def test_pandoc_underline_span_becomes_underline_mark():
+    doc = markdown_to_rich_doc("工具是[量角器]{.underline}。")
+    assert _inline(doc)[1] == {
+        "type": "text",
+        "text": "量角器",
+        "marks": [{"type": "underline"}],
+    }
+
+
+def test_underscores_stay_text_by_default():
+    doc = markdown_to_rich_doc("填\\_\\_\\_\\_空")
+    assert all(n["type"] == "text" for n in _inline(doc))
+
+
+def test_blanks_option_converts_underscores_and_whitespace_underline():
+    doc = markdown_to_rich_doc(
+        "甲\\_\\_\\_\\_\\_\\_乙<u>      </u>丙[   ]{.underline}丁", blanks=True
+    )
+    nodes = _inline(doc)
+    blanks = [n for n in nodes if n["type"] == "blank"]
+    assert [b["attrs"]["blankId"] for b in blanks] == ["blk_1", "blk_2", "blk_3"]
+    assert [b["attrs"]["widthEm"] for b in blanks] == [3, 3, 2]
+    assert "".join(n.get("text", "") for n in nodes) == "甲乙丙丁"
+
+
+def test_blanks_option_ignores_short_underscores_and_text_underline():
+    doc = markdown_to_rich_doc("a_b__c <u>词</u>", blanks=True)
+    assert [n["type"] for n in _inline(doc)] == ["text", "text"]
+
+
+def test_blank_ids_are_numbered_across_paragraphs():
+    doc = markdown_to_rich_doc("一\\_\\_\\_\\_\n\n二\\_\\_\\_\\_", blanks=True)
+    ids = [
+        n["attrs"]["blankId"]
+        for p in doc["content"]
+        for n in p["content"]
+        if n["type"] == "blank"
+    ]
+    assert ids == ["blk_1", "blk_2"]
