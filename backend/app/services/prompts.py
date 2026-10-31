@@ -70,6 +70,18 @@ DEFAULT_EXTRACT_PROMPT = r"""You are an expert {subject_name} question extractio
 ## Core task
 Extract all {subject_name} questions from the Markdown and convert them into structured JSON data.
 
+## Rule precedence
+
+The rules below can appear to conflict. Resolve conflicts in this fixed order, and never merge two rules into a compromise:
+
+| Rank | Rule | Meaning |
+| --- | --- | --- |
+| 1 | Content fidelity | Never change wording, numbers, options, symbols, or meaning of the source. |
+| 2 | Math syntax | Delimiter normalization is the only permitted edit: `\(...\)` becomes `$...$`, `\[...\]` becomes `$$...$$`. |
+| 3 | Presentation | Everything else: field order, whitespace, lists, JSON shape. |
+
+Rank 2 never authorizes changing what an expression computes or means. When a rule cannot be satisfied without breaking a higher rank, **follow the higher rank and drop the lower one** — do not pick whichever rule happens to be written first, and do not ask which rule wins.
+
 ## Extraction rules
 
 ### 1. Basic fields
@@ -86,7 +98,7 @@ Extract all {subject_name} questions from the Markdown and convert them into str
         - **Important**: if the original answer contains separators such as "or", "或", ";", "；", ",", "，", "、" or "/", you **must** split it into multiple alternative answers in the inner list. For example "1 or 2" (or "1或2") becomes `["1", "2"]`.
         - **Format**: all mathematical content (numbers, variables, formulas) **must** be wrapped in LaTeX (for example `$1$`, `$x$`, `$\sqrt{2}$`). Plain text does not need wrapping.
     - **Other question types**: return the standard answer as a string.
-- **Preserve completeness**: keep the thinking, analysis and summary exactly as written in the source. **Never modify them.**
+- **Preserve completeness**: keep the thinking, analysis and summary exactly as written in the source. Do not rewrite, shorten, reorder or reword them. The single permitted edit to these fields is the math delimiter normalization described in §2 — text, symbols and meaning stay verbatim.
 - **Difficulty (difficulty)**: an integer from 1 to 5 (1 is easiest, 5 is hardest).
 
 ### 2. Formatting
@@ -94,7 +106,8 @@ Extract all {subject_name} questions from the Markdown and convert them into str
 - **Tables**: if the stem or analysis contains a table, you **must** keep it exactly as a Markdown pipe table (`| Col A | Col B |` plus the separator row `| --- | --- |`). **Do not** flatten it into plain text or a list.
 
 ### 3. Knowledge points (knowledge_points)
-- Extract 3-5 core knowledge points for each question.
+- Return **1 to 3** knowledge points you are confident about. Precision beats coverage: a wrong knowledge point is worse than a missing one, because the library also retrieves knowledge points from its vector index and merges them in.
+- Do not pad the list to reach a count. If only one is defensible, return one.
 - **Requirements**:
     - Use standard subject terminology (for example "Pythagorean theorem", "properties of quadratic functions").
     - Cover key concepts, formulas, question types, or solution methods.
@@ -143,6 +156,18 @@ DEFAULT_SOLVE_PROMPT = r"""You are a senior {subject_name} teacher.{subject_desc
 ## Core task
 Identify all {subject_name} questions in the Markdown. **Ignore** any handwritten answers or incorrect solutions that may appear in the source, work out the standard answer and a detailed analysis yourself, and finally convert everything into structured JSON data.
 
+## Rule precedence
+
+The rules below can appear to conflict. Resolve conflicts in this fixed order, and never merge two rules into a compromise:
+
+| Rank | Rule | Meaning |
+| --- | --- | --- |
+| 1 | Content fidelity | Never change wording, numbers, options, symbols, or meaning of the source. |
+| 2 | Math syntax | Delimiter normalization is the only permitted edit: `\(...\)` becomes `$...$`, `\[...\]` becomes `$$...$$`. |
+| 3 | Presentation | Everything else: field order, whitespace, lists, JSON shape. |
+
+Rank 2 never authorizes changing what an expression computes or means. When a rule cannot be satisfied without breaking a higher rank, **follow the higher rank and drop the lower one** — do not pick whichever rule happens to be written first, and do not ask which rule wins.
+
 ## Processing rules
 
 ### 1. Question identification and solving
@@ -167,7 +192,7 @@ Identify all {subject_name} questions in the Markdown. **Ignore** any handwritte
 - **Tables**: if the stem or analysis contains a table, you **must** keep it exactly as a Markdown pipe table (`| Col A | Col B |` plus the separator row `| --- | --- |`). **Do not** flatten it into plain text or a list.
 
 ### 3. Knowledge points (knowledge_points)
-- Extract 3-5 core knowledge points using standard subject terminology.
+- Return **1 to 3** knowledge points you are confident about, using standard subject terminology. Precision beats coverage: a wrong knowledge point is worse than a missing one, because the library also retrieves knowledge points from its vector index and merges them in. Do not pad the list to reach a count.
 
 ### 4. Tags (tags)
 Try to extract the following tag information from the content or the file name (if present):

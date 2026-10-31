@@ -18,6 +18,26 @@ class BatchRerankItem(BaseModel):
     id: str
     points: List[str]
 
+class ResponseTruncatedError(ValueError):
+    """上游因输出 token 上限截断响应,题目列表必然不完整。"""
+
+
+def _guard_truncated(choice) -> None:
+    """响应被输出上限截断时抛错。
+
+    截断不是"结果变少":JSON 在中途被切断,过去唯一的表现是 JSON 解析异常,
+    看起来像模型输出格式错误,真实原因(输出 token 不够)被掩盖。
+    """
+    if getattr(choice, "finish_reason", None) != "length":
+        return
+    logger.error("AI response truncated by output token limit (finish_reason=length)")
+    raise ResponseTruncatedError(
+        "AI response was truncated by the model's output token limit; the extracted question "
+        "list is incomplete. Split the document into smaller parts or raise the model's output "
+        "limit."
+    )
+
+
 class AIProvider(ABC):
     @abstractmethod
     async def chat_stream(
@@ -739,7 +759,12 @@ class OpenAIProvider(AIProvider):
                 response_format={"type": "json_object"},
             )
             
-            content = response.choices[0].message.content
+            if not response.choices:
+                raise ValueError("AI provider returned no choices")
+
+            choice = response.choices[0]
+            _guard_truncated(choice)
+            content = choice.message.content
             logger.debug(f"OpenAI raw response content: {content}")
             if not content:
                 logger.warning("OpenAI returned empty content")
