@@ -19,6 +19,7 @@ from app.services import data_migrations
 from app.services.doc_processor import doc_processor
 from app.services.embedding import reload_embedding_function
 from app.services.paper_import_service import commit_extracted_paper_import
+from app.services.importing.ingest import read_markdown_text
 
 logging.basicConfig(
     level=logging.INFO,
@@ -69,7 +70,7 @@ async def process_task(db: AsyncSession, task: ImportTask):
                 filename=task.original_filename,
             )
         elif task.file_type == 'markdown':
-            content = file_path.read_text(encoding='utf-8')
+            content, _encoding = read_markdown_text(file_path)
             result = await doc_processor.process_markdown(content, db=db, filename=task.original_filename, mode=task.mode or "extract", subject_id=subject_id, user_id=task.user_id)
             
         if result and user and subject_id:
