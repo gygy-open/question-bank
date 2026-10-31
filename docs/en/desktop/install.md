@@ -33,7 +33,7 @@ The desktop edition is a Windows tray app / macOS menu-bar app with a built-in b
 Once started, the QuestionBank icon appears in the menu bar (top right) and in the Dock:
 
 - Click the **Dock icon** (or open the app again) to open the question bank;
-- Click the **menu-bar icon** for the Open QuestionBank / LAN sharing / Restart / Quit menu;
+- Click the **menu-bar icon** for the Open QuestionBank / LAN sharing / Open at Login / Restart / Quit menu;
 - <kbd>⌘Q</kbd> or right-clicking the Dock icon → **Quit** also stops the built-in service.
 
 ::: warning "Cannot verify the developer" / "is damaged"?
@@ -47,7 +47,7 @@ xattr -dr com.apple.quarantine /Applications/QuestionBank.app
 :::
 
 ::: tip Start at login
-The macOS version has no installer-time "launch at startup" option yet. To run it automatically after you sign in, add QuestionBank under **System Settings → General → Login Items**.
+Click the menu-bar icon and check **Open at Login** to start QuestionBank in the background every time you sign in (off by default). It is the same setting as **System Settings → General → Login Items**, so you can change it in either place. If you turned it off in System Settings, checking it again opens that page so you can re-allow it there.
 :::
 
 ## First Launch
@@ -62,6 +62,7 @@ Right-click the tray icon to see the menu:
 |--------|------|
 | Open QuestionBank | Opens the question bank in your default browser |
 | LAN sharing | When checked, opens access to devices on the same subnet (**off by default**); see [LAN Sharing](/en/desktop/lan-sharing) |
+| Open at Login | macOS only: when checked, starts automatically when you sign in to your Mac (**off by default**) |
 | Restart | Restarts the built-in service |
 | Quit | Closes the app and the built-in service |
 

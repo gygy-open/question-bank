@@ -25,7 +25,7 @@ import urllib.request
 import webbrowser
 from typing import Callable
 
-from app import channel
+from app import channel, macos_login_item
 from app.desktop_i18n import display_name, tr
 
 DEFAULT_PORT = int(os.getenv("PORT", str(channel.DEFAULT_PORT)))
@@ -336,6 +336,29 @@ class _Server:
             worker.join(timeout=5)
 
 
+def _toggle_login_item(icon, notify: Callable[[str], None]) -> None:
+    """菜单「登录时启动」:切换 macOS 登录项;需要用户在系统设置里批准时打开对应页面。"""
+    current = macos_login_item.status()
+    if current == macos_login_item.REQUIRES_APPROVAL:
+        # 已注册但被用户在系统设置里关掉了,只能由用户在那里重新打开
+        macos_login_item.open_system_settings()
+        notify(tr("notify.login_item_approval", name=display_name()))
+        return
+    try:
+        new_status = macos_login_item.set_enabled(current != macos_login_item.ENABLED)
+    except RuntimeError as exc:
+        threading.Thread(
+            target=channel.message_box,
+            args=(tr("error.login_item_failed", error=exc), channel.MB_ICONERROR),
+            daemon=True,
+        ).start()
+        return
+    if new_status == macos_login_item.REQUIRES_APPROVAL:
+        macos_login_item.open_system_settings()
+        notify(tr("notify.login_item_approval", name=display_name()))
+    icon.update_menu()
+
+
 def _make_image():
     """Generate the tray icon at runtime (no bundled asset needed)."""
     from app.branding import make_icon
@@ -460,12 +483,23 @@ def run_tray() -> None:
         icon.stop()
 
     # 文字用 callable:网页端切换语言后 update_menu() 即可刷新,无需重启托盘。
-    icon.menu = Menu(
+    items = [
         MenuItem(lambda _i: tr("menu.open"), on_open, default=True),
         MenuItem(lambda _i: tr("menu.lan_share"), on_toggle_lan, checked=lambda _i: get_lan_share()),
+    ]
+    if macos_login_item.is_supported():
+        items.append(
+            MenuItem(
+                lambda _i: tr("menu.launch_at_login"),
+                lambda _icon, _item: _toggle_login_item(icon, _notify),
+                checked=lambda _i: macos_login_item.is_enabled(),
+            )
+        )
+    items += [
         MenuItem(lambda _i: tr("menu.restart"), on_restart),
         MenuItem(lambda _i: tr("menu.quit"), on_quit),
-    )
+    ]
+    icon.menu = Menu(*items)
 
     def _on_locale_change() -> None:
         icon.title = _title()

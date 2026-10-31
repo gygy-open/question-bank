@@ -31,6 +31,7 @@ MESSAGES: Dict[str, Dict[str, str]] = {
         "app.name_preview": "QuestionBank 测试版",
         "menu.open": "打开题库",
         "menu.lan_share": "局域网共享",
+        "menu.launch_at_login": "登录时启动",
         "menu.restart": "重启",
         "menu.quit": "退出",
         "menu.quit_app": "退出 {name}",
@@ -41,6 +42,7 @@ MESSAGES: Dict[str, Dict[str, str]] = {
         "notify.lan_on_with_host": "局域网共享已开启\n{url} 或 {host_url}",
         "notify.lan_off": "局域网共享已关闭",
         "notify.restarted": "已重启",
+        "notify.login_item_approval": "请在「系统设置 → 通用 → 登录项」中允许 {name} 在登录时打开。",
         "notify.starting": "正在启动，请稍候…\n首次启动可能需要一两分钟，准备好后会自动打开。",
         "notify.still_starting": "仍在启动中，请稍候…",
         "tray.starting": "{name}（正在启动…）",
@@ -52,6 +54,7 @@ MESSAGES: Dict[str, Dict[str, str]] = {
         ),
         "error.ports_busy": "端口 {first}~{last} 都被其他程序占用，无法启动。\n\n请关闭占用这些端口的程序后重试。",
         "info.port_fallback": "端口 {default} 已被其他程序占用，本次改用 {port}。",
+        "error.login_item_failed": "无法更改「登录时启动」设置：{error}",
         "seed.ask": (
             "检测到正式版的题库数据。\n\n"
             "是否复制一份到测试版中使用？\n"
@@ -70,6 +73,7 @@ MESSAGES: Dict[str, Dict[str, str]] = {
         "app.name_preview": "QuestionBank Preview",
         "menu.open": "Open QuestionBank",
         "menu.lan_share": "LAN sharing",
+        "menu.launch_at_login": "Open at Login",
         "menu.restart": "Restart",
         "menu.quit": "Quit",
         "menu.quit_app": "Quit {name}",
@@ -80,6 +84,7 @@ MESSAGES: Dict[str, Dict[str, str]] = {
         "notify.lan_on_with_host": "LAN sharing is on\n{url} or {host_url}",
         "notify.lan_off": "LAN sharing is off",
         "notify.restarted": "Restarted",
+        "notify.login_item_approval": "Allow {name} under System Settings → General → Login Items to open it at login.",
         "notify.starting": "Starting, please wait…\nThe first launch can take a minute or two; it will open automatically when ready.",
         "notify.still_starting": "Still starting, please wait…",
         "tray.starting": "{name} (starting…)",
@@ -94,6 +99,7 @@ MESSAGES: Dict[str, Dict[str, str]] = {
             "Close the programs using these ports and try again."
         ),
         "info.port_fallback": "Port {default} is in use by another program; using {port} this time.",
+        "error.login_item_failed": "Could not change the Open at Login setting: {error}",
         "seed.ask": (
             "Data from the stable version of QuestionBank was found.\n\n"
             "Copy it into the Preview version?\n"

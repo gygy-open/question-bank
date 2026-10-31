@@ -59,7 +59,7 @@ The uninstaller will:
 
 1. Quit the app with <kbd>⌘Q</kbd> (or right-click the Dock icon → **Quit**).
 2. Drag **QuestionBank** from **Applications** to the Trash.
-3. If you added it to **Login Items**, remove it there as well.
+3. **Open at Login** stops working once the app is gone; if it still shows under **System Settings → General → Login Items**, remove it there.
 
 ## Is Data Kept After Uninstalling?
 

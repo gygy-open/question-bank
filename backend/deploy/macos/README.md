@@ -11,6 +11,7 @@
 | `package.sh` | `sign` / `smoke` / `dmg` / `notarize` / `all`：签名、冒烟测试、生成 DMG、公证。 |
 | `entitlements.plist` | Developer ID 签名时 hardened runtime 所需的 entitlements。 |
 | `../../app/macos_dock.py` | Dock 集成：点击 Dock 图标打开界面、⌘Q / Dock 退出时先停服务。 |
+| `../../app/macos_login_item.py` | 「登录时启动」：通过 `SMAppService` 注册 / 取消登录项。 |
 
 ## 本地构建
 
@@ -60,6 +61,6 @@ deploy/macos/package.sh all
 ## 与 Windows 版的差异
 
 - 没有安装器：拖进「应用程序」即安装，删除 `.app` 即卸载；数据目录 `~/Library/Application Support/QuestionBank[-Preview]` 不会被删除。
-- 没有安装时的「开机自启」：用户可在「系统设置 → 通用 → 登录项」中自行添加。
+- 开机自启不在安装时设置，而是菜单栏菜单里的「登录时启动」开关（默认关闭，`app/macos_login_item.py`，基于 `SMAppService.mainApp`，与系统设置的登录项同步）。
 - 局域网共享不需要改防火墙：macOS 会在首次监听 `0.0.0.0` / 广播 mDNS 时弹出系统授权。
 - 单实例由 LaunchServices 保证；再次打开 `.app` 会触发 reopen 事件，打开已在运行的实例的界面。

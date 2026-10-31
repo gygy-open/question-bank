@@ -38,6 +38,7 @@ dependencies = [
     "mutagen>=1.48.1",
     "olefile>=0.47",
     "mcp>=2.3.0",
+    "pyobjc-framework-servicemanagement>=12.2.1 ; sys_platform == 'darwin'",
 ]
 
 [dependency-groups]
