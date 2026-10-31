@@ -112,6 +112,65 @@ def read_bytes(sha256: str) -> bytes:
         raise StorageError(f"object not found: {sha256}")
     return path.read_bytes()
 
+# --- 导入草稿:内容寻址的临时对象,由 TTL 清理,不参与媒体 GC -------------------
+# 智能导入的抽取结果需要跨越“页面刷新/关闭”存活,所以单独一个根目录,不与 objects
+# 混放——否则 media_gc 会把未被题库引用的草稿当成孤儿对象删掉。
+
+def _drafts_root() -> Path:
+    return settings.STORAGE_DIR / "import-drafts"
+
+
+def draft_path(key: str) -> Path:
+    if not _SHA256_RE.match(key or ""):
+        raise StorageError(f"invalid draft key: {key!r}")
+    return _drafts_root() / key[:2] / key
+
+
+def put_draft(data: bytes) -> str:
+    """写入草稿并返回其内容哈希(同内容复用同一 key)。"""
+    key = hashlib.sha256(data).hexdigest()
+    target = draft_path(key)
+    if target.is_file():
+        os.utime(target)
+        return key
+    target.parent.mkdir(parents=True, exist_ok=True)
+    tmp = _staging_file()
+    tmp.write_bytes(data)
+    os.replace(tmp, target)
+    return key
+
+
+def read_draft(key: str) -> bytes:
+    path = draft_path(key)
+    if not path.is_file():
+        raise StorageError(f"draft not found: {key}")
+    return path.read_bytes()
+
+
+def delete_draft(key: str) -> None:
+    try:
+        draft_path(key).unlink(missing_ok=True)
+    except StorageError:
+        return
+
+
+def cleanup_drafts(max_age_seconds: int = 7 * 86400) -> int:
+    """删除过期草稿,返回删除个数。草稿比源文件更多变化,不需要长期留存。"""
+    root = _drafts_root()
+    if not root.is_dir():
+        return 0
+    cutoff = time.time() - max_age_seconds
+    removed = 0
+    for path in root.glob("*/*"):
+        try:
+            if path.is_file() and path.stat().st_mtime < cutoff:
+                path.unlink(missing_ok=True)
+                removed += 1
+        except OSError:
+            continue
+    return removed
+
+
 
 def delete(sha256: str) -> None:
     object_path(sha256).unlink(missing_ok=True)
