@@ -1,42 +1,39 @@
-"""两阶段抽取：AI 只判答案，题干由原文确定性切分。
+"""零 AI 的 markdown 规则抽取：题干、选项、答案全部由可复算的脚本从原文切出。
 
-动机（实测依据）
-----------------
-1.6.0 的 `AIExtractor` 把整篇原文丢给模型，要求它回写完整题干。实测 442K 字符
-/786 题的书，模型只出 15 题（`finish=stop`，不是截断）；把 `max_tokens` 提到
-131072 仍是 16 题；用强约束提示词要求"必须 786 题"，模型直接拒绝并回
-"原文过长，请分批"。
+为什么这条路要存在
+------------------
+把题干交给模型回写有问题，这是实测出来的，不是猜的。442K 字符 / 786 题的书：
+- 模型只回 15 题（`finish=stop`，不是截断）；`max_tokens` 提到 131072 仍是 16 题；
+- 强约束提示词要求"必须 786 题"，模型直接拒绝并回"原文过长，请分批"；
+- 就算回得出来，它也会改写原文：`\\(...\\)`→`$...$`、
+  `\\left( {{30}+{2m}}\\right)`→`(30+2m)`、`,若`→`，若`。
 
-根因不是上下文，是**输出体积**：题干逐字照抄等于把整个文件再输出一遍。同一份
-原文、同一次调用，只把输出改成 `{ord, answer, q_type}`（不回写题干），784→786 题
-100% 穷举，78 秒完成。
+而"原文里写了答案"的题，脚本剥比模型判更可靠：同一本书实测脚本剥出 117 题、
+模型只判出 85 题，两者一致的 14 题里，模型的判断没有提供额外信息。
 
-而且题干由 AI 回写本来就有风险：实测它会改写 `\\(...\\)`→`$...$`、
-`\\left( {{30}+{2m}}\\right)`→`(30+2m)`、`,若`→`，若`。改成从原文切片后，
-题干在结构上不可能被改写。
-
-设计
-----
-阶段 1（AI，整篇一次调用）：输出 `{"items":[{"ord":1,"answer":"A"}]}`，
-`ord` 是**出现顺序**（1..N），不是原文题号——教辅书每章从 1 重新编号，题号会重复
-786 次，不可用于对齐。
-
-阶段 2（纯脚本）：
-- 按行首题号切段
-- 剥选项块 → `options`
-- 剥内联答案 `(B)` / `( c )` / `故选B` → 脚本答案（比 AI 可靠）
-- 脚本答案优先，缺失时用 AI 的
-- `q_type` 由结构推断（AI 判题型实测不可靠：786 题里只判出 16 个选择题，
+所以抽取这一步可以完全不需要模型：
+- 按行首题号切段（排除小数 3.14、排除解析里的 1）步骤编号）
+- 剥选项块 → `options`（支持 A. / A、 / A) / A） / （A） 五种写法）
+- 剥内联答案 `(B)` / `（ABD）` / `故选B` → `answer`
+- 题型由结构推断（模型判题型实测不可靠：786 题里只判出 16 个选择题，
   而原文有 148 个带选项块的题）
-- 图片引用原样保留
+- 难度由结构启发式给初值（可按学科提示词覆盖）
+- 图片引用、公式原样保留，只做 `\\frac`→`\\dfrac` 这类排版升级
 
-降级：题数少于 `MIN_Q`、或 AI 调用失败、或 AI 返回条目数与切段数不符时，
-退回原始 `AIExtractor`，行为与未打补丁时一致。
+与"AI 做题"的分工
+------------------
+这条路只做抽取，**不判答案、不做题**。原文没写答案的题，`answer` 留空——
+那些答案属于"做题"阶段，应该在题干被确认之后再生成（见 issue #22：
+抽取 → 巡检 → 做题 → 回修）。把两步混在一起，题干有问题时做题结果会跟着错。
+
+局限
+----
+- 不识别整卷/材料题结构（`paper` / `stimuli` / `question_groups`）。检测到这类文档
+  直接报错，让人改用 `method="ai"`，而不是静默丢掉结构。
+- 不做知识点富化（那需要模型）。知识点由后续富化或学科提示词负责。
 """
 from __future__ import annotations
 
-import asyncio
-import json
 import logging
 import re
 import uuid
@@ -44,22 +41,11 @@ from typing import Any, Dict, List, Optional, Tuple
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.services.ai_provider import get_ai_provider
 from app.services.importing.contracts import ExtractionResult
-from app.services.importing.enrich import KnowledgePointEnricher
 
 logger = logging.getLogger(__name__)
 
 # 少于这个题数不值得走两阶段（小文件用原路径更稳）
-MIN_Q = 20
-
-# 答案阶段重试退避（秒）。整本请求体积大，上游偶发 502。
-RETRY_DELAYS = (0, 20, 60)
-
-# 答案阶段每批题数。实测单次 227K token 的整本请求上游会概率性 502，
-# 拆成每批 150 题（约 40K token）后稳定；对外仍是一次导入，不需要用户干预。
-BATCH_SIZE = 100000  # 不分批：整本一次调用（用户要求，上游限制靠切 cn: 前缀解决）
-
 # 行首题号：1. / 1． / 1、 / 1) / 1）
 # 必须排除小数（3.14 不是第 3 题）：点号后不能紧跟数字。
 # 必须排除解析里的 1） 这种：题号后要么是空白，要么紧接中文/字母（不能是"先化简"这类动词短语的判断交给
@@ -412,17 +398,11 @@ def _infer_difficulty(stem: str, options: List[str], q_type: str) -> int:
     return max(1, min(5, score))
 
 
-def build_questions(
-    segments: List[List[str]], ai_items: List[Dict[str, Any]]
-) -> List[Dict[str, Any]]:
-    """把切段 + AI 答案组装成 legacy 形态的题目 dict（喂给 adapt_legacy_question）。"""
-    by_ord: Dict[int, str] = {}
-    for item in ai_items:
-        try:
-            by_ord[int(item.get("ord"))] = (item.get("answer") or "").strip()
-        except (TypeError, ValueError):
-            continue
+def build_questions(segments: List[List[str]]) -> List[Dict[str, Any]]:
+    """把切好的段组装成 legacy 形态的题目 dict（喂给 adapt_legacy_question）。
 
+    答案只来自原文的内联标记。原文没写的就留空——那是"做题"阶段的事。
+    """
     questions: List[Dict[str, Any]] = []
     for idx, block in enumerate(segments, start=1):
         body = _strip_headings("\n".join(block)).strip()
@@ -437,9 +417,7 @@ def build_questions(
             analysis = (analysis + "\n\n" + table_tail).strip() if analysis else table_tail
         stem, script_answer = _strip_inline_answer(stem)
 
-        ai_answer = by_ord.get(idx, "")
-        # 脚本剥出的答案优先（确定性），AI 只补脚本剥不到的
-        answer = script_answer or ai_answer
+        answer = script_answer
         q_type = _infer_q_type(stem, options, answer)
         difficulty = _infer_difficulty(stem, options, q_type)
         stem = _escape_blanks(_upgrade_frac(stem))
@@ -468,88 +446,13 @@ def build_questions(
     return questions
 
 
-class TwoPhaseExtractor:
-    """整篇一次投：AI 判答案，脚本切题干。见模块 docstring 的实测依据。"""
-
-    def __init__(self, enricher: Optional[KnowledgePointEnricher] = None) -> None:
-        self.enricher = enricher or KnowledgePointEnricher()
-        self._fallback = None  # 延迟构造，避免循环导入
-
-    async def _ask_answers_batched(
-        self, segments: List[List[str]], config: Dict[str, Any]
-    ) -> List[Dict[str, Any]]:
-        """把题目分批问答案，返回带全局 ord 的结果。
-
-        整本塞进一次请求（227K token）实测会被上游概率性 502；分批体积小、稳，
-        而且对调用方仍然是一次导入，用户不需要干预。
-        """
-        collected: List[Dict[str, Any]] = []
-        total = len(segments)
-        for start in range(0, total, BATCH_SIZE):
-            batch = segments[start : start + BATCH_SIZE]
-            text = "\n".join("\n".join(block) for block in batch)
-            items = await self._ask_answers(text, config, len(batch))
-            for item in items:
-                try:
-                    item["ord"] = int(item.get("ord")) + start
-                except (TypeError, ValueError):
-                    continue
-            collected.extend(items)
-            logger.info(
-                "two-phase batch %d-%d/%d answered (%d items)",
-                start + 1, min(start + BATCH_SIZE, total), total, len(items),
-            )
-        return collected
-
-    async def _ask_answers(
-        self, content: str, config: Dict[str, Any], n: int
-    ) -> List[Dict[str, Any]]:
-        """整篇一次调用，只拿答案。带重试：大请求在上游容易偶发 502。"""
-        from openai import AsyncOpenAI
-
-        client = AsyncOpenAI(
-            api_key=config.get("API_KEY"), base_url=config.get("BASE_URL")
-        )
-        messages = [
-            {"role": "system", "content": SYS_PROMPT},
-            {"role": "user", "content": USER_PROMPT.format(n=n) + content},
-        ]
-
-        last_error: Exception | None = None
-        for attempt, delay in enumerate(RETRY_DELAYS, start=1):
-            try:
-                response = await client.chat.completions.create(
-                    model=config.get("MODEL_NAME", "gpt-4o"),
-                    messages=messages,
-                    response_format={"type": "json_object"},
-                    # 关键：不传 max_tokens 时上游默认额度会截断长输出；这里给足。
-                    max_tokens=131072,
-                )
-                choice = response.choices[0]
-                if choice.finish_reason == "length":
-                    raise RuntimeError("answer phase truncated (finish_reason=length)")
-                raw = choice.message.content or ""
-                payload = json.loads(raw)
-                items = payload.get("items") or payload.get("answers") or []
-                if isinstance(items, list) and items and isinstance(items[0], str):
-                    items = [{"ord": i + 1, "answer": a} for i, a in enumerate(items)]
-                if not items:
-                    raise RuntimeError("answer phase returned empty items")
-                return items
-            except Exception as exc:  # noqa: BLE001 - 重试后再决定是否失败
-                last_error = exc
-                logger.warning(
-                    "two-phase answer attempt %d/%d failed: %s",
-                    attempt, len(RETRY_DELAYS), exc,
-                )
-                if attempt < len(RETRY_DELAYS):
-                    await asyncio.sleep(delay)
-        raise RuntimeError(f"answer phase failed after {len(RETRY_DELAYS)} attempts: {last_error}")
+class RuleBasedExtractor:
+    """零 AI 抽取：全部由可复算脚本完成，不依赖任何模型配置。"""
 
     async def extract(
         self,
         content: str,
-        db: AsyncSession,
+        db: Optional[AsyncSession] = None,
         *,
         image_data: bytes | None = None,
         filename: str | None = None,
@@ -557,118 +460,28 @@ class TwoPhaseExtractor:
         subject_id: Optional[int] = None,
         user_id: Optional[int] = None,
     ) -> ExtractionResult:
-        # 图片整页 OCR 路径不走两阶段（没有可切分的 markdown）
+        # 规则抽取没有可切分的文本，图片要走视觉模型。
         if image_data:
-            return await self._fallback_extract(
-                content, db, image_data=image_data, filename=filename,
-                mode=mode, subject_id=subject_id, user_id=user_id,
+            raise ValueError(
+                "规则抽取不支持图片输入，请改用 method='ai' 走视觉模型"
             )
 
-        # mode=solve 要求 AI 自己做题并产出 thinking/analysis，两阶段会把它置空，
-        # 所以只服务 mode=extract（只抽原文已有答案）。
-        if mode != "extract":
-            logger.info("two-phase skipped: mode=%s not 'extract'", mode)
-            return await self._fallback_extract(
-                content, db, filename=filename, mode=mode,
-                subject_id=subject_id, user_id=user_id,
-            )
-
-        # 整卷/材料题文档不走两阶段：paper/stimuli/question_groups 会恒为空。
+        # 整卷/材料题结构(paper/stimuli/question_groups)无法用规则还原；
+        # 与其静默丢掉结构,不如让人显式改用 AI 路径。
         if _looks_like_paper(content):
-            logger.info("two-phase skipped: document looks like a whole paper")
-            return await self._fallback_extract(
-                content, db, filename=filename, mode=mode,
-                subject_id=subject_id, user_id=user_id,
+            raise ValueError(
+                "该文档含材料题/整卷结构，规则抽取无法保留题目材料与题组，"
+                "请改用 method='ai'"
             )
 
         segments = split_segments(content)
-        if len(segments) < MIN_Q:
-            logger.info(
-                "two-phase skipped: %d segments < MIN_Q(%d), falling back",
-                len(segments), MIN_Q,
-            )
-            return await self._fallback_extract(
-                content, db, filename=filename, mode=mode,
-                subject_id=subject_id, user_id=user_id,
-            )
-
-        from app.services.importing.provider_config import resolve_active_provider
-
-        provider_name, config = await resolve_active_provider(
-            db, is_vision=False, user_id=user_id
-        )
-        if provider_name is None:
-            logger.warning("two-phase: no active AI provider, falling back")
-            return await self._fallback_extract(
-                content, db, filename=filename, mode=mode,
-                subject_id=subject_id, user_id=user_id,
-            )
-
-        # 注意：这里刻意不降级到 AIExtractor。实测整本 227K token 的请求失败后，
-        # 单次全量抽取只会再失败一次（模型只吐十几题就 stop），产出的残缺数据
-        # 更难察觉。让异常抛出去，任务显式失败，重试一次就好。
-        ai_items = await self._ask_answers_batched(segments, config)
-
-        # 校验：条数必须与切段数一致，且 ord 必须是 1..N 的连续排列。
-        # 漏一条会让后面所有答案按 ord 对齐时整体错位，比降级更危险。
-        try:
-            ords = sorted(int(i.get("ord")) for i in ai_items if i.get("ord") is not None)
-        except (TypeError, ValueError):
-            ords = []
-        expected = list(range(1, len(segments) + 1))
-        if ords != expected:
-            missing = sorted(set(expected) - set(ords))[:8]
-            logger.warning(
-                "two-phase: ord mismatch (%d answered vs %d segments, missing=%s), falling back",
-                len(ords), len(segments), missing,
-            )
-            return await self._fallback_extract(
-                content, db, filename=filename, mode=mode,
-                subject_id=subject_id, user_id=user_id,
-            )
-
-        logger.info("two-phase: %d segments, AI answered all in order", len(segments))
-
-        questions = build_questions(segments, ai_items)
-        if not questions:
-            return ExtractionResult()
-
-        # 知识点富化沿用官方实现（向量召回 + AI rerank）
-        provider = get_ai_provider(provider_name)
-        try:
-            await self.enricher.enrich(
-                [_EnrichShim(q) for q in questions],
-                subject_id=subject_id, provider=provider, config=config,
-            )
-        except Exception as exc:  # noqa: BLE001 - 富化失败不影响入库
-            logger.warning("two-phase: knowledge point enrich failed: %s", exc)
-
+        questions = build_questions(segments)
         for q in questions:
             q["id"] = str(uuid.uuid4())
 
-        return ExtractionResult(questions=questions, stimuli=[], question_groups=[], paper=None)
-
-    async def _fallback_extract(self, content: str, db: AsyncSession, **kwargs: Any) -> ExtractionResult:
-        if self._fallback is None:
-            from app.services.importing.extract import AIExtractor
-            self._fallback = AIExtractor()
-        return await self._fallback.extract(content, db, **kwargs)
-
-
-class _EnrichShim:
-    """官方 KnowledgePointEnricher 读 .content / .knowledge_points 属性，
-    这里把 dict 包一层，避免为了富化把题目转成 AIQuestion。"""
-
-    __slots__ = ("_d", "content", "knowledge_points", "knowledge_point_ids")
-
-    def __init__(self, d: Dict[str, Any]) -> None:
-        self._d = d
-        self.content = d.get("content", "")
-        self.knowledge_points: List[str] = []
-        self.knowledge_point_ids: List[int] = []
-
-    def __getattr__(self, name: str) -> Any:
-        try:
-            return self._d[name]
-        except KeyError:
-            raise AttributeError(name) from None
+        logger.info(
+            "rule extract: %d segments -> %d questions (no AI)", len(segments), len(questions)
+        )
+        return ExtractionResult(
+            questions=questions, stimuli=[], question_groups=[], paper=None
+        )

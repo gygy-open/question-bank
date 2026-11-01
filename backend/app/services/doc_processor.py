@@ -3,7 +3,7 @@ from pathlib import Path
 from typing import BinaryIO, Optional
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.services.importing.extract import AIExtractor, ExtractionStrategy, TemplateExtractor
-from app.services.importing.two_phase import TwoPhaseExtractor
+from app.services.importing.markdown_rules import RuleBasedExtractor
 from app.services.importing.ingest import DocxIngestor, ImageIngestor, MarkdownArchiveIngestor, MarkdownIngestor
 from app.services.importing.media import ImportImageSink
 
@@ -13,7 +13,7 @@ class DocProcessor:
     def __init__(self):
         self.client = None
         self._ai_extractor = AIExtractor()
-        self._two_phase_extractor = TwoPhaseExtractor()
+        self._rule_extractor = RuleBasedExtractor()
         self._template_extractor = TemplateExtractor()
         self._docx_ingestor = DocxIngestor()
         self._markdown_ingestor = MarkdownIngestor()
@@ -22,13 +22,16 @@ class DocProcessor:
 
     def _extractor_for(self, method: str) -> ExtractionStrategy:
         # structured: 标签模板解析（零 AI）
-        # ai（默认）: 走两阶段——AI 只判答案，题干由原文确定性切分；小文件内部自动降级
+        # rule:       markdown 规则抽取（零 AI）——题干/选项/内联答案全由脚本切出
+        # ai（默认）: AI 抽取
         # legacy_ai: 保留原始单次全量抽取，便于对照排障
         if method == "structured":
             return self._template_extractor
+        if method == "rule":
+            return self._rule_extractor
         if method == "legacy_ai":
             return self._ai_extractor
-        return self._two_phase_extractor
+        return self._ai_extractor
 
     async def process_markdown(self, content: str, db: AsyncSession, filename: str = None, task_id: str = None, mode: str = "extract", method: str = "ai", subject_id: Optional[int] = None, user_id: Optional[int] = None) -> dict:
         """
