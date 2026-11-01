@@ -215,7 +215,8 @@
       "only_markdown": "Only .md files are supported.",
       "only_zip": "Only .zip archives are supported.",
       "only_image": "Only image files are supported.",
-      "unknown_encoding": "Unable to detect the file encoding. Save the file as UTF-8 and try again."
+      "unknown_encoding": "Unable to detect the file encoding. Save the file as UTF-8 and try again.",
+      "draft_not_found": "Draft not found. It may have expired."
     },
     "subject": {
       "not_found": "Subject not found.",
