@@ -1,8 +1,9 @@
 import asyncio
 import hashlib
+import json
 import logging
 import zipfile
-from typing import Optional
+from typing import Any, Optional
 
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 from pydantic import BaseModel
@@ -16,7 +17,9 @@ from app.core.api_errors import ApiError, ErrorCode
 from app.core.permissions import Permission
 from app.crud.crud_subject import subject as crud_subject
 from app.models.composition import Composition
-from app.models.import_task import ImportTask
+from app.core.file_paths import VIRTUAL_SOURCE
+from app.core.locale import get_locale
+from app.models.import_task import ImportTask, ImportTaskStatus
 from app.services.doc_processor import doc_processor
 from app.services.import_drafts import attach_draft_async, delete_draft_id, load_draft
 from app.services.importing.ingest import decode_markdown_bytes
@@ -50,6 +53,52 @@ def _as_review(result: dict, subject_id: int | None) -> dict:
     result["questions"] = extracted_to_v2_review(result.get("questions", []), subject_id=subject_id)
     result["stimuli"] = extracted_stimuli_to_review(result.get("stimuli", []))
     return result
+
+
+async def _record_import_task(
+    db,
+    user: Any,   # 只用到 .id；测试用轻量替身即可
+    *,
+    subject_id: Optional[int],
+    filename: Optional[str],
+    sha256: Optional[str],
+    file_type: str,
+    mode: str,
+    result: dict,
+) -> None:
+    """为智能导入补一条真实的导入记录。
+
+    响应体里的 `task_id` 是 CanonicalDoc 生成的随机 uuid,而 `import_tasks.id` 是整数
+    主键 —— 拿它去 `GET /imports/{id}` 永远查不到。这里补一行真实任务,让"哪天、用
+    什么文件、出了几道题"可追溯;同时写入 content_sha256,使同文件再次导入时
+    `_attach_duplicate_hint` 能命中(此前智能导入从不建任务,那条提示实际上是哑的)。
+
+    任务状态直接落 COMPLETED:工作已经在这次请求里做完了,不需要 worker 再跑一遍。
+    """
+    task = ImportTask(
+        user_id=user.id,
+        subject_id=subject_id,
+        file_path=VIRTUAL_SOURCE,
+        source_sha256=sha256,
+        content_sha256=sha256,
+        original_filename=(filename or "smart-import")[:255],
+        file_type=file_type,
+        status=ImportTaskStatus.COMPLETED,
+        source="smart_upload",
+        description=f"Smart import {filename}".strip(),
+        mode=mode,
+        locale=get_locale(),
+        result_summary=json.dumps(
+            {
+                "questions": len(result.get("questions") or []),
+                "stimuli": len(result.get("stimuli") or []),
+            },
+            ensure_ascii=False,
+        ),
+    )
+    db.add(task)
+    await db.flush()
+    result["import_task_id"] = task.id
 
 
 async def _attach_duplicate_hint(result: dict, db, content: bytes) -> dict:
@@ -120,6 +169,11 @@ async def upload_docx(
         _attach_source_ref(result, sha256, current_user)
         await _attach_duplicate_hint(result, db, content)
         await db.commit()
+        await _record_import_task(
+            db, current_user,
+            subject_id=subject_id, filename=file.filename, sha256=sha256,
+            file_type="docx", mode=mode, result=result,
+        )
         await attach_draft_async(result)
         return result
     except DomainError:
@@ -163,6 +217,11 @@ async def upload_markdown(
         _as_review(result, subject_id)
         _attach_source_ref(result, sha256, current_user)
         await _attach_duplicate_hint(result, db, markdown_content_bytes)
+        await _record_import_task(
+            db, current_user,
+            subject_id=subject_id, filename=file.filename, sha256=sha256,
+            file_type="markdown", mode=mode, result=result,
+        )
         await attach_draft_async(result)
         return result
     except Exception as e:
@@ -185,6 +244,11 @@ async def upload_markdown_text(
     try:
         result = await doc_processor.process_markdown(request.content, db=db, filename=request.filename, mode=request.mode, method=request.method, subject_id=request.subject_id, user_id=current_user.id)
         _as_review(result, request.subject_id)
+        await _record_import_task(
+            db, current_user,
+            subject_id=request.subject_id, filename=request.filename, sha256=None,
+            file_type="markdown", mode=request.mode, result=result,
+        )
         await attach_draft_async(result)
         return result
     except Exception as e:
@@ -228,6 +292,11 @@ async def upload_markdown_archive(
         _as_review(result, subject_id)
         _attach_source_ref(result, sha256, current_user)
         await db.commit()
+        await _record_import_task(
+            db, current_user,
+            subject_id=subject_id, filename=file.filename, sha256=sha256,
+            file_type="markdown", mode=mode, result=result,
+        )
         await attach_draft_async(result)
         return result
     except DomainError:
@@ -259,6 +328,11 @@ async def upload_image_recognition(
     try:
         result = await doc_processor.process_image(file.file, db=db, mode=mode, subject_id=subject_id, user_id=current_user.id)
         _as_review(result, subject_id)
+        await _record_import_task(
+            db, current_user,
+            subject_id=subject_id, filename=file.filename, sha256=None,
+            file_type="image", mode=mode, result=result,
+        )
         await attach_draft_async(result)
         return result
     except Exception as e:
