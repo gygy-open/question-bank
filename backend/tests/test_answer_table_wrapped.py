@@ -72,3 +72,18 @@ def test_table_without_number_header_is_not_an_answer_table():
     text = _paper(1) + "【答案区】\n| 名称 | 值 |\n| --- | --- |\n| 甲 | B |\n"
     result = parse_structured(text)
     assert result.questions[0]["answer"] in ("", None)
+
+
+def test_analysis_table_does_not_fill_blank_answer_cells():
+    # 答案表里第 3 题留空;解析里的取值表不能被对齐到“题号”表头上当成答案。
+    text = (
+        _paper(2)
+        + "3.【题目】填空\n"
+        + "【答案区】\n"
+        "| 题号 | 1 | 2 | 3 |\n| --- | --- | --- | --- |\n| 答案 | A | B |  |\n"
+        "\n2. 解析:列表如下\n"
+        "| x | 0 | 1 | 2 |\n| --- | --- | --- | --- |\n| y | 1 | 3 | 5 |\n"
+    )
+    result = parse_structured(text)
+    assert [q["answer"] for q in result.questions][:2] == ["A", "B"]
+    assert result.questions[2]["answer"] in ("", None)

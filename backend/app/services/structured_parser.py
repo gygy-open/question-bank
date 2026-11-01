@@ -260,6 +260,7 @@ def _extract_answer_table(rows: List[List[str]]) -> Dict[str, str]:
 
     长卷的答案表会沿“题号”行折成多块（一块只有几列宽），所以必须扫完所有块，
     不能读到第一块答案行就返回——那样第二块之后的题号全部丢答案。
+    每个“题号”行只配它下面的第一行：答案区后面解析里的表格不能被当成答案行。
     """
     answers: Dict[str, str] = {}
     header_row: Optional[List[str]] = None
@@ -276,6 +277,7 @@ def _extract_answer_table(rows: List[List[str]]) -> Dict[str, str]:
             ans = _strip_cell_markup(ans_cell)
             if num.isdigit() and ans:
                 answers.setdefault(num, ans)
+        header_row = None
     return answers
 
 
