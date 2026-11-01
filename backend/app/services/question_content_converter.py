@@ -346,11 +346,15 @@ def _convert_inline(
         elif t == "image":
             out.append(_image(node))
         elif t == "html_inline":
-            handled = _apply_html_inline(node.content, html_marks)
-            if not handled and node.content:
-                # 无法识别的行内 HTML → 原样保留为文本,不丢字符。
-                needs_review[0] = True
-                out.append(_text(node.content, current))
+            if _is_line_break_tag(node.content):
+                # <br> 是排版换行,不是内容:换成 hardBreak,而不是留成字面量文本。
+                out.append({"type": "hardBreak"})
+            else:
+                handled = _apply_html_inline(node.content, html_marks)
+                if not handled and node.content:
+                    # 无法识别的行内 HTML → 原样保留为文本,不丢字符。
+                    needs_review[0] = True
+                    out.append(_text(node.content, current))
         else:
             # 未知行内节点:优先展开子节点,否则保留原文。
             needs_review[0] = True
@@ -360,6 +364,16 @@ def _convert_inline(
                 out.append(_text(node.content, current))
 
     return out
+
+
+# 换行标签的三种写法与大小写;`<br />` 里的空格可有可无。表格单元格内无法写 markdown
+# 换行,排版工具(以及本项目的表格转写)统一用 <br>,所以必须识别,否则会在单元格里
+# 显示成一串字面量 "<br>"。
+_LINE_BREAK_TAG_RE = re.compile(r"^<\s*br\s*/?\s*>$", re.IGNORECASE)
+
+
+def _is_line_break_tag(raw: str) -> bool:
+    return bool(_LINE_BREAK_TAG_RE.match((raw or "").strip()))
 
 
 def _apply_html_inline(raw: str, html_marks: list[Mark]) -> bool:
