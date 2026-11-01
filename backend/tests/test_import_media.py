@@ -1,4 +1,5 @@
 """导入流程接入媒体资产:文档内图片入库为学科资产、源文件进对象存储、签名凭据回传。"""
+import hashlib
 import io
 import zipfile
 from types import SimpleNamespace
@@ -8,6 +9,7 @@ from PIL import Image
 from sqlalchemy import select
 
 from app.core import storage
+from app.core.api_errors import ErrorCode
 from app.core.config import settings
 from app.core.permissions import SubjectRole
 from app.core.security import create_access_token
@@ -142,6 +144,31 @@ async def test_archive_upload_with_images_but_no_subject_is_rejected(client, peo
     )
 
     assert response.status_code == 422
+
+
+async def test_markdown_upload_accepts_gbk_file(client, people, captured):
+    response = await client.post(
+        f"{API}/upload/markdown?method=structured&subject_id={people['subject'].id}",
+        files={"file": ("q.md", "1. 已知 $x=1$，求 $x+1$。".encode("gb18030"), "text/markdown")},
+        headers=_auth(people["editor"]),
+    )
+
+    assert response.status_code == 200, response.text
+    assert "已知" in captured[0]
+
+
+async def test_markdown_upload_rejects_undecodable_file(client, people, captured):
+    raw = b"\xff\xfe\x00\x00\x81\x00\xff\xff"
+    response = await client.post(
+        f"{API}/upload/markdown?method=structured&subject_id={people['subject'].id}",
+        files={"file": ("q.md", raw, "text/markdown")},
+        headers=_auth(people["editor"]),
+    )
+
+    assert response.status_code == 400
+    assert response.json()["code"] == ErrorCode.UPLOAD_UNKNOWN_ENCODING
+    assert captured == []
+    assert not storage.exists(hashlib.sha256(raw).hexdigest())
 
 
 def _commit_payload(**extra) -> dict:

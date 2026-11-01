@@ -214,7 +214,8 @@
       "only_docx": "Only .docx files are supported.",
       "only_markdown": "Only .md files are supported.",
       "only_zip": "Only .zip archives are supported.",
-      "only_image": "Only image files are supported."
+      "only_image": "Only image files are supported.",
+      "unknown_encoding": "Unable to detect the file encoding. Save the file as UTF-8 and try again."
     },
     "subject": {
       "not_found": "Subject not found.",

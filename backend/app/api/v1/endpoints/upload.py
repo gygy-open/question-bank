@@ -18,6 +18,7 @@ from app.crud.crud_subject import subject as crud_subject
 from app.models.composition import Composition
 from app.models.import_task import ImportTask
 from app.services.doc_processor import doc_processor
+from app.services.importing.ingest import decode_markdown_bytes
 from app.services.importing.media import sign_source_ref
 from app.services.importing.review import extracted_stimuli_to_review, extracted_to_v2_review
 
@@ -149,8 +150,11 @@ async def upload_markdown(
     await _check_import_subject(db, current_user, subject_id)
 
     markdown_content_bytes = await file.read()
+    try:
+        markdown_content, _encoding = decode_markdown_bytes(markdown_content_bytes, file.filename)
+    except ValueError as e:
+        raise ApiError(400, ErrorCode.UPLOAD_UNKNOWN_ENCODING, str(e)) from e
     sha256 = await _store_source(markdown_content_bytes)
-    markdown_content = markdown_content_bytes.decode('utf-8')
     
     try:
         result = await doc_processor.process_markdown(markdown_content, db=db, filename=file.filename, mode=mode, method=method, subject_id=subject_id, user_id=current_user.id)

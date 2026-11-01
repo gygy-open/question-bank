@@ -56,13 +56,8 @@ def _ensure_task_id(task_id: Optional[str]) -> str:
 _MARKDOWN_ENCODINGS = ("utf-8-sig", "gb18030")
 
 
-def read_markdown_text(path: Path) -> tuple[str, str]:
-    """读取 markdown 源文件,返回 (内容, 实际使用的编码)。
-
-    以前这里硬编码 utf-8:GBK 存盘的文件会抛 UnicodeDecodeError,报错只有
-    "'utf-8' codec can't decode byte ...",用户看不出是编码问题,整个导入任务失败。
-    """
-    raw = path.read_bytes()
+def decode_markdown_bytes(raw: bytes, name: str) -> tuple[str, str]:
+    """解码 markdown 源字节,返回 (内容, 实际使用的编码);都解不开时抛 ValueError。"""
     for encoding in _MARKDOWN_ENCODINGS:
         try:
             text = raw.decode(encoding)
@@ -70,12 +65,21 @@ def read_markdown_text(path: Path) -> tuple[str, str]:
             continue
         if encoding != "utf-8-sig":
             logger.warning(
-                "Markdown source is not UTF-8, decoded as %s: %s", encoding, path.name
+                "Markdown source is not UTF-8, decoded as %s: %s", encoding, name
             )
         return text, encoding
     raise ValueError(
-        f"无法识别 markdown 文件的文本编码(已尝试 {', '.join(_MARKDOWN_ENCODINGS)}): {path.name}"
+        f"无法识别 markdown 文件的文本编码(已尝试 {', '.join(_MARKDOWN_ENCODINGS)}): {name}"
     )
+
+
+def read_markdown_text(path: Path) -> tuple[str, str]:
+    """读取 markdown 源文件,返回 (内容, 实际使用的编码)。
+
+    以前这里硬编码 utf-8:GBK 存盘的文件会抛 UnicodeDecodeError,报错只有
+    "'utf-8' codec can't decode byte ...",用户看不出是编码问题,整个导入任务失败。
+    """
+    return decode_markdown_bytes(path.read_bytes(), path.name)
 
 
 # --- Markdown 归档(zip)摄取:解压 + 本地图片落地 + 路径重写 ---------------------

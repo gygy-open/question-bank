@@ -214,7 +214,8 @@
       "only_docx": "仅支持 .docx 文件",
       "only_markdown": "仅支持 .md 文件",
       "only_zip": "仅支持 .zip 压缩包",
-      "only_image": "仅支持图片文件"
+      "only_image": "仅支持图片文件",
+      "unknown_encoding": "无法识别文件编码，请将文件另存为 UTF-8 后重试"
     },
     "subject": {
       "not_found": "学科不存在",

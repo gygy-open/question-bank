@@ -182,6 +182,7 @@
     "apiErrors.upload.only_markdown": "daee30aca4e2",
     "apiErrors.upload.only_zip": "f22dd62d2529",
     "apiErrors.upload.only_image": "284338940052",
+    "apiErrors.upload.unknown_encoding": "820cde48e46e",
     "apiErrors.subject.not_found": "9c48ec66185e",
     "apiErrors.subject.member_not_found": "b3b97ad25361",
     "apiErrors.subject.answer_space_invalid_lines": "e8de5c69f606",
