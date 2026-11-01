@@ -50,6 +50,34 @@ def _ensure_task_id(task_id: Optional[str]) -> str:
     return task_id or str(uuid.uuid4())
 
 
+# markdown 文本的编码探测顺序。utf-8-sig 同时覆盖带 BOM 与不带 BOM 的 UTF-8;
+# gb18030 是 GBK/GB2312 的超集,覆盖国内 Windows 编辑器(记事本、旧版 WPS)的默认存盘编码。
+# gb18030 几乎能解码任意字节序列,所以必须放在最后当兜底,不能放在前面。
+_MARKDOWN_ENCODINGS = ("utf-8-sig", "gb18030")
+
+
+def read_markdown_text(path: Path) -> tuple[str, str]:
+    """读取 markdown 源文件,返回 (内容, 实际使用的编码)。
+
+    以前这里硬编码 utf-8:GBK 存盘的文件会抛 UnicodeDecodeError,报错只有
+    "'utf-8' codec can't decode byte ...",用户看不出是编码问题,整个导入任务失败。
+    """
+    raw = path.read_bytes()
+    for encoding in _MARKDOWN_ENCODINGS:
+        try:
+            text = raw.decode(encoding)
+        except UnicodeDecodeError:
+            continue
+        if encoding != "utf-8-sig":
+            logger.warning(
+                "Markdown source is not UTF-8, decoded as %s: %s", encoding, path.name
+            )
+        return text, encoding
+    raise ValueError(
+        f"无法识别 markdown 文件的文本编码(已尝试 {', '.join(_MARKDOWN_ENCODINGS)}): {path.name}"
+    )
+
+
 # --- Markdown 归档(zip)摄取:解压 + 本地图片落地 + 路径重写 ---------------------
 
 # zip 炸弹防护上限:文件数 / 解压后总字节 / 单文件字节。
@@ -158,7 +186,7 @@ async def extract_markdown_archive(zip_path: Path, *, store: ImageStore) -> list
 
         results: list[tuple[str, str]] = []
         for md_path in md_paths:
-            content = await asyncio.to_thread(md_path.read_text, encoding="utf-8")
+            content, _encoding = await asyncio.to_thread(read_markdown_text, md_path)
             rewritten = await _rewrite_local_images(
                 content,
                 resolve=_local_image_resolver(md_path.parent, extract_root),
