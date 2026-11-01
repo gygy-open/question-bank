@@ -244,7 +244,7 @@ def _convert_block(node: SyntaxTreeNode, needs_review: list[bool]) -> list[Node]
 
     if t in ("math_block", "math_block_label"):
         latex = node.content.strip()
-        return [{"type": "blockMath", "attrs": {"latex": latex}}]
+        return [{"type": "blockMath", "attrs": {"latex": _normalize_math_latex(latex)}}]
 
     if t == "html_block":
         # 降级:原始 HTML 块 → 纯文本,保留原文不丢字符。
@@ -342,7 +342,9 @@ def _convert_inline(
         elif t in ("softbreak", "hardbreak"):
             out.append({"type": "hardBreak"})
         elif t.startswith("math_inline"):
-            out.append({"type": "inlineMath", "attrs": {"latex": node.content.strip()}})
+            out.append(
+                {"type": "inlineMath", "attrs": {"latex": _normalize_math_latex(node.content.strip())}}
+            )
         elif t == "image":
             out.append(_image(node))
         elif t == "html_inline":
@@ -369,6 +371,37 @@ def _convert_inline(
 # 换行标签的三种写法与大小写;`<br />` 里的空格可有可无。表格单元格内无法写 markdown
 # 换行,排版工具(以及本项目的表格转写)统一用 <br>,所以必须识别,否则会在单元格里
 # 显示成一串字面量 "<br>"。
+# 数学公式里"能解析、但当前字体没有字形"的字符。KaTeX 对它们不报语法错误，只在控制台
+# 打 "No character metrics for 'X'"，页面上是空白或方框 —— 所以光看渲染是否报错查不出来。
+# 一本 786 题的教辅实测：12,245 个行内公式语法失败 0 个，这类告警却有 174 个。
+_MATH_TEXT_GLYPHS: tuple[tuple[re.Pattern[str], str], ...] = (
+    # 弧 AB 一律写成 \overset{\text{ ⏜ }}{AB}；\frown 是等价的圆弧符号且有字形。
+    (re.compile(r"\\text\{\s*⏜\s*\}"), r"\frown "),
+    # 平行；上下文均为 "AM ⫫ A'M'" 这类关系式。
+    (re.compile(r"\\text\{\s*⫫\s*\}"), r"\parallel "),
+)
+_CIRCLED_DIGITS = "①②③④⑤⑥⑦⑧⑨⑩"
+_CIRCLED_RE = re.compile("[" + _CIRCLED_DIGITS + "]")
+
+
+def _normalize_math_latex(latex: str) -> str:
+    """把公式里画不出字形的字符换成等价的 LaTeX 命令。
+
+    替换串带尾随空格:``\\text{ ⫫ }A`` 直接换 ``\\parallel`` 会拼成未定义命令
+    ``\\parallelA``;数学模式忽略空格,不会产生视觉间隙。
+    """
+    for pattern, replacement in _MATH_TEXT_GLYPHS:
+        # 必须用函数形式:替换串里 \p、\f 会被 re 当成非法组引用。
+        latex = pattern.sub(lambda _m, _r=replacement: _r, latex)
+
+    if _CIRCLED_RE.search(latex):
+        # 圈数字是正文字符,数学模式无字形;正文里的圈数字不经过这里,不受影响。
+        latex = _CIRCLED_RE.sub(
+            lambda m: f"\\textcircled{{{_CIRCLED_DIGITS.index(m.group(0)) + 1}}}", latex
+        )
+    return latex
+
+
 _LINE_BREAK_TAG_RE = re.compile(r"^<\s*br\s*/?\s*>$", re.IGNORECASE)
 
 
