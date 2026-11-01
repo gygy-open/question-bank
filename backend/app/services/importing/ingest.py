@@ -104,12 +104,17 @@ _MD_IMAGE_RE = re.compile(
 # HTML <img> 标签及其属性。富文本转换器(question_content_converter)只把 markdown 图片语法
 # 转成 image 节点:同一张图写成 ![图](url) 得到 image 节点,写成 <img src="url"> 得到一段
 # 纯文本。所以入口阶段就把它们归一成 markdown 语法,后面统一走入库与地址改写。
-_HTML_IMG_RE = re.compile(r"<img\b([^>]*?)/?>", re.IGNORECASE | re.DOTALL)
+# 属性段允许引号内出现 ">"(如 alt="a>b"),否则标签会被截断。
+_HTML_IMG_RE = re.compile(
+    r"""<img\b((?:[^>"']|"[^"]*"|'[^']*')*?)/?>""", re.IGNORECASE | re.DOTALL
+)
 _HTML_ATTR_RE = re.compile(r"""([\w:-]+)\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s"'>]+))""")
+# HTML width/height 属性的合法值是像素数(可带 px);百分比等无法换算的值不保留。
+_HTML_IMG_DIMENSION_RE = re.compile(r"^\s*(\d+(?:\.\d+)?)\s*(?:px)?\s*$", re.IGNORECASE)
 
 
-def _html_img_attrs(raw: str) -> Dict[str, str]:
-    attrs: Dict[str, str] = {}
+def _html_img_attrs(raw: str) -> dict[str, str]:
+    attrs: dict[str, str] = {}
     for match in _HTML_ATTR_RE.finditer(raw):
         value = match.group(2)
         if value is None:
@@ -121,17 +126,24 @@ def _html_img_attrs(raw: str) -> Dict[str, str]:
 def normalize_html_images(markdown: str) -> str:
     """把 HTML `<img>` 归一为 markdown 图片语法。
 
-    只保留 src 与 alt:markdown-it 的 image 节点不吃 width/height 等属性。src 缺失、或
-    src 含空白的标签原样保留——带空格的 URL 无法用这种语法安全表达,后续改写阶段同样
-    匹配不到,保持原样比产出一个坏链接安全。
+    保留 src、alt,以及像素 width/height(转成转换器认识的 `{width="300px"}` 属性语法,
+    与 DOCX 路径一致);其余属性丢弃。src 缺失、或 src 含空白的标签原样保留——带空格的
+    URL 无法用这种语法安全表达,后续改写阶段同样匹配不到,保持原样比产出一个坏链接安全。
     """
     def _replace(match: re.Match[str]) -> str:
         attrs = _html_img_attrs(match.group(1))
         src = (attrs.get("src") or "").strip()
         if not src or any(ch.isspace() for ch in src):
             return match.group(0)
-        alt = re.sub(r"[\[\]]", "", attrs.get("alt") or "")
-        return f"![{alt}]({src})"
+        alt = re.sub(r"[\[\]\\]", "", attrs.get("alt") or "")
+        alt = re.sub(r"\s+", " ", alt).strip()
+        dims = []
+        for name in ("width", "height"):
+            dim = _HTML_IMG_DIMENSION_RE.match(attrs.get(name) or "")
+            if dim:
+                dims.append(f'{name}="{dim.group(1)}px"')
+        suffix = "{" + " ".join(dims) + "}" if dims else ""
+        return f"![{alt}]({src}){suffix}"
 
     return _HTML_IMG_RE.sub(_replace, markdown)
 

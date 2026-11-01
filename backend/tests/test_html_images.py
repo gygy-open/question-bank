@@ -30,7 +30,11 @@ JPG = b"\xff\xd8\xff\xe0\x00\x10JFIF\x00\x01\x01\x00\x00\x01\x00\x01\x00\x00\xff
         ('<img src="images/a.jpg"/>', "![](images/a.jpg)"),
         ('<IMG SRC="images/a.jpg">', "![](images/a.jpg)"),
         ('<img alt="图" src="images/a.jpg">', "![图](images/a.jpg)"),
-        ('<img src="images/a.jpg" alt="图" width="300" height="200">', "![图](images/a.jpg)"),
+        ('<img src="images/a.jpg" alt="图" width="300" height="200">',
+         '![图](images/a.jpg){width="300px" height="200px"}'),
+        ('<img src="a.jpg" width="450px">', '![](a.jpg){width="450px"}'),
+        ('<img src="a.jpg" width="50%" height="auto">', "![](a.jpg)"),
+        ('<img src="a.jpg" alt="a>b">', "![a>b](a.jpg)"),
         ('<img data-src="x.jpg" src="images/a.jpg">', "![](images/a.jpg)"),
         ('<img title="提示" src="https://cdn.test/a.jpg">', "![](https://cdn.test/a.jpg)"),
     ],
@@ -62,6 +66,20 @@ def test_unsafe_tags_left_alone(source):
 
 def test_alt_brackets_removed():
     assert normalize_html_images('<img src="a.jpg" alt="a]b[c">') == "![abc](a.jpg)"
+
+
+def test_alt_trailing_backslash_cannot_escape_bracket():
+    assert normalize_html_images('<img src="a.jpg" alt="a\\">') == "![a](a.jpg)"
+
+
+def test_dimensions_reach_rich_doc_image():
+    from app.services.question_content_converter import markdown_to_rich_doc
+
+    md = normalize_html_images('<img src="/api/v1/media/12/content" width="450" height="120">')
+    attrs = markdown_to_rich_doc(md)["content"][0]["content"][0]["attrs"]
+    assert attrs["assetId"] == 12
+    assert attrs["width"] == 450.0
+    assert attrs["height"] == 120.0
 
 
 def test_multiple_tags_on_one_line():
@@ -107,6 +125,17 @@ def test_archive_mixed_html_and_markdown_images(tmp_path):
     _, markdown = parts[0]
     assert sorted(store.names) == ["a.jpg", "b.jpg"]
     assert markdown.count("https://cdn.test/") == 2
+
+
+def test_archive_keeps_dimensions_after_rewrite(tmp_path):
+    zip_path = tmp_path / "pack3.zip"
+    with zipfile.ZipFile(zip_path, "w") as zf:
+        zf.writestr("t.md", '<img src="images/a.jpg" width="200">\n')
+        zf.writestr("images/a.jpg", JPG)
+
+    parts = asyncio.run(extract_markdown_archive(zip_path, store=_Store()))
+    _, markdown = parts[0]
+    assert markdown == '![](https://cdn.test/a.jpg){width="200px"}\n'
 
 
 # --------------------------------------------------------------------------- #
