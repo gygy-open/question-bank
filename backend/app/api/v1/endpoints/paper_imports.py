@@ -85,5 +85,6 @@ async def commit_paper_import(
             content_sha256=payload.content_sha256,
             idempotency_key=payload.idempotency_key,
             allow_duplicate_temp_ids=payload.allow_duplicate_temp_ids,
+            import_task_id=payload.import_task_id,
         ),
     )

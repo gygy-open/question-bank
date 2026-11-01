@@ -21,6 +21,9 @@ class DocProcessor:
     def _extractor_for(self, method: str) -> ExtractionStrategy:
         return self._template_extractor if method == "structured" else self._ai_extractor
 
+    def extractor_for(self, method: str) -> ExtractionStrategy:
+        return self._extractor_for(method)
+
     async def process_markdown(self, content: str, db: AsyncSession, filename: str = None, task_id: str = None, mode: str = "extract", method: str = "ai", subject_id: Optional[int] = None, user_id: Optional[int] = None) -> dict:
         """
         Process markdown content directly and extract questions.

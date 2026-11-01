@@ -1,238 +1,333 @@
-from typing import Any, List, Optional
-from fastapi import APIRouter, Depends, UploadFile, File, Query
+"""导入任务 API:所有导入(文件、图片、粘贴文本)都在后台识别,完成后停在「待审核」。"""
+import asyncio
+import hashlib
+import io
+import json
+import logging
+import math
+import re
+import zipfile
+from datetime import datetime
+from pathlib import Path
+from typing import Any, List, Literal, Optional
+
+from fastapi import APIRouter, Depends, File, Query, UploadFile
 from fastapi.responses import FileResponse
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, update, func
+from pydantic import BaseModel, Field
+from sqlalchemy import func, select
 from sqlalchemy.orm import selectinload
-from app import models, schemas
+
+from app import models
 from app.api import deps
-from app.core.api_errors import ApiError, ErrorCode
 from app.core import permissions, storage
-from app.core.locale import get_locale
+from app.core.api_errors import ApiError, ErrorCode
 from app.core.file_paths import VIRTUAL_SOURCE, import_source_file, task_source_file
+from app.core.locale import get_locale
 from app.core.permissions import Permission
 from app.crud.crud_question import is_question_visible
-from app.models.import_task import ImportTask, ImportTaskStatus
+from app.crud.crud_subject import subject as crud_subject
+from app.models.import_task import ImportMethod, ImportTask, ImportTaskStatus
 from app.models.question import Question
-from app.services.importing.ingest import extract_markdown_archive
-from app.services.importing.media import ImportImageSink
-import logging
-import zipfile
-from pathlib import Path
-import asyncio
-from datetime import datetime
-import math
-import json
+from app.services import import_task_service as tasks_svc
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
+
+MethodParam = Literal["auto", "ai", "structured"]
+ModeParam = Literal["extract", "solve"]
+
+_CANCELLABLE = (
+    ImportTaskStatus.PENDING,
+    ImportTaskStatus.PROCESSING,
+    ImportTaskStatus.PAUSED,
+    ImportTaskStatus.REVIEW_READY,
+)
+_TEXT_TITLE_MAX = 60
+
+
+# 标题去掉行首的 markdown 标记与【题目】这类标签,只留正文。
+_TITLE_PREFIX_RE = re.compile(r"^(?:[#>*\s]+|-\s+|[【\[][^】\]]{1,10}[】\]]\s*[:：]?\s*)+")
+
+
+def _title_from_text(content: str) -> str:
+    for line in content.splitlines():
+        title = _TITLE_PREFIX_RE.sub("", line).strip()
+        if title:
+            return title[:_TEXT_TITLE_MAX]
+    return "text"
+
+
+class ImportTextRequest(BaseModel):
+    content: str
+    filename: Optional[str] = None
+    mode: ModeParam = "extract"
+    method: MethodParam = "auto"
+    auto_commit: bool = False
+    subject_id: Optional[int] = None
+
+
+class ResumeRequest(BaseModel):
+    ids: List[int] = Field(default_factory=list)
+
+
+async def _resolve_subject(db, user: models.User, subject_id: Optional[int]) -> int:
+    """抽取出的图片与题目都归属该学科,创建任务时即确定,不受之后切换学科影响。"""
+    subject_id = subject_id if subject_id is not None else user.last_active_subject_id
+    if subject_id is None:
+        raise ApiError(400, ErrorCode.IMPORT_TASK_SUBJECT_REQUIRED, "请先选择所属学科")
+    if await crud_subject.get(db, id=subject_id) is None:
+        raise ApiError(404, ErrorCode.UPLOAD_SUBJECT_NOT_FOUND, "Subject not found")
+    deps.require(user, Permission.EDIT_QUESTION, subject_id=subject_id)
+    return subject_id
+
+
+def _new_task(
+    *,
+    user: models.User,
+    subject_id: int,
+    filename: str,
+    file_type: str,
+    content: bytes,
+    source_sha256: str,
+    method: str,
+    mode: str,
+    auto_commit: bool,
+) -> ImportTask:
+    return ImportTask(
+        user_id=user.id,
+        subject_id=subject_id,
+        file_path=VIRTUAL_SOURCE,
+        source_sha256=source_sha256,
+        content_sha256=hashlib.sha256(content).hexdigest(),
+        original_filename=filename,
+        file_type=file_type,
+        status=ImportTaskStatus.PENDING,
+        source=tasks_svc.SOURCE_IMPORT,
+        description=f"Import {filename}",
+        method=ImportMethod.AI.value if file_type == "image" else method,
+        mode=mode,
+        auto_commit=auto_commit,
+        locale=get_locale(),
+    )
+
+
+async def _get_owned_task(db, task_id: int, user: models.User) -> ImportTask:
+    task = await db.get(ImportTask, task_id)
+    if task is None:
+        raise ApiError(404, ErrorCode.IMPORT_TASK_NOT_FOUND, "Task not found")
+    if task.user_id != user.id and not user.is_superuser:
+        raise ApiError(403, ErrorCode.IMPORT_TASK_FORBIDDEN, "Not enough permissions")
+    return task
+
+
+async def _serialize_one(db, task: ImportTask) -> dict:
+    positions = await tasks_svc.queue_positions(db, [task.id])
+    return tasks_svc.serialize(task, queue_ahead=positions.get(task.id))
+
 
 @router.get("/queue-status", response_model=dict)
 async def get_queue_status(
     db: deps.SessionDep,
     current_user: models.User = Depends(deps.get_current_active_user),
 ) -> Any:
-    """
-    Get global queue statistics and active tasks.
-    """
-    # 1. Get stats
-    stats_stmt = select(ImportTask.status, func.count(ImportTask.id)).group_by(ImportTask.status)
-    stats_result = await db.execute(stats_stmt)
+    """队列各状态的任务数,以及排队/处理中的任务。"""
+    stats_result = await db.execute(
+        select(ImportTask.status, func.count(ImportTask.id))
+        .where(ImportTask.source.in_(tasks_svc.QUEUE_SOURCES))
+        .group_by(ImportTask.status)
+    )
     stats_dict = {status: count for status, count in stats_result.all()}
-    
-    # Ensure all statuses are present
-    stats = {
-        "pending": stats_dict.get(ImportTaskStatus.PENDING, 0),
-        "processing": stats_dict.get(ImportTaskStatus.PROCESSING, 0),
-        "completed": stats_dict.get(ImportTaskStatus.COMPLETED, 0),
-        "failed": stats_dict.get(ImportTaskStatus.FAILED, 0),
-        "cancelled": stats_dict.get(ImportTaskStatus.CANCELLED, 0),
-    }
+    stats = {status.value: stats_dict.get(status, 0) for status in ImportTaskStatus}
 
-    # 2. Get active tasks (Pending & Processing) with User info
-    # Ordered by created_at asc (FIFO queue)
-    active_stmt = select(ImportTask).options(selectinload(ImportTask.user))\
-        .where(ImportTask.status.in_([ImportTaskStatus.PENDING, ImportTaskStatus.PROCESSING]))
-    
-    # Access Control for active tasks list
+    active_stmt = (
+        select(ImportTask)
+        .options(selectinload(ImportTask.user))
+        .where(
+            ImportTask.status.in_([ImportTaskStatus.PENDING, ImportTaskStatus.PROCESSING]),
+            ImportTask.source.in_(tasks_svc.QUEUE_SOURCES),
+        )
+        .order_by(ImportTask.created_at.asc(), ImportTask.id.asc())
+    )
     if not current_user.is_superuser:
         active_stmt = active_stmt.where(ImportTask.user_id == current_user.id)
-
-    active_stmt = active_stmt.order_by(ImportTask.created_at.asc())
-        
-    active_result = await db.execute(active_stmt)
-    active_tasks_db = active_result.scalars().all()
-    
-    active_tasks = []
-    for index, task in enumerate(active_tasks_db):
-        active_tasks.append({
-            "id": task.id,
-            "original_filename": task.original_filename,
-            "status": task.status,
-            "created_at": task.created_at,
-            "owner_name": task.user.full_name if task.user else "Unknown",
-            "queue_position": index + 1
-        })
-        
+    active_tasks = (await db.execute(active_stmt)).scalars().all()
     return {
         "stats": stats,
-        "active_tasks": active_tasks
+        "active_tasks": [
+            {
+                "id": task.id,
+                "original_filename": task.original_filename,
+                "status": task.status,
+                "created_at": task.created_at,
+                "owner_name": task.user.full_name if task.user else "Unknown",
+                "queue_position": index + 1,
+            }
+            for index, task in enumerate(active_tasks)
+        ],
     }
+
+
+@router.get("/summary", response_model=dict)
+async def get_import_summary(
+    db: deps.SessionDep,
+    current_user: models.User = Depends(deps.get_current_active_user),
+) -> Any:
+    """当前用户各状态的导入数(侧边栏角标、暂停提示用)。"""
+    return await tasks_svc.summary(db, owner_id=current_user.id)
+
 
 @router.get("", response_model=dict)
 async def list_import_tasks(
     *,
     db: deps.SessionDep,
     page: int = 1,
-    size: int = 10,
-    status: Optional[str] = None,
+    size: int = Query(20, ge=1, le=200),
+    status: Optional[str] = Query(None, description="Comma-separated statuses"),
     user_id: Optional[int] = None,
     current_user: models.User = Depends(deps.get_current_active_user),
 ) -> Any:
-    """
-    List import tasks for all users.
-    """
-    skip = (page - 1) * size
-    
-    # Base query conditions
-    conditions = [ImportTask.source == "batch_upload"]
+    """导入列表:普通用户只看自己的;管理员可看全部或按用户筛选。"""
+    conditions = tasks_svc.visible_condition(
+        current_user.id, is_superuser=current_user.is_superuser, owner_id=user_id
+    )
     if status:
-        conditions.append(ImportTask.status == status)
-    
-    # Access Control
-    if current_user.is_superuser:
-        if user_id:
-            conditions.append(ImportTask.user_id == user_id)
-    else:
-        conditions.append(ImportTask.user_id == current_user.id)
-    
-    # Count query
-    count_stmt = select(func.count()).select_from(ImportTask).where(*conditions)
-    count_result = await db.execute(count_stmt)
-    total = count_result.scalar_one()
+        wanted = [s.strip() for s in status.split(",") if s.strip()]
+        valid = {s.value for s in ImportTaskStatus}
+        conditions.append(ImportTask.status.in_([s for s in wanted if s in valid]))
 
-    stmt = select(ImportTask).options(selectinload(ImportTask.user))\
-        .where(*conditions)\
-        .order_by(ImportTask.created_at.desc())\
-        .offset(skip)\
-        .limit(size)
-    
-    result = await db.execute(stmt)
-    tasks = result.scalars().all()
-    
+    total = (
+        await db.execute(select(func.count()).select_from(ImportTask).where(*conditions))
+    ).scalar_one()
+    tasks = (
+        await db.execute(
+            select(ImportTask)
+            .options(selectinload(ImportTask.user))
+            .where(*conditions)
+            .order_by(ImportTask.created_at.desc(), ImportTask.id.desc())
+            .offset((max(page, 1) - 1) * size)
+            .limit(size)
+        )
+    ).scalars().all()
+    positions = await tasks_svc.queue_positions(
+        db, [t.id for t in tasks if t.status == ImportTaskStatus.PENDING]
+    )
     return {
-        "items": [
-            {
-                "id": t.id,
-                "original_filename": t.original_filename,
-                "status": t.status,
-                "created_at": t.created_at,
-                "error_message": t.error_message,
-                "result_summary": t.result_summary,
-                "description": t.description,
-                "source": t.source,
-                "owner_name": t.user.full_name if t.user else "Unknown"
-            }
-            for t in tasks
-        ],
+        "items": [tasks_svc.serialize(t, queue_ahead=positions.get(t.id)) for t in tasks],
         "total": total,
         "page": page,
         "size": size,
-        "pages": math.ceil(total / size) if size > 0 else 0
+        "pages": math.ceil(total / size) if size > 0 else 0,
     }
 
-@router.post("", response_model=List[dict])
+
+@router.post("", response_model=dict)
 async def create_import_tasks(
     *,
     db: deps.SessionDep,
     files: List[UploadFile] = File(...),
-    mode: str = Query("extract", description="Processing mode: extract or solve"),
+    mode: ModeParam = Query("extract", description="extract: keep the document's answers; solve: let AI answer"),
+    method: MethodParam = Query("auto", description="auto: tag parsing when the document has 【题目】 tags, else AI"),
+    auto_commit: bool = Query(False, description="Save questions right after recognition, skipping review"),
+    subject_id: Optional[int] = Query(None),
     current_user: models.User = Depends(deps.get_current_active_user),
 ) -> Any:
-    """
-    Upload multiple files for processing. Each file becomes an ImportTask.
-    """
+    """每个文件创建一条导入任务(压缩包整体为一条),由 worker 在后台识别。"""
     if not files:
         raise ApiError(400, ErrorCode.IMPORT_TASK_NO_FILES, "No files provided")
+    subject_id = await _resolve_subject(db, current_user, subject_id)
 
-    # 学科在创建时确定:抽取出的图片与题目都归属它,不受之后切换学科影响。
-    subject_id = current_user.last_active_subject_id
-    if subject_id is None:
-        raise ApiError(400, ErrorCode.IMPORT_TASK_SUBJECT_REQUIRED, "请先选择所属学科")
-    deps.require(current_user, Permission.EDIT_QUESTION, subject_id=subject_id)
-    sink = ImportImageSink(db, subject_id=subject_id, actor_id=current_user.id)
-
-    created_tasks = []
-
-    def _new_task(source_sha256: str, original_filename: str, file_type: str) -> ImportTask:
-        task = ImportTask(
-            user_id=current_user.id,
+    created: List[ImportTask] = []
+    skipped: List[str] = []
+    for file in files:
+        filename = Path(file.filename or "").name or "upload"
+        file_type = tasks_svc.file_type_for(filename, file.content_type)
+        content = await file.read()
+        if file_type is None or not content:
+            skipped.append(filename)
+            continue
+        if file_type == "archive" and not zipfile.is_zipfile(io.BytesIO(content)):
+            skipped.append(filename)
+            continue
+        sha256 = await asyncio.to_thread(storage.put_bytes, content)
+        task = _new_task(
+            user=current_user,
             subject_id=subject_id,
-            file_path=VIRTUAL_SOURCE,
-            source_sha256=source_sha256,
-            original_filename=original_filename,
+            filename=filename,
             file_type=file_type,
-            status=ImportTaskStatus.PENDING,
-            source="batch_upload",
-            description=f"Import {original_filename}",
+            content=content,
+            source_sha256=sha256,
+            method=method,
             mode=mode,
-            locale=get_locale(),
+            auto_commit=auto_commit,
         )
         db.add(task)
-        created_tasks.append(task)
-        return task
+        created.append(task)
 
-    for file in files:
-        # Determine file type
-        ext = Path(file.filename).suffix.lower()
-
-        # A .zip is a markdown archive: images become subject assets, then fan out into one
-        # markdown task per contained .md (each stored as its own rewritten source object).
-        if ext == '.zip':
-            content = await file.read()
-            zip_sha = await asyncio.to_thread(storage.put_bytes, content)
-            try:
-                parts = await extract_markdown_archive(storage.object_path(zip_sha), store=sink.store)
-            except (ValueError, zipfile.BadZipFile):
-                continue
-
-            archive_stem = Path(file.filename).stem
-            for md_name, rewritten in parts:
-                md_sha = await asyncio.to_thread(storage.put_bytes, rewritten.encode("utf-8"))
-                _new_task(md_sha, f"{archive_stem}/{md_name}", 'markdown')
-            continue
-
-        if ext == '.docx':
-            file_type = 'docx'
-        elif ext == '.md':
-            file_type = 'markdown'
-        else:
-            continue 
-
-        content = await file.read()
-        sha256 = await asyncio.to_thread(storage.put_bytes, content)
-        _new_task(sha256, file.filename, file_type)
-    
-    if not created_tasks:
-         raise ApiError(
-            400, ErrorCode.IMPORT_TASK_NO_VALID_FILES, "No valid files found (supported: .docx, .md, .zip)"
+    if not created:
+        raise ApiError(
+            400,
+            ErrorCode.IMPORT_TASK_NO_VALID_FILES,
+            "No valid files found (supported: .docx, .md, .zip, images)",
         )
-
     await db.commit()
-    
-    # Refresh to get IDs
-    for task in created_tasks:
+    for task in created:
         await db.refresh(task)
-        
-    return [
-        {
-            "id": t.id,
-            "original_filename": t.original_filename,
-            "status": t.status,
-            "created_at": t.created_at
-        }
-        for t in created_tasks
-    ]
+    positions = await tasks_svc.queue_positions(db, [t.id for t in created])
+    return {
+        "items": [tasks_svc.serialize(t, queue_ahead=positions.get(t.id)) for t in created],
+        "skipped": skipped,
+    }
+
+
+@router.post("/text", response_model=dict)
+async def create_text_import_task(
+    *,
+    db: deps.SessionDep,
+    payload: ImportTextRequest,
+    current_user: models.User = Depends(deps.get_current_active_user),
+) -> Any:
+    """粘贴的文本作为一条导入任务;名称默认取第一行。"""
+    content = payload.content.strip()
+    if not content:
+        raise ApiError(400, ErrorCode.IMPORT_TASK_EMPTY_TEXT, "Text is empty")
+    subject_id = await _resolve_subject(db, current_user, payload.subject_id)
+
+    title = (payload.filename or "").strip() or _title_from_text(content)
+    raw = content.encode("utf-8")
+    sha256 = await asyncio.to_thread(storage.put_bytes, raw)
+    task = _new_task(
+        user=current_user,
+        subject_id=subject_id,
+        filename=title,
+        file_type="text",
+        content=raw,
+        source_sha256=sha256,
+        method=payload.method,
+        mode=payload.mode,
+        auto_commit=payload.auto_commit,
+    )
+    db.add(task)
+    await db.commit()
+    await db.refresh(task)
+    return await _serialize_one(db, task)
+
+
+@router.post("/resume", response_model=dict)
+async def resume_import_tasks(
+    *,
+    db: deps.SessionDep,
+    payload: ResumeRequest,
+    current_user: models.User = Depends(deps.get_current_active_user),
+) -> Any:
+    """把暂停的任务放回队列;不传 ids 时恢复全部(管理员为所有人的,其他人为自己的)。"""
+    owner_id = None if current_user.is_superuser else current_user.id
+    if payload.ids:
+        count = await tasks_svc.resume_ids(db, payload.ids, owner_id=owner_id)
+    else:
+        count = await tasks_svc.resume_all(db, owner_id=owner_id)
+    await db.commit()
+    return {"count": count}
+
 
 @router.post("/reset-stuck", response_model=dict)
 async def reset_stuck_tasks(
@@ -240,30 +335,22 @@ async def reset_stuck_tasks(
     db: deps.SessionDep,
     current_user: models.User = Depends(deps.get_current_active_user),
 ) -> Any:
-    """
-    Reset tasks that are stuck in processing state to pending.
-    """
+    """把卡在「处理中」的任务放回队列。"""
     stmt = select(ImportTask).where(
         ImportTask.status == ImportTaskStatus.PROCESSING,
-        ImportTask.source == "batch_upload"
+        ImportTask.source.in_(tasks_svc.QUEUE_SOURCES),
     )
-    
     if not current_user.is_superuser:
         stmt = stmt.where(ImportTask.user_id == current_user.id)
-        
-    result = await db.execute(stmt)
-    tasks = result.scalars().all()
-    
-    count = 0
+    tasks = (await db.execute(stmt)).scalars().all()
     for task in tasks:
         task.status = ImportTaskStatus.PENDING
         task.error_message = None
+        task.progress = None
         task.updated_at = datetime.utcnow()
-        count += 1
-        
     await db.commit()
-    
-    return {"message": f"Reset {count} tasks to pending state", "count": count}
+    return {"message": f"Reset {len(tasks)} tasks to pending state", "count": len(tasks)}
+
 
 @router.get("/{task_id}", response_model=dict)
 async def get_import_task_status(
@@ -272,29 +359,29 @@ async def get_import_task_status(
     task_id: int,
     current_user: models.User = Depends(deps.get_current_active_user),
 ) -> Any:
-    """
-    Get status of an import task.
-    """
-    stmt = select(ImportTask).where(ImportTask.id == task_id)
-    result = await db.execute(stmt)
-    task = result.scalar_one_or_none()
-    
-    if not task:
-        raise ApiError(404, ErrorCode.IMPORT_TASK_NOT_FOUND, "Task not found")
-        
-    if task.user_id != current_user.id and not current_user.is_superuser:
-        raise ApiError(403, ErrorCode.IMPORT_TASK_FORBIDDEN, "Not enough permissions")
-        
-    return {
-        "id": task.id,
-        "original_filename": task.original_filename,
-        "status": task.status,
-        "error_message": task.error_message,
-        "result_summary": task.result_summary,
-        "created_at": task.created_at,
-        "description": task.description,
-        "source": task.source
-    }
+    task = await _get_owned_task(db, task_id, current_user)
+    return await _serialize_one(db, task)
+
+
+@router.get("/{task_id}/result", response_model=dict)
+async def get_import_task_result(
+    *,
+    db: deps.SessionDep,
+    task_id: int,
+    current_user: models.User = Depends(deps.get_current_active_user),
+) -> Any:
+    """待审核的识别结果:题目、材料、题组、整卷结构,以及文件级重复提示。"""
+    task = await _get_owned_task(db, task_id, current_user)
+    payload = await asyncio.to_thread(tasks_svc.load_result, task) if task.status == ImportTaskStatus.REVIEW_READY else None
+    if payload is None:
+        raise ApiError(404, ErrorCode.IMPORT_TASK_RESULT_UNAVAILABLE, "Recognition result is not available")
+    payload["content_sha256"] = task.content_sha256
+    payload["duplicate_of"] = await tasks_svc.find_duplicate_of(
+        db, task.content_sha256, exclude_task_id=task.id
+    )
+    payload["task"] = await _serialize_one(db, task)
+    return payload
+
 
 @router.post("/{task_id}/cancel", response_model=dict)
 async def cancel_import_task(
@@ -303,27 +390,28 @@ async def cancel_import_task(
     task_id: int,
     current_user: models.User = Depends(deps.get_current_active_user),
 ) -> Any:
-    """
-    Cancel an import task.
-    """
-    stmt = select(ImportTask).where(ImportTask.id == task_id)
-    result = await db.execute(stmt)
-    task = result.scalar_one_or_none()
-    
-    if not task:
-        raise ApiError(404, ErrorCode.IMPORT_TASK_NOT_FOUND, "Task not found")
-        
-    if task.user_id != current_user.id and not current_user.is_superuser:
-        raise ApiError(403, ErrorCode.IMPORT_TASK_FORBIDDEN, "Not enough permissions")
-        
-    if task.status in [ImportTaskStatus.COMPLETED, ImportTaskStatus.FAILED, ImportTaskStatus.CANCELLED]:
+    """取消排队/处理中/暂停的任务,或放弃待审核的结果。处理中的任务会在几秒内停下。"""
+    task = await _get_owned_task(db, task_id, current_user)
+    if task.status not in _CANCELLABLE:
         raise ApiError(400, ErrorCode.IMPORT_TASK_ALREADY_FINISHED, "Task already finished")
-        
-    # Update task status
     task.status = ImportTaskStatus.CANCELLED
+    task.result_sha256 = None
+    task.paused_reason = None
+    task.progress = None
+    task.updated_at = datetime.utcnow()
     await db.commit()
-    
     return {"message": "Task cancelled"}
+
+
+def _is_empty_completed(task: ImportTask) -> bool:
+    if task.status != ImportTaskStatus.COMPLETED or not task.result_summary:
+        return False
+    try:
+        summary = json.loads(task.result_summary)
+        return summary.get("count", len(summary.get("created_question_ids") or [])) == 0
+    except (ValueError, AttributeError):
+        return False
+
 
 @router.post("/{task_id}/retry", response_model=dict)
 async def retry_import_task(
@@ -332,49 +420,32 @@ async def retry_import_task(
     task_id: int,
     current_user: models.User = Depends(deps.get_current_active_user),
 ) -> Any:
-    """
-    Retry a failed import task.
-    """
-    stmt = select(ImportTask).where(ImportTask.id == task_id)
-    result = await db.execute(stmt)
-    task = result.scalar_one_or_none()
-    
-    if not task:
-        raise ApiError(404, ErrorCode.IMPORT_TASK_NOT_FOUND, "Task not found")
-        
-    if task.user_id != current_user.id and not current_user.is_superuser:
-        raise ApiError(403, ErrorCode.IMPORT_TASK_FORBIDDEN, "Not enough permissions")
-        
-    # Check if retry is allowed
-    can_retry = False
-    if task.status in [ImportTaskStatus.FAILED, ImportTaskStatus.CANCELLED]:
-        can_retry = True
-    elif task.status == ImportTaskStatus.COMPLETED:
-        # Allow retry if 0 questions were extracted
-        try:
-            if task.result_summary:
-                summary = json.loads(task.result_summary)
-                if summary.get("count", 0) == 0:
-                    can_retry = True
-        except Exception:
-            pass
-
-    if not can_retry:
+    """重新识别失败、已取消、已暂停或结果为空的任务。"""
+    task = await _get_owned_task(db, task_id, current_user)
+    retryable = task.status in (
+        ImportTaskStatus.FAILED,
+        ImportTaskStatus.CANCELLED,
+        ImportTaskStatus.PAUSED,
+    ) or _is_empty_completed(task)
+    if not retryable:
         raise ApiError(
             400,
             ErrorCode.IMPORT_TASK_NOT_RETRYABLE,
-            "Only failed, cancelled, or empty completed tasks can be retried",
+            "Only failed, cancelled, paused, or empty completed tasks can be retried",
         )
-        
-    # Reset task status
     task.status = ImportTaskStatus.PENDING
     task.error_message = None
     task.result_summary = None
-    task.created_at = datetime.utcnow() # Update timestamp to move to top of queue? Or keep original? Maybe update created_at so it looks new.
-    
+    task.result_sha256 = None
+    task.paused_reason = None
+    task.provider_id = None
+    task.progress = None
+    # 重新排到队尾。
+    task.created_at = datetime.utcnow()
+    task.updated_at = datetime.utcnow()
     await db.commit()
-    
     return {"message": "Task queued for retry"}
+
 
 @router.delete("/{task_id}", response_model=dict)
 async def delete_import_task(
@@ -383,30 +454,16 @@ async def delete_import_task(
     task_id: int,
     current_user: models.User = Depends(deps.get_current_active_user),
 ) -> Any:
-    """
-    Delete an import task.
-    """
-    stmt = select(ImportTask).where(ImportTask.id == task_id)
-    result = await db.execute(stmt)
-    task = result.scalar_one_or_none()
-    
-    if not task:
-        raise ApiError(404, ErrorCode.IMPORT_TASK_NOT_FOUND, "Task not found")
-        
-    if task.user_id != current_user.id and not current_user.is_superuser:
-        raise ApiError(403, ErrorCode.IMPORT_TASK_FORBIDDEN, "Not enough permissions")
-        
-    # Delete file if exists
+    """删除导入记录;正在处理的任务会随之停止。"""
+    task = await _get_owned_task(db, task_id, current_user)
     source = import_source_file(task.file_path)
     if source is not None:
         try:
             source.unlink()
         except OSError as e:
             logger.warning("Error deleting import source %s: %s", source, e)
-        
     await db.delete(task)
     await db.commit()
-    
     return {"message": "Task deleted"}
 
 
@@ -414,6 +471,12 @@ _SOURCE_MEDIA_TYPES = {
     ".docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
     ".md": "text/markdown; charset=utf-8",
     ".zip": "application/zip",
+    ".txt": "text/plain; charset=utf-8",
+    ".png": "image/png",
+    ".jpg": "image/jpeg",
+    ".jpeg": "image/jpeg",
+    ".webp": "image/webp",
+    ".gif": "image/gif",
 }
 
 

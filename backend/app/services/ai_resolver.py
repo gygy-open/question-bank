@@ -117,6 +117,16 @@ async def resolve_model(
             raise Invalid("所选模型不支持该用途", ErrorCode.AI_CONFIG_MODEL_PURPOSE_UNSUPPORTED)
         return ResolvedModel(model, model.provider, build_config(model, model.provider), "explicit")
 
+    found = await _default_model(db, user_id=user_id, purpose=purpose, lock=lock)
+    if found is None:
+        return None
+    model, source = found
+    return ResolvedModel(model, model.provider, build_config(model, model.provider), source)  # type: ignore[arg-type]
+
+
+async def _default_model(
+    db: AsyncSession, *, user_id: Optional[int], purpose: Purpose, lock: bool = False
+) -> Optional[tuple[AIModel, str]]:
     candidates = (
         ("personal", await _pref_model_id(db, user_id, purpose)),
         ("global", await _global_model_id(db, purpose)),
@@ -128,5 +138,13 @@ async def resolve_model(
         scope_user = user_id if source == "personal" else None
         model = await get_usable_model(db, user_id=scope_user, model_id=candidate_id, lock=lock)
         if model is not None and supports(model, purpose):
-            return ResolvedModel(model, model.provider, build_config(model, model.provider), source)  # type: ignore[arg-type]
+            return model, source
     return None
+
+
+async def resolve_provider_id(
+    db: AsyncSession, *, user_id: Optional[int], purpose: Purpose = "text"
+) -> Optional[int]:
+    """按与 resolve_model 相同的顺序找到默认模型所属服务商;不解密 Key。未配置时返回 None。"""
+    found = await _default_model(db, user_id=user_id, purpose=purpose)
+    return found[0].provider_id if found else None

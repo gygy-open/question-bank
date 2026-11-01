@@ -201,6 +201,15 @@ def _match_tag(line: str) -> Optional[Tuple[str, str, Optional[str]]]:
     return (field, inline, None)
 
 
+def has_structured_tags(text: str) -> bool:
+    """文档里是否有【题目】类题块起始标签;解析方式为「自动」时据此选择标签解析。"""
+    for line in (text or "").splitlines():
+        matched = _match_tag(_strip_blockquote_prefix(line))
+        if matched is not None and matched[0] == "content":
+            return True
+    return False
+
+
 def _split_option_block(text: str) -> List[str]:
     """Split a single 【选项】 block into ["A. ...", "B. ...", ...]."""
     pattern = re.compile(r'(?<!\S)([A-Za-z])\s*[\.、\)．]\s*')

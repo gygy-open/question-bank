@@ -45,6 +45,11 @@ MESSAGES: Dict[str, Dict[str, str]] = {
         "notify.login_item_approval": "请在「系统设置 → 通用 → 登录项」中允许 {name} 在登录时打开。",
         "notify.starting": "正在启动，请稍候…\n首次启动可能需要一两分钟，准备好后会自动打开。",
         "notify.still_starting": "仍在启动中，请稍候…",
+        "notify.import_ready": "「{name}」识别完成，共 {count} 题，可以开始审核",
+        "notify.imports_ready_many": "{count} 个导入识别完成，可以开始审核",
+        "notify.import_saved": "「{name}」已入库 {count} 题",
+        "notify.import_failed": "「{name}」识别失败，可在导入页面查看原因",
+        "notify.imports_paused": "AI 服务暂时不可用，已暂停 {count} 个导入",
         "tray.starting": "{name}（正在启动…）",
         "error.start_failed": "服务未能启动。\n\n请把日志发给我们排查：\n{log}",
         "error.migration_failed": (
@@ -87,6 +92,11 @@ MESSAGES: Dict[str, Dict[str, str]] = {
         "notify.login_item_approval": "Allow {name} under System Settings → General → Login Items to open it at login.",
         "notify.starting": "Starting, please wait…\nThe first launch can take a minute or two; it will open automatically when ready.",
         "notify.still_starting": "Still starting, please wait…",
+        "notify.import_ready": "“{name}” is ready for review ({count} questions)",
+        "notify.imports_ready_many": "{count} imports are ready for review",
+        "notify.import_saved": "“{name}”: {count} questions saved",
+        "notify.import_failed": "“{name}” could not be recognized; see the Import page for details",
+        "notify.imports_paused": "The AI service is unavailable; {count} import(s) paused",
         "tray.starting": "{name} (starting…)",
         "error.start_failed": "The service failed to start.\n\nPlease send us the log file:\n{log}",
         "error.migration_failed": (

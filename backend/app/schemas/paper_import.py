@@ -131,6 +131,8 @@ class PaperImportCommitRequest(BaseModel):
     idempotency_key: Optional[str] = None
     # 用户已确认「仍然录入」的疑似重复题(temp_id);其余命中查重的题按跳过处理。
     allow_duplicate_temp_ids: List[str] = Field(default_factory=list)
+    # 审核的是后台导入任务的识别结果时传入;入库后该任务即完成,不再另建任务。
+    import_task_id: Optional[int] = None
 
     @model_validator(mode="after")
     def _check_composition_fields(self) -> "PaperImportCommitRequest":

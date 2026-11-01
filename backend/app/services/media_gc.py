@@ -39,6 +39,7 @@ async def _referenced_hashes(db: AsyncSession) -> set[str]:
     hashes.update(await db.scalars(select(MediaAsset.sha256)))
     hashes.update(await db.scalars(select(LegacyMediaPath.sha256)))
     hashes.update(await db.scalars(select(ImportTask.source_sha256).where(ImportTask.source_sha256.is_not(None))))
+    hashes.update(await db.scalars(select(ImportTask.result_sha256).where(ImportTask.result_sha256.is_not(None))))
     return hashes
 
 

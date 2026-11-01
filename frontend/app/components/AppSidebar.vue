@@ -8,6 +8,7 @@ import {
   SidebarGroupLabel,
   SidebarHeader,
   SidebarMenu,
+  SidebarMenuBadge,
   SidebarMenuButton,
   SidebarMenuItem,
   SidebarRail,
@@ -28,8 +29,8 @@ import CustomSidebarTrigger from '~/components/CustomSidebarTrigger.vue'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import UserProfileDialog from '~/components/UserProfileDialog.vue'
 import ChangePasswordDialog from '~/components/ChangePasswordDialog.vue'
-import { useColorMode } from '@vueuse/core'
-import { BookOpen, ChevronsUpDown, Images, ListTree, LogOut, Settings, Sparkles, User, Users, Tags, Library, KeyRound, Activity, Layers, Info, Moon, Sun, Lock, Languages, Check, LayoutDashboard } from '@lucide/vue'
+import { useColorMode, useIntervalFn } from '@vueuse/core'
+import { BookOpen, ChevronsUpDown, Images, Inbox, ListTree, LogOut, Settings, User, Users, Tags, Library, KeyRound, Activity, Info, Moon, Sun, Lock, Languages, Check, LayoutDashboard } from '@lucide/vue'
 
 const props = withDefaults(defineProps<SidebarProps>(), {
   collapsible: "icon",
@@ -46,6 +47,11 @@ const colorMode = useColorMode()
 const toggleColorMode = () => {
   colorMode.value = colorMode.value === 'dark' ? 'light' : 'dark'
 }
+
+// 待审核的导入数;识别在后台完成,用户不在导入页时也要看得到。
+const { reviewCount: importReviewCount, refreshSummary: refreshImportSummary } = useImportQueue()
+useIntervalFn(() => { if (user.value) refreshImportSummary() }, 30_000)
+watch(user, (current) => { if (current) refreshImportSummary() }, { immediate: true })
 
 const handleLogout = () => {
   logout()
@@ -97,6 +103,21 @@ const navActiveClass = 'border-l-2 border-transparent data-[active=true]:border-
                   </NuxtLink>
                 </SidebarMenuButton>
               </SidebarMenuItem>
+              <SidebarMenuItem>
+                <SidebarMenuButton
+                  as-child
+                  :is-active="route.path === '/imports' || route.path.startsWith('/imports/')"
+                  :class="navActiveClass"
+                >
+                  <NuxtLink to="/imports">
+                    <Inbox />
+                    <span>{{ t('nav.import') }}</span>
+                  </NuxtLink>
+                </SidebarMenuButton>
+                <SidebarMenuBadge v-if="importReviewCount" :title="t('nav.importReviewBadge', { count: importReviewCount })">
+                  {{ importReviewCount }}
+                </SidebarMenuBadge>
+              </SidebarMenuItem>
             </SidebarMenu>
           </div>
 
@@ -124,28 +145,6 @@ const navActiveClass = 'border-l-2 border-transparent data-[active=true]:border-
                   <NuxtLink to="/compositions/personal">
                     <Lock />
                     <span>{{ t('nav.personalSpace') }}</span>
-                  </NuxtLink>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-            </SidebarMenu>
-          </div>
-
-          <div>
-            <SidebarGroupLabel>{{ t('nav.import') }}</SidebarGroupLabel>
-            <SidebarMenu>
-              <SidebarMenuItem>
-                <SidebarMenuButton as-child :is-active="route.path === '/import/smart'" :class="navActiveClass">
-                  <NuxtLink to="/import/smart">
-                    <Sparkles />
-                    <span>{{ t('nav.smartImport') }}</span>
-                  </NuxtLink>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-              <SidebarMenuItem>
-                <SidebarMenuButton as-child :is-active="route.path === '/imports'" :class="navActiveClass">
-                  <NuxtLink to="/imports">
-                    <Layers />
-                    <span>{{ t('nav.batchImport') }}</span>
                   </NuxtLink>
                 </SidebarMenuButton>
               </SidebarMenuItem>

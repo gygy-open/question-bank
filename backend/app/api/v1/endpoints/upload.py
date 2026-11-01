@@ -1,3 +1,4 @@
+"""同步上传识别接口(已废弃:前端改走 /imports 后台导入任务,这里保留给旧客户端)。"""
 import asyncio
 import hashlib
 import logging
@@ -6,7 +7,6 @@ from typing import Optional
 
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 from pydantic import BaseModel
-from sqlalchemy import select
 
 from app import models
 from app.api import deps
@@ -15,8 +15,6 @@ from app.core import storage
 from app.core.api_errors import ApiError, ErrorCode
 from app.core.permissions import Permission
 from app.crud.crud_subject import subject as crud_subject
-from app.models.composition import Composition
-from app.models.import_task import ImportTask
 from app.services.doc_processor import doc_processor
 from app.services.importing.ingest import decode_markdown_bytes
 from app.services.importing.media import sign_source_ref
@@ -53,31 +51,11 @@ def _as_review(result: dict, subject_id: int | None) -> dict:
 
 async def _attach_duplicate_hint(result: dict, db, content: bytes) -> dict:
     """标记“与历史导入文件内容完全一致”。只提示，不阻塞；近似重复不在本期承诺范围。"""
+    from app.services.import_task_service import find_duplicate_of
+
     digest = hashlib.sha256(content).hexdigest()
     result["content_sha256"] = digest
-
-    task = (
-        await db.execute(
-            select(ImportTask)
-            .where(ImportTask.content_sha256 == digest)
-            .order_by(ImportTask.created_at.desc())
-        )
-    ).scalars().first()
-    if task is None:
-        result["duplicate_of"] = None
-        return result
-
-    comp = (
-        await db.execute(
-            select(Composition).where(Composition.source_import_task_id == task.id)
-        )
-    ).scalars().first()
-    result["duplicate_of"] = {
-        "import_task_id": task.id,
-        "original_filename": task.original_filename,
-        "imported_at": task.created_at.isoformat() if task.created_at else None,
-        "composition_id": comp.id if comp else None,
-    }
+    result["duplicate_of"] = await find_duplicate_of(db, digest)
     return result
 
 class MarkdownContentRequest(BaseModel):

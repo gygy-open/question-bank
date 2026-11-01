@@ -6,11 +6,12 @@ from __future__ import annotations
 
 import logging
 import uuid
-from typing import Optional, Protocol
+from typing import Awaitable, Callable, Optional, Protocol
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.schemas.ai import AIQuestion, QuestionList
+from app.services.ai_errors import with_ai_retry
 from app.services.ai_provider import get_ai_provider
 from app.services.structured_parser import parse_structured
 
@@ -21,6 +22,9 @@ from .prompt import PromptBuilder
 from .provider_config import resolve_active_provider
 
 logger = logging.getLogger(__name__)
+
+# 进度回调:收到阶段名(extracting / matching),供导入任务展示进度。
+StageCallback = Callable[[str], Awaitable[None]]
 
 
 class ExtractionStrategy(Protocol):
@@ -36,6 +40,7 @@ class ExtractionStrategy(Protocol):
         mode: str = "extract",
         subject_id: Optional[int] = None,
         user_id: Optional[int] = None,
+        on_stage: Optional[StageCallback] = None,
     ) -> ExtractionResult: ...
 
 
@@ -73,6 +78,7 @@ class AIExtractor:
         mode: str = "extract",
         subject_id: Optional[int] = None,
         user_id: Optional[int] = None,
+        on_stage: Optional[StageCallback] = None,
     ) -> ExtractionResult:
         provider_name, config = await resolve_active_provider(
             db, is_vision=bool(image_data), user_id=user_id
@@ -98,7 +104,11 @@ class AIExtractor:
             final_content = f"文件名: {filename}\n\n{masked_content}"
 
         try:
-            extracted_payload = await provider.extract_questions(final_content, image_data, config)
+            if on_stage:
+                await on_stage("extracting")
+            extracted_payload = await with_ai_retry(
+                lambda: provider.extract_questions(final_content, image_data, config)
+            )
             if isinstance(extracted_payload, QuestionList):
                 questions = extracted_payload.questions
                 stimuli = [item.model_dump() for item in extracted_payload.stimuli]
@@ -114,6 +124,8 @@ class AIExtractor:
                 questions, stimuli, paper = self._restore_images(
                     questions, stimuli, paper, image_map
                 )
+            if on_stage:
+                await on_stage("matching")
             await self.enricher.enrich(
                 questions, subject_id=subject_id, provider=provider, config=config
             )
@@ -176,6 +188,7 @@ class TemplateExtractor:
         mode: str = "extract",
         subject_id: Optional[int] = None,
         user_id: Optional[int] = None,
+        on_stage: Optional[StageCallback] = None,
     ) -> ExtractionResult:
         return parse_structured(content)
 

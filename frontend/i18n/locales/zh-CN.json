@@ -201,12 +201,15 @@
     "import_task": {
       "no_files": "请选择要导入的文件",
       "subject_required": "请先选择所属学科",
-      "no_valid_files": "没有可导入的文件（支持 .docx、.md、.zip）",
+      "no_valid_files": "没有可导入的文件（支持 .docx、.md、.zip 和图片）",
       "not_found": "导入任务不存在",
       "forbidden": "您没有权限操作该导入任务",
       "already_finished": "任务已结束",
-      "not_retryable": "只有失败、已取消或结果为空的任务才能重试",
-      "source_unavailable": "源文件不可用"
+      "not_retryable": "只有失败、已取消、已暂停或结果为空的任务才能重试",
+      "source_unavailable": "源文件不可用",
+      "empty_text": "请输入要导入的文本",
+      "result_unavailable": "识别结果不存在或已失效，请重新识别",
+      "not_reviewable": "该导入不在待审核状态，可能已入库或已取消"
     },
     "upload": {
       "subject_not_found": "学科不存在",
@@ -330,8 +333,6 @@
     "sharedSpace": "共享空间",
     "personalSpace": "个人空间",
     "import": "导入",
-    "smartImport": "智能导入",
-    "batchImport": "批量智能导入",
     "subjectResources": "学科资源",
     "knowledgePoints": "知识点管理",
     "tags": "标签管理",
@@ -341,7 +342,8 @@
     "activityLogs": "行为日志",
     "subjects": "学科管理",
     "systemSettings": "系统设置",
-    "settings": "设置"
+    "settings": "设置",
+    "importReviewBadge": "{count} 个导入待审核"
   },
   "dashboard": {
     "refresh": "刷新",
@@ -690,66 +692,17 @@
     }
   },
   "importSmart": {
-    "steps": {
-      "upload": "上传",
-      "review": "审核",
-      "done": "完成"
-    },
     "alerts": {
       "embeddingNotConfigured": "未配置 Embedding 模型，导入时不会自动匹配知识点。可前往 {link} 配置后再导入。",
       "kpNotVectorizedAdmin": "当前学科的知识点尚未建立向量索引，导入时不会自动匹配。可前往 {link} 重建索引。",
       "kpNotVectorized": "当前学科的知识点尚未建立向量索引，导入时不会自动匹配，请联系管理员重建索引。",
-      "chromaUnreachableConfirm": "知识点向量库暂时不可达，是否跳过知识点自动匹配继续导入？",
-      "tagMissing": "未检测到{tag}标签，标签精准解析可能无法识别到任何题目。",
-      "noQuestionsParsed": "未解析到任何题目，请检查文档是否使用了{tag}等标签。"
-    },
-    "tabs": {
-      "file": "文件或图片",
-      "text": "纯文本粘贴"
-    },
-    "upload": {
-      "inputTitle": "点击上传文件",
-      "dropTitle": "点击此处 或 拖拽文件到这里上传",
-      "pasteHint": "同时支持 Ctrl/Cmd + V 直接粘贴屏幕截图",
-      "imageExtract": "图片提取",
-      "pastedImage": "已粘贴图片",
-      "removeAndReselect": "删除并重新选择",
-      "folderHint": "Markdown 引用了本地图片？上传 {zip} 压缩包，或 {folder}",
-      "selectFolder": "选择整个文件夹",
-      "textPlaceholder": "将含有题目的文档内容或纯文本直接粘贴到此处...",
-      "zipFailed": "打包文件夹失败: {error}",
-      "selectSubjectFirst": "请先选择所属学科",
-      "enterMarkdown": "请输入 Markdown 内容"
-    },
-    "settings": {
-      "title": "个性化解析设置",
-      "aiMethodTitle": "✨ 强力 AI 识别",
-      "aiMethodDescription": "自动识别各种排版或截图题目，无需格式。",
-      "structuredMethodTitle": "📝 严格模板解析",
-      "structuredMethodDescription": "适用于已按{tags}等标签排版好的题库。",
-      "viewTagGuide": "查看标签格式与示例",
-      "aiModeLabel": "选择 AI 处理模式",
-      "extractTitle": "📥 仅提取/原样录入",
-      "extractDescription": "提取原文件内的题目和答案。",
-      "solveTitle": "🤖 让 AI 帮我解答",
-      "solveDescription": "AI 会自动为您补全标准答案和解析。",
-      "templateTitle": "模板说明",
-      "templateBody": "必须使用 {tag} 作为每道题的开头，其余标签均可省略：",
-      "viewFullGuide": "查看完整格式说明与示例",
-      "viewGuide": "查看格式说明"
-    },
-    "submit": {
-      "uploading": "正在拼命识别中...",
-      "ai": "开始智能识别",
-      "structured": "开始模板解析",
-      "empty": "请在上方提供文件或纯文本内容"
+      "tagMissing": "未检测到{tag}标签，标签精准解析可能无法识别到任何题目。"
     },
     "review": {
       "duplicate": "检测到与此前导入内容完全相同的文件（{filename}）。你仍然可以继续导入。",
       "viewLastComposition": "查看上次生成的稿件",
       "structureInvalid": "题组结构无效，无法导入，请重新解析文件。",
       "structureInvalidToast": "题组结构无效，请重新解析文件",
-      "empty": "无导入的题目，请先上传文档或粘贴内容",
       "status": "状态",
       "source": "来源",
       "sourcePlaceholder": "例如：2023年期末考试",
@@ -785,15 +738,12 @@
     },
     "success": {
       "title": "导入成功",
-      "description": "题目已成功添加到题库中。",
       "composition": "已生成稿件「{title}」，可直接替换少量题目后复用。",
       "skipped": "{count} 道题目被跳过",
       "degraded": "以下内容做了结构降级，请在稿件中检查",
       "degradedItem": "{reason}：{excerpt}",
-      "continue": "继续导入",
       "openComposition": "打开稿件",
-      "viewImported": "查看本次导入题目",
-      "viewBank": "查看题库"
+      "viewImported": "查看本次导入题目"
     },
     "partial": {
       "title": "部分题目无法入库",
@@ -802,64 +752,151 @@
       "confirm": "仅导入已通过的题目"
     }
   },
-  "importTasks": {
-    "title": "异步导入队列",
-    "batchRetry": "批量重试 ({count})",
-    "batchRetryConfirm": "确定要重试选中的 {count} 个任务吗？",
-    "batchRetried": "已重试 {count} 个任务",
-    "resetStuck": "重置卡住任务",
-    "resetStuckConfirm": "确定要重置所有处理中的任务吗？这会将它们重新设为等待状态。",
-    "resetDone": "已重置 {count} 个任务",
-    "resetFailed": "重置失败",
-    "statuses": {
-      "pending": "等待中",
-      "processing": "处理中",
-      "completed": "已完成",
+  "imports": {
+    "title": "导入",
+    "new": "新建导入",
+    "dropHint": "松开鼠标即可导入",
+    "loadMore": "加载更多",
+    "groups": {
+      "review": "待审核",
+      "active": "进行中",
+      "paused": "已暂停",
       "failed": "失败",
+      "history": "历史"
+    },
+    "statuses": {
       "cancelled": "已取消"
     },
-    "upload": {
-      "title": "批量上传",
-      "description": "上传文件后，系统将在后台自动处理",
-      "extractTitle": "录入原题",
-      "extractDescription": "提取文档中的题目、答案和解析，保持原样。适用于已有标准答案的题。",
-      "solveTitle": "AI 自动做题",
-      "solveDescription": "AI 提取题目并做题并生成标准答案和解析，适用于无答案的教材题。",
-      "pick": "点击选择文件 (支持多选)",
-      "hint": "支持拖拽上传，支持批量上传 .docx, .md, .zip 格式。上传文件后，系统将自动处理，不需要一直👀着。",
-      "folderHint": "Markdown 引用了本地图片？上传 {zip} 压缩包，或 {folder}",
-      "selectFolder": "选择整个文件夹",
-      "uploading": "正在上传...",
-      "zipFailed": "打包文件夹失败",
-      "created": "成功创建 {count} 个导入任务"
+    "stages": {
+      "parsing": "正在读取文档",
+      "extracting": "正在识别题目",
+      "matching": "正在匹配知识点"
     },
-    "list": {
-      "title": "导入队列",
-      "description": "查看导入任务的处理状态和结果",
-      "filterUser": "筛选用户",
-      "allUsers": "全部用户",
-      "filterStatus": "筛选状态",
-      "allStatuses": "全部状态",
-      "filename": "文件名",
-      "owner": "所属用户",
-      "status": "状态",
-      "result": "结果",
-      "createdAt": "创建时间",
-      "empty": "暂无导入任务",
-      "extracted": "成功提取 {count} 题",
-      "processFailed": "处理失败",
-      "cancelTask": "取消任务",
-      "viewQuestions": "查看题目",
-      "deleteRecord": "删除记录"
+    "line": {
+      "queued": "排队中",
+      "queuedAhead": "排队中 · 前面还有 {count} 个",
+      "questions": "识别出 {count} 题，等待审核",
+      "saved": "已入库 {count} 题",
+      "paused": {
+        "quota": "AI 额度已用尽",
+        "auth": "AI 服务的 API Key 无效",
+        "model": "没有可用的 AI 模型",
+        "unavailable": "AI 服务暂时不可用"
+      }
     },
-    "cancelConfirm": "确定要取消此任务吗？",
-    "cancelled": "任务已取消",
-    "cancelFailed": "取消失败",
-    "retried": "任务已重新加入队列",
-    "retryFailed": "重试失败",
-    "deleteConfirm": "确定要删除此记录吗？",
-    "deleted": "记录已删除",
-    "deleteFailed": "删除失败"
+    "empty": {
+      "title": "选择一条导入，或新建一个",
+      "description": "支持 Word、Markdown、压缩包和图片。也可以直接把文件拖到这里，或按 Ctrl/⌘ + V 粘贴截图和文本。",
+      "list": "还没有导入记录"
+    },
+    "paused": {
+      "quota": "AI 额度已用尽，{count} 个导入已暂停。充值后点「全部继续」。",
+      "auth": "AI 服务的 API Key 无效，{count} 个导入已暂停。修改 AI 设置后会自动继续。",
+      "model": "没有可用的 AI 模型，{count} 个导入已暂停。配置模型后会自动继续。",
+      "unavailable": "AI 服务暂时不可用，{count} 个导入已暂停，每隔 5 分钟会自动重试。",
+      "resumeAll": "全部继续",
+      "retryNow": "立即重试",
+      "openSettings": "前往 AI 设置",
+      "resumed": "已继续 {count} 个导入"
+    },
+    "menu": {
+      "more": "更多操作",
+      "show": "显示",
+      "mine": "我的导入",
+      "allUsers": "所有用户的导入",
+      "resetStuck": "重置卡住的任务",
+      "resetStuckConfirm": "确定要把所有处理中的任务重新放回队列吗？",
+      "resetDone": "已重置 {count} 个任务",
+      "resetFailed": "重置失败"
+    },
+    "detail": {
+      "back": "返回列表",
+      "modeExtract": "使用文档中的答案",
+      "modeSolve": "由 AI 补全答案",
+      "autoCommit": "识别后直接入库",
+      "methods": {
+        "ai": "AI 识别",
+        "structured": "按标签解析"
+      },
+      "queuedTitle": "排队等待识别",
+      "queuedAhead": "前面还有 {count} 个导入，可以先去做别的，完成后会通知你。",
+      "queuedNext": "马上开始。",
+      "processingTitle": "正在识别",
+      "processingHint": "大文件可能需要几分钟。可以离开这个页面，进度不会丢失。",
+      "cancel": "取消导入",
+      "cancelConfirm": "确定要取消这条导入吗？",
+      "cancelled": "已取消",
+      "pausedTitle": "已暂停",
+      "pausedReasons": {
+        "quota": "AI 服务的额度已用尽。充值后点「继续」。",
+        "auth": "AI 服务的 API Key 无效或没有权限。修改 AI 设置后会自动继续。",
+        "model": "没有可用的 AI 模型，或模型不存在。配置模型后会自动继续。",
+        "unavailable": "暂时连不上 AI 服务，每隔 5 分钟会自动重试，也可以现在就继续。"
+      },
+      "resume": "继续",
+      "resumed": "已重新加入队列",
+      "failedTitle": "识别失败",
+      "cancelledTitle": "已取消",
+      "errorDetail": "错误详情",
+      "retry": "重新识别",
+      "retried": "已重新加入队列",
+      "delete": "删除记录",
+      "deleteConfirm": "确定要删除这条导入记录吗？",
+      "deleted": "已删除",
+      "discard": "放弃本次导入",
+      "discardConfirm": "放弃后识别结果会被删除，确定吗？",
+      "discarded": "已放弃",
+      "completedDescription": "共导入 {count} 道题目。",
+      "viewDuplicates": "查看疑似重复（{count}）"
+    },
+    "errors": {
+      "no_questions": "没有识别到题目。",
+      "noQuestionsStructured": "没有识别到题目，请检查文档是否使用了{tag}等标签。",
+      "source_unavailable": "原文件已不可用，请重新上传。",
+      "parse_failed": "无法读取这份文档，请确认文件没有损坏。",
+      "ai_document": "AI 无法处理这份文档（可能内容过长或输出异常），可以拆分后重试。",
+      "ai_unknown": "AI 识别时出错，可以稍后重试。",
+      "generic": "导入时出错。"
+    },
+    "review": {
+      "empty": "没有可导入的题目",
+      "noSubject": "这条导入没有所属学科，无法入库"
+    },
+    "newDialog": {
+      "title": "新建导入",
+      "description": "导入到「{subject}」。支持 Word、Markdown、压缩包和图片，可以一次选择多个文件。",
+      "tabs": {
+        "file": "文件",
+        "text": "粘贴文本"
+      },
+      "dropOrPick": "把文件拖到这里，或{pick}",
+      "pick": "选择文件",
+      "folderHint": "Markdown 引用了本地图片？可以上传 .zip，或{folder}",
+      "pickFolder": "选择整个文件夹",
+      "remove": "移除",
+      "textPlaceholder": "把题目文本粘贴到这里…",
+      "answers": "答案",
+      "answersExtract": "使用文档中的答案",
+      "answersSolve": "由 AI 补全答案和解析",
+      "answersAutoHint": "按标签解析的文档始终使用文档中的答案。",
+      "method": "解析方式",
+      "methodAuto": "自动（推荐）",
+      "methodAutoHint": "文档里有{tag}等标签时按标签解析，速度快且不消耗 AI 额度；否则使用 AI 识别。",
+      "methodAi": "AI 识别",
+      "methodAiHint": "适合各种排版，图片总是使用 AI 识别。",
+      "methodStructured": "按标签解析",
+      "methodStructuredHint": "只按{tags}等标签解析，不调用 AI。",
+      "viewTagGuide": "查看标签格式",
+      "autoCommit": "识别后直接入库",
+      "autoCommitHint": "跳过审核，适合格式规范、来源可靠的文档。",
+      "submit": "开始导入",
+      "submitting": "正在上传…",
+      "created": "已创建 {count} 条导入",
+      "skipped": "以下文件格式不支持，已跳过：{names}",
+      "nameSeparator": "、",
+      "empty": "请先选择文件或粘贴文本",
+      "zipFailed": "打包文件夹失败：{error}"
+    }
   },
   "templateGuide": {
     "title": "标签精准解析：格式说明",

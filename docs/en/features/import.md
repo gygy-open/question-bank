@@ -1,20 +1,25 @@
 # Smart Import
 
-Smart Import lets you upload raw materials and extract them into structured questions through a three-step **Upload → Review → Save** flow. Two **parsing methods** are supported:
+Upload raw materials (files, screenshots, or pasted text); the system **recognizes questions in the background**, and you review them before they are saved: **New Import → background recognition → review → save**. All imports live on the **Import** page in the sidebar, and refreshing or closing the page never loses progress.
 
-- **AI Extraction**: AI automatically recognizes question structure; suited to documents and images without a fixed format.
+There are two **parsing methods**:
+
+- **AI Recognition**: AI automatically recognizes question structure; suited to documents and images without a fixed format.
 - **Tag-Based Parsing**: parses precisely by tags such as `【题目】【选项】【答案】`, **without AI** — instant and fully controllable.
+
+The default is **Auto**: documents containing tags such as `【题目】` are parsed by tags (fast, and uses no AI quota); everything else uses AI Recognition.
 
 ## Supported Formats
 
-| Type | Extensions | AI Extraction | Tag-Based Parsing |
+| Type | Extensions | AI Recognition | Tag-Based Parsing |
 |------|--------|:---:|:---:|
 | Word | `.docx` | ✅ | ✅ |
-| Markdown | `.md` / pasted text | ✅ | ✅ |
-| Image | `.png` `.jpg` `.jpeg` `.webp` | ✅ (vision model OCR) | — |
+| Markdown / plain text | `.md` `.txt` / pasted text | ✅ | ✅ |
+| Markdown archive | `.zip` (Markdown plus referenced local images; the whole archive is one import) | ✅ | ✅ |
+| Image | `.png` `.jpg` `.jpeg` `.webp`, etc., or a pasted screenshot | ✅ (vision model OCR) | — |
 
 ::: tip Prerequisites
-**AI Extraction** relies on AI models: text content uses the text model, and images use the **vision model**. Configure and activate the corresponding models in [AI Providers & Models](/en/admin/ai-config) first. **Tag-Based Parsing** requires no AI configuration.
+**AI Recognition** relies on AI models: text content uses the text model, and images use the **vision model**. Configure and activate the corresponding models in [AI Providers & Models](/en/admin/ai-config) first. **Tag-Based Parsing** requires no AI configuration.
 :::
 
 ## Tag-Based Parsing
@@ -118,29 +123,36 @@ When `【题型】` is omitted, the type is determined as follows: options + a s
 
 The parser **does its best and does not stop because of formatting problems in individual questions**. Missing answers, out-of-range answers, empty stems, stray text at the beginning, and similar issues are flagged with a **yellow warning** on the affected question in the review page, so you can fix them on the spot.
 
-## Three-Step Flow
+## Import Flow
 
-### 1. Upload
+### 1. New Import
 
-First choose the **parsing method** (AI Extraction / Tag-Based Parsing), then choose a data source to upload a file or paste content.
+On the **Import** page, click **New Import**, drag files onto the page, or press `Ctrl/⌘ + V` to paste a screenshot or text. You can pick several files at once; each file becomes its own import.
 
-When you choose **AI Extraction**, you can also pick a processing mode:
+Imports go into the **current subject** (switch it at the top of the sidebar); recognized questions and the images inside the document belong to it.
 
-- **Extract (extract)**: the default; extracts existing questions from the material.
-- **Solve (solve)**: has the AI solve the questions.
+- **Parsing Method**: Auto (default) / AI Recognition / Tag-Based Parsing.
+- **Answer**: **Use Answers from Document** (default), or **Let AI Fill In Answers and Explanations**. This only applies to AI Recognition and is hidden for Tag-Based Parsing; tag-parsed documents always use the answers in the document.
+- **Save Automatically After Recognition**: skips review; suited to well-formatted documents from trusted sources (this replaces the former batch import).
 
-### 2. Review
+The parsing method and the automatic-save setting are remembered for your next import; **Answer** always defaults to **Use Answers from Document**.
 
-After AI extraction, the results are shown question by question in editable form, with fields including:
+### 2. Background Recognition
+
+Imports are queued and recognized in the background. The list and detail view show the current stage (reading document → recognizing questions → matching knowledge points) and how many imports are ahead. You can leave the page or close the browser while it runs, and you can **Cancel Import** at any time. The desktop app shows a system notification when an import is ready, fails, or is paused, and the sidebar **Import** item shows how many imports are awaiting review.
+
+### 3. Review
+
+When recognition finishes, the import moves to **Awaiting Review**. Open it to view and edit each question, with fields including:
 
 - Stem, question type, options, answer, explanation, approach, difficulty
 - AI-suggested tags (year, source, grade, semester, exam type, feature, etc.)
 
-You can edit, delete, or adjust each question before confirming.
+You can edit, delete, or adjust each question before confirming, or **Discard Import** if you don't need it.
 
-### 3. Save
+### 4. Save
 
-After you confirm, the questions are written to the question bank in bulk and linked to this **Import Task**, so you can later filter and manage them by batch.
+After you confirm, the questions are written to the question bank in bulk and linked to this import, so you can later filter and manage them by batch; you can also save them as an editable composition.
 
 ### Duplicate Check
 
@@ -151,27 +163,45 @@ On the review page, every question is automatically compared with the question b
 - **Keeping a question selected confirms importing it.** Sub-questions of a material can't be unselected individually and are only marked.
 - The server checks again on submit; duplicates added by others during your review are skipped unless confirmed, and the result explains why.
 
-## Import Task Status
-
-Each import creates an Import Task, with the following statuses:
+## Import Status
 
 | Status | Meaning |
 |------|------|
-| `PENDING` | Queued |
-| `PROCESSING` | Processing |
-| `COMPLETED` | Completed |
-| `FAILED` | Failed |
-| `CANCELLED` | Cancelled |
+| Queued `pending` | Waiting for background recognition |
+| Recognizing `processing` | Reading the document, recognizing questions, or matching knowledge points |
+| Awaiting Review `review_ready` | Recognized and waiting for you to review and save |
+| Paused `paused` | The AI service is temporarily unavailable; see below |
+| Completed `completed` | Questions saved |
+| Failed `failed` | The document couldn't be read, no questions were found, or the AI couldn't process the document; can be recognized again |
+| Cancelled `cancelled` | Cancelled or discarded; can be recognized again |
 
-## Batch Management
+### When the AI Fails
 
-- **Queue status**: view counts of queued / processing / completed / failed / cancelled tasks, plus active tasks.
-- **Import history**: browse past imports with pagination, filterable by status and user.
-- **Permissions**: Super Administrators can see all Import Tasks; regular users only see their own.
-- **Possible duplicates**: background batch imports run unattended, so possible duplicates are imported as usual and flagged as "Possible duplicates" in the task result. Open it to compare each question and delete the new ones you don't need.
+AI errors are handled by cause, so one failure never stalls the whole queue:
+
+- **Temporary problems** (rate limits, server errors, timeouts, network drops): retried automatically a few times; if they keep failing, the import is paused as "service unreachable".
+- **Service or configuration problems** (quota exhausted, invalid API key, model not found, no model configured): this import is paused, together with the queued AI imports **that use the same provider**. Tag-based imports keep running, and imports that use another provider (such as a personal key) are not affected.
+- **Problems with the document itself** (too long, truncated output, unparsable model output): only this import fails; split the document and try again.
+
+How paused imports resume:
+
+| Cause | Resume |
+|------|------|
+| Service unreachable | Retried automatically every 5 minutes |
+| Invalid API key / no usable model | Resume automatically after you change the AI settings |
+| Quota exhausted | Top up, then click **Resume All** on the Import page |
+
+You can always **Resume** a single import or click **Resume All** at the top of the page. As soon as a call to a provider succeeds, every import paused because of that provider resumes automatically.
+
+## Import List
+
+- The list is grouped into **Awaiting Review / In Progress / Paused / Failed / History**, with imports awaiting review first.
+- **Permissions**: regular users only see their own imports; Super Administrators can use the "⋯" menu to show everyone's imports or a specific user's, and to reset tasks stuck in recognition.
+- **Possible duplicates**: imports saved automatically after recognition run unattended, so possible duplicates are saved as usual and flagged as "Possible duplicates" in the result. Open it to compare each question and delete the new ones you don't need.
 
 ## FAQ
 
-- **Inaccurate extraction results?** Adjust the [Prompt Templates](/en/admin/prompts) or switch to a stronger model.
+- **Inaccurate recognition results?** Adjust the [Prompt Templates](/en/admin/prompts) or switch to a stronger model.
 - **Image recognition fails?** Make sure a **vision model** is activated and the image is clear.
-- **Stuck in processing?** (Server edition) Check the [Worker logs](/en/server/operations#background-worker).
+- **Imports stay paused?** Check the notice at the top of the page: top up and click **Resume All** when the quota is exhausted; key or model problems resume automatically once you fix the AI settings.
+- **Stuck in recognition?** (Server edition) Check the [Worker logs](/en/server/operations#background-worker); administrators can reset stuck tasks from the "⋯" menu. The desktop app puts interrupted imports back in the queue after a restart.

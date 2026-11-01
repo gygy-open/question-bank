@@ -113,6 +113,7 @@ class PaperImportResult:
     degraded: List[DegradedItem] = field(default_factory=list)
     composition_id: Optional[int] = None
     composition_title: Optional[str] = None
+    composition_scope: Optional[str] = None
     temp_id_map: Dict[str, int] = field(default_factory=dict)
     stimulus_temp_id_map: Dict[str, int] = field(default_factory=dict)
     reused_existing: bool = False
@@ -573,6 +574,7 @@ async def _result_from_task(db: AsyncSession, task: ImportTask) -> PaperImportRe
         degraded=[DegradedItem(**item) for item in summary.get("degraded", [])],
         composition_id=summary.get("composition_id"),
         composition_title=summary.get("composition_title"),
+        composition_scope=summary.get("composition_scope"),
         temp_id_map={key: int(value) for key, value in summary.get("temp_id_map", {}).items()},
         stimulus_temp_id_map={
             key: int(value)
@@ -586,6 +588,7 @@ async def _result_from_task(db: AsyncSession, task: ImportTask) -> PaperImportRe
         if comp is not None:
             result.composition_id = comp.id
             result.composition_title = comp.title
+            result.composition_scope = comp.scope_type.value
     return result
 
 
@@ -597,6 +600,7 @@ def _store_result_summary(task: ImportTask, result: PaperImportResult) -> None:
             "degraded": [vars(item) for item in result.degraded],
             "composition_id": result.composition_id,
             "composition_title": result.composition_title,
+            "composition_scope": result.composition_scope,
             "temp_id_map": result.temp_id_map,
             "stimulus_temp_id_map": result.stimulus_temp_id_map,
             "duplicates": result.duplicates,
@@ -834,6 +838,11 @@ async def commit_paper_import(
         import_task.status = ImportTaskStatus.COMPLETED
         import_task.error_message = None
         import_task.composition_state = CompositionImportState.NOT_REQUESTED
+        import_task.subject_id = subject_id
+        # 审核结果已入库,不再需要保留。
+        import_task.result_sha256 = None
+        if idempotency_key and not import_task.idempotency_key:
+            import_task.idempotency_key = idempotency_key
     await db.flush()
 
     created: List[Question] = []
@@ -975,6 +984,7 @@ async def commit_paper_import(
     import_task.composition_state = CompositionImportState.CREATED
     result.composition_id = comp.id
     result.composition_title = comp.title
+    result.composition_scope = comp.scope_type.value
     _store_result_summary(import_task, result)
     return result
 

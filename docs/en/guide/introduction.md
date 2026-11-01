@@ -4,7 +4,7 @@
 
 ## Key Features
 
-- **Smart multi-format import**: Upload Word / Markdown / images and AI extracts structured questions automatically (a three-step upload → review → save flow).
+- **Smart multi-format import**: Upload Word / Markdown / images and AI extracts structured questions automatically (recognized in the background, then reviewed and saved; refreshing or closing the page never loses progress).
 - **Multiple question types**: Single choice, multiple choice, fill-in-the-blank (with multiple accepted answers), true/false, and free response; rich text + LaTeX formulas.
 - **Multi-provider AI**: Gemini, OpenAI, and any OpenAI-compatible API (DeepSeek, Qwen, self-hosted deployments, etc.); configuration lives in the database and can be switched on the fly.
 - **Knowledge point RAG**: ChromaDB vector search + batch reranking maps AI-suggested knowledge points onto your standard framework.

@@ -59,6 +59,11 @@
   "app/components/composition/SnapshotRenderer.vue": [
     "<span v-if=\"resolvedQuestionScore(node, props.snapshot) != null\" class=\"ml-auto text-xs text-muted-foreground\">（{{ resolvedQuestionScore(node, props.snapshot) }} 分）</span>"
   ],
+  "app/components/import/NewImportDialog.vue": [
+    "const STRUCTURED_TAG_PATTERN = /[【\\[]\\s*(题目|题干|question|title)\\s*[】\\]]/i",
+    "{{ prefs.method === 'auto' ? t('imports.newDialog.methodAutoHint', { tag: '【题目】' }) : prefs.method === 'ai' ? t('imports.newDialog.methodAiHint') : t('imports.newDialog.methodStructuredHint', { tags: '【题目】【答案】' }) }}",
+    "{{ t('importSmart.alerts.tagMissing', { tag: '【题目】' }) }}"
+  ],
   "app/components/manager/TagImportDialog.vue": [
     "<li>{{ t('tagImport.steps.upload', { name: '名称' }) }}</li>",
     "<p class=\"text-muted-foreground mt-1\">{{ t('tagImport.templateColumns', { name: '名称', category: '分类', color: '颜色' }) }}</p>"
@@ -142,19 +147,11 @@
     "if (scores.length === slotCount && new Set(scores).size === 1) return `每空 ${scores[0]} 分`",
     "return `共 ${scores.reduce((sum, score) => sum + score, 0)} 分`"
   ],
+  "app/lib/importTasks.ts": [
+    "return { key: 'imports.errors.noQuestionsStructured', params: { tag: '【题目】' } }"
+  ],
   "app/pages/about.vue": [
     "{ name: '寻梦', noteKey: 'about.contributors.xunmeng' },"
-  ],
-  "app/pages/import/smart.vue": [
-    "<Badge variant=\"secondary\">【答案】</Badge>",
-    "<Badge variant=\"secondary\">【答案区】</Badge>",
-    "<Badge variant=\"secondary\">【解析】</Badge>",
-    "<Badge variant=\"secondary\">【选项】</Badge>",
-    "<div class=\"text-sm text-muted-foreground mt-1\">{{ t('importSmart.settings.structuredMethodDescription', { tags: '【题目】【答案】' }) }}</div>",
-    "<template #tag><Badge variant=\"outline\">【题目】</Badge></template>",
-    "const STRUCTURED_TAG_PATTERN = /[【\\[]\\s*(题目|题干|question|title)\\s*[】\\]]/i",
-    "error.value = t('importSmart.alerts.noQuestionsParsed', { tag: '【题目】' })",
-    "return t('importSmart.alerts.tagMissing', { tag: '【题目】' })"
   ],
   "app/pages/test.vue": [
     "content: { type: 'doc', content: [{ type: 'paragraph', content: [{ type: 'text', text: '拖动左侧手柄可整块移动；按住 Ctrl/Cmd 拖拽可跨块框选。' }] }] },",

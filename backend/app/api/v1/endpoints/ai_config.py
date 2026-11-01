@@ -4,9 +4,10 @@
 - 个人(任意登录用户):/me/providers、/me/models、/me/preferences。只有本人可用,Key 不对任何人回显。
 - 工具:/discover-models 测试连接并拉取模型列表。
 """
-from typing import Any, List, Optional
+import logging
+from typing import Any, AsyncIterator, List, Optional
 
-from fastapi import APIRouter, Depends, Response, status
+from fastapi import APIRouter, Depends, Request, Response, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api import deps
@@ -31,7 +32,27 @@ from app.services import ai_config_service as svc
 from app.services.ai_config_service import EMBEDDING_MODEL_KEY, validate_active_model
 from app.services.ai_resolver import resolve_model
 
-router = APIRouter()
+logger = logging.getLogger(__name__)
+
+
+async def _resume_paused_imports(request: Request, db: deps.SessionDep) -> AsyncIterator[None]:
+    """AI 设置改动成功后,把因 Key/模型问题暂停的导入放回队列;仍不可用时 worker 会再次暂停它们。"""
+    yield
+    if request.method in ("GET", "HEAD", "OPTIONS") or request.url.path.endswith("/discover-models"):
+        return
+    from app.services.import_task_service import resume_after_ai_config_change
+
+    try:
+        resumed = await resume_after_ai_config_change(db)
+        await db.commit()
+    except Exception:  # noqa: BLE001 - 恢复失败不影响设置本身已保存
+        logger.warning("Failed to resume paused imports after an AI config change", exc_info=True)
+        return
+    if resumed:
+        logger.info("AI config changed; re-queued %d paused import task(s)", resumed)
+
+
+router = APIRouter(dependencies=[Depends(_resume_paused_imports)])
 
 
 async def _reload_embedding() -> None:

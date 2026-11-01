@@ -77,6 +77,9 @@ class ErrorCode(StrEnum):
     IMPORT_TASK_ALREADY_FINISHED = "import_task.already_finished"
     IMPORT_TASK_NOT_RETRYABLE = "import_task.not_retryable"
     IMPORT_TASK_SOURCE_UNAVAILABLE = "import_task.source_unavailable"
+    IMPORT_TASK_EMPTY_TEXT = "import_task.empty_text"
+    IMPORT_TASK_RESULT_UNAVAILABLE = "import_task.result_unavailable"
+    IMPORT_TASK_NOT_REVIEWABLE = "import_task.not_reviewable"
     # composition
     COMPOSITION_NOT_FOUND = "composition.not_found"
     COMPOSITION_FOLDER_NOT_FOUND = "composition.folder_not_found"

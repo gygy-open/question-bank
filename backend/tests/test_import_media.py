@@ -231,7 +231,7 @@ async def test_commit_ignores_source_ref_signed_for_another_user(client, people,
     assert task.source_sha256 is None
 
 
-async def test_batch_zip_import_records_subject_and_source_objects(client, people, db_session):
+async def test_zip_import_becomes_one_task_with_the_archive_as_source(client, people, db_session):
     editor = people["editor"]
     editor.last_active_subject_id = people["subject"].id
     await db_session.commit()
@@ -244,17 +244,14 @@ async def test_batch_zip_import_records_subject_and_source_objects(client, peopl
     )
 
     assert response.status_code == 200, response.text
-    tasks = (
-        await db_session.execute(select(ImportTask).order_by(ImportTask.original_filename))
-    ).scalars().all()
-    assert [t.original_filename for t in tasks] == ["set/a.md", "set/b.md"]
-    asset = (await db_session.execute(select(MediaAsset))).scalars().one()
-    for task in tasks:
-        assert task.subject_id == people["subject"].id
-        assert task.file_path == "virtual"
-    assert storage.read_bytes(tasks[0].source_sha256) == (
-        f"![fig](/api/v1/media/{asset.id}/content)".encode()
-    )
+    task = (await db_session.execute(select(ImportTask))).scalars().one()
+    assert task.original_filename == "set.zip"
+    assert task.file_type == "archive"
+    assert task.subject_id == people["subject"].id
+    assert task.file_path == "virtual"
+    assert storage.read_bytes(task.source_sha256) == archive
+    # 图片在后台识别时才入库为学科资产。
+    assert (await db_session.execute(select(MediaAsset))).scalars().all() == []
 
 
 async def test_batch_import_requires_active_subject(client, people):

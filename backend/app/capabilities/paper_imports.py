@@ -26,7 +26,7 @@ from app.schemas.paper_import import (
 
 from .base import Authz, Capability, Scope
 from .context import ExecutionContext
-from .errors import NotFound, Unprocessable
+from .errors import Conflict, NotFound, Unprocessable
 from .registry import register
 
 
@@ -59,11 +59,32 @@ class PaperImportCommitInput(PaperImportScopeInput):
     content_sha256: Optional[str] = None
     idempotency_key: Optional[str] = None
     allow_duplicate_temp_ids: List[str] = Field(default_factory=list)
+    import_task_id: Optional[int] = Field(
+        default=None,
+        description="Background import task whose recognition result is being committed; it is completed instead of creating a new task.",
+    )
 
 
 async def _ensure_subject(ctx: ExecutionContext, subject_id: int) -> None:
     if not await crud.subject.get(ctx.db, id=subject_id):
         raise NotFound("Subject not found", ErrorCode.SUBJECT_NOT_FOUND)
+
+
+async def _reviewable_import_task(ctx: ExecutionContext, inp: "PaperImportCommitInput"):
+    """待审核的导入任务;以同一幂等键重放已完成的提交也放行(由服务层返回原结果)。"""
+    from app.models.import_task import ImportTask, ImportTaskStatus
+
+    task = await ctx.db.get(ImportTask, inp.import_task_id)
+    if task is None or (task.user_id != ctx.actor.id and not ctx.actor.is_superuser):
+        raise NotFound("Import task not found", ErrorCode.IMPORT_TASK_NOT_FOUND)
+    replay = (
+        task.status == ImportTaskStatus.COMPLETED
+        and inp.idempotency_key is not None
+        and task.idempotency_key == inp.idempotency_key
+    )
+    if task.status != ImportTaskStatus.REVIEW_READY and not replay:
+        raise Conflict("Import task is not waiting for review", ErrorCode.IMPORT_TASK_NOT_REVIEWABLE)
+    return task
 
 
 @register
@@ -133,7 +154,12 @@ class CommitPaperImport(Capability[PaperImportCommitInput, PaperImportCommitResp
         from app.services.importing.media import verify_source_ref
         from app.services.paper_import_service import PaperImportError
 
-        source_sha256 = verify_source_ref(inp.source_ref, ctx.actor.id)
+        import_task = None
+        if inp.import_task_id is not None:
+            import_task = await _reviewable_import_task(ctx, inp)
+            source_sha256 = import_task.source_sha256
+        else:
+            source_sha256 = verify_source_ref(inp.source_ref, ctx.actor.id)
         if source_sha256 is not None and not storage.exists(source_sha256):
             source_sha256 = None
 
@@ -158,6 +184,7 @@ class CommitPaperImport(Capability[PaperImportCommitInput, PaperImportCommitResp
                 source_sha256=source_sha256,
                 content_sha256=inp.content_sha256,
                 idempotency_key=inp.idempotency_key,
+                import_task=import_task,
                 allow_duplicate_refs=inp.allow_duplicate_temp_ids,
             )
         except PaperImportError as exc:

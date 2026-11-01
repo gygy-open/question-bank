@@ -419,6 +419,10 @@ def run_tray() -> None:
         except Exception:  # noqa: BLE001 - notifications are best-effort
             pass
 
+    from app.import_notifier import ImportNotifier
+
+    import_notifier = ImportNotifier(_notify, tr)
+
     def _boot() -> None:
         try:
             server.start(lan)
@@ -437,6 +441,7 @@ def run_tray() -> None:
         icon.title = _title()
         channel.close_splash()
         webbrowser.open(_url())
+        import_notifier.start()
 
     def _setup(_icon) -> None:
         icon.visible = True
@@ -479,6 +484,7 @@ def run_tray() -> None:
 
     def on_quit(_icon, _item) -> None:
         quitting.set()
+        import_notifier.stop()
         server.stop()
         icon.stop()
 
@@ -512,6 +518,7 @@ def run_tray() -> None:
 
         def _on_terminate() -> None:
             quitting.set()
+            import_notifier.stop()
             server.shutdown()
 
         macos_dock.install(

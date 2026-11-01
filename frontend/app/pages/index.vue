@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { BookOpen, RefreshCw, Sparkles } from '@lucide/vue'
+import { BookOpen, RefreshCw, Upload } from '@lucide/vue'
 import { Button } from '@/components/ui/button'
 import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from '@/components/ui/empty'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -111,7 +111,7 @@ const isEmpty = computed(() => stats.value?.overview.total_questions === 0)
         </EmptyHeader>
         <EmptyContent class="flex-row justify-center gap-2">
           <Button as-child>
-            <NuxtLink to="/import/smart"><Sparkles class="size-4" />{{ t('nav.smartImport') }}</NuxtLink>
+            <NuxtLink to="/imports?new=1"><Upload class="size-4" />{{ t('imports.new') }}</NuxtLink>
           </Button>
           <Button variant="outline" as-child>
             <NuxtLink to="/questions">{{ t('nav.questionBank') }}</NuxtLink>

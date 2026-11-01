@@ -201,12 +201,15 @@
     "import_task": {
       "no_files": "Select files to import.",
       "subject_required": "Select a subject first.",
-      "no_valid_files": "No importable files found (.docx, .md, and .zip are supported).",
+      "no_valid_files": "No files to import. Supported formats: .docx, .md, .zip, and images.",
       "not_found": "Import task not found.",
       "forbidden": "You don't have permission to manage this import task.",
       "already_finished": "The task has already finished.",
-      "not_retryable": "Only failed, canceled, or empty-result tasks can be retried.",
-      "source_unavailable": "The source file is unavailable."
+      "not_retryable": "Only failed, cancelled, paused, or empty-result tasks can be retried.",
+      "source_unavailable": "The source file is unavailable.",
+      "empty_text": "Enter the text to import.",
+      "result_unavailable": "The recognition result doesn't exist or has expired. Please recognize again.",
+      "not_reviewable": "This import isn't awaiting review. It may have been saved or cancelled."
     },
     "upload": {
       "subject_not_found": "Subject not found.",
@@ -330,8 +333,6 @@
     "sharedSpace": "Shared",
     "personalSpace": "Personal",
     "import": "Import",
-    "smartImport": "Smart Import",
-    "batchImport": "Batch Import",
     "subjectResources": "Subject Resources",
     "knowledgePoints": "Knowledge Points",
     "tags": "Tags",
@@ -341,7 +342,8 @@
     "activityLogs": "Activity Logs",
     "subjects": "Subjects",
     "systemSettings": "System Settings",
-    "settings": "Settings"
+    "settings": "Settings",
+    "importReviewBadge": "Imports awaiting review: {count}"
   },
   "dashboard": {
     "refresh": "Refresh",
@@ -690,66 +692,17 @@
     }
   },
   "importSmart": {
-    "steps": {
-      "upload": "Upload",
-      "review": "Review",
-      "done": "Done"
-    },
     "alerts": {
       "embeddingNotConfigured": "No embedding model is configured, so knowledge points won't be matched automatically during import. Configure one in {link} before importing.",
       "kpNotVectorizedAdmin": "Knowledge points for this subject haven't been indexed yet, so they won't be matched automatically during import. Rebuild the index in {link}.",
       "kpNotVectorized": "Knowledge points for this subject haven't been indexed yet, so they won't be matched automatically during import. Ask an administrator to rebuild the index.",
-      "chromaUnreachableConfirm": "The knowledge point vector store is temporarily unreachable. Skip automatic knowledge point matching and continue importing?",
-      "tagMissing": "No {tag} tag detected. Tag-based parsing may not find any questions.",
-      "noQuestionsParsed": "No questions were parsed. Check that the document uses tags such as {tag}."
-    },
-    "tabs": {
-      "file": "File or Image",
-      "text": "Paste Text"
-    },
-    "upload": {
-      "inputTitle": "Click to upload a file",
-      "dropTitle": "Click here or drag files here to upload",
-      "pasteHint": "You can also paste screenshots with Ctrl/Cmd + V",
-      "imageExtract": "Image Extraction",
-      "pastedImage": "Pasted Image",
-      "removeAndReselect": "Remove and Reselect",
-      "folderHint": "Markdown references local images? Upload a {zip} archive, or {folder}",
-      "selectFolder": "select an entire folder",
-      "textPlaceholder": "Paste document content or plain text containing questions here...",
-      "zipFailed": "Failed to package folder: {error}",
-      "selectSubjectFirst": "Select a subject first.",
-      "enterMarkdown": "Enter Markdown content."
-    },
-    "settings": {
-      "title": "Parsing Settings",
-      "aiMethodTitle": "✨ AI Recognition",
-      "aiMethodDescription": "Recognizes questions in any layout or screenshot. No formatting required.",
-      "structuredMethodTitle": "📝 Strict Template Parsing",
-      "structuredMethodDescription": "For question sets already formatted with tags such as {tags}.",
-      "viewTagGuide": "View Tag Format and Examples",
-      "aiModeLabel": "AI Processing Mode",
-      "extractTitle": "📥 Extract As-Is",
-      "extractDescription": "Extracts the questions and answers from the original file.",
-      "solveTitle": "🤖 Let AI Solve",
-      "solveDescription": "AI fills in standard answers and explanations automatically.",
-      "templateTitle": "Template Notes",
-      "templateBody": "Each question must start with {tag}; all other tags are optional:",
-      "viewFullGuide": "View Full Format Guide and Examples",
-      "viewGuide": "View Format Guide"
-    },
-    "submit": {
-      "uploading": "Recognizing...",
-      "ai": "Start AI Recognition",
-      "structured": "Start Template Parsing",
-      "empty": "Provide a file or plain text above"
+      "tagMissing": "No {tag} tag detected. Tag-based parsing may not find any questions."
     },
     "review": {
       "duplicate": "This file is identical to a previous import ({filename}). You can still continue importing.",
       "viewLastComposition": "View Previously Generated Composition",
       "structureInvalid": "The question group structure is invalid and can't be imported. Parse the file again.",
       "structureInvalidToast": "Invalid question group structure. Parse the file again.",
-      "empty": "No questions to import. Upload a document or paste content first.",
       "status": "Status",
       "source": "Source",
       "sourcePlaceholder": "e.g. 2023 Final Exam",
@@ -785,15 +738,12 @@
     },
     "success": {
       "title": "Import Successful",
-      "description": "The questions have been added to the question bank.",
       "composition": "Composition “{title}” created. Swap out a few questions and reuse it.",
       "skipped": "{count} questions skipped",
       "degraded": "The following content was simplified structurally. Check it in the composition.",
       "degradedItem": "{reason}: {excerpt}",
-      "continue": "Import More",
       "openComposition": "Open Composition",
-      "viewImported": "View Imported Questions",
-      "viewBank": "View Question Bank"
+      "viewImported": "View Imported Questions"
     },
     "partial": {
       "title": "Some Questions Can't Be Saved",
@@ -802,64 +752,151 @@
       "confirm": "Import Valid Questions Only"
     }
   },
-  "importTasks": {
-    "title": "Import Queue",
-    "batchRetry": "Retry Selected ({count})",
-    "batchRetryConfirm": "Retry the {count} selected tasks?",
-    "batchRetried": "Retried {count} tasks",
-    "resetStuck": "Reset Stuck Tasks",
-    "resetStuckConfirm": "Reset all processing tasks? They will be set back to pending.",
-    "resetDone": "Reset {count} tasks",
-    "resetFailed": "Reset failed",
-    "statuses": {
-      "pending": "Pending",
-      "processing": "Processing",
-      "completed": "Completed",
+  "imports": {
+    "title": "Import",
+    "new": "New Import",
+    "dropHint": "Drop to import",
+    "loadMore": "Load More",
+    "groups": {
+      "review": "Awaiting Review",
+      "active": "In Progress",
+      "paused": "Paused",
       "failed": "Failed",
+      "history": "History"
+    },
+    "statuses": {
       "cancelled": "Cancelled"
     },
-    "upload": {
-      "title": "Batch Upload",
-      "description": "Uploaded files are processed in the background.",
-      "extractTitle": "Import As-Is",
-      "extractDescription": "Extracts questions, answers, and explanations as they are. Best for questions that already have answers.",
-      "solveTitle": "AI Solves",
-      "solveDescription": "AI extracts and solves the questions, generating answers and explanations. Best for textbook questions without answers.",
-      "pick": "Click to Select Files (multiple allowed)",
-      "hint": "Drag and drop or batch upload .docx, .md, and .zip files. Files are processed automatically, so no need to keep 👀 on it.",
-      "folderHint": "Markdown references local images? Upload a {zip} archive, or {folder}",
-      "selectFolder": "select an entire folder",
-      "uploading": "Uploading...",
-      "zipFailed": "Failed to package folder",
-      "created": "Created {count} import tasks"
+    "stages": {
+      "parsing": "Reading document",
+      "extracting": "Recognizing questions",
+      "matching": "Matching knowledge points"
     },
-    "list": {
-      "title": "Import Queue",
-      "description": "View the status and results of import tasks.",
-      "filterUser": "Filter by User",
-      "allUsers": "All Users",
-      "filterStatus": "Filter by Status",
-      "allStatuses": "All Statuses",
-      "filename": "File Name",
-      "owner": "Owner",
-      "status": "Status",
-      "result": "Result",
-      "createdAt": "Created",
-      "empty": "No import tasks yet",
-      "extracted": "Extracted {count} questions",
-      "processFailed": "Processing failed",
-      "cancelTask": "Cancel Task",
-      "viewQuestions": "View Questions",
-      "deleteRecord": "Delete Record"
+    "line": {
+      "queued": "Queued",
+      "queuedAhead": "Queued · {count} ahead",
+      "questions": "Questions found: {count} · Awaiting review",
+      "saved": "Questions saved: {count}",
+      "paused": {
+        "quota": "AI quota exhausted",
+        "auth": "Invalid AI service API Key",
+        "model": "No AI model available",
+        "unavailable": "AI service temporarily unavailable"
+      }
     },
-    "cancelConfirm": "Cancel this task?",
-    "cancelled": "Task cancelled",
-    "cancelFailed": "Failed to cancel",
-    "retried": "Task re-queued",
-    "retryFailed": "Retry failed",
-    "deleteConfirm": "Delete this record?",
-    "deleted": "Record deleted",
-    "deleteFailed": "Failed to delete"
+    "empty": {
+      "title": "Select an import or create a new one",
+      "description": "Supports Word, Markdown, zip archives, and images. You can also drag files here, or press Ctrl/⌘ + V to paste screenshots and text.",
+      "list": "No imports yet"
+    },
+    "paused": {
+      "quota": "AI quota exhausted. Paused imports: {count}. Top up, then click “Resume All”.",
+      "auth": "Invalid AI service API Key. Paused imports: {count}. They'll resume automatically once you update the AI settings.",
+      "model": "No AI model available. Paused imports: {count}. They'll resume automatically once a model is configured.",
+      "unavailable": "AI service temporarily unavailable. Paused imports: {count}. Retrying automatically every 5 minutes.",
+      "resumeAll": "Resume All",
+      "retryNow": "Retry Now",
+      "openSettings": "Go to AI Settings",
+      "resumed": "Imports resumed: {count}"
+    },
+    "menu": {
+      "more": "More Actions",
+      "show": "Show",
+      "mine": "My Imports",
+      "allUsers": "All Users' Imports",
+      "resetStuck": "Reset Stuck Tasks",
+      "resetStuckConfirm": "Put all in-progress tasks back in the queue?",
+      "resetDone": "Tasks reset: {count}",
+      "resetFailed": "Reset failed"
+    },
+    "detail": {
+      "back": "Back to List",
+      "modeExtract": "Use Answers from Document",
+      "modeSolve": "Let AI Fill In Answers",
+      "autoCommit": "Save Automatically After Recognition",
+      "methods": {
+        "ai": "AI Recognition",
+        "structured": "Tag-Based Parsing"
+      },
+      "queuedTitle": "Waiting in Queue",
+      "queuedAhead": "Imports ahead of this one: {count}. Feel free to do something else. You'll be notified when it's done.",
+      "queuedNext": "Starting soon.",
+      "processingTitle": "Recognizing",
+      "processingHint": "Large files may take a few minutes. You can leave this page without losing progress.",
+      "cancel": "Cancel Import",
+      "cancelConfirm": "Cancel this import?",
+      "cancelled": "Cancelled",
+      "pausedTitle": "Paused",
+      "pausedReasons": {
+        "quota": "The AI service quota is exhausted. Top up, then click “Resume”.",
+        "auth": "The AI service API Key is invalid or lacks permission. The import will resume automatically once you update the AI settings.",
+        "model": "No AI model is available, or the model doesn't exist. The import will resume automatically once a model is configured.",
+        "unavailable": "Can't reach the AI service right now. Retrying automatically every 5 minutes, or you can resume now."
+      },
+      "resume": "Resume",
+      "resumed": "Added back to the queue",
+      "failedTitle": "Recognition Failed",
+      "cancelledTitle": "Cancelled",
+      "errorDetail": "Error Details",
+      "retry": "Recognize Again",
+      "retried": "Added back to the queue",
+      "delete": "Delete Record",
+      "deleteConfirm": "Delete this import record?",
+      "deleted": "Deleted",
+      "discard": "Discard Import",
+      "discardConfirm": "Discarding will delete the recognition results. Continue?",
+      "discarded": "Discarded",
+      "completedDescription": "Questions imported: {count}.",
+      "viewDuplicates": "View Possible Duplicates ({count})"
+    },
+    "errors": {
+      "no_questions": "No questions were recognized.",
+      "noQuestionsStructured": "No questions were recognized. Check that the document uses tags like {tag}.",
+      "source_unavailable": "The original file is no longer available. Please upload it again.",
+      "parse_failed": "Couldn't read this document. Make sure the file isn't corrupted.",
+      "ai_document": "AI couldn't process this document (it may be too long or produced invalid output). Try splitting it and retrying.",
+      "ai_unknown": "An error occurred during AI recognition. Please try again later.",
+      "generic": "An error occurred during import."
+    },
+    "review": {
+      "empty": "No questions to import",
+      "noSubject": "This import has no subject and can't be saved to the question bank."
+    },
+    "newDialog": {
+      "title": "New Import",
+      "description": "Import into {subject}. Supports Word, Markdown, archives, and images. You can select multiple files at once.",
+      "tabs": {
+        "file": "File",
+        "text": "Paste Text"
+      },
+      "dropOrPick": "Drag files here, or {pick}",
+      "pick": "choose files",
+      "folderHint": "Markdown with local images? Upload a .zip, or {folder}",
+      "pickFolder": "select the whole folder",
+      "remove": "Remove",
+      "textPlaceholder": "Paste question text here…",
+      "answers": "Answer",
+      "answersExtract": "Use Answers from Document",
+      "answersSolve": "Let AI Fill In Answers and Explanations",
+      "answersAutoHint": "With Tag-Based Parsing, answers are always taken from the document.",
+      "method": "Parsing Method",
+      "methodAuto": "Auto (Recommended)",
+      "methodAutoHint": "If the document uses tags like {tag}, it's parsed by tags, which is faster and uses no AI quota. Otherwise, AI recognition is used.",
+      "methodAi": "AI Recognition",
+      "methodAiHint": "Works with any layout. Images always use AI recognition.",
+      "methodStructured": "Tag-Based Parsing",
+      "methodStructuredHint": "Parses only by tags like {tags}, without using AI.",
+      "viewTagGuide": "View Tag Format",
+      "autoCommit": "Save Automatically After Recognition",
+      "autoCommitHint": "Skips review. Best for well-formatted documents from reliable sources.",
+      "submit": "Start Import",
+      "submitting": "Uploading…",
+      "created": "Imports created: {count}",
+      "skipped": "Skipped unsupported files: {names}",
+      "nameSeparator": ", ",
+      "empty": "Select files or paste text first.",
+      "zipFailed": "Failed to package folder: {error}"
+    }
   },
   "templateGuide": {
     "title": "Tag-Based Parsing: Format Guide",

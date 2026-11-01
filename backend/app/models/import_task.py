@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, Enum as SQLEnum, Text
+from sqlalchemy import Boolean, Column, Integer, String, DateTime, ForeignKey, Enum as SQLEnum, Text, false
 from sqlalchemy.orm import relationship
 from datetime import datetime
 import enum
@@ -7,9 +7,26 @@ from .base import Base
 class ImportTaskStatus(str, enum.Enum):
     PENDING = "pending"
     PROCESSING = "processing"
+    # 抽取完成、结果已保存,等待用户审核后入库。
+    REVIEW_READY = "review_ready"
+    # AI 服务不可用(额度/鉴权/模型/不可达)时暂停,恢复后回到 PENDING。
+    PAUSED = "paused"
     COMPLETED = "completed"
     FAILED = "failed"
     CANCELLED = "cancelled"
+
+
+class ImportPauseReason(str, enum.Enum):
+    QUOTA = "quota"
+    AUTH = "auth"
+    MODEL = "model"
+    UNAVAILABLE = "unavailable"
+
+
+class ImportMethod(str, enum.Enum):
+    AUTO = "auto"
+    AI = "ai"
+    STRUCTURED = "structured"
 
 
 class CompositionImportState(str, enum.Enum):
@@ -33,8 +50,19 @@ class ImportTask(Base):
     
     file_path = Column(String(512), nullable=False)
     original_filename = Column(String(255), nullable=False)
-    file_type = Column(String(20), nullable=False) # docx, markdown
+    file_type = Column(String(20), nullable=False) # docx, markdown, archive, image, text
     mode = Column(String(20), default="extract") # extract, solve
+    # 解析方式:auto / ai / structured;旧任务为空,按 ai 处理。
+    method = Column(String(20), nullable=True)
+    # 抽取后直接入库(跳过审核),即旧的批量导入行为。
+    auto_commit = Column(Boolean, nullable=False, default=False, server_default=false())
+    # 待审核的抽取结果(JSON)在内容寻址存储中的键。
+    result_sha256 = Column(String(64), nullable=True)
+    # 进度 JSON:{"stage": ..., "method": ...}。
+    progress = Column(Text, nullable=True)
+    paused_reason = Column(String(20), nullable=True)
+    # 实际使用的 AI 服务商;不建外键,任务记录不能阻止删除服务商。
+    provider_id = Column(Integer, nullable=True, index=True)
     # 创建任务时的界面语言;worker 没有请求头,靠它决定 AI 解析的输出语言。
     locale = Column(String(16), nullable=True)
     
