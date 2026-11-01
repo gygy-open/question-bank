@@ -41,22 +41,39 @@ def test_arc_symbol_becomes_frown():
     assert _latex_list(doc) == [r"\overset{\frown }{AB}"]
 
 
-def test_parallel_symbol_keeps_word_boundary():
-    """替换串必须带空格:原写法 \\text{ ⫫ }A 直接换会变成未定义命令。"""
+def test_parallel_and_equal_keeps_meaning():
+    """⫫ 在中文教材里是"平行且相等",不能只剩 \\parallel;也不能拼成 \\parallelA。"""
     doc = markdown_to_rich_doc(r"${AM}\text{ ⫫ }A{A}^{\prime}$")
     latex = _latex_list(doc)[0]
 
-    assert latex == r"{AM}\parallel A{A}^{\prime}"
-    assert "parallelA" not in latex
+    assert latex == r"{AM}\underline{\parallel}A{A}^{\prime}"
 
 
-def test_circled_digits_inside_math():
+def test_circled_digits_inside_math_untouched():
+    """\\textcircled 在 Word 导出里会变成字面量;KaTeX 能用系统字体显示 ①,保持原样。"""
     doc = markdown_to_rich_doc(r"$① + ② = ③$")
-    latex = _latex_list(doc)[0]
+    assert _latex_list(doc) == [r"① + ② = ③"]
 
-    assert latex.count(r"\textcircled") == 3
-    assert latex == r"\textcircled{1} + \textcircled{2} = \textcircled{3}"
-    assert "①" not in latex
+
+@pytest.mark.parametrize(
+    "source",
+    [
+        r"$\overset{\text{ ⏜ }}{AB}$",
+        r"${AM}\text{ ⫫ }A{A}^{\prime}$",
+        r"$① + ②$",
+    ],
+)
+def test_normalized_latex_exports_to_omml_without_raw_commands(source):
+    import re
+
+    from lxml import etree
+
+    from app.services.exporting.richdoc.omml import latex_to_omml
+
+    latex = _latex_list(markdown_to_rich_doc(source))[0]
+    xml = etree.tostring(latex_to_omml(latex), encoding="unicode")
+    text = "".join(re.findall(r"<m:t[^>]*>([^<]*)</m:t>", xml))
+    assert "\\" not in text
 
 
 def test_circled_digits_outside_math_untouched():

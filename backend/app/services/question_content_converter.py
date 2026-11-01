@@ -408,40 +408,34 @@ def _convert_inline(
     return out
 
 
-# 换行标签的三种写法与大小写;`<br />` 里的空格可有可无。表格单元格内无法写 markdown
-# 换行,排版工具(以及本项目的表格转写)统一用 <br>,所以必须识别,否则会在单元格里
-# 显示成一串字面量 "<br>"。
-# 数学公式里"能解析、但当前字体没有字形"的字符。KaTeX 对它们不报语法错误，只在控制台
-# 打 "No character metrics for 'X'"，页面上是空白或方框 —— 所以光看渲染是否报错查不出来。
-# 一本 786 题的教辅实测：12,245 个行内公式语法失败 0 个，这类告警却有 174 个。
+# 数学公式里"能解析、但 KaTeX 字体没有字形"的字符(控制台告警 No character metrics),
+# 换成有字形的等价命令。替换结果还要能被导出链路(latex2mathml → OMML)识别:
+# 圈数字不在此列——KaTeX 会用系统字体回退显示 ①,而 \textcircled 在 Word 导出里会变成
+# 字面量 "\textcircled1"。
 _MATH_TEXT_GLYPHS: tuple[tuple[re.Pattern[str], str], ...] = (
     # 弧 AB 一律写成 \overset{\text{ ⏜ }}{AB}；\frown 是等价的圆弧符号且有字形。
     (re.compile(r"\\text\{\s*⏜\s*\}"), r"\frown "),
-    # 平行；上下文均为 "AM ⫫ A'M'" 这类关系式。
-    (re.compile(r"\\text\{\s*⫫\s*\}"), r"\parallel "),
+    # 中文教材里 "AM ⫫ A'M'" 表示平行且相等,不能只换成 \parallel。
+    # 不包 \mathrel:latex2mathml 处理 \mathrel{\underline{...}} 会抛异常。
+    (re.compile(r"\\text\{\s*⫫\s*\}"), r"\underline{\parallel}"),
 )
-_CIRCLED_DIGITS = "①②③④⑤⑥⑦⑧⑨⑩"
-_CIRCLED_RE = re.compile("[" + _CIRCLED_DIGITS + "]")
 
 
 def _normalize_math_latex(latex: str) -> str:
     """把公式里画不出字形的字符换成等价的 LaTeX 命令。
 
-    替换串带尾随空格:``\\text{ ⫫ }A`` 直接换 ``\\parallel`` 会拼成未定义命令
-    ``\\parallelA``;数学模式忽略空格,不会产生视觉间隙。
+    替换串以空格或 } 结尾:``\\text{ ⏜ }A`` 直接换 ``\\frown`` 会拼成未定义命令
+    ``\\frownA``;数学模式忽略空格,不会产生视觉间隙。
     """
     for pattern, replacement in _MATH_TEXT_GLYPHS:
         # 必须用函数形式:替换串里 \p、\f 会被 re 当成非法组引用。
         latex = pattern.sub(lambda _m, _r=replacement: _r, latex)
-
-    if _CIRCLED_RE.search(latex):
-        # 圈数字是正文字符,数学模式无字形;正文里的圈数字不经过这里,不受影响。
-        latex = _CIRCLED_RE.sub(
-            lambda m: f"\\textcircled{{{_CIRCLED_DIGITS.index(m.group(0)) + 1}}}", latex
-        )
     return latex
 
 
+# 换行标签的三种写法与大小写;`<br />` 里的空格可有可无。表格单元格内无法写 markdown
+# 换行,排版工具(以及本项目的表格转写)统一用 <br>,所以必须识别,否则会在单元格里
+# 显示成一串字面量 "<br>"。
 _LINE_BREAK_TAG_RE = re.compile(r"^<\s*br\s*/?\s*>$", re.IGNORECASE)
 
 
