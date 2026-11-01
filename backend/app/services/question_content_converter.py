@@ -81,6 +81,65 @@ _TABLE_SEPARATOR_RE = re.compile(r"^[\s|:-]+$")
 _FENCE_RE = re.compile(r"^\s*(`{3,}|~{3,})")
 
 
+_HTML_IMG_RE = re.compile(
+    r"""<img\b((?:[^>"']|"[^"]*"|'[^']*')*?)/?>""", re.IGNORECASE | re.DOTALL
+)
+_HTML_ATTR_RE = re.compile(r"""([\w:-]+)\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s"'>]+))""")
+# HTML width/height 属性的合法值是像素数(可带 px);百分比等无法换算的值不保留。
+_HTML_IMG_DIMENSION_RE = re.compile(r"^\s*(\d+(?:\.\d+)?)\s*(?:px)?\s*$", re.IGNORECASE)
+
+
+def _html_img_attrs(raw: str) -> dict[str, str]:
+    attrs: dict[str, str] = {}
+    for match in _HTML_ATTR_RE.finditer(raw):
+        value = match.group(2)
+        if value is None:
+            value = match.group(3) if match.group(3) is not None else match.group(4)
+        attrs.setdefault(match.group(1).lower(), value)
+    return attrs
+
+
+def _normalize_html_images(markdown: str) -> str:
+    """把 HTML `<img>` 归一为 markdown 图片语法。
+
+    放在转换器里而不是导入入口:试卷导入、AI 产出、组卷编写的 markdown 都不经过入口,
+    只靠入口归一的话,这些路径里的 <img> 仍会退化成一段纯文本。
+
+    保留 src、alt,以及像素 width/height(转成转换器认识的 `{width="300px"}` 属性语法,
+    与 DOCX 路径一致);其余属性丢弃。src 缺失、或 src 含空白的标签原样保留——带空格的
+    URL 无法用这种语法安全表达,后续改写阶段同样匹配不到,保持原样比产出一个坏链接安全。
+    """
+    def _replace(match: re.Match[str]) -> str:
+        attrs = _html_img_attrs(match.group(1))
+        src = (attrs.get("src") or "").strip()
+        if not src or any(ch.isspace() for ch in src):
+            return match.group(0)
+        alt = re.sub(r"[\[\]\\]", "", attrs.get("alt") or "")
+        alt = re.sub(r"\s+", " ", alt).strip()
+        dims = []
+        for name in ("width", "height"):
+            dim = _HTML_IMG_DIMENSION_RE.match(attrs.get(name) or "")
+            if dim:
+                dims.append(f'{name}="{dim.group(1)}px"')
+        suffix = "{" + " ".join(dims) + "}" if dims else ""
+        return f"![{alt}]({src}){suffix}"
+
+    return _apply_outside_fences(markdown, lambda chunk: _HTML_IMG_RE.sub(_replace, chunk))
+
+
+def _apply_outside_fences(md: str, transform) -> str:
+    """只对围栏代码块之外的内容应用变换；代码块原样保留。"""
+    parts = re.split(r"(^[ \t]*(?:`{3,}|~{3,})[^\n]*$[\s\S]*?^[ \t]*(?:`{3,}|~{3,})[^\n]*$)",
+                     md, flags=re.MULTILINE)
+    out: list[str] = []
+    for index, part in enumerate(parts):
+        out.append(part if index % 2 else transform(part))
+    return "".join(out)
+
+
+# 导入入口仍需要同一份实现(压缩包内的本地图片要按 markdown 语法解析并上传)。
+normalize_html_images = _normalize_html_images
+
 def _ensure_blank_line_before_tables(md: str) -> str:
     """在表格表头前保证有一个空行。
 
@@ -140,6 +199,7 @@ def markdown_to_rich_doc_with_review(
     try:
         normalized_md = _DETACHED_IMAGE_SIZE_RE.sub(r"\1\2", md)
         normalized_md = _PANDOC_UNDERLINE_RE.sub(r"<u>\1</u>", normalized_md)
+        normalized_md = _normalize_html_images(normalized_md)
         normalized_md = _ensure_blank_line_before_tables(normalized_md)
         tokens = _MD_PARSER.parse(normalized_md)
         root = SyntaxTreeNode(tokens)
