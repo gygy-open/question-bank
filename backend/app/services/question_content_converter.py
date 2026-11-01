@@ -75,6 +75,45 @@ _MAX_IMAGE_DIMENSION_PX = 20_000.0
 # TODO: 目前是写死常量,未来若要支持后台可调,可挪到 system_settings 并在此处读取。
 _DEFAULT_IMAGE_WIDTH_PX = 300.0
 
+# markdown 表格表头:以 | 开头的行,下一行是分隔行(| --- |)。
+_TABLE_ROW_PREFIX_RE = re.compile(r"^\s*\|")
+_TABLE_SEPARATOR_RE = re.compile(r"^[\s|:-]+$")
+_FENCE_RE = re.compile(r"^\s*(`{3,}|~{3,})")
+
+
+def _ensure_blank_line_before_tables(md: str) -> str:
+    """在表格表头前保证有一个空行。
+
+    表格紧跟在 "1. …" 这类有序列表项之后时,markdown-it 会把表格行当成该列表项的
+    懒续行,整张表退化为带竖线的纯文本且没有任何提示;补一个空行后恢复成 table 节点。
+    放在转换器里而不是导入入口:结构化解析会丢掉题干里的空行,AI 产出、试卷导入、
+    组卷编写的 markdown 也都只经过这里。围栏代码块内的内容不动。
+    """
+    lines = md.split("\n")
+    out: list[str] = []
+    fence: Optional[str] = None
+    for index, line in enumerate(lines):
+        fence_match = _FENCE_RE.match(line)
+        if fence_match:
+            marker = fence_match.group(1)
+            if fence is None:
+                fence = marker
+            elif marker[0] == fence[0] and len(marker) >= len(fence):
+                fence = None
+            out.append(line)
+            continue
+        if fence is None and _TABLE_ROW_PREFIX_RE.match(line):
+            next_line = lines[index + 1] if index + 1 < len(lines) else ""
+            is_header = bool(
+                _TABLE_ROW_PREFIX_RE.match(next_line)
+                and _TABLE_SEPARATOR_RE.match(next_line)
+                and "-" in next_line
+            )
+            if is_header and out and out[-1].strip():
+                out.append("")
+        out.append(line)
+    return "\n".join(out)
+
 
 # --------------------------------------------------------------------------- #
 # Markdown → RichDoc
@@ -101,6 +140,7 @@ def markdown_to_rich_doc_with_review(
     try:
         normalized_md = _DETACHED_IMAGE_SIZE_RE.sub(r"\1\2", md)
         normalized_md = _PANDOC_UNDERLINE_RE.sub(r"<u>\1</u>", normalized_md)
+        normalized_md = _ensure_blank_line_before_tables(normalized_md)
         tokens = _MD_PARSER.parse(normalized_md)
         root = SyntaxTreeNode(tokens)
 
