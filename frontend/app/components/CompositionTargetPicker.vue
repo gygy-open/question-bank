@@ -73,7 +73,9 @@ const handleConflict = (err: unknown) => {
   if (err instanceof CompositionConflictError && err.kind === 'revision') {
     toast.error(t('compositions.targetPicker.conflict'))
   } else {
-    toast.error(t('compositions.quickAdd.addFailed'))
+    toast.error(t('compositions.quickAdd.addFailed'), {
+      description: err instanceof Error ? err.message : undefined,
+    })
   }
 }
 

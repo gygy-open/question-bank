@@ -1,3 +1,4 @@
+import { apiErrorMessage } from '@/composables/useAIConfigApi'
 import { useCompositions, CompositionConflictError } from '@/composables/useCompositions'
 import {
   appendQuestionsToDocument,
@@ -60,7 +61,8 @@ export function useAddQuestionsToComposition() {
       revision = resp.revision
     } catch (err) {
       if (err instanceof CompositionConflictError) throw err
-      throw new Error(translate('compositions.quickAdd.addFailed'))
+      // 保留服务端给出的具体原因（如“题目依赖材料”“属于其他学科”），否则用户只看到笼统的失败提示。
+      throw new Error(apiErrorMessage(err), { cause: err })
     }
 
     return {

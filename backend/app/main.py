@@ -49,14 +49,20 @@ app.add_middleware(LocaleMiddleware)
 
 
 @app.exception_handler(DomainError)
-async def domain_error_handler(_request: Request, exc: DomainError) -> JSONResponse:
+async def domain_error_handler(request: Request, exc: DomainError) -> JSONResponse:
     """领域错误 → HTTP。端点因此可以直接 await capabilities.run(...) 而不用 try/except。"""
+    status_code = status_for(exc)
+    # 访问日志只有状态码；把原因一并记下，用户反馈时附上日志即可定位。
+    logger.info(
+        "%s %s -> %d %s: %s",
+        request.method, request.url.path, status_code, exc.code or "-", exc.detail,
+    )
     content: dict = {"detail": exc.detail}
     if exc.code:
         content["code"] = exc.code
         if exc.params:
             content["params"] = exc.params
-    return JSONResponse(status_code=status_for(exc), content=content)
+    return JSONResponse(status_code=status_code, content=content)
 
 
 def _clean_validation_error(error: dict) -> dict:
@@ -73,12 +79,18 @@ def _clean_validation_error(error: dict) -> dict:
 
 
 @app.exception_handler(RequestValidationError)
-async def validation_error_handler(_request: Request, exc: RequestValidationError) -> JSONResponse:
+async def validation_error_handler(request: Request, exc: RequestValidationError) -> JSONResponse:
     """422:``detail`` 仍是 pydantic 错误列表(兼容旧客户端),另附 ``code`` 让前端按 ``type`` 翻译。"""
+    errors = [_clean_validation_error(e) for e in exc.errors()]
+    logger.info(
+        "%s %s -> 422 validation: %s",
+        request.method, request.url.path,
+        "; ".join(f"{'.'.join(map(str, e['loc']))}: {e['msg']}" for e in errors[:5]),
+    )
     return JSONResponse(
         status_code=422,
         content={
-            "detail": [_clean_validation_error(e) for e in exc.errors()],
+            "detail": errors,
             "code": ErrorCode.VALIDATION_FAILED,
         },
     )
