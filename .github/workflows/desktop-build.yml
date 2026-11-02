@@ -39,8 +39,34 @@ jobs:
           uv sync --group dev
           uv run pytest
 
+  # The SPA is platform-independent: build it once on a fast Linux runner and share it, instead of
+  # rebuilding it on every (much slower) macOS/Windows runner.
+  frontend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: frontend/pnpm-lock.yaml
+      - name: Build frontend
+        working-directory: frontend
+        run: |
+          pnpm install --frozen-lockfile
+          pnpm generate
+      - uses: actions/upload-artifact@v4
+        with:
+          name: frontend-spa
+          path: frontend/.output/public
+          include-hidden-files: true
+          if-no-files-found: error
+
   build-windows:
-    needs: test
+    needs: frontend
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
@@ -68,20 +94,11 @@ jobs:
           echo "Stamped version $v"
           cat app/_version.py
 
-      # --- Frontend: build the SPA that gets bundled into the executable ---
-      - uses: pnpm/action-setup@v4
+      # --- Frontend: the SPA built by the `frontend` job, bundled into the executable ---
+      - uses: actions/download-artifact@v4
         with:
-          version: 9
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          cache: pnpm
-          cache-dependency-path: frontend/pnpm-lock.yaml
-      - name: Build frontend
-        working-directory: frontend
-        run: |
-          pnpm install --frozen-lockfile
-          pnpm generate
+          name: frontend-spa
+          path: frontend/.output/public
 
       # --- Backend: PyInstaller single-file build ---
       - name: Install uv
@@ -130,7 +147,7 @@ jobs:
           if-no-files-found: error
 
   build-macos:
-    needs: test
+    needs: frontend
     strategy:
       fail-fast: false
       matrix:
@@ -171,19 +188,10 @@ jobs:
           echo "Stamped version $v"
           cat app/_version.py
 
-      - uses: pnpm/action-setup@v4
+      - uses: actions/download-artifact@v4
         with:
-          version: 9
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          cache: pnpm
-          cache-dependency-path: frontend/pnpm-lock.yaml
-      - name: Build frontend
-        working-directory: frontend
-        run: |
-          pnpm install --frozen-lockfile
-          pnpm generate
+          name: frontend-spa
+          path: frontend/.output/public
 
       - name: Install uv
         uses: astral-sh/setup-uv@v5
@@ -249,7 +257,7 @@ jobs:
           rm -f "$RUNNER_TEMP/notary.p8"
 
   release:
-    needs: [build-windows, build-macos]
+    needs: [test, build-windows, build-macos]
     if: github.ref_type == 'tag'
     runs-on: ubuntu-latest
     permissions:
@@ -257,6 +265,7 @@ jobs:
     steps:
       - uses: actions/download-artifact@v4
         with:
+          pattern: question-bank-*
           path: artifacts
       - name: Publish Release
         uses: softprops/action-gh-release@v2

@@ -47,11 +47,11 @@ cmd_sign() {
   else
     echo "==> Signing $APP with \"$IDENTITY\""
     # Inside-out: every Mach-O file first, then nested bundles (deepest first), then the app.
-    while IFS= read -r -d '' f; do
-      if file -b "$f" | grep -q "Mach-O"; then
-        sign_one "$f"
-      fi
-    done < <(find "$APP/Contents" -type f ! -path "*/Contents/MacOS/*" -print0)
+    # Independent files, and each signature waits on Apple's timestamp server, so sign in parallel.
+    export -f sign_one
+    export IDENTITY ENTITLEMENTS
+    find "$APP/Contents" -type f ! -path "*/Contents/MacOS/*" -print0 |
+      xargs -0 -n1 -P "${SIGN_JOBS:-8}" bash -c 'if file -b "$1" | grep -q "Mach-O"; then sign_one "$1"; fi' _
     while IFS= read -r bundle; do
       sign_one "$bundle"
     done < <(find "$APP/Contents" -type d \( -name "*.framework" -o -name "*.app" \) | awk '{ print length, $0 }' | sort -rn | cut -d" " -f2-)
