@@ -4,8 +4,8 @@
 
 **QuestionBank** is an AI-native question bank and composition system for teachers and teaching research teams. It covers smart AI import, multi-subject question management, knowledge point matching, review and publishing, and composition layout. It ships as a Windows desktop app and as a server edition, so it works for individual use as well as for collaboration on a LAN or across a team.
 
-![Question bank](./docs/public/examples/questions.png)
-![Compositions](./docs/public/examples/compositions.png)
+![Question bank](./docs/public/examples/questions.en.png)
+![Compositions](./docs/public/examples/compositions.en.png)
 
 ## ✨ Key Features
 

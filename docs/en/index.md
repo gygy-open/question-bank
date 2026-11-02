@@ -6,7 +6,7 @@ hero:
   text: An AI-native question bank system
   tagline: Smart import, multiple question types, multi-provider AI, knowledge point RAG, and a review workflow
   image:
-    src: /examples/questions.png
+    src: /examples/questions.en.png
     alt: QuestionBank
   actions:
     - theme: brand
