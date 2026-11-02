@@ -12,7 +12,8 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
   SidebarRail,
-  SidebarSeparator
+  SidebarSeparator,
+  useSidebar
 } from '@/components/ui/sidebar'
 import type { SidebarProps } from "@/components/ui/sidebar"
 import {
@@ -25,18 +26,18 @@ import {
   DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
-import CustomSidebarTrigger from '~/components/CustomSidebarTrigger.vue'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import UserProfileDialog from '~/components/UserProfileDialog.vue'
 import ChangePasswordDialog from '~/components/ChangePasswordDialog.vue'
 import { useColorMode, useIntervalFn } from '@vueuse/core'
-import { BookOpen, ChevronsUpDown, Images, Inbox, ListTree, LogOut, Settings, User, Users, Tags, Library, KeyRound, Activity, Info, Moon, Sun, Lock, Languages, Check, LayoutDashboard } from '@lucide/vue'
+import { BookOpen, ChevronsUpDown, Images, Inbox, ListTree, LogOut, Settings, User, Users, Tags, Library, KeyRound, Activity, Info, Moon, Sun, Lock, Languages, Check, LayoutDashboard, PanelLeftClose, PanelLeftOpen } from '@lucide/vue'
 
 const props = withDefaults(defineProps<SidebarProps>(), {
   collapsible: "icon",
 })
 
 const route = useRoute()
+const { state: sidebarState, toggleSidebar } = useSidebar()
 const { t, locale, locales, setLocale } = useI18n()
 const { user, logout } = useAuth()
 const { isAdmin, isManagerSomewhere } = usePermissions()
@@ -53,6 +54,10 @@ const { reviewCount: importReviewCount, refreshSummary: refreshImportSummary } =
 useIntervalFn(() => { if (user.value) refreshImportSummary() }, 30_000)
 watch(user, (current) => { if (current) refreshImportSummary() }, { immediate: true })
 
+const sidebarToggleLabel = computed(() =>
+  sidebarState.value === 'expanded' ? t('common.collapseSidebar') : t('common.expandSidebar'),
+)
+
 const handleLogout = () => {
   logout()
   router.push('/login')
@@ -66,15 +71,8 @@ const navActiveClass = 'border-l-2 border-transparent data-[active=true]:border-
   <Sidebar v-bind="props">
     <SidebarHeader>
       <SidebarMenu>
-        <SidebarMenuItem
-          class="flex flex-row items-center gap-1 group-data-[collapsible=icon]:flex-col group-data-[collapsible=icon]:gap-2"
-        >
-          <div class="min-w-0 flex-1 group-data-[collapsible=icon]:w-full">
-            <SubjectSelector />
-          </div>
-          <CustomSidebarTrigger
-            class="ml-2 h-8 w-8 shrink-0 rounded-md hover:bg-sidebar-accent group-data-[collapsible=icon]:ml-0"
-          />
+        <SidebarMenuItem>
+          <SubjectSelector />
         </SidebarMenuItem>
       </SidebarMenu>
     </SidebarHeader>
@@ -284,6 +282,17 @@ const navActiveClass = 'border-l-2 border-transparent data-[active=true]:border-
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
+        </SidebarMenuItem>
+        <SidebarMenuItem>
+          <SidebarMenuButton
+            class="text-sidebar-foreground/70"
+            :tooltip="sidebarToggleLabel"
+            :aria-label="sidebarToggleLabel"
+            @click="toggleSidebar"
+          >
+            <component :is="sidebarState === 'expanded' ? PanelLeftClose : PanelLeftOpen" />
+            <span>{{ sidebarToggleLabel }}</span>
+          </SidebarMenuButton>
         </SidebarMenuItem>
       </SidebarMenu>
     </SidebarFooter>

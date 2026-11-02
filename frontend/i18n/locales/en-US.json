@@ -41,6 +41,8 @@
     "prevStep": "Back",
     "nextStep": "Next",
     "toggleSidebar": "Toggle sidebar",
+    "collapseSidebar": "Collapse sidebar",
+    "expandSidebar": "Expand sidebar",
     "scrollToEnd": "Scroll to bottom",
     "scrollToStart": "Scroll to top"
   },

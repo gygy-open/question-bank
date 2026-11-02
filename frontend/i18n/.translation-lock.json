@@ -39,6 +39,8 @@
     "common.prevStep": "75ef1241c0f4",
     "common.nextStep": "ea0ef2ae7245",
     "common.toggleSidebar": "a87ff4c1de2b",
+    "common.collapseSidebar": "364ffce5a126",
+    "common.expandSidebar": "8ab5192048a3",
     "common.scrollToEnd": "60f4cd8a8c2d",
     "common.scrollToStart": "81b7c52f0532",
     "language.label": "cd99b225a08e",

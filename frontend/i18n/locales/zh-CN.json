@@ -41,6 +41,8 @@
     "prevStep": "上一步",
     "nextStep": "下一步",
     "toggleSidebar": "展开或收起侧边栏",
+    "collapseSidebar": "收起侧边栏",
+    "expandSidebar": "展开侧边栏",
     "scrollToEnd": "滚动到底部",
     "scrollToStart": "滚动到顶部"
   },
