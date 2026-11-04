@@ -167,6 +167,12 @@ class StructRun(Base):
     asks = relationship(
         "StructAsk", back_populates="run", cascade="all, delete-orphan", order_by="StructAsk.ordinal"
     )
+    element_groups = relationship(
+        "StructElementGroup",
+        back_populates="run",
+        cascade="all, delete-orphan",
+        order_by="StructElementGroup.sort_order",
+    )
 
 
 class StructElement(Base):
@@ -199,6 +205,7 @@ class StructElement(Base):
     )
 
     run = relationship("StructRun", back_populates="elements", foreign_keys=[run_id])
+    params = relationship("StructParam", back_populates="element", cascade="all, delete-orphan")
 
 
 class StructAsk(Base):
@@ -230,3 +237,68 @@ class StructAskElement(Base):
 
     ask_id = Column(Integer, ForeignKey("struct_asks.id", ondelete="CASCADE"), primary_key=True)
     element_id = Column(Integer, ForeignKey("struct_elements.id", ondelete="CASCADE"), primary_key=True)
+
+
+class StructParam(Base):
+    """参数槽：元素中可替换的槽位，是「改数/改条件/改问法」变式生成的抓手。
+
+    replaceable=1 表示该槽位可被替换；slot_kind 取 numeric/symbolic/point/region；
+    domain 存放允许取值的约束说明。
+    """
+
+    __tablename__ = "question_struct_params"
+
+    id = Column(Integer, primary_key=True, index=True)
+    element_id = Column(
+        Integer, ForeignKey("struct_elements.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    name = Column(String(64), nullable=False)  # 参数名，如 a / c / 2
+    value_text = Column(_LongText, nullable=False)  # 原值，逐字照抄
+    slot_kind = Column(String(32), nullable=True)  # numeric | symbolic | point | region
+    domain = Column(Text, nullable=True)  # 允许取值范围 / 约束说明
+    replaceable = Column(Integer, nullable=False, default=1, server_default="1")
+
+    element = relationship("StructElement", back_populates="params")
+
+
+class StructElementGroup(Base):
+    """可整体替换的元素组：一组元素作为整体可被另一组替换，用于条件重组命题。"""
+
+    __tablename__ = "question_struct_element_groups"
+
+    id = Column(Integer, primary_key=True, index=True)
+    run_id = Column(Integer, ForeignKey("struct_runs.id", ondelete="CASCADE"), nullable=False, index=True)
+    name = Column(String(128), nullable=False)
+    description = Column(Text, nullable=True)
+    replaceable = Column(Integer, nullable=False, default=1, server_default="1")
+    sort_order = Column(Integer, nullable=False, default=0, server_default="0")
+
+    run = relationship("StructRun", back_populates="element_groups")
+    items = relationship(
+        "StructElementGroupItem", cascade="all, delete-orphan", passive_deletes=True, back_populates="group"
+    )
+
+
+class StructElementGroupItem(Base):
+    """元素组与元素的多对多关联。"""
+
+    __tablename__ = "question_struct_element_group_items"
+
+    group_id = Column(
+        Integer, ForeignKey("question_struct_element_groups.id", ondelete="CASCADE"), primary_key=True
+    )
+    element_id = Column(
+        Integer, ForeignKey("struct_elements.id", ondelete="CASCADE"), primary_key=True
+    )
+
+    __table_args__ = (
+        Index("ix_question_struct_element_group_items_group_id", "group_id"),
+        Index("ix_question_struct_element_group_items_element_id", "element_id"),
+    )
+
+    group = relationship("StructElementGroup", back_populates="items")
+    element = relationship("StructElement")
+
+
+# 在 StructRun / StructElement 上反向关联由关系字段声明，此处不重复定义。
+

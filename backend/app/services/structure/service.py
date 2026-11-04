@@ -22,7 +22,10 @@ from app.models.question_structure import (
     StructAsk,
     StructAskElement,
     StructElement,
+    StructElementGroup,
+    StructElementGroupItem,
     StructOrigin,
+    StructParam,
     StructRun,
     StructRunState,
     StructTargetType,
@@ -840,4 +843,211 @@ def _span(item: Dict[str, Any], stem_text: str) -> Optional[tuple]:
         return start, end
     return None
 
+
+# region 参数槽与元素组:旋钮式条件重组与原创命题
+# 与上游 struct_* 表不冲突,全部旁挂;写入不提交,由调用方掌控事务。
+
+
+async def create_struct_param(
+    db: AsyncSession,
+    *,
+    element_id: int,
+    name: str,
+    value_text: str,
+    slot_kind: Optional[str] = None,
+    domain: Optional[str] = None,
+    replaceable: bool = True,
+) -> StructParam:
+    """在元素上新建一个参数槽。"""
+    param = StructParam(
+        element_id=element_id,
+        name=name.strip(),
+        value_text=value_text,
+        slot_kind=slot_kind,
+        domain=domain,
+        replaceable=1 if replaceable else 0,
+    )
+    db.add(param)
+    await db.flush()
+    return param
+
+
+async def get_struct_param(db: AsyncSession, param_id: int) -> StructParam:
+    """按 id 取参数槽,不存在抛 NotFound。"""
+    param = await db.get(StructParam, param_id)
+    if param is None:
+        raise NotFound("Structure param not found", ErrorCode.STRUCTURE_TYPE_NOT_FOUND)
+    return param
+
+
+async def list_struct_params(
+    db: AsyncSession, element_id: Optional[int] = None, *, replaceable_only: bool = False
+) -> List[StructParam]:
+    """取参数槽,可按元素过滤,可只取可替换的。"""
+    stmt = select(StructParam)
+    if element_id is not None:
+        stmt = stmt.where(StructParam.element_id == element_id)
+    if replaceable_only:
+        stmt = stmt.where(StructParam.replaceable == 1)
+    stmt = stmt.order_by(StructParam.id)
+    return list((await db.execute(stmt)).scalars().all())
+
+
+async def update_struct_param(
+    db: AsyncSession, param_id: int, **values: Any
+) -> StructParam:
+    """更新参数槽字段,仅允许 name/value_text/slot_kind/domain/replaceable。"""
+    allowed = {"name", "value_text", "slot_kind", "domain", "replaceable"}
+    param = await get_struct_param(db, param_id)
+    for key, val in values.items():
+        if key not in allowed:
+            raise Invalid(f"Unknown param field: {key}", ErrorCode.STRUCTURE_TYPE_NOT_FOUND)
+        if key == "replaceable":
+            val = 1 if val else 0
+        if key in ("name", "value_text") and isinstance(val, str):
+            val = val.strip()
+        setattr(param, key, val)
+    await db.flush()
+    return param
+
+
+async def delete_struct_param(db: AsyncSession, param_id: int) -> None:
+    """删除参数槽。"""
+    param = await get_struct_param(db, param_id)
+    await db.delete(param)
+    await db.flush()
+
+
+async def create_element_group(
+    db: AsyncSession,
+    *,
+    run_id: int,
+    name: str,
+    description: Optional[str] = None,
+    replaceable: bool = True,
+    sort_order: int = 0,
+) -> StructElementGroup:
+    """在一个拆解快照下新建元素组。"""
+    group = StructElementGroup(
+        run_id=run_id,
+        name=name.strip(),
+        description=description,
+        replaceable=1 if replaceable else 0,
+        sort_order=sort_order,
+    )
+    db.add(group)
+    await db.flush()
+    return group
+
+
+async def get_element_group(db: AsyncSession, group_id: int) -> StructElementGroup:
+    """按 id 取元素组,不存在抛 NotFound。"""
+    group = await db.get(StructElementGroup, group_id)
+    if group is None:
+        raise NotFound("Structure element group not found", ErrorCode.STRUCTURE_TYPE_NOT_FOUND)
+    return group
+
+
+async def list_element_groups(db: AsyncSession, run_id: int) -> List[StructElementGroup]:
+    """取一个快照下的全部元素组(按排序号、id)。"""
+    stmt = (
+        select(StructElementGroup)
+        .where(StructElementGroup.run_id == run_id)
+        .order_by(StructElementGroup.sort_order, StructElementGroup.id)
+    )
+    return list((await db.execute(stmt)).scalars().all())
+
+
+async def update_element_group(db: AsyncSession, group_id: int, **values: Any) -> StructElementGroup:
+    """更新元素组字段。"""
+    allowed = {"name", "description", "replaceable", "sort_order"}
+    group = await get_element_group(db, group_id)
+    for key, val in values.items():
+        if key not in allowed:
+            raise Invalid(f"Unknown group field: {key}", ErrorCode.STRUCTURE_TYPE_NOT_FOUND)
+        if key == "replaceable":
+            val = 1 if val else 0
+        if key == "name" and isinstance(val, str):
+            val = val.strip()
+        setattr(group, key, val)
+    await db.flush()
+    return group
+
+
+async def delete_element_group(db: AsyncSession, group_id: int) -> None:
+    """删除元素组及其关联项(cascade)。"""
+    group = await get_element_group(db, group_id)
+    await db.delete(group)
+    await db.flush()
+
+
+async def add_group_item(db: AsyncSession, *, group_id: int, element_id: int) -> StructElementGroupItem:
+    """把元素加入元素组。"""
+    await get_element_group(db, group_id)
+    item = StructElementGroupItem(group_id=group_id, element_id=element_id)
+    db.add(item)
+    await db.flush()
+    return item
+
+
+async def remove_group_item(db: AsyncSession, *, group_id: int, element_id: int) -> None:
+    """从元素组移出元素。"""
+    stmt = select(StructElementGroupItem).where(
+        StructElementGroupItem.group_id == group_id,
+        StructElementGroupItem.element_id == element_id,
+    )
+    item = (await db.execute(stmt)).scalar_one_or_none()
+    if item is None:
+        raise NotFound("Group item not found", ErrorCode.STRUCTURE_TYPE_NOT_FOUND)
+    await db.delete(item)
+    await db.flush()
+
+
+async def list_group_items(db: AsyncSession, group_id: int) -> List[StructElement]:
+    """取元素组包含的全部元素(按元素 ordinal)。"""
+    await get_element_group(db, group_id)
+    stmt = (
+        select(StructElement)
+        .join(StructElementGroupItem, StructElement.id == StructElementGroupItem.element_id)
+        .where(StructElementGroupItem.group_id == group_id)
+        .order_by(StructElement.ordinal)
+    )
+    return list((await db.execute(stmt)).scalars().all())
+
+
+async def list_replaceable_params(
+    db: AsyncSession, run_id: int
+) -> List[StructParam]:
+    """取一个快照下全部可替换的参数槽(带所属元素内容),用于变式生成。"""
+    stmt = (
+        select(StructParam)
+        .join(StructElement, StructParam.element_id == StructElement.id)
+        .where(StructElement.run_id == run_id, StructParam.replaceable == 1)
+        .order_by(StructElement.ordinal, StructParam.id)
+    )
+    return list((await db.execute(stmt)).scalars().all())
+
+
+def apply_param_values_to_stem(
+    stem_text: str,
+    assignments: Dict[int, str],
+    params_by_id: Dict[int, StructParam],
+) -> str:
+    """把参数槽新值应用到题干快照上,生成变式题干文本。
+
+    以参数槽的 value_text 作为旧值在 stem_text 中做逐字替换;同一旧值出现多处时全部替换。
+    仅替换 assignments 里给出的槽位,未给出的保持原值。
+    """
+    result = stem_text
+    for param_id, new_value in assignments.items():
+        param = params_by_id.get(param_id)
+        if param is None:
+            continue
+        old_value = param.value_text
+        if old_value and old_value != new_value:
+            result = result.replace(old_value, new_value)
+    return result
+
+
 # endregion
+

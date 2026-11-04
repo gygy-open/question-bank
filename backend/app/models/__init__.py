@@ -8,7 +8,7 @@ from .tag import Tag
 from .tag_category import TagCategory
 from .job import Job
 from .question import Question, QuestionDedupBand
-from .question_structure import StructAsk, StructAskElement, StructElement, StructRun, StructType
+from .question_structure import StructAsk, StructAskElement, StructElement, StructElementGroup, StructElementGroupItem, StructParam, StructRun, StructType
 from .stimulus import Stimulus
 from .question_relation import QuestionRelation
 from .question_relation_audit import LegacyQuestionParentAudit

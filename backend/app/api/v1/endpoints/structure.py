@@ -20,7 +20,7 @@ from app.core.permissions import Permission
 from app.crud.crud_question import is_question_visible, visible_questions_filter
 from app.crud.crud_subject import subject as crud_subject
 from app.models.question import Question
-from app.models.question_structure import StructRun, StructRunState, StructTargetType
+from app.models.question_structure import StructElement, StructElementGroup, StructElementGroupItem, StructParam, StructRun, StructRunState, StructTargetType
 from app.models.stimulus import Stimulus
 from app.services.structure import service as struct_service
 from app.services.structure import settings as struct_settings
@@ -399,6 +399,273 @@ async def merge_type(
     )
     usage = await type_svc.usage_counts(db, merged.subject_id)
     return _type_out(merged, usage.get(merged.id, 0))
+
+
+# region 参数槽与元素组:旋钮式条件重组与原创命题
+
+
+class StructParamCreate(BaseModel):
+    element_id: int
+    name: str = Field(..., min_length=1, max_length=64)
+    value_text: str
+    slot_kind: Optional[str] = None
+    domain: Optional[str] = None
+    replaceable: bool = True
+
+
+class StructParamUpdate(BaseModel):
+    name: Optional[str] = Field(None, min_length=1, max_length=64)
+    value_text: Optional[str] = None
+    slot_kind: Optional[str] = None
+    domain: Optional[str] = None
+    replaceable: Optional[bool] = None
+
+
+class ElementGroupCreate(BaseModel):
+    run_id: int
+    name: str = Field(..., min_length=1, max_length=128)
+    description: Optional[str] = None
+    replaceable: bool = True
+    sort_order: int = 0
+
+
+class ElementGroupUpdate(BaseModel):
+    name: Optional[str] = Field(None, min_length=1, max_length=128)
+    description: Optional[str] = None
+    replaceable: Optional[bool] = None
+    sort_order: Optional[int] = None
+
+
+class GroupItemLink(BaseModel):
+    element_id: int
+
+
+class VariantGenerate(BaseModel):
+    run_id: int
+    assignments: Dict[int, str] = Field(default_factory=dict)
+
+
+# ---------- 参数槽 ----------
+
+@router.get("/params", response_model=list)
+async def list_struct_params(
+    db: deps.SessionDep,
+    current_user: models.User = Depends(deps.get_current_active_user),
+    element_id: Optional[int] = None,
+    replaceable_only: bool = False,
+) -> Any:
+    """列参数槽,可按元素/可替换性过滤。"""
+    params = await struct_service.list_struct_params(
+        db, element_id=element_id, replaceable_only=replaceable_only
+    )
+    return [
+        {
+            "id": p.id,
+            "element_id": p.element_id,
+            "name": p.name,
+            "value_text": p.value_text,
+            "slot_kind": p.slot_kind,
+            "domain": p.domain,
+            "replaceable": bool(p.replaceable),
+        }
+        for p in params
+    ]
+
+
+@router.post("/params", response_model=dict)
+async def create_struct_param(
+    payload: StructParamCreate,
+    db: deps.SessionDep,
+    current_user: models.User = Depends(deps.get_current_active_user),
+) -> Any:
+    """在元素上新建参数槽。"""
+    param = await struct_service.create_struct_param(
+        db,
+        element_id=payload.element_id,
+        name=payload.name,
+        value_text=payload.value_text,
+        slot_kind=payload.slot_kind,
+        domain=payload.domain,
+        replaceable=payload.replaceable,
+    )
+    return {"id": param.id}
+
+
+@router.put("/params/{param_id}", response_model=dict)
+async def update_struct_param(
+    param_id: int,
+    payload: StructParamUpdate,
+    db: deps.SessionDep,
+    current_user: models.User = Depends(deps.get_current_active_user),
+) -> Any:
+    """更新参数槽字段。"""
+    updates = {k: v for k, v in payload.model_dump(exclude_unset=True).items()}
+    param = await struct_service.update_struct_param(db, param_id, **updates)
+    return {"id": param.id}
+
+
+@router.delete("/params/{param_id}", response_model=dict)
+async def delete_struct_param(
+    param_id: int,
+    db: deps.SessionDep,
+    current_user: models.User = Depends(deps.get_current_active_user),
+) -> Any:
+    """删除参数槽。"""
+    await struct_service.delete_struct_param(db, param_id)
+    return {"ok": True}
+
+
+# ---------- 元素组 ----------
+
+@router.get("/element-groups", response_model=list)
+async def list_element_groups(
+    run_id: int,
+    db: deps.SessionDep,
+    current_user: models.User = Depends(deps.get_current_active_user),
+) -> Any:
+    """列一个拆解快照下的全部元素组。"""
+    groups = await struct_service.list_element_groups(db, run_id)
+    return [
+        {
+            "id": g.id,
+            "run_id": g.run_id,
+            "name": g.name,
+            "description": g.description,
+            "replaceable": bool(g.replaceable),
+            "sort_order": g.sort_order,
+        }
+        for g in groups
+    ]
+
+
+@router.post("/element-groups", response_model=dict)
+async def create_element_group(
+    payload: ElementGroupCreate,
+    db: deps.SessionDep,
+    current_user: models.User = Depends(deps.get_current_active_user),
+) -> Any:
+    """新建元素组。"""
+    group = await struct_service.create_element_group(
+        db,
+        run_id=payload.run_id,
+        name=payload.name,
+        description=payload.description,
+        replaceable=payload.replaceable,
+        sort_order=payload.sort_order,
+    )
+    return {"id": group.id}
+
+
+@router.put("/element-groups/{group_id}", response_model=dict)
+async def update_element_group(
+    group_id: int,
+    payload: ElementGroupUpdate,
+    db: deps.SessionDep,
+    current_user: models.User = Depends(deps.get_current_active_user),
+) -> Any:
+    """更新元素组。"""
+    updates = {k: v for k, v in payload.model_dump(exclude_unset=True).items()}
+    group = await struct_service.update_element_group(db, group_id, **updates)
+    return {"id": group.id}
+
+
+@router.delete("/element-groups/{group_id}", response_model=dict)
+async def delete_element_group(
+    group_id: int,
+    db: deps.SessionDep,
+    current_user: models.User = Depends(deps.get_current_active_user),
+) -> Any:
+    """删除元素组。"""
+    await struct_service.delete_element_group(db, group_id)
+    return {"ok": True}
+
+
+@router.post("/element-groups/{group_id}/items", response_model=dict)
+async def add_group_item(
+    group_id: int,
+    payload: GroupItemLink,
+    db: deps.SessionDep,
+    current_user: models.User = Depends(deps.get_current_active_user),
+) -> Any:
+    """把元素加入元素组。"""
+    item = await struct_service.add_group_item(db, group_id=group_id, element_id=payload.element_id)
+    return {"id": item.id}
+
+
+@router.delete(
+    "/element-groups/{group_id}/items/{element_id}", response_model=dict
+)
+async def remove_group_item(
+    group_id: int,
+    element_id: int,
+    db: deps.SessionDep,
+    current_user: models.User = Depends(deps.get_current_active_user),
+) -> Any:
+    """从元素组移出元素。"""
+    await struct_service.remove_group_item(db, group_id=group_id, element_id=element_id)
+    return {"ok": True}
+
+
+@router.get("/element-groups/{group_id}/items", response_model=list)
+async def list_group_items(
+    group_id: int,
+    db: deps.SessionDep,
+    current_user: models.User = Depends(deps.get_current_active_user),
+) -> Any:
+    """列元素组包含的元素。"""
+    elems = await struct_service.list_group_items(db, group_id)
+    return [
+        {
+            "id": e.id,
+            "run_id": e.run_id,
+            "ordinal": e.ordinal,
+            "content": e.content,
+            "type_id": e.type_id,
+            "type_hint": e.type_hint,
+            "facet": e.facet,
+            "span_start": e.span_start,
+            "span_end": e.span_end,
+        }
+        for e in elems
+    ]
+
+
+# ---------- 变式生成 ----------
+
+@router.get("/params/replaceable", response_model=list)
+async def list_replaceable_params(
+    run_id: int,
+    db: deps.SessionDep,
+    current_user: models.User = Depends(deps.get_current_active_user),
+) -> Any:
+    """列一个快照下全部可替换的参数槽,用于变式生成。"""
+    params = await struct_service.list_replaceable_params(db, run_id)
+    return [
+        {
+            "id": p.id,
+            "element_id": p.element_id,
+            "name": p.name,
+            "value_text": p.value_text,
+            "slot_kind": p.slot_kind,
+            "domain": p.domain,
+        }
+        for p in params
+    ]
+
+
+@router.post("/variants", response_model=dict)
+async def generate_variant(
+    payload: VariantGenerate,
+    db: deps.SessionDep,
+    current_user: models.User = Depends(deps.get_current_active_user),
+) -> Any:
+    """把参数槽新值应用到题干快照,生成变式题干文本(不写库)。"""
+    run = await struct_service.get_run(db, payload.run_id)
+    params = await struct_service.list_replaceable_params(db, payload.run_id)
+    params_by_id = {p.id: p for p in params}
+    new_stem = struct_service.apply_param_values_to_stem(run.stem_text, payload.assignments, params_by_id)
+    return {"run_id": payload.run_id, "new_stem_text": new_stem}
+
 
 # endregion
 

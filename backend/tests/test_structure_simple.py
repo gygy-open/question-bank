@@ -140,6 +140,9 @@ def test_sqlite_create_all() -> None:
         "struct_elements",
         "struct_asks",
         "struct_ask_elements",
+        "question_struct_params",
+        "question_struct_element_groups",
+        "question_struct_element_group_items",
         "jobs",
         "system_settings",
     }
