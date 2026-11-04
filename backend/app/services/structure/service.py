@@ -1049,5 +1049,133 @@ def apply_param_values_to_stem(
     return result
 
 
+# region 同源检索与跨题拼装:题目多样化玩法
+# 与上游 struct_* 表不冲突,全部基于已有表查询;写入不提交,由调用方掌控事务。
+
+
+async def find_similar_by_element_group(
+    db: AsyncSession, run_id: int, *, limit: int = 20
+) -> List[Dict[str, Any]]:
+    """按元素组成员查找同源题:找拥有相同元素内容的其他 run。
+
+    返回每条命中题的 run_id、题目 id、命中元素数、命中元素内容。
+    不包含 run_id 本身。
+    """
+    own_elem_ids = (
+        await db.execute(select(StructElement.id).where(StructElement.run_id == run_id))
+    ).scalars().all()
+    if not own_elem_ids:
+        return []
+
+    stmt = (
+        select(
+            StructElement.run_id,
+            func.count(StructElement.id).label("hit_count"),
+        )
+        .where(StructElement.id.in_(own_elem_ids), StructElement.run_id != run_id)
+        .group_by(StructElement.run_id)
+        .order_by(func.count(StructElement.id).desc())
+        .limit(limit)
+    )
+    rows = (await db.execute(stmt)).all()
+
+    results: List[Dict[str, Any]] = []
+    for target_run_id, hit_count in rows:
+        run = (
+            await db.execute(select(StructRun).where(StructRun.id == target_run_id))
+        ).scalar_one_or_none()
+        if run is None:
+            continue
+        question = (
+            await db.execute(select(Question).where(Question.id == run.target_id))
+        ).scalar_one_or_none() if run.target_type == StructTargetType.QUESTION else None
+        results.append(
+            {
+                "run_id": run.id,
+                "target_type": run.target_type,
+                "target_id": run.target_id,
+                "question_id": question.id if question else None,
+                "hit_count": hit_count,
+                "stem_text": run.stem_text,
+                "state": run.state,
+            }
+        )
+    return results
+
+
+async def find_similar_by_param(
+    db: AsyncSession, *, param_name: str, param_value: str, limit: int = 20
+) -> List[Dict[str, Any]]:
+    """按参数槽名/值查找同源题:找有相同参数槽的其他 run。
+
+    返回每条命中题的 run_id、题目 id、参数槽信息。
+    """
+    stmt = (
+        select(StructParam, StructElement.run_id)
+        .join(StructElement, StructParam.element_id == StructElement.id)
+        .where(StructParam.name == param_name, StructParam.value_text == param_value)
+        .order_by(StructElement.run_id, StructParam.id)
+        .limit(limit)
+    )
+    rows = (await db.execute(stmt)).all()
+
+    by_run: Dict[int, List[Dict[str, Any]]] = {}
+    for param, run_id in rows:
+        by_run.setdefault(run_id, []).append(
+            {
+                "param_id": param.id,
+                "element_id": param.element_id,
+                "name": param.name,
+                "value_text": param.value_text,
+                "slot_kind": param.slot_kind,
+            }
+        )
+
+    results: List[Dict[str, Any]] = []
+    for run_id, params in by_run.items():
+        run = (
+            await db.execute(select(StructRun).where(StructRun.id == run_id))
+        ).scalar_one_or_none()
+        if run is None:
+            continue
+        question = (
+            await db.execute(select(Question).where(Question.id == run.target_id))
+        ).scalar_one_or_none() if run.target_type == StructTargetType.QUESTION else None
+        results.append(
+            {
+                "run_id": run.id,
+                "target_type": run.target_type,
+                "target_id": run.target_id,
+                "question_id": question.id if question else None,
+                "params": params,
+                "stem_text": run.stem_text,
+                "state": run.state,
+            }
+        )
+    return results
+
+
+async def compose_stem(
+    db: AsyncSession, *, element_ids: Sequence[int], separator: str = "\n"
+) -> str:
+    """跨题拼装题干:按给定元素 id 顺序,取元素 content 拼接成新题干文本。
+
+    支持跨 run_id:元素可以来自不同的拆解快照。按 element_ids 给定的顺序拼接,
+    不自动排序;如需按 ordinal,由调用方传入有序 id 列表。
+    不写库,只返回拼接后的文本。
+    """
+    if not element_ids:
+        return ""
+    stmt = (
+        select(StructElement)
+        .where(StructElement.id.in_(list(element_ids)))
+        .order_by(StructElement.ordinal)
+    )
+    elems = list((await db.execute(stmt)).scalars().all())
+    id_to_elem = {e.id: e for e in elems}
+    parts = [id_to_elem[eid].content for eid in element_ids if eid in id_to_elem]
+    return separator.join(parts)
+
+
 # endregion
 

@@ -667,6 +667,60 @@ async def generate_variant(
     return {"run_id": payload.run_id, "new_stem_text": new_stem}
 
 
+# region 同源检索与跨题拼装:题目多样化玩法
+
+
+class ComposeRequest(BaseModel):
+    element_ids: List[int] = Field(..., description="元素 id 列表,按期望顺序排列")
+    separator: str = Field("\n", description="元素间分隔符")
+
+
+# ---------- 同源检索:按元素组 ----------
+
+@router.get("/similar/element-group", response_model=list)
+async def similar_by_element_group(
+    db: deps.SessionDep,
+    current_user: models.User = Depends(deps.get_current_active_user),
+    run_id: int = Query(..., description="拆解快照 id"),
+    limit: int = Query(20, ge=1, le=100, description="返回上限"),
+) -> Any:
+    """按元素组成员查找同源题:找拥有相同元素的其他题。"""
+    results = await struct_service.find_similar_by_element_group(db, run_id, limit=limit)
+    return results
+
+
+# ---------- 同源检索:按参数槽 ----------
+
+@router.get("/similar/param", response_model=list)
+async def similar_by_param(
+    db: deps.SessionDep,
+    current_user: models.User = Depends(deps.get_current_active_user),
+    param_name: str = Query(..., description="参数槽名"),
+    param_value: str = Query(..., description="参数槽值"),
+    limit: int = Query(20, ge=1, le=100, description="返回上限"),
+) -> Any:
+    """按参数槽名/值查找同源题:找有相同参数槽的其他题。"""
+    results = await struct_service.find_similar_by_param(
+        db, param_name=param_name, param_value=param_value, limit=limit
+    )
+    return results
+
+
+# ---------- 跨题拼装 ----------
+
+@router.post("/compose", response_model=dict)
+async def compose_stem(
+    payload: ComposeRequest,
+    db: deps.SessionDep,
+    current_user: models.User = Depends(deps.get_current_active_user),
+) -> Any:
+    """跨题拼装题干:按给定元素 id 顺序拼接成新题干文本(不写库)。"""
+    stem = await struct_service.compose_stem(
+        db, element_ids=payload.element_ids, separator=payload.separator
+    )
+    return {"stem_text": stem, "element_count": len(payload.element_ids)}
+
+
 # endregion
 
 
