@@ -7,6 +7,24 @@ from .knowledge_point import KnowledgePoint
 from .tag import Tag
 from .tag_category import TagCategory
 from .question import Question, QuestionDedupBand
+from .question_structure import (
+    ElementRole,
+    ElementType,
+    QuestionStructAsk,
+    QuestionStructAskElement,
+    QuestionStructElement,
+    QuestionStructElementGroup,
+    QuestionStructMaterial,
+    QuestionStructMisconception,
+    QuestionStructParam,
+    QuestionStructProduce,
+    QuestionStructRun,
+    QuestionStructStep,
+    QuestionStructStepElement,
+    QuestionStructStepProduce,
+    SolvingMethod,
+    StructVocabularyMeta,
+)
 from .stimulus import Stimulus
 from .question_relation import QuestionRelation
 from .question_relation_audit import LegacyQuestionParentAudit
