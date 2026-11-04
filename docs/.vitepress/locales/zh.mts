@@ -1,5 +1,10 @@
 import type { DefaultTheme, LocaleSpecificConfig } from 'vitepress'
 
+type LocaleEntry = LocaleSpecificConfig<DefaultTheme.Config> & {
+  label: string
+  link?: string
+}
+
 const deploySidebar: DefaultTheme.SidebarItem[] = [
   {
     text: '桌面版',
@@ -21,24 +26,45 @@ const deploySidebar: DefaultTheme.SidebarItem[] = [
   }
 ]
 
-export const zh: LocaleSpecificConfig<DefaultTheme.Config> = {
+const deployNav: DefaultTheme.NavItem[] = [
+  { text: '入门', link: '/guide/introduction', activeMatch: '/guide/' },
+  {
+    text: '安装部署',
+    activeMatch: '/(desktop|server)/',
+    items: [
+      {
+        text: '桌面版',
+        items: [
+          { text: '安装与首次启动', link: '/desktop/install' },
+          { text: '个人使用', link: '/desktop/personal' },
+          { text: '局域网共享', link: '/desktop/lan-sharing' },
+          { text: '升级与卸载', link: '/desktop/upgrade' }
+        ]
+      },
+      {
+        text: '服务器版',
+        items: [
+          { text: 'Docker Compose 部署', link: '/server/docker' },
+          { text: '配置参考', link: '/server/configuration' },
+          { text: '数据库与迁移', link: '/server/database' },
+          { text: '运维', link: '/server/operations' }
+        ]
+      }
+    ]
+  },
+  { text: '配置', link: '/admin/ai-config', activeMatch: '/admin/' },
+  { text: '功能', link: '/features/import', activeMatch: '/features/' },
+  { text: '开发', link: '/development/architecture', activeMatch: '/development/' }
+]
+
+export const zh: LocaleEntry = {
   label: '简体中文',
   lang: 'zh-CN',
   title: 'QuestionBank',
   description: 'AI 原生的题库系统 · 使用文档',
 
   themeConfig: {
-    nav: [
-      { text: '入门', link: '/guide/introduction', activeMatch: '/guide/' },
-      {
-        text: '安装部署',
-        activeMatch: '/(desktop|server)/',
-        items: deploySidebar
-      },
-      { text: '配置', link: '/admin/ai-config', activeMatch: '/admin/' },
-      { text: '功能', link: '/features/import', activeMatch: '/features/' },
-      { text: '开发', link: '/development/architecture', activeMatch: '/development/' }
-    ],
+    nav: deployNav,
 
     sidebar: {
       '/guide/': [

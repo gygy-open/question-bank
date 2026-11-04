@@ -1,5 +1,10 @@
 import type { DefaultTheme, LocaleSpecificConfig } from 'vitepress'
 
+type LocaleEntry = LocaleSpecificConfig<DefaultTheme.Config> & {
+  label: string
+  link?: string
+}
+
 const deploySidebar: DefaultTheme.SidebarItem[] = [
   {
     text: 'Desktop',
@@ -21,7 +26,38 @@ const deploySidebar: DefaultTheme.SidebarItem[] = [
   }
 ]
 
-export const en: LocaleSpecificConfig<DefaultTheme.Config> = {
+const deployNav: DefaultTheme.NavItem[] = [
+  { text: 'Guide', link: '/en/guide/introduction', activeMatch: '/en/guide/' },
+  {
+    text: 'Install',
+    activeMatch: '/en/(desktop|server)/',
+    items: [
+      {
+        text: 'Desktop',
+        items: [
+          { text: 'Installation & First Launch', link: '/en/desktop/install' },
+          { text: 'Personal Use', link: '/en/desktop/personal' },
+          { text: 'LAN Sharing', link: '/en/desktop/lan-sharing' },
+          { text: 'Upgrade & Uninstall', link: '/en/desktop/upgrade' }
+        ]
+      },
+      {
+        text: 'Server',
+        items: [
+          { text: 'Docker Compose Deployment', link: '/en/server/docker' },
+          { text: 'Configuration Reference', link: '/en/server/configuration' },
+          { text: 'Database & Migrations', link: '/en/server/database' },
+          { text: 'Operations', link: '/en/server/operations' }
+        ]
+      }
+    ]
+  },
+  { text: 'Configuration', link: '/en/admin/ai-config', activeMatch: '/en/admin/' },
+  { text: 'Features', link: '/en/features/import', activeMatch: '/en/features/' },
+  { text: 'Development', link: '/en/development/architecture', activeMatch: '/en/development/' }
+]
+
+export const en: LocaleEntry = {
   label: 'English',
   lang: 'en-US',
   link: '/en/',
@@ -29,17 +65,7 @@ export const en: LocaleSpecificConfig<DefaultTheme.Config> = {
   description: 'AI-native question bank · Documentation',
 
   themeConfig: {
-    nav: [
-      { text: 'Guide', link: '/en/guide/introduction', activeMatch: '/en/guide/' },
-      {
-        text: 'Install',
-        activeMatch: '/en/(desktop|server)/',
-        items: deploySidebar
-      },
-      { text: 'Configuration', link: '/en/admin/ai-config', activeMatch: '/en/admin/' },
-      { text: 'Features', link: '/en/features/import', activeMatch: '/en/features/' },
-      { text: 'Development', link: '/en/development/architecture', activeMatch: '/en/development/' }
-    ],
+    nav: deployNav,
 
     sidebar: {
       '/en/guide/': [

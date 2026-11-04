@@ -1,8 +1,8 @@
 import { defineConfig } from 'vitepress'
+import { ImagePreviewPlugin } from 'vitepress-plugin-image-preview'
 import { redirectScript } from './lang-redirect.mts'
 import { en } from './locales/en.mts'
 import { zh, zhSearch } from './locales/zh.mts'
-
 // https://vitepress.dev/reference/site-config
 const base = '/question-bank/'
 
@@ -28,6 +28,12 @@ export default defineConfig({
     en
   },
 
+  vite: {
+    plugins: [
+      ImagePreviewPlugin()
+    ]
+  },
+
   themeConfig: {
     logo: '/logo.svg',
 
@@ -41,3 +47,4 @@ export default defineConfig({
     }
   }
 })
+
