@@ -84,6 +84,17 @@ CAPABILITY_OUTPUT_TYPES: Dict[str, Any] = {
     "composition.finalize_version": CompositionVersionRead,
     "knowledge_point.create": schemas.KnowledgePoint,
     "tag.create": schemas.Tag,
+    # 结构化拆解能力:输出为 dict(queued/skipped/job_ids 等),不绑定 Pydantic schema
+    "structure.decompose": dict,
+    "structure.save": dict,
+    "structure.review": dict,
+    "structure.backfill": dict,
+    # 结构化元素类型树:返回 StructType ORM 对象,用 StructTypeRead 序列化
+    "struct_type.create": capabilities.structure.StructTypeRead,
+    "struct_type.update": capabilities.structure.StructTypeRead,
+    "struct_type.delete": None,
+    "struct_type.merge": capabilities.structure.StructTypeRead,
+    "struct_type.import": dict,
 }
 
 _PROVIDED_SUFFIX = "_provided"

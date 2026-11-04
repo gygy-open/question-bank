@@ -10,7 +10,7 @@ from __future__ import annotations
 
 from typing import Any, Dict, List, Literal, Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 from app.core import permissions
 from app.core.api_errors import ErrorCode
@@ -371,3 +371,21 @@ def _can_edit(ctx: ExecutionContext, target: struct_service.Target) -> bool:
     return is_question_visible(target.obj, ctx.actor) and permissions.can(
         ctx.actor, Permission.EDIT_QUESTION, subject_id=target.subject_id
     )
+
+
+class StructTypeRead(BaseModel):
+    """结构化元素类型的只读输出,供 MCP 序列化用。"""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    subject_id: int
+    parent_id: Optional[int] = None
+    kind: str
+    code: str
+    name: str
+    definition: Optional[str] = None
+    examples: Optional[str] = None
+    status: str
+    sort_order: int
+
