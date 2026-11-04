@@ -39,6 +39,8 @@ async def read_questions(
     source: Optional[str] = None,
     has_stimulus: Optional[bool] = None,
     stimulus_id: Optional[int] = None,
+    struct_type_ids: List[int] = Query(None),
+    struct_state: Optional[str] = Query(None, description="none / draft / accepted / stale"),
     current_user: models.User = Depends(deps.get_current_active_user),
 ) -> Any:
     skip = (page - 1) * size
@@ -63,6 +65,8 @@ async def read_questions(
         source=source,
         has_stimulus=has_stimulus,
         stimulus_id=stimulus_id,
+        struct_type_ids=struct_type_ids,
+        struct_state=struct_state,
         viewer=current_user
     )
     total = await crud.question.count_with_filters(
@@ -84,6 +88,8 @@ async def read_questions(
         source=source,
         has_stimulus=has_stimulus,
         stimulus_id=stimulus_id,
+        struct_type_ids=struct_type_ids,
+        struct_state=struct_state,
         viewer=current_user
     )
     relation_counts = await crud.question.get_relation_counts(
@@ -91,11 +97,15 @@ async def read_questions(
         question_ids=[question.id for question in questions],
         viewer=current_user,
     )
+    from app.services.structure import service as struct_service
+
+    struct_states = await struct_service.states_for_questions(db, questions)
     items = [
         schemas.QuestionListItem.model_validate(question).model_copy(
             update={
                 "incoming_relation_count": relation_counts[question.id]["incoming"],
                 "outgoing_relation_count": relation_counts[question.id]["outgoing"],
+                "struct_state": struct_states.get(question.id),
             }
         )
         for question in questions

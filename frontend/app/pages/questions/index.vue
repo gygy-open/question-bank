@@ -5,7 +5,11 @@ import { useAPI } from '~/composables/useAPI'
 import KnowledgePointTreeSelector from '~/components/KnowledgePointTreeSelector.vue'
 import QuestionListItem from '~/components/QuestionListItem.vue'
 import QuestionEditDialog from '~/components/QuestionEditDialog.vue'
-import QuestionStructureSheet from '~/components/QuestionStructureSheet.vue'
+import QuestionRelationsSheet from '~/components/QuestionRelationsSheet.vue'
+import StructureSheet from '~/components/structure/StructureSheet.vue'
+import StructTypeSelect from '~/components/structure/StructTypeSelect.vue'
+import type { StructType } from '~/types'
+import { getApiErrorDetail } from '@/lib/apiErrors'
 import PageHeader from '~/components/PageHeader.vue'
 import CompositionTargetPicker from '~/components/CompositionTargetPicker.vue'
 import QuestionBasketButton from '~/components/QuestionBasketButton.vue'
@@ -13,7 +17,7 @@ import QuestionBasketPanel from '~/components/QuestionBasketPanel.vue'
 import TagFilter from '~/components/TagFilter.vue'
 import { useQuestionBasket } from '~/composables/useQuestionBasket'
 import { richDocToPlainText } from '~/components/rich-editor/richDoc'
-import { Loader2, Plus, X, Trash2, ShoppingBasket, FileText, ListTree, Edit, SlidersHorizontal, ChevronsUpDown, ChevronLeft, ChevronRight, ChevronDown, Layers3 } from '@lucide/vue'
+import { Loader2, Plus, X, Trash2, ShoppingBasket, FileText, ListTree, Edit, SlidersHorizontal, ChevronsUpDown, ChevronLeft, ChevronRight, ChevronDown, Layers3, Shapes } from '@lucide/vue'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { Label } from '@/components/ui/label'
 import { Badge } from '@/components/ui/badge'
@@ -97,6 +101,9 @@ const filters = reactive({
   source: undefined as string | undefined,
   root_only: false,
   membership: 'all' as 'all' | 'independent' | 'grouped',
+  // 题干结构化:元素类型(含子类型,只匹配已采纳拆解)与结构状态。
+  struct_type_ids: [] as number[],
+  struct_state: undefined as string | undefined,
 })
 
 // Initialize filters from route query
@@ -165,6 +172,8 @@ const queryParams = computed(() => {
   if (filters.source) params.source = filters.source
   if (filters.root_only) params.root_only = true
   if (filters.membership !== 'all') params.has_stimulus = filters.membership === 'grouped'
+  if (filters.struct_type_ids.length > 0) params.struct_type_ids = filters.struct_type_ids
+  if (filters.struct_state && filters.struct_state !== '0') params.struct_state = filters.struct_state
   
   return params
 })
@@ -486,6 +495,8 @@ const resetFilters = () => {
   filters.source = undefined
   filters.root_only = false
   filters.membership = 'all'
+  filters.struct_type_ids = []
+  filters.struct_state = undefined
   page.value = 1
   
   // Remove query param
@@ -526,13 +537,70 @@ const handleQuestionUpdate = (newQuestion: Question) => {
   }
 }
 
-// --- Structure Sheet ---
+// --- 题干结构化 ---
+// 总开关关闭时不显示任何结构化入口;类型树按当前学科加载,供「元素类型」筛选使用。
+const { enabled: structureEnabled, refresh: refreshStructureEnabled } = useStructureEnabled()
+const structureApi = useStructure()
+const structTypes = ref<StructType[]>([])
+const showStructure = computed(() => structureEnabled.value === true)
+
+const loadStructTypes = async () => {
+  const subjectId = Number(selectedSubjectId.value)
+  if (!showStructure.value || !subjectId) {
+    structTypes.value = []
+    return
+  }
+  try {
+    structTypes.value = (await structureApi.listTypes(subjectId)).items
+  } catch {
+    structTypes.value = []
+  }
+}
+watch([selectedSubjectId, showStructure], () => {
+  // 切换学科后,上一学科的类型筛选已无意义,清空。
+  filters.struct_type_ids = []
+  void loadStructTypes()
+}, { immediate: true })
+onActivated(() => { void refreshStructureEnabled() })
+if (structureEnabled.value === null) void refreshStructureEnabled()
+
+const structStateOptions = computed(() => [
+  { label: t('structure.library.allStates'), value: '0' },
+  { label: t('structure.states.none'), value: 'none' },
+  { label: t('structure.states.draft'), value: 'draft' },
+  { label: t('structure.states.accepted'), value: 'accepted' },
+  { label: t('structure.states.stale'), value: 'stale' },
+])
+
 const structureSheetOpen = ref(false)
 const structureQuestionId = ref<number | null>(null)
-
 const viewStructure = (question: Question) => {
   structureQuestionId.value = question.id
   structureSheetOpen.value = true
+}
+
+/** 批量排队拆解选中题目;无权编辑或看不到的题会被后端跳过。 */
+const batchDecompose = async () => {
+  const ids = Array.from(selectedIds.value)
+  if (ids.length === 0) return
+  try {
+    const result = await structureApi.decompose(ids)
+    toast.success(t('structure.library.decomposeQueued', { count: result.queued.length }), {
+      description: result.skipped.length ? t('structure.library.decomposeSkipped', { count: result.skipped.length }) : undefined,
+    })
+    selectedIds.value.clear()
+  } catch (error) {
+    toast.error(t('structure.library.decomposeFailed'), { description: getApiErrorDetail(error, '') })
+  }
+}
+
+// --- Relations Sheet(材料与小题、拆分来源等关联关系)---
+const relationsSheetOpen = ref(false)
+const relationsQuestionId = ref<number | null>(null)
+
+const viewRelations = (question: Question) => {
+  relationsQuestionId.value = question.id
+  relationsSheetOpen.value = true
 }
 </script>
 
@@ -665,6 +733,21 @@ const viewStructure = (question: Question) => {
                       :categories="tagCategories || []" 
                     />
                   </div>
+
+                  <!-- 题干结构化:元素类型(多选,含子类型)与结构状态 -->
+                  <div v-if="showStructure" class="space-y-2 flex-1 min-w-[200px] max-w-sm">
+                    <Label class="text-xs font-medium">{{ t('structure.library.typeFilter') }}</Label>
+                    <StructTypeSelect
+                      v-model="filters.struct_type_ids"
+                      :types="structTypes"
+                      multiple
+                      :placeholder="t('structure.library.allTypes')"
+                    />
+                  </div>
+                  <div v-if="showStructure" class="space-y-2 min-w-[140px]">
+                    <Label class="text-xs font-medium">{{ t('structure.library.stateFilter') }}</Label>
+                    <ClearableSelect v-model="filters.struct_state" :options="structStateOptions" :placeholder="t('structure.library.allStates')" />
+                  </div>
                   </div>
 
                   <div class="space-y-2">
@@ -769,6 +852,16 @@ const viewStructure = (question: Question) => {
                         <FileText class="mr-1 h-3 w-3" />
                         {{ t('questions.list.addToComposition') }}
                       </Button>
+                      <Button
+                        v-if="showStructure && canEditCurrentSubject"
+                        size="sm"
+                        variant="outline"
+                        class="h-7 px-2"
+                        @click="batchDecompose"
+                      >
+                        <Shapes class="mr-1 h-3 w-3" />
+                        {{ t('structure.library.batchDecompose') }}
+                      </Button>
                       <Button size="sm" variant="outline" class="h-7 px-2" @click="openBatchUpdateSourceDialog">
                         <Edit class="mr-1 h-3 w-3" />
                         {{ t('questions.list.editSource') }}
@@ -815,8 +908,10 @@ const viewStructure = (question: Question) => {
                     @edit="editQuestion(question)"
                     @delete="deleteQuestion(question.id)"
                     @update="handleQuestionUpdate"
-                    @view-structure="viewStructure"
+                    @view-relations="viewRelations"
                     @decompose="decomposeQuestion"
+                    :show-structure="showStructure"
+                    @view-structure="viewStructure"
                   />
                 </div>
 
@@ -868,9 +963,16 @@ const viewStructure = (question: Question) => {
     @success="handleEditSuccess"
   />
   
-  <QuestionStructureSheet
+  <QuestionRelationsSheet
+    v-model:open="relationsSheetOpen"
+    :question-id="relationsQuestionId"
+  />
+
+  <StructureSheet
     v-model:open="structureSheetOpen"
-    :question-id="structureQuestionId"
+    target-type="question"
+    :target-id="structureQuestionId"
+    @changed="refreshQuestions()"
   />
   
   <Dialog :open="isSourceDialogOpen" @update:open="(v) => isSourceDialogOpen = v">

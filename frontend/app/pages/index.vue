@@ -9,6 +9,7 @@ import TrendChart from '~/components/dashboard/TrendChart.vue'
 import TypeDonut from '~/components/dashboard/TypeDonut.vue'
 import QualityCard from '~/components/dashboard/QualityCard.vue'
 import KnowledgeCoverage from '~/components/dashboard/KnowledgeCoverage.vue'
+import StructureCard from '~/components/dashboard/StructureCard.vue'
 import ContributorBoard from '~/components/dashboard/ContributorBoard.vue'
 import type { DashboardStats } from '~/types/dashboard'
 
@@ -20,6 +21,9 @@ const stats = ref<DashboardStats | null>(null)
 const loading = ref(false)
 const error = ref(false)
 const refreshKey = ref(0)
+// 题干结构化总开关:关闭时不显示结构化卡片。
+const { enabled: structureEnabled, refresh: refreshStructureEnabled } = useStructureEnabled()
+if (structureEnabled.value === null) void refreshStructureEnabled()
 let seq = 0
 
 const load = async () => {
@@ -128,6 +132,8 @@ const isEmpty = computed(() => stats.value?.overview.total_questions === 0)
           <QualityCard :distribution="stats.distribution" :total="stats.overview.total_questions" />
           <KnowledgeCoverage :coverage="stats.knowledge_coverage" />
         </div>
+        <!-- 题干结构化进度(总开关关闭时不显示) -->
+        <StructureCard v-if="structureEnabled" :subject-id="stats.subject_id" :refresh-key="refreshKey" />
       </template>
 
       <ContributorBoard :subject-id="stats.subject_id" :refresh-key="refreshKey" />

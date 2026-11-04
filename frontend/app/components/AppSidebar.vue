@@ -30,7 +30,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import UserProfileDialog from '~/components/UserProfileDialog.vue'
 import ChangePasswordDialog from '~/components/ChangePasswordDialog.vue'
 import { useColorMode, useIntervalFn } from '@vueuse/core'
-import { BookOpen, ChevronsUpDown, Images, Inbox, ListTree, LogOut, Settings, User, Users, Tags, Library, KeyRound, Activity, Info, Moon, Sun, Lock, Languages, Check, LayoutDashboard, PanelLeftClose, PanelLeftOpen } from '@lucide/vue'
+import { BookOpen, ChevronsUpDown, ListChecks, Shapes, Images, Inbox, ListTree, LogOut, Settings, User, Users, Tags, Library, KeyRound, Activity, Info, Moon, Sun, Lock, Languages, Check, LayoutDashboard, PanelLeftClose, PanelLeftOpen } from '@lucide/vue'
 
 const props = withDefaults(defineProps<SidebarProps>(), {
   collapsible: "icon",
@@ -53,6 +53,10 @@ const toggleColorMode = () => {
 const { reviewCount: importReviewCount, refreshSummary: refreshImportSummary } = useImportQueue()
 useIntervalFn(() => { if (user.value) refreshImportSummary() }, 30_000)
 watch(user, (current) => { if (current) refreshImportSummary() }, { immediate: true })
+
+// 题干结构化总开关:关闭时隐藏「拆解审核」「元素类型」入口。
+const { enabled: structureEnabled, refresh: refreshStructureEnabled } = useStructureEnabled()
+watch(user, (current) => { if (current) refreshStructureEnabled() }, { immediate: true })
 
 const sidebarToggleLabel = computed(() =>
   sidebarState.value === 'expanded' ? t('common.collapseSidebar') : t('common.expandSidebar'),
@@ -116,6 +120,14 @@ const navActiveClass = 'border-l-2 border-transparent data-[active=true]:border-
                   {{ importReviewCount }}
                 </SidebarMenuBadge>
               </SidebarMenuItem>
+              <SidebarMenuItem v-if="structureEnabled">
+                <SidebarMenuButton as-child :is-active="route.path === '/structure/review'" :class="navActiveClass">
+                  <NuxtLink to="/structure/review">
+                    <ListChecks />
+                    <span>{{ t('nav.structureReview') }}</span>
+                  </NuxtLink>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
             </SidebarMenu>
           </div>
 
@@ -165,6 +177,14 @@ const navActiveClass = 'border-l-2 border-transparent data-[active=true]:border-
                   <NuxtLink to="/tags">
                     <Tags />
                     <span>{{ t('nav.tags') }}</span>
+                  </NuxtLink>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+              <SidebarMenuItem v-if="structureEnabled">
+                <SidebarMenuButton as-child :is-active="route.path === '/structure/types'" :class="navActiveClass">
+                  <NuxtLink to="/structure/types">
+                    <Shapes />
+                    <span>{{ t('nav.structureTypes') }}</span>
                   </NuxtLink>
                 </SidebarMenuButton>
               </SidebarMenuItem>

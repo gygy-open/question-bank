@@ -203,6 +203,19 @@ class ErrorCode(StrEnum):
     PROMPT_TEMPLATE_NOT_FOUND = "prompt.template_not_found"
     PROMPT_UNKNOWN_KEY = "prompt.unknown_key"
     PROMPT_SUBJECT_NOT_FOUND = "prompt.subject_not_found"
+    # structure(题干结构化)
+    STRUCTURE_DISABLED = "structure.disabled"
+    STRUCTURE_TARGET_NOT_FOUND = "structure.target_not_found"
+    STRUCTURE_RUN_NOT_FOUND = "structure.run_not_found"
+    STRUCTURE_RUN_NOT_REVIEWABLE = "structure.run_not_reviewable"
+    STRUCTURE_EMPTY_STEM = "structure.empty_stem"
+    STRUCTURE_INVALID_ITEM = "structure.invalid_item"
+    STRUCTURE_TYPE_NOT_FOUND = "structure.type_not_found"
+    STRUCTURE_TYPE_CODE_EXISTS = "structure.type_code_exists"
+    STRUCTURE_TYPE_INVALID_PARENT = "structure.type_invalid_parent"
+    STRUCTURE_TYPE_IN_USE = "structure.type_in_use"
+    STRUCTURE_TYPE_HAS_CHILDREN = "structure.type_has_children"
+    STRUCTURE_TYPE_INVALID_IMPORT = "structure.type_invalid_import"
 
 
 class ApiError(HTTPException):

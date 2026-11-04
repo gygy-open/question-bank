@@ -1,3 +1,4 @@
+import type { StructState } from './structure'
 export type {
   RichDoc,
   RichDocNode,
@@ -267,6 +268,8 @@ export interface Question {
   stimulus_position?: number | null
   incoming_relation_count?: number
   outgoing_relation_count?: number
+  /** 题干结构化状态(题库列表返回)。 */
+  struct_state?: StructState | null
 }
 
 export interface QuestionListItem extends Question {
@@ -396,3 +399,28 @@ export interface UserUpdatePassword {
   new_password: string
 }
 export type { SetupStatus } from './setup'
+
+export type {
+  StructTargetType,
+  StructState,
+  StructRunState,
+  StructFacet,
+  StructTypeKind,
+  StructTypeStatus,
+  StructCheckIssue,
+  StructCheckReport,
+  StructElement,
+  StructAsk,
+  StructRun,
+  StructJob,
+  StructureView,
+  StructType,
+  StructItemInput,
+  StructSavePayload,
+  StructReviewQueueItem,
+  StructReviewQueuePage,
+  StructSimilarItem,
+  StructStats,
+  StructDistribution,
+  StructSettings,
+} from './structure'

@@ -51,9 +51,18 @@ from app.schemas.composition import (
 logger = logging.getLogger(__name__)
 
 # 依赖前置的文件抽取流程,外部客户端无法独立构造合法输入,第一期不暴露。
+# 题干结构化:审核(采纳/驳回)必须由人在站内完成;类型树的修改与存量回填属于学科管理,
+# MCP 只提供只读的类型列表(list_structure_types)。
 EXCLUDED_CAPABILITIES: frozenset[str] = frozenset({
     "paper_import.preview",
     "paper_import.commit",
+    "structure.review",
+    "structure.backfill",
+    "struct_type.create",
+    "struct_type.update",
+    "struct_type.delete",
+    "struct_type.merge",
+    "struct_type.import",
 })
 
 # capability → 输出类型,与对应 REST 端点的 response_model 一致;None 表示无返回体。
@@ -84,6 +93,8 @@ CAPABILITY_OUTPUT_TYPES: Dict[str, Any] = {
     "composition.finalize_version": CompositionVersionRead,
     "knowledge_point.create": schemas.KnowledgePoint,
     "tag.create": schemas.Tag,
+    "structure.decompose": dict,
+    "structure.save": dict,
 }
 
 _PROVIDED_SUFFIX = "_provided"
@@ -377,6 +388,8 @@ async def _search_questions(ctx: ExecutionContext, args: Dict[str, Any]) -> Dict
         q_type=q_type,
         difficulty=_optional_int(args, "difficulty"),
         status=args.get("status") or None,
+        struct_type_ids=args.get("struct_type_ids") or None,
+        struct_state=args.get("struct_state") or None,
         viewer=ctx.actor,
     )
     questions = await crud.question.get_multi_with_filters(
@@ -597,6 +610,67 @@ _AUTHORING_NODE = {
 }
 
 
+async def _structure_target(ctx: ExecutionContext, target_type: str, target_id: int):
+    """取拆解对象并判权(学科查看权限 + 可见性),与 REST 端点一致。"""
+    from app.services.structure import service as struct_service
+
+    try:
+        target = await struct_service.load_target(ctx.db, target_type, target_id)
+    except DomainError:
+        raise NotFound("Not found", ErrorCode.STRUCTURE_TARGET_NOT_FOUND)
+    if target.subject_id is not None and not permissions.can(
+        ctx.actor, Permission.VIEW_QUESTION, subject_id=target.subject_id
+    ):
+        raise Forbidden("The user doesn't have enough privileges", ErrorCode.AUTH_FORBIDDEN)
+    if not is_question_visible(target.obj, ctx.actor):
+        raise NotFound("Not found", ErrorCode.STRUCTURE_TARGET_NOT_FOUND)
+    return target
+
+
+async def _get_question_structure(ctx: ExecutionContext, args: Dict[str, Any]) -> Dict[str, Any]:
+    from app.services.structure import service as struct_service
+
+    target_type = args.get("target_type") or "question"
+    if target_type not in ("question", "stimulus"):
+        raise ToolError({"status": 422, "detail": "target_type must be 'question' or 'stimulus'"})
+    target = await _structure_target(ctx, target_type, _int_arg(args, "target_id"))
+    return jsonable_encoder(await struct_service.structure_view(ctx.db, target))
+
+
+async def _list_structure_types(ctx: ExecutionContext, args: Dict[str, Any]) -> Dict[str, Any]:
+    from app.services.structure import types as type_svc
+
+    subject_id = await _require_subject(ctx, args)
+    await type_svc.ensure_roots(ctx.db, subject_id)
+    types = await type_svc.list_types(ctx.db, subject_id)
+    return {
+        "items": [
+            {
+                "id": t.id, "parent_id": t.parent_id, "kind": t.kind, "code": t.code,
+                "name": t.name, "definition": t.definition, "status": t.status,
+            }
+            for t in types
+        ]
+    }
+
+
+async def _find_similar_structure_questions(ctx: ExecutionContext, args: Dict[str, Any]) -> Dict[str, Any]:
+    from app.services.structure import service as struct_service
+
+    target = await _structure_target(ctx, "question", _int_arg(args, "question_id"))
+    limit = _limit(args.get("limit"), default=10)
+    scored = await struct_service.similar_question_ids(ctx.db, target.obj, limit=limit * 3)
+    visible = []
+    for item in scored:
+        question = await crud.question.get(db=ctx.db, id=item["question_id"])
+        if question is None or question.deleted_at is not None or not is_question_visible(question, ctx.actor):
+            continue
+        visible.append(item)
+        if len(visible) >= limit:
+            break
+    return {"items": visible}
+
+
 _SUBJECT_ID = {"type": "integer", "description": "Subject ID, see list_subjects."}
 _SCOPE_TYPE = {
     "type": "string",
@@ -629,6 +703,14 @@ def _read_tools() -> List[McpTool]:
                 "q_type": {"type": "string", "enum": [t.value for t in QuestionType]},
                 "difficulty": {"type": "integer"},
                 "status": {"type": "string", "description": "draft / pending / published / rejected"},
+                "struct_type_ids": {
+                    "type": "array", "items": {"type": "integer"},
+                    "description": "Structure type IDs (see list_structure_types); matches accepted stem decompositions, including child types.",
+                },
+                "struct_state": {
+                    "type": "string", "enum": ["none", "draft", "accepted", "stale"],
+                    "description": "Stem decomposition state: none, draft (awaiting review), accepted, stale (question edited since).",
+                },
                 "page": {"type": "integer", "minimum": 1, "default": 1},
                 "size": {"type": "integer", "minimum": 1, "maximum": _LIST_LIMIT_MAX, "default": 20},
             }, ["subject_id"]),
@@ -747,6 +829,45 @@ def _read_tools() -> List[McpTool]:
                 "composition_id": {"type": "integer"},
             }, ["subject_id", "scope_type", "composition_id"]),
             handler=_get_composition,
+            read_only=True,
+        ),
+        McpTool(
+            name="get_question_structure",
+            description=(
+                "Get the stem decomposition of a question (or a material): its conditions and asks, each with a "
+                "structure type, the exact source span in stem_text, and which conditions each ask depends on. "
+                "'accepted' is the reviewed version; 'draft' awaits review; 'stale' means the question was edited after "
+                "it was decomposed. Use structure_decompose to (re)queue decomposition."
+            ),
+            input_schema=_schema({
+                "target_type": {"type": "string", "enum": ["question", "stimulus"], "default": "question"},
+                "target_id": {"type": "integer"},
+            }, ["target_id"]),
+            handler=_get_question_structure,
+            read_only=True,
+        ),
+        McpTool(
+            name="list_structure_types",
+            description=(
+                "List the structure types of a subject as a flat tree (parent_id encodes the hierarchy). kind=condition "
+                "types classify stem conditions (for math the roots are algebra, geometry, statistics); kind=ask types "
+                "classify what the question asks. Only status=active types are used for new decompositions."
+            ),
+            input_schema=_schema({"subject_id": _SUBJECT_ID}, ["subject_id"]),
+            handler=_list_structure_types,
+            read_only=True,
+        ),
+        McpTool(
+            name="find_similar_structure_questions",
+            description=(
+                "Find questions whose accepted stem decomposition has similar ask and condition types to the given "
+                "question (Jaccard similarity of type sets). Useful for finding variants and same-pattern questions."
+            ),
+            input_schema=_schema({
+                "question_id": {"type": "integer"},
+                "limit": {"type": "integer", "minimum": 1, "maximum": _LIST_LIMIT_MAX, "default": 10},
+            }, ["question_id"]),
+            handler=_find_similar_structure_questions,
             read_only=True,
         ),
     ]

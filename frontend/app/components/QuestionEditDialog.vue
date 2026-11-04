@@ -16,7 +16,7 @@ import {
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
 import { Input } from '@/components/ui/input'
-import { Save, Loader2, Check, ChevronsUpDown, X, Layers3 } from '@lucide/vue'
+import { Save, Loader2, Check, ChevronsUpDown, X, Layers3, Shapes } from '@lucide/vue'
 import {
   Select,
   SelectContent,
@@ -48,6 +48,7 @@ import DuplicateConfirmDialog from './dedup/DuplicateConfirmDialog.vue'
 import { useDebounceFn } from '@vueuse/core'
 import { type DuplicateCandidate, duplicateCandidatesFromError } from '@/lib/questionDedup'
 import AnswerDisplay from './AnswerDisplay.vue'
+import StructureSheet from './structure/StructureSheet.vue'
 import RichContent from './rich-editor/RichContent.vue'
 import {
   type QuestionDraft,
@@ -181,6 +182,14 @@ const canConvertToStimulus = computed(() => {
   return props.mode === 'edit' && typeof question?.id === 'number' && question.stimulus_id == null
 })
 const stimulusPickerOpen = ref(false)
+
+// 题干结构:只对已保存的题(编辑模式)提供;结构化总开关关闭时隐藏。
+const { enabled: structureEnabled } = useStructureEnabled()
+const structureQuestionId = computed(() => {
+  const question = props.question as Partial<Question> | null | undefined
+  return props.mode === 'edit' && typeof question?.id === 'number' ? question.id : null
+})
+const structureSheetOpen = ref(false)
 const joinStimulus = async (stimulusId: number | null) => {
   if (draft.value && JSON.stringify(draft.value) !== initialDraft.value
     && !window.confirm(t('questionEditor.discardConfirm'))) return
@@ -321,6 +330,15 @@ const toggleTag = (tagId: number) => {
             >
               <Layers3 class="mr-2 h-4 w-4" />
               {{ t('stimuli.targetPicker.title') }}
+            </Button>
+            <Button
+              v-if="structureQuestionId != null && structureEnabled !== false"
+              variant="outline"
+              size="sm"
+              @click="structureSheetOpen = true"
+            >
+              <Shapes class="mr-2 h-4 w-4" />
+              {{ t('structure.title') }}
             </Button>
             <Button v-if="!isImportMode" size="sm" @click="handlePublish()" :disabled="isSubmitting">
               <Loader2 v-if="isSubmitting" class="mr-2 h-4 w-4 animate-spin" />
@@ -517,6 +535,12 @@ const toggleTag = (tagId: number) => {
     :subject-id="(question as Partial<Question>).subject_id"
     :question-visibility="(question as Partial<Question>).visibility ?? 'public'"
     @select="joinStimulus"
+  />
+  <StructureSheet
+    v-if="structureQuestionId != null"
+    v-model:open="structureSheetOpen"
+    target-type="question"
+    :target-id="structureQuestionId"
   />
   <DuplicateConfirmDialog
     v-model:open="confirmDuplicatesOpen"

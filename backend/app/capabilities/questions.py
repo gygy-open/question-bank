@@ -44,6 +44,13 @@ def can_delete_question(question: Question, user: models.User) -> bool:
     return permissions.can(user, Permission.MANAGE_SUBJECT, subject_id=question.subject_id)
 
 
+async def after_questions_saved(db, questions, *, user_id) -> None:
+    """题目入库后按学科开关自动排队拆解题干(延迟导入:结构化服务依赖能力层,顶层导入会循环)。"""
+    from app.services.structure.service import after_questions_saved as _after_saved
+
+    await _after_saved(db, questions, user_id=user_id)
+
+
 async def _load_visible_question(ctx: ExecutionContext, question_id: int) -> Question:
     question = await crud.question.get(db=ctx.db, id=question_id)
     if not question or not is_question_visible(question, ctx.actor):
@@ -120,7 +127,10 @@ class CreateQuestion(Capability[schemas.QuestionCreate, Question]):
             await ensure_not_duplicate(
                 ctx, subject_id=inp.subject_id, q_type=inp.q_type, content=inp.content, options=inp.options
             )
-        return await crud.question.create_with_tags(db=ctx.db, obj_in=inp, user_id=ctx.actor.id)
+        question = await crud.question.create_with_tags(db=ctx.db, obj_in=inp, user_id=ctx.actor.id)
+        # 入库后按学科开关自动排队拆解题干(失败不影响题目保存)。
+        await after_questions_saved(ctx.db, [question], user_id=ctx.actor.id)
+        return question
 
 
 @register
@@ -216,6 +226,7 @@ class CreateDerivedQuestion(Capability[DerivedQuestionCreateInput, Question]):
             created = await crud.question.get(ctx.db, id=question.id)
             if created is None:
                 raise NotFound("Question not found", ErrorCode.QUESTION_NOT_FOUND)
+            await after_questions_saved(ctx.db, [created], user_id=ctx.actor.id)
             return created
         except Exception:
             await ctx.db.rollback()
@@ -294,6 +305,7 @@ class BatchCreateQuestions(Capability[schemas.QuestionBatchCreate, List[Question
 
         created = [await create_recursive(question_in) for question_in in inp.questions]
         await ctx.db.commit()
+        await after_questions_saved(ctx.db, created, user_id=ctx.actor.id)
         return created
 
     async def _check_duplicates(self, ctx: ExecutionContext, inp: schemas.QuestionBatchCreate) -> None:
@@ -438,7 +450,11 @@ class ReviewQuestion(Capability[QuestionReviewInput, Question]):
         )
 
         await ctx.db.commit()
-        return await crud.question.get(db=ctx.db, id=inp.id)
+        reviewed = await crud.question.get(db=ctx.db, id=inp.id)
+        if inp.data.action == "approve" and reviewed is not None:
+            # 审核通过视为入库:没拆过(或内容改过)的题按学科开关排队拆解。
+            await after_questions_saved(ctx.db, [reviewed], user_id=ctx.actor.id)
+        return reviewed
 
 
 @register

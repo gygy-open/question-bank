@@ -1,8 +1,12 @@
-"""导入任务:创建、源文件摄取、待审核结果存取、按服务商暂停与恢复、对外序列化。
+"""导入任务:创建、源文件摄取、待审核结果存取、恢复暂停、对外序列化。
 
 所有导入都以 ImportTask 的形式由 worker 在后台执行;抽取完成后停在 REVIEW_READY,
 用户审核后经整卷导入提交入库(`auto_commit` 的任务则由 worker 直接入库)。
-API 与 worker 共用本模块。
+
+调度与执行状态(排队、执行、暂停、失败、取消)由通用任务表 ``jobs`` 管理,见
+``app/services/jobs`` 与 ``app/services/importing/job.py``;ImportTask 上的
+status / paused_reason / provider_id / error_message / progress 是 job 状态的投影,
+供导入页面展示。API 与 worker 共用本模块。
 """
 from __future__ import annotations
 
@@ -10,11 +14,11 @@ import asyncio
 import json
 import logging
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta
+from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Optional, Sequence
 
-from sqlalchemy import ColumnElement, func, select, update
+from sqlalchemy import ColumnElement, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core import storage
@@ -22,7 +26,6 @@ from app.core.file_paths import task_source_file
 from app.models.composition import Composition
 from app.models.import_task import (
     ImportMethod,
-    ImportPauseReason,
     ImportTask,
     ImportTaskStatus,
 )
@@ -32,8 +35,9 @@ logger = logging.getLogger(__name__)
 SOURCE_IMPORT = "import"
 # 列表、worker 认可的来源;batch_upload 为旧版批量导入。
 QUEUE_SOURCES = (SOURCE_IMPORT, "batch_upload")
-# 服务不可达而暂停的任务,隔这么久自动放回队列试探一次。
-UNAVAILABLE_RETRY_AFTER = timedelta(minutes=5)
+# 导入任务对应的 job 类型与 target_type(执行与调度见 app/services/importing/job.py)。
+JOB_TYPE = "import.extract"
+JOB_TARGET_TYPE = "import_task"
 
 _IMAGE_SUFFIXES = {".png", ".jpg", ".jpeg", ".webp", ".gif", ".bmp"}
 _FILE_TYPES = {
@@ -209,123 +213,41 @@ def review_payload(
 
 
 # --------------------------------------------------------------------------- #
-# 暂停与恢复
+# 恢复暂停的导入(调度由 jobs 统一管理,这里只是按导入任务的口径调用)
 # --------------------------------------------------------------------------- #
-async def _sibling_ids_for_provider(
-    db: AsyncSession, provider_id: Optional[int], *, exclude_id: Optional[int] = None
-) -> List[int]:
-    """排队中、需要(或可能需要)AI、且默认模型落在同一服务商上的任务。"""
-    from app.services.ai_resolver import resolve_provider_id
-
-    stmt = select(ImportTask).where(
-        ImportTask.status == ImportTaskStatus.PENDING,
-        ImportTask.source.in_(QUEUE_SOURCES),
-    )
-    if exclude_id is not None:
-        stmt = stmt.where(ImportTask.id != exclude_id)
-    ids: List[int] = []
-    cache: Dict[tuple, Optional[int]] = {}
-    for task in (await db.execute(stmt)).scalars().all():
-        if needs_ai(task) is False:
-            continue
-        key = (task.user_id, purpose_of(task))
-        if key not in cache:
-            cache[key] = await resolve_provider_id(db, user_id=task.user_id, purpose=purpose_of(task))  # type: ignore[arg-type]
-        if cache[key] == provider_id:
-            ids.append(task.id)
-    return ids
-
-
-async def pause_for_provider(
-    db: AsyncSession,
-    *,
-    task_id: int,
-    reason: ImportPauseReason,
-    provider_id: Optional[int],
-    message: Optional[str] = None,
-) -> int:
-    """暂停当前任务和同一服务商下排队中的 AI 任务,返回被暂停的数量。调用方负责 commit。"""
-    now = datetime.utcnow()
-    values = dict(
-        status=ImportTaskStatus.PAUSED,
-        paused_reason=reason.value,
-        provider_id=provider_id,
-        error_message=message,
-        updated_at=now,
-    )
-    current = await db.execute(
-        update(ImportTask)
-        .where(ImportTask.id == task_id, ImportTask.status == ImportTaskStatus.PROCESSING)
-        .values(**values, progress=None)
-        .execution_options(synchronize_session=False)
-    )
-    sibling_ids = await _sibling_ids_for_provider(db, provider_id, exclude_id=task_id)
-    paused = current.rowcount or 0
-    if sibling_ids:
-        result = await db.execute(
-            update(ImportTask)
-            .where(ImportTask.id.in_(sibling_ids), ImportTask.status == ImportTaskStatus.PENDING)
-            .values({**values, "error_message": None})
-            .execution_options(synchronize_session=False)
-        )
-        paused += result.rowcount or 0
-    return paused
-
-
-async def _resume_where(db: AsyncSession, *conditions: ColumnElement[bool]) -> int:
-    result = await db.execute(
-        update(ImportTask)
-        .where(ImportTask.status == ImportTaskStatus.PAUSED, *conditions)
-        .values(
-            status=ImportTaskStatus.PENDING,
-            paused_reason=None,
-            error_message=None,
-            progress=None,
-            updated_at=datetime.utcnow(),
-        )
-        .execution_options(synchronize_session=False)
-    )
-    return result.rowcount or 0
-
-
 async def resume_ids(db: AsyncSession, ids: Sequence[int], *, owner_id: Optional[int] = None) -> int:
-    if not ids:
-        return 0
-    conditions = [ImportTask.id.in_(list(ids))]
-    if owner_id is not None:
-        conditions.append(ImportTask.user_id == owner_id)
-    return await _resume_where(db, *conditions)
+    """恢复指定导入任务的暂停 job。不提交。"""
+    from app.services.jobs import job_service
+
+    return await job_service.resume_targets(db, JOB_TARGET_TYPE, list(ids), owner_id=owner_id)
 
 
 async def resume_all(db: AsyncSession, *, owner_id: Optional[int] = None) -> int:
-    conditions = [ImportTask.source.in_(QUEUE_SOURCES)]
-    if owner_id is not None:
-        conditions.append(ImportTask.user_id == owner_id)
-    return await _resume_where(db, *conditions)
+    """恢复全部暂停的导入(``owner_id`` 不为空时只恢复该用户的)。不提交。"""
+    from app.services.jobs import job_service
+
+    return await job_service.resume_all(db, types=[JOB_TYPE], owner_id=owner_id)
 
 
 async def resume_provider(db: AsyncSession, provider_id: Optional[int]) -> int:
-    """服务商又能成功调用了:恢复因它暂停的全部任务。"""
-    if provider_id is None:
-        return 0
-    return await _resume_where(db, ImportTask.provider_id == provider_id)
+    """服务商又能成功调用了:恢复因它暂停的全部 job(不限于导入)。不提交。"""
+    from app.services.jobs import job_service
+
+    return await job_service.resume_provider(db, provider_id)
 
 
 async def resume_after_ai_config_change(db: AsyncSession) -> int:
-    """AI 设置改动后,把因 Key/模型问题暂停的任务放回队列;仍不可用会再次暂停。调用方负责 commit。"""
-    return await _resume_where(
-        db,
-        ImportTask.paused_reason.in_([ImportPauseReason.AUTH.value, ImportPauseReason.MODEL.value]),
-    )
+    """AI 设置改动后,把因 Key/模型问题暂停的 job 放回队列;仍不可用会再次暂停。调用方负责 commit。"""
+    from app.services.jobs import job_service
+
+    return await job_service.resume_after_ai_config_change(db)
 
 
 async def resume_stale_unavailable(db: AsyncSession, *, now: Optional[datetime] = None) -> int:
-    cutoff = (now or datetime.utcnow()) - UNAVAILABLE_RETRY_AFTER
-    return await _resume_where(
-        db,
-        ImportTask.paused_reason == ImportPauseReason.UNAVAILABLE.value,
-        ImportTask.updated_at < cutoff,
-    )
+    """「服务不可达」暂停一段时间后放回队列试探。不提交。"""
+    from app.services.jobs import job_service
+
+    return await job_service.resume_stale_unavailable(db, now=now)
 
 
 # --------------------------------------------------------------------------- #
@@ -348,25 +270,13 @@ async def summary(db: AsyncSession, *, owner_id: int) -> Dict[str, Any]:
 
 
 async def queue_positions(db: AsyncSession, task_ids: Iterable[int]) -> Dict[int, int]:
-    """排队中的任务前面还有几个任务(含正在处理的);worker 串行执行。"""
-    wanted = set(task_ids)
-    if not wanted:
-        return {}
-    active = await db.execute(
-        select(ImportTask.id, ImportTask.status)
-        .where(
-            ImportTask.status.in_([ImportTaskStatus.PENDING, ImportTaskStatus.PROCESSING]),
-            ImportTask.source.in_(QUEUE_SOURCES),
-        )
-        .order_by(ImportTask.created_at, ImportTask.id)
-    )
-    positions: Dict[int, int] = {}
-    ahead = 0
-    for task_id, status in active.all():
-        if status == ImportTaskStatus.PENDING and task_id in wanted:
-            positions[task_id] = ahead
-        ahead += 1
-    return positions
+    """排队中的导入任务前面还有几个 job(含正在执行的、其他类型的后台任务);worker 串行执行。"""
+    from app.services.jobs import job_service
+
+    jobs = await job_service.jobs_for_targets(db, JOB_TARGET_TYPE, task_ids, type=JOB_TYPE)
+    by_job = {job.id: task_id for task_id, job in jobs.items()}
+    positions = await job_service.queue_positions(db, by_job)
+    return {by_job[job_id]: ahead for job_id, ahead in positions.items()}
 
 
 def serialize(task: ImportTask, *, queue_ahead: Optional[int] = None) -> Dict[str, Any]:

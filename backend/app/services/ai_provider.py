@@ -95,6 +95,16 @@ class AIProvider(ABC):
         """
         return candidates
 
+    async def generate_json(self, system: str, user: str, config: Dict[str, str]) -> Any:
+        """通用的「给提示词、拿 JSON」调用(题干拆解等结构化任务使用)。
+
+        - ``system``:系统提示词(任务说明与输出格式);``user``:本次输入。
+        - 返回解析后的 JSON(dict / list);模型输出不是合法 JSON 时抛 ``ValueError``,
+          输出被 token 上限截断时抛 ``ResponseTruncatedError``(由 ai_errors 归为文档类错误)。
+        - 网络、鉴权、额度等错误原样抛出,由调用方按 ai_errors 分类处理(重试 / 暂停)。
+        """
+        raise NotImplementedError(f"{type(self).__name__} does not support generate_json")
+
     async def batch_rerank_knowledge_points(self, items: List[Dict[str, Any]], config: Dict[str, str] = None) -> Dict[str, List[str]]:
         """
         Batch rerank knowledge points for multiple questions.
@@ -407,6 +417,38 @@ class GeminiProvider(AIProvider):
         if text.endswith("```"):
             text = text[:-3]
         return text.strip()
+
+    async def generate_json(self, system: str, user: str, config: Dict[str, str]) -> Any:
+        """Gemini:系统提示词走 system_instruction,要求 application/json 输出。"""
+        from google import genai
+        from google.genai import types
+
+        api_key = (config or {}).get("API_KEY")
+        if not api_key:
+            raise ValueError("API_KEY not configured for Gemini")
+        client_kwargs: Dict[str, Any] = {"api_key": api_key}
+        if config.get("BASE_URL"):
+            client_kwargs["http_options"] = {"base_url": config["BASE_URL"]}
+        client = genai.Client(**client_kwargs)
+        model_name = config.get("MODEL_NAME", "gemini-2.0-flash-exp")
+
+        def generate_content():
+            return client.models.generate_content(
+                model=model_name,
+                contents=user,
+                config=types.GenerateContentConfig(
+                    system_instruction=system,
+                    response_mime_type="application/json",
+                ),
+            )
+
+        response = await asyncio.to_thread(generate_content)
+        candidates = getattr(response, "candidates", None) or []
+        if candidates and str(getattr(candidates[0], "finish_reason", "")).upper().endswith("MAX_TOKENS"):
+            raise ResponseTruncatedError("AI response was truncated by the model's output token limit")
+        if not response.text:
+            raise ValueError("AI provider returned empty content")
+        return json.loads(self._clean_json_response(response.text))
 
     async def rerank_knowledge_points(self, question_content: str, candidates: List[str], config: Dict[str, str] = None) -> List[str]:
         try:
@@ -791,6 +833,33 @@ class OpenAIProvider(AIProvider):
             # found" to callers, returning a silent 200 instead of a visible error.
             logger.exception(f"OpenAI API error: {e}")
             raise
+
+    async def generate_json(self, system: str, user: str, config: Dict[str, str]) -> Any:
+        """OpenAI 及兼容接口:chat.completions + json_object 输出。"""
+        from openai import AsyncOpenAI
+
+        api_key = (config or {}).get("API_KEY")
+        if not api_key:
+            raise ValueError("API_KEY not configured for OpenAI")
+        client = AsyncOpenAI(api_key=api_key, base_url=config.get("BASE_URL"))
+        response = await client.chat.completions.create(
+            model=config.get("MODEL_NAME", "gpt-4o"),
+            messages=[{"role": "system", "content": system}, {"role": "user", "content": user}],
+            response_format={"type": "json_object"},
+        )
+        if not response.choices:
+            raise ValueError("AI provider returned no choices")
+        choice = response.choices[0]
+        _guard_truncated(choice)
+        content = choice.message.content
+        if not content:
+            raise ValueError("AI provider returned empty content")
+        text = content.strip()
+        if text.startswith("```"):
+            # 少数兼容接口忽略 json_object,仍把 JSON 包在代码块里。
+            text = text.strip("`")
+            text = text[4:] if text.lower().startswith("json") else text
+        return json.loads(text)
 
     async def rerank_knowledge_points(self, question_content: str, candidates: List[str], config: Dict[str, str] = None) -> List[str]:
         try:

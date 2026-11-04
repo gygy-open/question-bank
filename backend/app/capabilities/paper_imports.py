@@ -209,6 +209,11 @@ class CommitPaperImport(Capability[PaperImportCommitInput, PaperImportCommitResp
         except Exception:
             await ctx.db.rollback()
             raise
+        if not result.reused_existing:
+            # 入库后按学科开关自动排队拆解题干(失败不影响导入)。
+            from app.services.structure.service import after_questions_saved
+
+            await after_questions_saved(ctx.db, result.created_questions, user_id=ctx.actor.id)
         return PaperImportCommitResponse(
             import_task_id=result.import_task_id,
             created_count=len(result.created_questions),

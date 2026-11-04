@@ -108,6 +108,24 @@ const onToggleApproval = (value: boolean) => {
   saveRegistrationSetting(REGISTRATION_APPROVAL_KEY, value)
 }
 
+// --- 题干结构化总开关(超级管理员) ---
+// 值保存在内部系统设置 structure.enabled,经专用接口读写,不出现在下方的通用设置列表里。
+const { enabled: structureEnabled, refresh: refreshStructureEnabled } = useStructureEnabled()
+const structureApi = useStructure()
+const structureSaving = ref(false)
+const onToggleStructure = async (value: boolean) => {
+  structureSaving.value = true
+  try {
+    await structureApi.setEnabled(value)
+    await refreshStructureEnabled()
+    toast.success(t('structure.settings.saved'))
+  } catch (e) {
+    toast.error(t('common.saveFailed'))
+  } finally {
+    structureSaving.value = false
+  }
+}
+
 const updateSetting = async (setting: SystemSetting) => {
   try {
     await $api(`/settings/${setting.key}`, {
@@ -128,6 +146,7 @@ const updateSetting = async (setting: SystemSetting) => {
 }
 
 onMounted(() => {
+  void refreshStructureEnabled()
   if (user.value?.is_superuser) {
     fetchSettings()
   }
@@ -210,6 +229,23 @@ onMounted(() => {
         </div>
 
         <div v-else class="grid gap-6">
+          <!-- 题干结构化总开关 -->
+          <Card>
+            <CardContent class="pt-6">
+              <div class="flex items-center justify-between gap-4">
+                <div class="space-y-0.5">
+                  <Label class="text-base">{{ t('structure.settings.enabledLabel') }}</Label>
+                  <p class="text-sm text-muted-foreground">{{ t('structure.settings.enabledHint') }}</p>
+                </div>
+                <Switch
+                  :model-value="structureEnabled !== false"
+                  :disabled="structureSaving || structureEnabled === null"
+                  @update:model-value="onToggleStructure"
+                />
+              </div>
+            </CardContent>
+          </Card>
+
           <Card v-for="setting in settings" :key="setting.key">
             <CardHeader>
               <CardTitle class="text-base">{{ setting.key }}</CardTitle>

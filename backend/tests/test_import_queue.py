@@ -24,7 +24,10 @@ from app.models.question import Question
 from app.models.subject import Subject
 from app.models.system_setting import SystemSetting
 from app.models.user import User
+from app.models.job import Job
 from app.services import import_task_service as tasks_svc
+from app.services.importing.job import enqueue_import
+from app.services.jobs import job_service
 from app.services.ai_errors import classify_ai_error, with_ai_retry
 from app.services.ai_provider import ResponseTruncatedError
 from app.services.doc_processor import doc_processor
@@ -150,13 +153,28 @@ async def _task(db, user, *, content=PLAIN.encode(), file_type="markdown", metho
         **extra,
     )
     db.add(task)
+    await db.flush()
+    # 与 API 创建导入时一样:每条排队 / 暂停的导入任务都有一个执行 job,状态与任务一致。
+    if status in (ImportTaskStatus.PENDING, ImportTaskStatus.PAUSED):
+        job = await enqueue_import(db, task)
+        if status == ImportTaskStatus.PAUSED:
+            job.status = "paused"
+            job.paused_reason = task.paused_reason
+            job.provider_id = task.provider_id
     await db.commit()
     return task
 
 
+async def _claim(db, task) -> Job:
+    """领取这条导入任务的 job(标记为执行中),模拟 worker 选中它。"""
+    job = await job_service.latest_for_target(db, tasks_svc.JOB_TARGET_TYPE, task.id)
+    await job_service.claim(db, job)
+    return job
+
+
 async def _run(db, task, **kwargs):
     kwargs.setdefault("cancel_poll_seconds", None)
-    await worker.process_task(db, task, **kwargs)
+    await worker.process_job(db, await _claim(db, task), **kwargs)
     await db.refresh(task)
     return task
 
@@ -371,7 +389,7 @@ async def test_cancel_stops_a_running_task(client, engine, db_session, people, g
     maker = async_sessionmaker(bind=engine, class_=AsyncSession, expire_on_commit=False)
 
     run = asyncio.create_task(
-        worker.process_task(db_session, task, session_factory=maker, cancel_poll_seconds=0.02)
+        worker.process_job(db_session, await _claim(db_session, task), session_factory=maker, cancel_poll_seconds=0.02)
     )
     while not fake_ai.stages:
         await asyncio.sleep(0.01)

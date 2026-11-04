@@ -210,6 +210,44 @@ Try to extract the following tag information from the content or the file name (
 ```"""
 
 
+# 题干拆解(题干结构化)提示词。只看题干、不解题;分类词表由运行时注入。
+# 占位符:{subject_name}/{subject_description}(render_subject_prompt)、
+# {condition_types}/{ask_types}(学科当前启用的元素类型树)、{output_language}。
+# 改动规则时同步递增 app/services/structure/decompose.py 的 PROMPT_VERSION。
+DEFAULT_STRUCT_DECOMPOSE_PROMPT = r"""You are a senior {subject_name} teaching researcher.{subject_description} Decompose the STEM of one question into its conditions and asks. You do NOT solve the question.
+
+## Definitions
+- A **condition** is one thing the stem gives: the object under study (a function, a figure, a sample, a text...), a known fact or value, a relation, a constraint or range, or something that moves or varies (a parameter, a moving point, a sampling process). Each condition states exactly ONE thing.
+- An **ask** is one thing the student must answer (find a value, find a range, prove, judge, choose, explain...). A question with sub-questions (1)(2)... has one ask per sub-question.
+
+## Rules
+1. Use only the stem. Do not solve, do not add facts that are not in the stem, do not derive intermediate results.
+2. Split compound statements: "x>0 and y>0" gives two conditions. One phrase may carry two facts (e.g. "meets the x-axis at A(-1,0) and B(3,0)" gives two conditions that may quote the same phrase).
+3. `source` must be copied character-for-character from the stem, including any `$...$` math exactly as written. Quote the shortest fragment that supports the item. Never paraphrase inside `source`.
+4. `content` restates the item as a short self-contained statement in the language of the stem, with math in `$...$`. It may supply the omitted subject (e.g. "$f(x)$ has 3 zeros").
+5. Purely descriptive words ("Given", "the function", "then", "which of the following") are not conditions.
+6. Choice options:
+   - If the options are candidate answers (values, intervals, expressions, figures), they are NOT conditions; they only belong to the ask.
+   - If the question asks to judge statements (e.g. "which of the following is correct"), make one ask per option that judges that option; a condition that appears only inside an option is listed as a condition and referenced by that option's ask.
+7. Classification: for each item pick the most specific matching `code` from the lists below (condition codes for conditions, ask codes for asks). If only a top-level code fits, use it and describe the finer category in `type_hint` as a short noun phrase (e.g. "含参三次函数" for a Chinese stem, "parametric cubic function" for an English one). If nothing fits, use null and fill `type_hint`. Always write `type_hint` in the language of the stem: teachers group these hints into new types.
+8. `facet` (conditions only, optional): "quant" gives a value, "qual" gives a relation, "proc" something moves or varies, "form" the object under study itself.
+9. `depends_on` lists the 0-based indices of the conditions each ask needs.
+10. If shared material conditions are listed in the input, do not repeat them as conditions; cite their indices in the ask's `material_refs`.
+
+## Condition types
+{condition_types}
+
+## Ask types
+{ask_types}
+
+## Output
+Return only one JSON object, no commentary:
+{"conditions": [{"source": "...", "content": "...", "type": "code or null", "type_hint": "...", "facet": "quant|qual|proc|form|null"}],
+ "asks": [{"source": "...", "content": "...", "type": "code or null", "type_hint": "...", "depends_on": [0], "material_refs": []}]}
+
+{output_language}"""
+
+
 # 可按学科覆盖的提示词注册表：key -> {default, title, description}。
 # 前端据此渲染配置项；消费端据此取默认值。
 SUBJECT_PROMPTS: dict[str, dict[str, str]] = {
@@ -222,6 +260,11 @@ SUBJECT_PROMPTS: dict[str, dict[str, str]] = {
         "default": DEFAULT_SOLVE_PROMPT,
         "title": "解题推理分析助手",
         "description": "定义 AI 在生成题目解析和答案时应遵循的逻辑与排版格式。",
+    },
+    "AI_STRUCT_DECOMPOSE_PROMPT": {
+        "default": DEFAULT_STRUCT_DECOMPOSE_PROMPT,
+        "title": "题干拆解助手",
+        "description": "控制 AI 把题干拆成条件与设问、并按元素类型归类的规则（只看题干，不看答案）。",
     },
 }
 

@@ -175,6 +175,16 @@ SEARCH_QUESTIONS_PARAMS = {
             "enum": ["draft", "pending", "published", "archived"],
             "description": "题目状态。不传则不限状态。"
         },
+        "struct_type_ids": {
+            "type": "array",
+            "items": {"type": "integer"},
+            "description": "按题干结构的元素类型筛选(含子类型,命中任一即可),只匹配已采纳的拆解。"
+        },
+        "struct_state": {
+            "type": "string",
+            "enum": ["none", "draft", "accepted", "stale"],
+            "description": "按题干结构化状态筛选:未拆 / 待审 / 已采纳 / 已过期。"
+        },
         "limit": {
             "type": "integer",
             "description": "返回结果的数量 (默认 5,最多 50)。",
@@ -197,9 +207,12 @@ async def search_questions(ctx: ExecutionContext, args: Dict[str, Any]) -> ToolR
     q_type = args.get("q_type")
     status = args.get("status")
 
-    if not (keyword or knowledge_point_ids or tag_ids):
+    struct_type_ids = args.get("struct_type_ids")
+    struct_state = args.get("struct_state")
+
+    if not (keyword or knowledge_point_ids or tag_ids or struct_type_ids):
         return ToolResult.text(
-            "请至少提供 keyword、knowledge_point_ids、tag_ids 三者之一,否则会返回整个题库。"
+            "请至少提供 keyword、knowledge_point_ids、tag_ids、struct_type_ids 之一,否则会返回整个题库。"
         )
 
     if q_type is not None and q_type not in _QUESTION_TYPE_VALUES:
@@ -226,6 +239,8 @@ async def search_questions(ctx: ExecutionContext, args: Dict[str, Any]) -> ToolR
         q_type=q_type,
         status=status,
         subject_id=subject_id,
+        struct_type_ids=struct_type_ids,
+        struct_state=struct_state,
         limit=limit,
         viewer=ctx.actor,
     )

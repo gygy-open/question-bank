@@ -29,6 +29,8 @@ from app.crud.crud_subject import subject as crud_subject
 from app.models.import_task import ImportMethod, ImportTask, ImportTaskStatus
 from app.models.question import Question
 from app.services import import_task_service as tasks_svc
+from app.services.importing.job import enqueue_import, requeue_import
+from app.services.jobs import job_service
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -269,6 +271,10 @@ async def create_import_tasks(
             ErrorCode.IMPORT_TASK_NO_VALID_FILES,
             "No valid files found (supported: .docx, .md, .zip, images)",
         )
+    # 先 flush 拿到任务 id,再为每条任务排一个执行 job,一起提交。
+    await db.flush()
+    for task in created:
+        await enqueue_import(db, task)
     await db.commit()
     for task in created:
         await db.refresh(task)
@@ -307,6 +313,8 @@ async def create_text_import_task(
         auto_commit=payload.auto_commit,
     )
     db.add(task)
+    await db.flush()
+    await enqueue_import(db, task)
     await db.commit()
     await db.refresh(task)
     return await _serialize_one(db, task)
@@ -335,21 +343,14 @@ async def reset_stuck_tasks(
     db: deps.SessionDep,
     current_user: models.User = Depends(deps.get_current_active_user),
 ) -> Any:
-    """把卡在「处理中」的任务放回队列。"""
-    stmt = select(ImportTask).where(
-        ImportTask.status == ImportTaskStatus.PROCESSING,
-        ImportTask.source.in_(tasks_svc.QUEUE_SOURCES),
+    """把卡在「处理中」的导入放回队列(管理员为所有人的,其他人为自己的)。"""
+    count = await job_service.requeue_running(
+        db,
+        user_id=None if current_user.is_superuser else current_user.id,
+        types=[tasks_svc.JOB_TYPE],
     )
-    if not current_user.is_superuser:
-        stmt = stmt.where(ImportTask.user_id == current_user.id)
-    tasks = (await db.execute(stmt)).scalars().all()
-    for task in tasks:
-        task.status = ImportTaskStatus.PENDING
-        task.error_message = None
-        task.progress = None
-        task.updated_at = datetime.utcnow()
     await db.commit()
-    return {"message": f"Reset {len(tasks)} tasks to pending state", "count": len(tasks)}
+    return {"message": f"Reset {count} tasks to pending state", "count": count}
 
 
 @router.get("/{task_id}", response_model=dict)
@@ -394,11 +395,17 @@ async def cancel_import_task(
     task = await _get_owned_task(db, task_id, current_user)
     if task.status not in _CANCELLABLE:
         raise ApiError(400, ErrorCode.IMPORT_TASK_ALREADY_FINISHED, "Task already finished")
-    task.status = ImportTaskStatus.CANCELLED
-    task.result_sha256 = None
-    task.paused_reason = None
-    task.progress = None
-    task.updated_at = datetime.utcnow()
+    # 排队 / 处理中 / 暂停:取消它的 job,状态经投影同步回导入任务;
+    # 待审核(job 已结束)或找不到 job 的旧数据:直接放弃识别结果。
+    cancelled = await job_service.cancel_for_targets(
+        db, tasks_svc.JOB_TARGET_TYPE, [task.id], type=tasks_svc.JOB_TYPE
+    )
+    if not cancelled:
+        task.status = ImportTaskStatus.CANCELLED
+        task.result_sha256 = None
+        task.paused_reason = None
+        task.progress = None
+        task.updated_at = datetime.utcnow()
     await db.commit()
     return {"message": "Task cancelled"}
 
@@ -433,16 +440,14 @@ async def retry_import_task(
             ErrorCode.IMPORT_TASK_NOT_RETRYABLE,
             "Only failed, cancelled, paused, or empty completed tasks can be retried",
         )
-    task.status = ImportTaskStatus.PENDING
-    task.error_message = None
+    # 业务结果清空;执行状态(排队、错误、暂停、服务商、进度)由 job 重新排队时投影清空。
     task.result_summary = None
     task.result_sha256 = None
-    task.paused_reason = None
-    task.provider_id = None
-    task.progress = None
     # 重新排到队尾。
     task.created_at = datetime.utcnow()
     task.updated_at = datetime.utcnow()
+    await db.flush()
+    await requeue_import(db, task)
     await db.commit()
     return {"message": "Task queued for retry"}
 
@@ -462,6 +467,8 @@ async def delete_import_task(
             source.unlink()
         except OSError as e:
             logger.warning("Error deleting import source %s: %s", source, e)
+    # 先删 job:正在处理的任务会因 job 消失而停止。
+    await job_service.delete_for_target(db, tasks_svc.JOB_TARGET_TYPE, task.id)
     await db.delete(task)
     await db.commit()
     return {"message": "Task deleted"}

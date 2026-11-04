@@ -89,9 +89,73 @@ async def _question_dedup(db: AsyncSession) -> str:
     return f"backfilled {count} questions"
 
 
+async def _import_jobs(db: AsyncSession) -> str:
+    """为升级前就在排队 / 处理中 / 暂停的导入任务补建 job,让新 worker 接着执行。
+
+    处理中的任务在升级时一定已被中断,放回排队;暂停的保留原因与服务商,恢复逻辑照常生效。
+    排队时间沿用任务的创建时间,保持原来的先后顺序。已有 job 的任务跳过,可重复执行。
+    """
+    from sqlalchemy import select
+
+    from app.models.import_task import ImportTask, ImportTaskStatus
+    from app.models.job import Job, JobPriority, JobStatus
+    from app.services import import_task_service as tasks_svc
+
+    tasks = (
+        await db.execute(
+            select(ImportTask).where(
+                ImportTask.source.in_(tasks_svc.QUEUE_SOURCES),
+                ImportTask.status.in_(
+                    [ImportTaskStatus.PENDING, ImportTaskStatus.PROCESSING, ImportTaskStatus.PAUSED]
+                ),
+            )
+        )
+    ).scalars().all()
+    have_job = set(
+        (
+            await db.execute(
+                select(Job.target_id).where(
+                    Job.type == tasks_svc.JOB_TYPE, Job.target_type == tasks_svc.JOB_TARGET_TYPE
+                )
+            )
+        ).scalars().all()
+    )
+    created = 0
+    for task in tasks:
+        if task.id in have_job:
+            continue
+        paused = task.status == ImportTaskStatus.PAUSED
+        if task.status == ImportTaskStatus.PROCESSING:
+            task.status = ImportTaskStatus.PENDING
+            task.progress = None
+        db.add(
+            Job(
+                type=tasks_svc.JOB_TYPE,
+                status=JobStatus.PAUSED.value if paused else JobStatus.PENDING.value,
+                priority=JobPriority.USER,
+                attempts=0,
+                max_attempts=1,
+                target_type=tasks_svc.JOB_TARGET_TYPE,
+                target_id=task.id,
+                provider_id=task.provider_id if paused else None,
+                paused_reason=task.paused_reason if paused else None,
+                error=task.error_message if paused else None,
+                user_id=task.user_id,
+                subject_id=task.subject_id,
+                locale=task.locale,
+                created_at=task.created_at or datetime.utcnow(),
+                updated_at=task.updated_at or datetime.utcnow(),
+            )
+        )
+        created += 1
+    await db.commit()
+    return f"created {created} import jobs"
+
+
 DATA_MIGRATIONS: List[DataMigration] = [
     DataMigration("legacy_media_assets", _legacy_media_assets),
     DataMigration(f"question_dedup_v{DEDUP_VERSION}", _question_dedup),
+    DataMigration("import_jobs_v1", _import_jobs),
 ]
 
 

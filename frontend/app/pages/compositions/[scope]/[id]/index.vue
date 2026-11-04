@@ -26,6 +26,7 @@ import CompositionSettingsPanel from '~/components/composition/CompositionSettin
 import CompositionNumberingPanel from '~/components/composition/CompositionNumberingPanel.vue'
 import CompositionScoringPanel from '~/components/composition/CompositionScoringPanel.vue'
 import CompositionQuestionDisplayPanel from '~/components/composition/CompositionQuestionDisplayPanel.vue'
+import CompositionStructurePanel from '~/components/composition/CompositionStructurePanel.vue'
 import CompositionVersionsSheet from '~/components/composition/CompositionVersionsSheet.vue'
 import CompositionTimelineSheet from '~/components/composition/CompositionTimelineSheet.vue'
 import CompositionAiChangesBar from '~/components/composition/CompositionAiChangesBar.vue'
@@ -187,6 +188,12 @@ const questionDisplay = computed<Record<AnswerFieldKey, boolean>>(
   () => composition.value?.question_display ?? { answer: false, thinking: false, analysis: false, summary: false },
 )
 const scorableQuestions = computed(() => orderedScorableQuestions(document.value))
+
+// 题干结构分布:收集组卷中引用的题库题目 id(含题组内小题);结构化总开关关闭时不显示。
+const { enabled: structureEnabled } = useStructureEnabled()
+const compositionQuestionIds = computed(() => documentQuestionNodes(document.value)
+  .map(node => node.questionId)
+  .filter((id): id is number => id != null))
 const totalScoreValue = computed(() => totalScore(document.value))
 
 // 自动保存：标题/描述与正文节点各自去抖，静默等待到手停顿后再落库，替代手动点击保存。
@@ -885,6 +892,10 @@ onBeforeRouteLeave(() => {
               :disabled="saving"
               @toggle="toggleDisplayField"
             />
+            <template v-if="structureEnabled">
+              <Separator />
+              <CompositionStructurePanel :question-ids="compositionQuestionIds" :subject-id="currentSubjectId ?? null" />
+            </template>
           </CompositionSettingsPanel>
         </aside>
       </div>

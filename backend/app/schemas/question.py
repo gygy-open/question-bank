@@ -291,6 +291,8 @@ class Question(QuestionBase):
 class QuestionListItem(Question):
     incoming_relation_count: int = 0
     outgoing_relation_count: int = 0
+    # 题干结构化状态(列表徽标):none 未拆 / draft 待审 / accepted 已采纳 / stale 已过期。
+    struct_state: Optional[str] = None
 
 
 class QuestionPage(BaseModel):

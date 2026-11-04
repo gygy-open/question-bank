@@ -10,11 +10,12 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
-import { Pencil, Trash2, Copy, ChevronDown, Star, ShoppingBasket, CheckCircle, History, Workflow, CornerDownRight, GitFork, FileText, AlertTriangle, MoreVertical, Lock } from '@lucide/vue'
+import { Pencil, Trash2, Copy, ChevronDown, Star, ShoppingBasket, CheckCircle, History, Workflow, CornerDownRight, GitFork, FileText, AlertTriangle, MoreVertical, Lock, Shapes } from '@lucide/vue'
 import RichContent from './rich-editor/RichContent.vue'
 import AnswerDisplay from './AnswerDisplay.vue'
 import { isEmptyRichDoc, richDocToPlainText } from './rich-editor/richDoc'
 import CompositionQuickAdd from './CompositionQuickAdd.vue'
+import StructureStateBadge from './structure/StructureStateBadge.vue'
 import { useQuestionBasket } from '@/composables/useQuestionBasket'
 import type { Question as DbQuestion, KnowledgePoint, OptionSpec } from '@/types'
 import type { ImportDraft } from '@/lib/questionModel'
@@ -34,6 +35,8 @@ interface Props {
   hideDuplicate?: boolean
   hideDecompose?: boolean
   defaultExpanded?: boolean
+  /** 是否显示题干结构化入口与状态徽标(结构化总开关开启时由列表页传入)。 */
+  showStructure?: boolean
 }
 
 const props = withDefaults(defineProps<Props>(), {
@@ -45,7 +48,8 @@ const props = withDefaults(defineProps<Props>(), {
   hideDelete: false,
   hideDuplicate: false,
   hideDecompose: false,
-  defaultExpanded: false
+  defaultExpanded: false,
+  showStructure: false,
 })
 
 const emit = defineEmits<{
@@ -54,6 +58,7 @@ const emit = defineEmits<{
   (e: 'duplicate'): void
   (e: 'refresh'): void
   (e: 'update', item: DbQuestion): void
+  (e: 'view-relations', item: DbQuestion): void
   (e: 'view-structure', item: DbQuestion): void
   (e: 'decompose', item: DbQuestion): void
   (e: 'select', val: boolean): void
@@ -256,6 +261,9 @@ const sourcePreviewQuery = computed(() => {
               </Badge>
               <Badge variant="outline">{{ typeLabel }}</Badge>
 
+              <!-- 题干结构化状态(待审 / 已采纳 / 已过期;未拆解不显示) -->
+              <StructureStateBadge v-if="showStructure" :state="(item as DbQuestion).struct_state" />
+
               <!-- 私有题标记 -->
               <Badge v-if="(item as DbQuestion).visibility === 'private'" variant="secondary" class="flex items-center gap-1 px-1.5 bg-amber-50 text-amber-700 hover:bg-amber-100 dark:bg-amber-500/10 dark:text-amber-400">
                 <Lock class="w-3 h-3" /> {{ t('questionItem.private') }}
@@ -320,6 +328,18 @@ const sourcePreviewQuery = computed(() => {
               :subject-id="(item as DbQuestion).subject_id ?? null"
             />
 
+            <!-- 题干结构:结构化开启时直接放在外面,方便查看 / 审核拆解 -->
+            <Button
+              v-if="showStructure"
+              variant="ghost"
+              size="icon"
+              class="h-8 w-8 text-muted-foreground"
+              :title="t('structure.title')"
+              @click="emit('view-structure', item as DbQuestion)"
+            >
+              <Shapes class="h-4 w-4" />
+            </Button>
+
             <!-- Low-frequency reference action: kept before the overflow menu, after the higher-frequency edit/review/basket/compose actions -->
             <Button
               v-if="sourcePreviewQuery"
@@ -351,7 +371,7 @@ const sourcePreviewQuery = computed(() => {
                 </DropdownMenuItem>
                 <DropdownMenuItem
                   v-if="(item as DbQuestion).incoming_relation_count || (item as DbQuestion).outgoing_relation_count"
-                  @click="emit('view-structure', item as DbQuestion)"
+                  @click="emit('view-relations', item as DbQuestion)"
                 >
                   <Workflow class="h-4 w-4" />
                   {{ t('questionItem.viewDerived') }}

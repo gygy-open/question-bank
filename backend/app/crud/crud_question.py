@@ -22,6 +22,7 @@ from app.models.import_task import ImportTask
 from app.models.activity_log import ActivityLog
 from app.models.question_relation import QuestionRelation
 from app.models.stimulus import Stimulus
+from app.models.question_structure import StructType
 from app.core.api_errors import ErrorCode
 
 
@@ -140,6 +141,8 @@ class CRUDQuestion(CRUDBase[Question, QuestionCreate, QuestionUpdate]):
         source: Optional[str] = None,
         has_stimulus: Optional[bool] = None,
         stimulus_id: Optional[int] = None,
+        struct_type_ids: Optional[List[int]] = None,
+        struct_state: Optional[str] = None,
         viewer=None,
     ):
         query = select(self.model).options(
@@ -222,6 +225,27 @@ class CRUDQuestion(CRUDBase[Question, QuestionCreate, QuestionUpdate]):
             ).distinct()
             query = query.filter(self.model.id.in_(subquery))
 
+        if struct_type_ids:
+            # 题干结构化:已采纳拆解中有条件 / 设问属于所选类型(含其子类型)。
+            from app.services.structure import service as struct_service
+            from app.services.structure import types as struct_types
+
+            selected = await db.execute(select(StructType.subject_id).where(StructType.id.in_(struct_type_ids)))
+            expanded: set = set()
+            for type_subject_id in set(selected.scalars().all()):
+                tree = await struct_types.list_types(db, type_subject_id)
+                known = {t.id for t in tree}
+                expanded |= struct_types.descendants(tree, [i for i in struct_type_ids if i in known])
+            # 一个有效类型都没有时用不存在的 id,结果为空而不是不过滤。
+            query = query.filter(struct_service.question_type_filter(sorted(expanded) or [-1]))
+
+        if struct_state:
+            from app.services.structure import service as struct_service
+
+            condition = struct_service.question_state_filter(struct_state)
+            if condition is not None:
+                query = query.filter(condition)
+
         if viewer is not None:
             query = query.filter(visible_questions_filter(viewer))
 
@@ -250,6 +274,8 @@ class CRUDQuestion(CRUDBase[Question, QuestionCreate, QuestionUpdate]):
         source: Optional[str] = None,
         has_stimulus: Optional[bool] = None,
         stimulus_id: Optional[int] = None,
+        struct_type_ids: Optional[List[int]] = None,
+        struct_state: Optional[str] = None,
         viewer=None
     ) -> List[Question]:
         query = await self._get_filter_query(
@@ -271,6 +297,8 @@ class CRUDQuestion(CRUDBase[Question, QuestionCreate, QuestionUpdate]):
             source=source,
             has_stimulus=has_stimulus,
             stimulus_id=stimulus_id,
+            struct_type_ids=struct_type_ids,
+            struct_state=struct_state,
             viewer=viewer
         )
         query = query.offset(skip).limit(limit).order_by(self.model.created_at.desc())
@@ -355,6 +383,8 @@ class CRUDQuestion(CRUDBase[Question, QuestionCreate, QuestionUpdate]):
         source: Optional[str] = None,
         has_stimulus: Optional[bool] = None,
         stimulus_id: Optional[int] = None,
+        struct_type_ids: Optional[List[int]] = None,
+        struct_state: Optional[str] = None,
         viewer=None
     ) -> int:
         query = await self._get_filter_query(
@@ -376,6 +406,8 @@ class CRUDQuestion(CRUDBase[Question, QuestionCreate, QuestionUpdate]):
             source=source,
             has_stimulus=has_stimulus,
             stimulus_id=stimulus_id,
+            struct_type_ids=struct_type_ids,
+            struct_state=struct_state,
             viewer=viewer
         )
         # Use subquery for count to handle joins correctly

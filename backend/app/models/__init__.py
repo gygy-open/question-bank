@@ -11,6 +11,8 @@ from .stimulus import Stimulus
 from .question_relation import QuestionRelation
 from .question_relation_audit import LegacyQuestionParentAudit
 from .import_task import ImportTask
+from .job import Job
+from .question_structure import StructAsk, StructAskElement, StructElement, StructRun, StructType
 from .media_asset import LegacyMediaPath, MediaAsset, MediaReference
 from .activity_log import ActivityLog
 from .system_setting import SystemSetting

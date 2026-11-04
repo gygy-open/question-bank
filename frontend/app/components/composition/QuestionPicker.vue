@@ -14,8 +14,9 @@ import RichContent from '@/components/rich-editor/RichContent.vue'
 import KnowledgePointTreeSelector from '@/components/KnowledgePointTreeSelector.vue'
 import TagFilter from '@/components/TagFilter.vue'
 import ClearableSelect from '@/components/ClearableSelect.vue'
+import StructTypeSelect from '@/components/structure/StructTypeSelect.vue'
 import { questionTypeDisplayLabel } from '@/lib/answerFormat'
-import type { Question, KnowledgePoint, Tag, TagCategory, TagPage } from '@/types'
+import type { Question, KnowledgePoint, StructType, Tag, TagCategory, TagPage } from '@/types'
 
 const props = defineProps<{
   open: boolean
@@ -43,6 +44,11 @@ const qType = ref<string | undefined>(undefined)
 const difficulty = ref<string | undefined>(undefined)
 const knowledgePointIds = ref<string[]>([])
 const tagIds = ref<string[]>([])
+// 题干结构化:按元素类型筛选(含子类型,只匹配已采纳拆解);总开关关闭时不显示。
+const structTypeIds = ref<number[]>([])
+const structTypes = ref<StructType[]>([])
+const { enabled: structureEnabled } = useStructureEnabled()
+const structureApi = useStructure()
 
 const qTypeOptions = computed(() => [
   { label: t('questions.filters.allTypes'), value: '0' },
@@ -68,6 +74,7 @@ const activeFilterCount = computed(() => {
   if (difficulty.value && difficulty.value !== '0') count++
   if (knowledgePointIds.value.length > 0) count++
   if (tagIds.value.length > 0) count++
+  if (structTypeIds.value.length > 0) count++
   return count
 })
 
@@ -76,6 +83,7 @@ function resetFilters() {
   difficulty.value = undefined
   knowledgePointIds.value = []
   tagIds.value = []
+  structTypeIds.value = []
 }
 
 function toggleKnowledgePoint(id: string) {
@@ -118,6 +126,7 @@ async function loadFilterOptions() {
     knowledgePoints.value = kpRes
     tags.value = tagRes.items
     tagCategories.value = catRes
+    if (structureEnabled.value) structTypes.value = (await structureApi.listTypes(props.subjectId)).items
   } catch {
     // 筛选选项加载失败不影响基础检索，静默忽略
   }
@@ -141,6 +150,7 @@ async function search() {
     if (difficulty.value && difficulty.value !== '0') query.difficulty = difficulty.value
     if (knowledgePointIds.value.length > 0) query.knowledge_point_ids = knowledgePointIds.value
     if (tagIds.value.length > 0) query.tag_ids = tagIds.value
+    if (structTypeIds.value.length > 0) query.struct_type_ids = structTypeIds.value
     const page = await $api<{ items: Question[] }>('/questions', { query })
     if (mine === seq) results.value = page.items
   } catch {
@@ -155,7 +165,7 @@ watch(keyword, () => {
   if (debounce) clearTimeout(debounce)
   debounce = setTimeout(search, 250)
 })
-watch([qType, difficulty, knowledgePointIds, tagIds], () => search(), { deep: true })
+watch([qType, difficulty, knowledgePointIds, tagIds, structTypeIds], () => search(), { deep: true })
 
 watch(
   () => props.open,
@@ -255,6 +265,10 @@ function confirmInsert() {
         <div class="min-w-[200px] flex-1 space-y-1">
           <span class="text-xs font-medium text-muted-foreground">{{ t('questions.filters.tags') }}</span>
           <TagFilter v-model="tagIds" :tags="tags" :categories="tagCategories" />
+        </div>
+        <div v-if="structureEnabled && structTypes.length" class="min-w-[200px] flex-1 space-y-1">
+          <span class="text-xs font-medium text-muted-foreground">{{ t('structure.library.typeFilter') }}</span>
+          <StructTypeSelect v-model="structTypeIds" :types="structTypes" multiple :placeholder="t('structure.library.allTypes')" />
         </div>
         <Button v-if="activeFilterCount > 0" variant="ghost" size="sm" @click="resetFilters">
           <X class="mr-1 h-3.5 w-3.5" />
