@@ -62,6 +62,7 @@ export const en: LocaleSpecificConfig<DefaultTheme.Config> = {
             { text: 'Smart Import', link: '/en/features/import' },
             { text: 'Question Bank', link: '/en/features/questions' },
             { text: 'Knowledge Points', link: '/en/features/knowledge-points' },
+            { text: 'Question Structure', link: '/en/features/question-structure' },
             { text: 'Review Workflow', link: '/en/features/review-workflow' },
             { text: 'AI Assistant', link: '/en/features/chat' },
             { text: 'Subjects & Tags', link: '/en/features/subjects-and-tags' },

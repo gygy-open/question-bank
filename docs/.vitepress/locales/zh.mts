@@ -61,6 +61,7 @@ export const zh: LocaleSpecificConfig<DefaultTheme.Config> = {
             { text: '智能导入', link: '/features/import' },
             { text: '题库管理', link: '/features/questions' },
             { text: '知识点体系', link: '/features/knowledge-points' },
+            { text: '题干结构化', link: '/features/question-structure' },
             { text: '审核工作流', link: '/features/review-workflow' },
             { text: 'AI 对话', link: '/features/chat' },
             { text: '学科与标签', link: '/features/subjects-and-tags' },
