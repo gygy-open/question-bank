@@ -30,6 +30,7 @@ from sqlalchemy import (
     Text,
     UniqueConstraint,
     false,
+    JSON,
 )
 from sqlalchemy.orm import relationship
 
@@ -408,4 +409,140 @@ __all__ = [
     "QuestionStructStepProduce",
     "SolvingMethod",
     "StructVocabularyMeta",
+    "StudentSheet",
+    "StudentAnswer",
+    "StepError",
+    "QuestionElementKnowledgePoint",
+    "StudentElementMastery",
 ]
+
+
+class StudentSheet(Base):
+    """学生卷子 / 作答批次。sheet_id 是学情溯源的入口。
+
+    一次考试或一次拍照刷题对应一张 sheet，下面挂若干 student_answer。
+    """
+
+    __tablename__ = "student_sheets"
+
+    id = Column(Integer, primary_key=True, index=True)
+    student_id = Column(Integer, ForeignKey("user.id"), nullable=False, index=True)
+    exam_id = Column(Integer, nullable=True, index=True)
+    sheet_no = Column(String(64), nullable=True)
+    scanned_at = Column(DateTime, nullable=True)
+    source = Column(String(32), nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+
+class StudentAnswer(Base):
+    """学生题目作答记录。
+
+    run_id 指向用于出题的结构化拆解版本，这样能知道学生做题时题干是哪个版本。
+    """
+
+    __tablename__ = "student_answers"
+    __table_args__ = (Index("ix_student_answers_question_run", "question_id", "run_id"),)
+
+    id = Column(Integer, primary_key=True, index=True)
+    sheet_id = Column(
+        Integer, ForeignKey("student_sheets.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    question_id = Column(Integer, ForeignKey("questions.id"), nullable=False, index=True)
+    run_id = Column(
+        Integer,
+        ForeignKey("question_struct_runs.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
+    answer_content = Column(Text, nullable=True)
+    answer_structured = Column(JSON, nullable=True)
+    score = Column(Float, nullable=True)
+    answered_at = Column(DateTime, default=datetime.utcnow)
+
+
+class StepError(Base):
+    """步骤级错位，是“拍照卷子 → 溯源元素”的最小可用单元。
+
+    教师或 OCR 标注学生在哪个标准步骤走了偏，错什么，错位在步骤内的哪里。
+    通过 element_id 可直接追溯到该步骤依赖的核心条件；再通过
+    question_element_knowledge_points 可追溯到课标知识点。
+    """
+
+    __tablename__ = "step_errors"
+    __table_args__ = (
+        Index("ix_step_errors_error_type", "error_type"),
+    )
+
+    id = Column(Integer, primary_key=True, index=True)
+    answer_id = Column(
+        Integer, ForeignKey("student_answers.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    step_id = Column(
+        Integer,
+        ForeignKey("question_struct_steps.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    element_id = Column(
+        Integer,
+        ForeignKey("question_struct_elements.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
+    # concept / calculation / reading / omission / format
+    error_type = Column(String(32), nullable=False)
+    error_detail = Column(Text, nullable=True)
+    position_in_step = Column(String(64), nullable=True)
+    is_breakthrough_missed = Column(Boolean, nullable=False, default=False, server_default=false())
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+
+class QuestionElementKnowledgePoint(Base):
+    """元素 → 知识点映射。
+
+    元素本身是原子条件，不污染知识点体系；通过这张表把元素挂到课标
+    知识点上，使“按知识点看薄弱点”成为可能。
+    """
+
+    __tablename__ = "question_element_knowledge_points"
+
+    element_id = Column(
+        Integer,
+        ForeignKey("question_struct_elements.id", ondelete="CASCADE"),
+        nullable=False,
+        primary_key=True,
+    )
+    knowledge_point_id = Column(
+        Integer,
+        ForeignKey("knowledge_points.id", ondelete="CASCADE"),
+        nullable=False,
+        primary_key=True,
+    )
+
+
+class StudentElementMastery(Base):
+    """学生 × 元素掌握状态，长期学情分析用（可延后建表填充）。"""
+
+    __tablename__ = "student_element_mastery"
+
+    id = Column(Integer, primary_key=True, index=True)
+    student_id = Column(Integer, ForeignKey("user.id"), nullable=False, index=True)
+    element_id = Column(
+        Integer,
+        ForeignKey("question_struct_elements.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    knowledge_point_id = Column(
+        Integer, ForeignKey("knowledge_points.id", ondelete="CASCADE"), nullable=True, index=True
+    )
+    # mastered / partial / not_mastered / unknown
+    mastery_level = Column(String(16), nullable=False, default="unknown", server_default="unknown")
+    error_count = Column(Integer, nullable=False, default=0, server_default="0")
+    last_seen_at = Column(DateTime, nullable=True)
+
+    __table_args__ = (
+        UniqueConstraint(
+            "student_id", "element_id", name="uq_student_element_mastery_student_element"
+        ),
+    )

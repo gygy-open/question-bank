@@ -10,7 +10,7 @@ from pathlib import Path
 
 import pytest
 import pytest_asyncio
-from sqlalchemy import create_engine, select
+from sqlalchemy import create_engine, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from alembic.autogenerate import compare_metadata
@@ -31,11 +31,17 @@ from app.models.question_structure import (
     QuestionStructStep,
     QuestionStructStepProduce,
     SolvingMethod,
+    StudentSheet,
+    StudentAnswer,
+    StepError,
+    QuestionElementKnowledgePoint,
+    StudentElementMastery,
 )
+from app.models.subject import Subject
 
 MIGRATION = (
     Path(__file__).resolve().parents[1]
-    / "alembic/versions/b3e8c1d7a402_question_structure.py"
+    / "alembic/versions/b3e8c1d7a403_add_student_answer_layer.py"
 )
 
 NEW_TABLES = [
@@ -55,6 +61,20 @@ NEW_TABLES = [
     "solving_methods",
     "element_types",
     "element_roles",
+    "student_sheets",
+    "student_answers",
+    "step_errors",
+    "question_element_knowledge_points",
+    "student_element_mastery",
+]
+
+# 本次新增的学生层 5 张表，用于迁移双向校验（旧 16 张结构化表在测试 fixture 中已保留）
+STUDENT_TABLES = [
+    "student_sheets",
+    "student_answers",
+    "step_errors",
+    "question_element_knowledge_points",
+    "student_element_mastery",
 ]
 
 def _sha(text: str) -> str:
@@ -293,7 +313,8 @@ class TestMigrationMatchesModels:
         Base.metadata.create_all(engine)
         with engine.begin() as conn:
             conn.exec_driver_sql("PRAGMA foreign_keys=OFF")
-            for table in NEW_TABLES:
+            # 只回滚本次新增的 5 张学生层表，旧 16 张结构化表保留
+            for table in STUDENT_TABLES:
                 conn.exec_driver_sql("DROP TABLE %s" % table)
 
         spec = importlib.util.spec_from_file_location("mig_under_test", MIGRATION)
@@ -308,7 +329,8 @@ class TestMigrationMatchesModels:
         from sqlalchemy import inspect
 
         present = set(inspect(engine).get_table_names())
-        assert not [t for t in NEW_TABLES if t not in present]
+        missing = [t for t in STUDENT_TABLES if t not in present]
+        assert not missing, f"缺失表: {missing}"
 
         with engine.connect() as conn:
             ctx = MigrationContext.configure(conn)
@@ -320,7 +342,7 @@ class TestMigrationMatchesModels:
             ctx = MigrationContext.configure(conn)
             with Operations.context(ctx):
                 migration.downgrade()
-        left = [t for t in NEW_TABLES if t in set(inspect(engine).get_table_names())]
+        left = [t for t in STUDENT_TABLES if t in set(inspect(engine).get_table_names())]
         assert left == []
 
 
@@ -403,3 +425,146 @@ class TestStemSnapshot:
             db_session, question_id=23, stem_text=stem, stem_sha256=_sha(stem)
         )
         assert run.stem_sha256 == _sha(stem)
+
+
+async def _seed_user_kp(db_session: AsyncSession) -> int:
+    """为学生层测试准备 user 与 knowledge_points 基础数据。"""
+    for uid, uname in ((1, "u1"), (2, "u2"), (3, "u3")):
+        await db_session.execute(
+            text("INSERT OR IGNORE INTO user (id, username, hashed_password) VALUES (:uid, :uname, 'x')"),
+            {"uid": uid, "uname": uname},
+        )
+    subject = (await db_session.execute(select(Subject).limit(1))).scalars().first()
+    if subject is None:
+        subject = Subject(name="数学", slug="math")
+        db_session.add(subject)
+        await db_session.flush()
+    await db_session.execute(
+        text(
+            "INSERT OR IGNORE INTO knowledge_points (id, name, slug, subject_id) "
+            "VALUES (100, 'kp', 'kp', :sid)"
+        ),
+        {"sid": subject.id},
+    )
+    await db_session.flush()
+    return subject.id
+
+
+class TestStudentLayer:
+    """学生作答 / 学情溯源层：拍照卷子 → 步骤错位 → 元素 → 知识点。"""
+
+    async def test_sheet_answer_step_error_cascade(self, db_session: AsyncSession):
+        await _seed_vocabulary(db_session)
+        await _seed_user_kp(db_session)
+        run = await _make_run(db_session, question_id=31)
+        ask = QuestionStructAsk(run_id=run.id, ordinal=1, content="求 a 的范围", target="solve")
+        element = QuestionStructElement(
+            run_id=run.id, ordinal=1, content="f(x)=x^3+ax+2", role="object",
+            element_type="alg_form",
+        )
+        step = QuestionStructStep(run_id=run.id, ask_id=ask.id, ordinal=1, method="deriv")
+        db_session.add_all([ask, element, step])
+        await db_session.flush()
+
+        sheet = StudentSheet(student_id=1, sheet_no="S001")
+        db_session.add(sheet)
+        await db_session.flush()
+
+        answer = StudentAnswer(
+            sheet_id=sheet.id, question_id=31, run_id=run.id,
+            answer_content="a>-3", score=5.0,
+        )
+        db_session.add(answer)
+        await db_session.flush()
+
+        err = StepError(
+            answer_id=answer.id, step_id=step.id, element_id=element.id,
+            error_type="calculation", error_detail="配方常数项算错了",
+        )
+        db_session.add(err)
+        await db_session.flush()
+
+        # 删除 sheet，answer 与 step_error 应级联删除
+        await db_session.delete(sheet)
+        await db_session.flush()
+        assert (await db_session.execute(select(StudentAnswer))).scalars().all() == []
+        assert (await db_session.execute(select(StepError))).scalars().all() == []
+
+    async def test_answer_links_run_version(self, db_session: AsyncSession):
+        """学生做题时题干是哪个版本，run_id 能回溯。"""
+        await _seed_vocabulary(db_session)
+        await _seed_user_kp(db_session)
+        run = await _make_run(
+            db_session, question_id=32, stem_text="f(x)=x^3+ax+2", stem_sha256=_sha("f(x)=x^3+ax+2")
+        )
+        sheet = StudentSheet(student_id=2, sheet_no="S002")
+        db_session.add(sheet)
+        await db_session.flush()
+        answer = StudentAnswer(sheet_id=sheet.id, question_id=32, run_id=run.id)
+        db_session.add(answer)
+        await db_session.flush()
+
+        got = (
+            await db_session.execute(select(StudentAnswer).where(StudentAnswer.id == answer.id))
+        ).scalars().one()
+        assert got.run_id == run.id
+
+    async def test_element_links_knowledge_point(self, db_session: AsyncSession):
+        await _seed_user_kp(db_session)
+        # 直接建立该测试所需的元素角色/类型，不依赖 _seed_vocabulary
+        db_session.add(ElementRole(code="given", name="已知"))
+        db_session.add(
+            ElementType(
+                code="dom_algebra", domain="algebra", action="form",
+                name="数与代数", parent_code=None, sort_order=10, status="active",
+            )
+        )
+        db_session.add(
+            ElementType(
+                code="alg_qual", domain="algebra", action="qual", name="代数关系",
+                parent_code="dom_algebra",
+            )
+        )
+        await db_session.flush()
+        run = await _make_run(db_session, question_id=33)
+        element = QuestionStructElement(
+            run_id=run.id, ordinal=1, content="二次函数与一元二次方程关系", role="given",
+            element_type="alg_qual",
+        )
+        db_session.add(element)
+        await db_session.flush()
+        db_session.add(
+            QuestionElementKnowledgePoint(element_id=element.id, knowledge_point_id=100)
+        )
+        await db_session.flush()
+
+        rows = (
+            await db_session.execute(select(QuestionElementKnowledgePoint))
+        ).scalars().all()
+        assert rows and rows[0].knowledge_point_id == 100
+
+    async def test_student_element_mastery(self, db_session: AsyncSession):
+        await _seed_vocabulary(db_session)
+        await _seed_user_kp(db_session)
+        run = await _make_run(db_session, question_id=34)
+        element = QuestionStructElement(
+            run_id=run.id, ordinal=1, content="配方", role="given",
+            element_type="alg_form",
+        )
+        db_session.add(element)
+        await db_session.flush()
+        db_session.add(
+            StudentElementMastery(
+                student_id=3, element_id=element.id,
+                mastery_level="partial", error_count=2,
+            )
+        )
+        await db_session.flush()
+
+        row = (
+            await db_session.execute(
+                select(StudentElementMastery).where(StudentElementMastery.student_id == 3)
+            )
+        ).scalars().one()
+        assert row.mastery_level == "partial"
+        assert row.error_count == 2

@@ -24,6 +24,11 @@ from .question_structure import (
     QuestionStructStepProduce,
     SolvingMethod,
     StructVocabularyMeta,
+    StudentSheet,
+    StudentAnswer,
+    StepError,
+    QuestionElementKnowledgePoint,
+    StudentElementMastery,
 )
 from .stimulus import Stimulus
 from .question_relation import QuestionRelation
