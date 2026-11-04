@@ -34,14 +34,26 @@ def upgrade() -> None:
 
     op.create_table(
         "element_types",
-        sa.Column("code", sa.String(length=32), nullable=False),
-        sa.Column("subject", sa.String(length=32), nullable=False),
+        sa.Column("code", sa.String(length=64), nullable=False),
+        sa.Column("domain", sa.String(length=32), nullable=False),
         sa.Column("action", sa.String(length=32), nullable=False),
         sa.Column("name", sa.String(length=64), nullable=False),
         sa.Column("note", sa.String(length=255), nullable=True),
+        sa.Column("parent_code", sa.String(length=64), nullable=True),
+        sa.Column("sort_order", sa.Integer(), server_default="0", nullable=False),
+        sa.Column("status", sa.String(length=16), server_default="active", nullable=False),
+        sa.ForeignKeyConstraint(
+            ["parent_code"],
+            ["element_types.code"],
+            name=op.f("fk_element_types_parent_code_element_types"),
+        ),
         sa.PrimaryKeyConstraint("code", name=op.f("pk_element_types")),
-        sa.UniqueConstraint("subject", "action", name=op.f("uq_element_types_subject_action")),
+        sa.UniqueConstraint(
+            "domain", "action", "name", name=op.f("uq_element_types_domain_action_name")
+        ),
     )
+    op.create_index("ix_element_types_parent", "element_types", ["parent_code"], unique=False)
+    op.create_index("ix_element_types_status", "element_types", ["status"], unique=False)
 
     op.create_table(
         "solving_methods",
@@ -76,6 +88,8 @@ def upgrade() -> None:
         sa.Column("prompt_version", sa.String(length=32), nullable=True),
         sa.Column("vocabulary_version", sa.String(length=32), nullable=True),
         sa.Column("state", sa.String(length=16), server_default="draft", nullable=False),
+        sa.Column("stem_text", sa.Text(), nullable=True),
+        sa.Column("stem_sha256", sa.String(length=64), nullable=True),
         sa.Column("created_at", sa.DateTime(), nullable=True),
         sa.Column("updated_at", sa.DateTime(), nullable=True),
         sa.ForeignKeyConstraint(
@@ -100,6 +114,12 @@ def upgrade() -> None:
         "ix_question_struct_runs_subject_state",
         "question_struct_runs",
         ["subject_id", "state"],
+        unique=False,
+    )
+    op.create_index(
+        "ix_question_struct_runs_stem_sha256",
+        "question_struct_runs",
+        ["stem_sha256"],
         unique=False,
     )
 

@@ -35,8 +35,9 @@ from sqlalchemy.orm import relationship
 
 from .base import Base
 
-#: 元素类型的第一坐标：跟着课标领域走，不自造。
-ELEMENT_SUBJECTS = ("algebra", "geometry", "stat", "practice")
+#: 元素类型的第一坐标：跟着课标**领域**走，不自造。
+#: 注意与题库的 subjects 表（学科）区分，这里叫 domain。
+ELEMENT_DOMAINS = ("algebra", "geometry", "stat", "practice")
 #: 元素类型的第二坐标。
 #: quant=给值  qual=给关系  proc=在动/可变  form=被研究的对象本身。
 ELEMENT_ACTIONS = ("quant", "qual", "proc", "form")
@@ -56,22 +57,36 @@ class ElementRole(Base):
 
 
 class ElementType(Base):
-    """元素类型词表：学科 × 作用。
+    """元素类型词表：领域 × 作用，可按 parent_code 组成树。
+
+    ``domain`` 是课标**领域**（数与代数、图形与几何…），不要与题库的 ``subjects``
+    表（学科：数学、物理…）混用，所以这里叫 domain 不叫 subject。
 
     两个坐标分开存而不是拼成一个枚举值，是为了能单独按任一坐标检索：
-    「所有含动点的题」查 action=proc，「所有几何条件」查 subject=geometry。
+    「所有含动点的题」查 action=proc，「所有几何条件」查 domain=geometry。
+
+    ``parent_code`` 让类型树可以像知识点那样挂层级；``status`` 为空出「候选」这一态：
+    AI 从大量题目里归纳出的新类型先进 candidate，人确认后才变 active，这与
+    「AI 只能选不能造」的原则一致——它可以提名，不能直接定名。
     """
 
     __tablename__ = "element_types"
     __table_args__ = (
-        UniqueConstraint("subject", "action", name="uq_element_types_subject_action"),
+        UniqueConstraint("domain", "action", "name", name="uq_element_types_domain_action_name"),
+        Index("ix_element_types_parent", "parent_code"),
+        Index("ix_element_types_status", "status"),
     )
 
-    code = Column(String(32), primary_key=True)
-    subject = Column(String(32), nullable=False)  # 见 ELEMENT_SUBJECTS
+    code = Column(String(64), primary_key=True)
+    domain = Column(String(32), nullable=False)  # 见 ELEMENT_DOMAINS
     action = Column(String(32), nullable=False)  # 见 ELEMENT_ACTIONS
     name = Column(String(64), nullable=False)
     note = Column(String(255), nullable=True)
+
+    parent_code = Column(String(64), ForeignKey("element_types.code"), nullable=True)
+    sort_order = Column(Integer, nullable=False, default=0, server_default="0")
+    # active 已确认 / candidate AI 提名待确认 / rejected 已否决
+    status = Column(String(16), nullable=False, default="active", server_default="active")
 
 
 class SolvingMethod(Base):
@@ -123,6 +138,13 @@ class QuestionStructRun(Base):
 
     # draft / reviewed / rejected —— 只有 reviewed 进检索
     state = Column(String(16), nullable=False, default="draft", server_default="draft")
+
+    # 拆解时题干的纯文本快照。**所有 span_start/span_end 都是相对这份文本的字符下标**，
+    # 不是相对 questions.content 里的 RichDoc JSON——JSON 里算出来的偏移前端拿来
+    # 高亮必然错位。题库的 content 是富文本，必须先把 text 节点拼成纯文本再定 span。
+    stem_text = Column(Text, nullable=True)
+    # 这份快照的哈希。与题干当前的哈希不一致，说明题目被改过，本次拆解已过期。
+    stem_sha256 = Column(String(64), nullable=True, index=True)
 
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
@@ -369,7 +391,7 @@ class QuestionStructMisconception(Base):
 
 __all__ = [
     "ELEMENT_ACTIONS",
-    "ELEMENT_SUBJECTS",
+    "ELEMENT_DOMAINS",
     "ElementRole",
     "ElementType",
     "QuestionStructAsk",

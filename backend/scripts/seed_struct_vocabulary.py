@@ -36,7 +36,15 @@ ROLES = [
     ("material", "材料", "题组共享的背景材料"),
 ]
 
-# 学科轴跟着课标四领域走，不自造；作用轴是第二坐标。
+# 第一坐标跟着课标四**领域**走，不自造（不叫 subject，避免与题库的学科表混淆）；
+# 第二坐标是作用。层级先做两档：领域节点 + 具体类型，用 parent_code 挂上去。
+DOMAIN_NODES = [
+    ("dom_algebra", "algebra", "form", "数与代数", 10),
+    ("dom_geometry", "geometry", "form", "图形与几何", 20),
+    ("dom_stat", "stat", "form", "统计与概率", 30),
+    ("dom_practice", "practice", "form", "综合与实践", 40),
+]
+
 ELEMENT_TYPES = [
     ("alg_form", "algebra", "form", "式结构", "函数式 / 方程 / 不等式本身"),
     ("alg_quant", "algebra", "quant", "代数量", "坐标、系数、具体的值"),
@@ -98,9 +106,19 @@ async def main() -> None:
                 added += 1
             else:
                 changed += 1
-        for code, subject, action, name, note in ELEMENT_TYPES:
+        for code, domain, action, name, sort_order in DOMAIN_NODES:
             if await _upsert(session, ElementType, code, {
-                "subject": subject, "action": action, "name": name, "note": note,
+                "domain": domain, "action": action, "name": name,
+                "sort_order": sort_order, "status": "active", "parent_code": None,
+            }):
+                added += 1
+            else:
+                changed += 1
+        for code, domain, action, name, note in ELEMENT_TYPES:
+            parent = "dom_" + domain
+            if await _upsert(session, ElementType, code, {
+                "domain": domain, "action": action, "name": name, "note": note,
+                "parent_code": parent, "sort_order": 0, "status": "active",
             }):
                 added += 1
             else:

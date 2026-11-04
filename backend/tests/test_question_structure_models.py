@@ -4,6 +4,7 @@
 最后一条是这套表存在的理由——推导链必须能机器复算。
 """
 
+import hashlib
 import importlib.util
 from pathlib import Path
 
@@ -56,6 +57,11 @@ NEW_TABLES = [
     "element_roles",
 ]
 
+def _sha(text: str) -> str:
+    """与上游 question_dedup 保持同一口径：utf-8 + sha256 十六进制。"""
+    return hashlib.sha256(text.encode("utf-8")).hexdigest()
+
+
 ROLES = [
     ("object", "对象"),
     ("given", "已知"),
@@ -90,8 +96,14 @@ async def _seed_subject_and_question(session: AsyncSession, question_id: int) ->
 async def _seed_vocabulary(session: AsyncSession) -> None:
     for code, name in ROLES:
         session.add(ElementRole(code=code, name=name))
-    session.add(ElementType(code="alg_form", subject="algebra", action="form", name="式结构"))
-    session.add(ElementType(code="alg_quant", subject="algebra", action="quant", name="代数量"))
+    session.add(ElementType(code="dom_algebra", domain="algebra", action="form", name="数与代数"))
+    session.add(
+        ElementType(
+            code="alg_form", domain="algebra", action="form", name="式结构",
+            parent_code="dom_algebra",
+        )
+    )
+    session.add(ElementType(code="alg_quant", domain="algebra", action="quant", name="代数量"))
     session.add(SolvingMethod(code="deriv", name="求导判断单调与极值", weight=1.0))
     session.add(SolvingMethod(code="classify", name="分类讨论", weight=1.5))
     await session.flush()
@@ -164,7 +176,7 @@ class TestVocabularyForeignKeys:
         await _seed_vocabulary(db_session)
         run = await _make_run(db_session)
         db_session.add(
-            ElementType(code="geo_proc", subject="geometry", action="proc", name="动形")
+            ElementType(code="geo_proc", domain="geometry", action="proc", name="动形")
         )
         await db_session.flush()
         db_session.add(
@@ -310,3 +322,84 @@ class TestMigrationMatchesModels:
                 migration.downgrade()
         left = [t for t in NEW_TABLES if t in set(inspect(engine).get_table_names())]
         assert left == []
+
+
+class TestElementTypeTree:
+    """作者的用法清单要求「元素类型树选择器，同知识点」，所以要能按父子查。"""
+
+    async def test_children_of_a_domain_node(self, db_session: AsyncSession):
+        await _seed_vocabulary(db_session)
+        stmt = select(ElementType.code).where(ElementType.parent_code == "dom_algebra")
+        children = (await db_session.execute(stmt)).scalars().all()
+        assert "alg_form" in children
+
+    async def test_candidate_status_for_ai_nominations(self, db_session: AsyncSession):
+        """AI 归纳出的新类型进 candidate，人确认后才 active——它能提名，不能定名。"""
+        await _seed_vocabulary(db_session)
+        db_session.add(
+            ElementType(
+                code="geo_aux_circle", domain="geometry", action="qual",
+                name="辅助圆", status="candidate",
+            )
+        )
+        await db_session.flush()
+        pending = (
+            await db_session.execute(
+                select(ElementType.code).where(ElementType.status == "candidate")
+            )
+        ).scalars().all()
+        assert pending == ["geo_aux_circle"]
+
+    async def test_active_types_exclude_candidates(self, db_session: AsyncSession):
+        await _seed_vocabulary(db_session)
+        db_session.add(
+            ElementType(
+                code="geo_aux_circle", domain="geometry", action="qual",
+                name="辅助圆", status="candidate",
+            )
+        )
+        await db_session.flush()
+        active = (
+            await db_session.execute(select(ElementType.code).where(ElementType.status == "active"))
+        ).scalars().all()
+        assert "geo_aux_circle" not in active
+
+
+class TestStemSnapshot:
+    """span 必须相对题干纯文本快照算；快照哈希用来判「已过期」。"""
+
+    async def test_span_is_relative_to_stem_text(self, db_session: AsyncSession):
+        await _seed_vocabulary(db_session)
+        stem = "已知函数 f(x)=x^3+ax+2 有三个零点。"
+        run = await _make_run(
+            db_session, question_id=21, stem_text=stem, stem_sha256=_sha(stem)
+        )
+        start = stem.find("f(x)=x^3+ax+2")
+        db_session.add(
+            QuestionStructElement(
+                run_id=run.id, ordinal=1, content="f(x)=x^3+ax+2", role="object",
+                span_start=start, span_end=start + len("f(x)=x^3+ax+2"),
+            )
+        )
+        await db_session.flush()
+
+        element = (
+            await db_session.execute(select(QuestionStructElement))
+        ).scalars().one()
+        assert run.stem_text[element.span_start:element.span_end] == "f(x)=x^3+ax+2"
+
+    async def test_changed_stem_marks_run_stale(self, db_session: AsyncSession):
+        """题干改了哈希就对不上，旧拆解即为过期——这是「已过期」状态的唯一依据。"""
+        original = "已知函数 f(x)=x^3+ax+2 有三个零点。"
+        run = await _make_run(
+            db_session, question_id=22, stem_text=original, stem_sha256=_sha(original)
+        )
+        edited = "已知函数 f(x)=x^3+ax+2 有三个不同零点。"
+        assert run.stem_sha256 != _sha(edited)
+
+    async def test_same_stem_keeps_run_fresh(self, db_session: AsyncSession):
+        stem = "已知函数 f(x)=x^3+ax+2 有三个零点。"
+        run = await _make_run(
+            db_session, question_id=23, stem_text=stem, stem_sha256=_sha(stem)
+        )
+        assert run.stem_sha256 == _sha(stem)
