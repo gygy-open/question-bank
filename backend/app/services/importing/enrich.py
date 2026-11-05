@@ -79,6 +79,7 @@ class KnowledgePointEnricher:
             verified_results = await provider.batch_rerank_knowledge_points(
                 items=batch_items,
                 config=config,
+                prompt_template=(config or {}).get("AI_KP_RERANK_PROMPT"),
             )
 
         # Update questions

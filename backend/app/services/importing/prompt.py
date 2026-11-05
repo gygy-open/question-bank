@@ -23,19 +23,26 @@ logger = logging.getLogger(__name__)
 
 
 class PromptBuilder:
-    async def build(self, db: AsyncSession, *, mode: str, subject_id: int | None) -> str:
-        """产出最终 extract/solve prompt 字符串(学科渲染 + tag 上下文注入)。"""
-        prompt_key = "AI_SOLVE_PROMPT" if mode == "solve" else "AI_EXTRACT_PROMPT"
-
+    async def _resolve(self, db: AsyncSession, *, key: str, subject_id: int | None) -> str:
+        """取提示词正文:学科覆盖优先,回退代码默认值,再渲染学科占位符。"""
         subject = None
         override = None
         if subject_id:
             res_subj = await db.execute(select(Subject).where(Subject.id == subject_id))
             subject = res_subj.scalar_one_or_none()
-            override = await crud_subject_prompt.get_value(db, subject_id, prompt_key)
+            override = await crud_subject_prompt.get_value(db, subject_id, key)
 
-        template = override if override is not None else get_default_prompt(prompt_key)
-        prompt = render_subject_prompt(template, subject)
+        template = override if override is not None else get_default_prompt(key)
+        return render_subject_prompt(template, subject)
+
+    async def build_kp_rerank(self, db: AsyncSession, *, subject_id: int | None) -> str:
+        """知识点 rerank 提示词正文。题块与输出契约由 provider 追加。"""
+        return await self._resolve(db, key="AI_KP_RERANK_PROMPT", subject_id=subject_id)
+
+    async def build(self, db: AsyncSession, *, mode: str, subject_id: int | None) -> str:
+        """产出最终 extract/solve prompt 字符串(学科渲染 + tag 上下文注入)。"""
+        prompt_key = "AI_SOLVE_PROMPT" if mode == "solve" else "AI_EXTRACT_PROMPT"
+        prompt = await self._resolve(db, key=prompt_key, subject_id=subject_id)
 
         try:
             tag_context = await self._build_tag_context(db)

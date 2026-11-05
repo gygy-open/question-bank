@@ -91,6 +91,9 @@ class _StubPromptBuilder:
     async def build(self, db, *, mode, subject_id):
         return "STUB_PROMPT"
 
+    async def build_kp_rerank(self, db, *, subject_id):
+        return "STUB_KP_RERANK_PROMPT"
+
 
 class _StubEnricher:
     async def enrich(self, questions, *, subject_id, provider, config):

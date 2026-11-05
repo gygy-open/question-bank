@@ -90,6 +90,9 @@ class AIExtractor:
         config["AI_EXTRACT_PROMPT"] = await self.prompt_builder.build(
             db, mode=mode, subject_id=subject_id
         )
+        config["AI_KP_RERANK_PROMPT"] = await self.prompt_builder.build_kp_rerank(
+            db, subject_id=subject_id
+        )
 
         provider = get_ai_provider(provider_name)
 

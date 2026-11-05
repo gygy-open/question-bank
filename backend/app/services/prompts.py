@@ -11,6 +11,10 @@
 提示词正文统一用英文维护一份，输出语言由 {output_language} / apply_output_language 追加的指令决定，
 不随界面语言复制多份。{subject_name} 之后必须紧跟一个空格，学科为空时 render_subject_prompt 会连同空格一起去掉。
 """
+import logging
+
+logger = logging.getLogger(__name__)
+
 
 CHAT_SYSTEM_PROMPT = """You are a senior {subject_name} teaching researcher.{subject_description}
 
@@ -210,6 +214,46 @@ Try to extract the following tag information from the content or the file name (
 ```"""
 
 
+# 知识点 rerank:判断一道题应当挂到哪些候选知识点上。
+# 正文只在注册表里维护一份,各 provider 只追加自己的输出契约 —— JSON 形状受限于
+# 各自的 API(JSON mode vs response_schema),那属于调用协议,不属于提示词内容。
+# 不需要 {output_language}:输出是从候选里逐字抄回的知识点名,不含任何行文。
+DEFAULT_KP_RERANK_PROMPT = r"""You are a {subject_name} knowledge point tagger.{subject_description} For each question below you get a set of candidate knowledge points retrieved from the library. Decide which candidates each question actually belongs to.
+
+## Decision rules
+
+1. **Candidates only.** Never output a knowledge point that is not in the candidate list, even if it fits better — anything outside the list cannot be linked.
+2. **Judge by what solving the question requires**, not by the words that appear in it. A concept merely named in the stem, but not needed to solve it, does not match.
+3. **Hierarchy.** When the candidates contain both `A > B` and `A > B > C`, choose the more specific `A > B > C` and drop the parent. Keep the parent only when the question truly concerns the parent concept alone.
+4. **Prefer fewer over wrong.** A question usually matches 1–3 knowledge points. If nothing fits, return an empty list rather than padding it.
+5. **Copy verbatim.** Rephrasing, changing case, or dropping the hierarchy prefix is not allowed — the string must match a candidate exactly.
+
+## Questions and candidates
+
+{items}"""
+
+# 覆盖模板漏写 {items} 时不静默丢题:追加在末尾,与 {tags} 的处理保持一致。
+ITEMS_PLACEHOLDER = "{items}"
+
+
+def render_kp_rerank_prompt(template: str | None, items_block: str, output_contract: str) -> str:
+    """把题块和 provider 自己的输出契约填进 rerank 提示词。"""
+    if template:
+        body = template
+    else:
+        # 没有学科覆盖时也要渲染学科占位符,否则提示词里会留下裸 {subject_name}。
+        from app.services.prompt_utils import render_subject_prompt
+
+        body = render_subject_prompt(get_default_prompt("AI_KP_RERANK_PROMPT"), None)
+    if ITEMS_PLACEHOLDER in body:
+        body = body.replace(ITEMS_PLACEHOLDER, items_block)
+    else:
+        logger.warning(
+            "Knowledge point rerank prompt has no {items} placeholder; appended the items at the end"
+        )
+        body = f"{body}\n\n{items_block}"
+    return f"{body}\n\n{output_contract}"
+
 # 可按学科覆盖的提示词注册表：key -> {default, title, description}。
 # 前端据此渲染配置项；消费端据此取默认值。
 SUBJECT_PROMPTS: dict[str, dict[str, str]] = {
@@ -222,6 +266,11 @@ SUBJECT_PROMPTS: dict[str, dict[str, str]] = {
         "default": DEFAULT_SOLVE_PROMPT,
         "title": "解题推理分析助手",
         "description": "定义 AI 在生成题目解析和答案时应遵循的逻辑与排版格式。",
+    },
+    "AI_KP_RERANK_PROMPT": {
+        "default": DEFAULT_KP_RERANK_PROMPT,
+        "title": "知识点标注助手",
+        "description": "控制 AI 从召回的候选知识点中为题目挑选真正贴切的项。留空表示由 AI 自行判断 1–3 个。",
     },
 }
 

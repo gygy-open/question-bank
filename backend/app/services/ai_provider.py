@@ -88,6 +88,28 @@ class AIProvider(ABC):
         """
         pass
 
+    # 各 provider 自己的 JSON 输出契约。提示词正文统一放在 SUBJECT_PROMPTS
+    # (AI_KP_RERANK_PROMPT) 里由学科覆盖,这里只描述本次调用怎么把结果取回来。
+    KP_RERANK_OUTPUT_CONTRACT = ""
+
+    def _kp_rerank_items_block(self, items: List[Dict[str, Any]]) -> str:
+        """把一批题目渲染成提示词里的 {items} 段。"""
+        return "".join(
+            "Question ID: {id}\nContent: {content}...\nCandidates: {candidates}\n\n".format(
+                id=item["id"],
+                content=str(item.get("content") or "")[:200],
+                candidates=json.dumps(item.get("candidates") or [], ensure_ascii=False),
+            )
+            for item in items
+        )
+
+    def _kp_rerank_prompt(self, items: List[Dict[str, Any]], prompt_template: Optional[str] = None) -> str:
+        from app.services.prompts import render_kp_rerank_prompt
+
+        return render_kp_rerank_prompt(
+            prompt_template, self._kp_rerank_items_block(items), self.KP_RERANK_OUTPUT_CONTRACT
+        )
+
     async def rerank_knowledge_points(self, question_content: str, candidates: List[str], config: Dict[str, str] = None) -> List[str]:
         """
         Rerank or filter knowledge points based on relevance to the question.
@@ -95,14 +117,15 @@ class AIProvider(ABC):
         """
         return candidates
 
-    async def batch_rerank_knowledge_points(self, items: List[Dict[str, Any]], config: Dict[str, str] = None) -> Dict[str, List[str]]:
+    async def batch_rerank_knowledge_points(self, items: List[Dict[str, Any]], config: Dict[str, str] = None, prompt_template: Optional[str] = None) -> Dict[str, List[str]]:
         """
         Batch rerank knowledge points for multiple questions.
-        
+
         Args:
             items: List of dicts, each containing 'id' (str/int), 'content', and 'candidates'.
             config: Provider configuration.
-            
+            prompt_template: 学科覆盖的提示词正文；None 表示用代码默认值。
+
         Returns:
             Dict mapping id (as string) to list of verified knowledge points.
         """
@@ -459,7 +482,11 @@ class GeminiProvider(AIProvider):
             return candidates
         return candidates
 
-    async def batch_rerank_knowledge_points(self, items: List[Dict[str, Any]], config: Dict[str, str] = None) -> Dict[str, List[str]]:
+    KP_RERANK_OUTPUT_CONTRACT = (
+        "Return a JSON array, one element per question, each with an \"id\" string and a \"points\" array of knowledge point strings."
+    )
+
+    async def batch_rerank_knowledge_points(self, items: List[Dict[str, Any]], config: Dict[str, str] = None, prompt_template: Optional[str] = None) -> Dict[str, List[str]]:
         try:
             from google import genai
             from google.genai import types
@@ -480,17 +507,7 @@ class GeminiProvider(AIProvider):
         client = genai.Client(**client_kwargs)
         model_name = config.get("MODEL_NAME", "gemini-2.0-flash-exp")
 
-        prompt = "请批量判断以下题目与候选知识点的相关性。\n\n"
-        for item in items:
-            prompt += f"题目ID: {item['id']}\n"
-            prompt += f"题目内容: {item['content'][:200]}...\n"
-            prompt += f"候选知识点: {json.dumps(item['candidates'], ensure_ascii=False)}\n\n"
-            
-        prompt += """
-请返回一个 JSON 列表，每个元素包含 "id" 和 "points" 字段。
-注意：
-如果候选知识点中存在层级关系（例如 "A > B" 和 "A > B > C"），请优先选择更具体的子级知识点（"A > B > C"），并排除父级知识点，除非题目内容仅涉及父级概念。
-"""
+        prompt = self._kp_rerank_prompt(items, prompt_template)
         try:
             def generate_content():
                 return client.models.generate_content(
@@ -840,7 +857,12 @@ class OpenAIProvider(AIProvider):
             logger.error(f"Rerank error: {e}")
             return candidates
 
-    async def batch_rerank_knowledge_points(self, items: List[Dict[str, Any]], config: Dict[str, str] = None) -> Dict[str, List[str]]:
+    KP_RERANK_OUTPUT_CONTRACT = (
+        "Return a JSON object whose keys are the question IDs (strings) and whose values are the matching knowledge point arrays, "
+        'for example {"0": ["point A", "point B"], "1": []}.'
+    )
+
+    async def batch_rerank_knowledge_points(self, items: List[Dict[str, Any]], config: Dict[str, str] = None, prompt_template: Optional[str] = None) -> Dict[str, List[str]]:
         try:
             from openai import AsyncOpenAI
         except ImportError:
@@ -857,23 +879,7 @@ class OpenAIProvider(AIProvider):
             client = AsyncOpenAI(api_key=api_key, base_url=base_url)
             model_name = config.get("MODEL_NAME", "gpt-4o")
 
-            prompt = "请批量判断以下题目与候选知识点的相关性。\n\n"
-            for item in items:
-                prompt += f"题目ID: {item['id']}\n"
-                prompt += f"题目内容: {item['content'][:200]}...\n"
-                prompt += f"候选知识点: {json.dumps(item['candidates'], ensure_ascii=False)}\n\n"
-
-            prompt += """
-请返回一个 JSON 对象，键为题目ID（字符串），值为该题目最相关的知识点列表。
-注意：
-如果候选知识点中存在层级关系（例如 "A > B" 和 "A > B > C"），请优先选择更具体的子级知识点（"A > B > C"），并排除父级知识点，除非题目内容仅涉及父级概念。
-
-格式示例：
-{
-  "0": ["知识点A", "知识点B"],
-  "1": []
-}
-"""
+            prompt = self._kp_rerank_prompt(items, prompt_template)
             response = await client.chat.completions.create(
                 model=model_name,
                 messages=[{"role": "user", "content": prompt}],

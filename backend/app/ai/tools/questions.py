@@ -363,9 +363,12 @@ async def _enrich_question_with_knowledge_points(db: AsyncSession, question_data
                 "candidates": candidates
             }]
             
+            from app.services.importing.prompt import PromptBuilder
+
             verified_results = await provider.batch_rerank_knowledge_points(
                 items=batch_items,
-                config=config
+                config=config,
+                prompt_template=await PromptBuilder().build_kp_rerank(db, subject_id=subject_id),
             )
             
             verified_points = verified_results.get("1")
