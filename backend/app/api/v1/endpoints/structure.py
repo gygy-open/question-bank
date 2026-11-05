@@ -657,24 +657,11 @@ async def structure_job(
     db: deps.SessionDep,
     current_user: models.User = Depends(deps.get_current_active_user),
 ) -> Any:
-    """自己发起的命题 / 组替换任务的状态(进度里有生成的题目 id 或失败原因)。"""
-    import json as _json
-
-    from app.models.job import Job
-    from app.services.structure import compose as compose_svc
-
-    job = await db.get(Job, job_id)
-    if job is None or job.type != compose_svc.JOB_TYPE or (job.user_id != current_user.id and not current_user.is_superuser):
+    """自己发起的结构化任务(拆解、变式、命题、解答、归纳)的状态与结果。"""
+    try:
+        return await struct_service.job_status(db, job_id, current_user)
+    except Exception:
         raise ApiError(404, ErrorCode.STRUCTURE_JOB_NOT_FOUND, "Not found")
-    return {
-        "id": job.id,
-        "status": job.status,
-        "paused_reason": job.paused_reason,
-        "error": job.error,
-        "progress": _json.loads(job.progress) if job.progress else {},
-        "created_at": job.created_at,
-        "finished_at": job.finished_at,
-    }
 
 # endregion
 

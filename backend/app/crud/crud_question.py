@@ -145,6 +145,7 @@ class CRUDQuestion(CRUDBase[Question, QuestionCreate, QuestionUpdate]):
         struct_state: Optional[str] = None,
         thinking_min: Optional[float] = None,
         thinking_max: Optional[float] = None,
+        created_via: Optional[str] = None,
         viewer=None,
     ):
         query = select(self.model).options(
@@ -252,6 +253,11 @@ class CRUDQuestion(CRUDBase[Question, QuestionCreate, QuestionUpdate]):
             query = query.filter(self.model.thinking_difficulty >= thinking_min)
         if thinking_max is not None:
             query = query.filter(self.model.thinking_difficulty <= thinking_max)
+        if created_via:
+            # "app" 表示站内创建(没有渠道标记)。
+            query = query.filter(
+                self.model.created_via.is_(None) if created_via == "app" else self.model.created_via == created_via
+            )
 
         if viewer is not None:
             query = query.filter(visible_questions_filter(viewer))
@@ -285,6 +291,7 @@ class CRUDQuestion(CRUDBase[Question, QuestionCreate, QuestionUpdate]):
         struct_state: Optional[str] = None,
         thinking_min: Optional[float] = None,
         thinking_max: Optional[float] = None,
+        created_via: Optional[str] = None,
         sort: Optional[str] = None,
         viewer=None
     ) -> List[Question]:
@@ -311,6 +318,7 @@ class CRUDQuestion(CRUDBase[Question, QuestionCreate, QuestionUpdate]):
             struct_state=struct_state,
             thinking_min=thinking_min,
             thinking_max=thinking_max,
+            created_via=created_via,
             viewer=viewer
         )
         if sort in ("thinking_asc", "thinking_desc"):
@@ -406,6 +414,7 @@ class CRUDQuestion(CRUDBase[Question, QuestionCreate, QuestionUpdate]):
         struct_state: Optional[str] = None,
         thinking_min: Optional[float] = None,
         thinking_max: Optional[float] = None,
+        created_via: Optional[str] = None,
         viewer=None
     ) -> int:
         query = await self._get_filter_query(
@@ -431,6 +440,7 @@ class CRUDQuestion(CRUDBase[Question, QuestionCreate, QuestionUpdate]):
             struct_state=struct_state,
             thinking_min=thinking_min,
             thinking_max=thinking_max,
+            created_via=created_via,
             viewer=viewer
         )
         # Use subquery for count to handle joins correctly

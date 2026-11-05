@@ -270,6 +270,8 @@ class Question(QuestionBase):
     content_revision: int = 1
     # 思维量难度(题干结构化三期):已采纳解答的步骤权重之和(多解取最小);没有解答结构时为空。
     thinking_difficulty: Optional[float] = None
+    # 创建渠道:mcp 表示由外部 Agent 经 MCP 创建。
+    created_via: Optional[str] = None
     knowledge_points: List[KnowledgePoint] = []
     created_at: datetime
     updated_at: datetime

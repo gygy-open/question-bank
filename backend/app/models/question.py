@@ -7,6 +7,7 @@ from sqlalchemy.orm import relationship
 from datetime import datetime
 import enum
 from .base import Base
+from app.core.channel import channel_value
 
 # v2 内容目标结构版本(存量未迁移行为 0,见 docs/development/question-model-v2.md §0)。
 SCHEMA_VERSION = 1
@@ -106,6 +107,8 @@ class Question(Base):
         server_default=QuestionVisibility.PUBLIC.value, index=True,
     )
     difficulty = Column(Integer, default=1) # 难度 1-5
+    # 创建渠道:mcp 表示由外部 Agent 经 MCP 创建(含 Agent 发起的变式 / 命题任务生成的题);站内创建为空。
+    created_via = Column(String(16), nullable=True, index=True, default=channel_value)
     # 思维量难度(题干结构化三期):已采纳解答中步骤权重之和,多解取最小;没有采纳解答时为空。
     thinking_difficulty = Column(Float, nullable=True)
     review_count = Column(Integer, default=0) # 审核次数

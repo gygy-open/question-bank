@@ -3,14 +3,16 @@
 读路径(查看拆解、类型树、同结构题、审核队列)与题目域一致,刻意不放进能力层:端点
 直接调用 ``app.services.structure.service``,MCP 另有同等门禁的只读工具。
 
-MCP 暴露范围:``structure.decompose``、``structure.save``(只能存为待审);审核、类型树的
-修改、存量回填只在站内使用(见 ``app/mcp_server/tools.py`` 的 EXCLUDED_CAPABILITIES)。
+MCP 暴露范围(规格 §12.3 N5,2026-11-05 修订):外部 Agent 可以拆解、保存(只能存为待审)、
+生成变式 / 整组替换 / 拼装命题、拆解解答,并维护类型树与归纳;**采纳**(``structure.review``、
+``solution.review``)与存量回填只在站内使用(见 ``app/mcp_server/tools.py`` 的 EXCLUDED_CAPABILITIES)。
+Agent 发起的写入记为 MCP 渠道:拆解来源为 agent,生成的题目 ``created_via='mcp'``。
 """
 from __future__ import annotations
 
 from typing import Any, Dict, List, Literal, Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 from app.core import permissions
 from app.core.api_errors import ErrorCode
@@ -75,7 +77,7 @@ class StructureParamInput(BaseModel):
     domain: Optional[Dict[str, Any]] = Field(
         None, description="Allowed values: {min, max, integer, values, exclude, note}."
     )
-    domain_confirmed: bool = Field(False, description="Teacher confirmed the domain (ignored via MCP).")
+    domain_confirmed: bool = Field(False, description="Teacher confirmed the domain (ignored via MCP; only teachers confirm).")
     replaceable: bool = True
 
 
@@ -141,6 +143,23 @@ class StructTypeUpdateInput(BaseModel):
     knowledge_point_ids: Optional[List[int]] = Field(None, description="Replace the mapped knowledge points.")
 
 
+class StructTypeRead(BaseModel):
+    """A structure type node (output)."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    subject_id: int
+    parent_id: Optional[int] = None
+    kind: str
+    code: str
+    name: str
+    definition: Optional[str] = None
+    status: str
+    sort_order: int
+    weight: float = 1.0
+
+
 class StructTypeIdInput(BaseModel):
     id: int
 
@@ -199,10 +218,12 @@ class SolutionStepInput(BaseModel):
 
 
 class SolutionSaveInput(BaseModel):
+    """An edited solution decomposition, saved as a new draft."""
+
     question_id: int
     solution_no: int = Field(1, ge=1, le=9)
     steps: List[SolutionStepInput] = Field(..., min_length=1, max_length=60)
-    accept: bool = False
+    accept: bool = Field(False, description="Accept immediately after saving (not available via MCP).")
 
 
 class SolutionReviewInput(BaseModel):
@@ -566,6 +587,7 @@ class DecomposeSolutions(Capability[SolutionDecomposeInput, dict]):
 
         queued: List[int] = []
         skipped: List[int] = []
+        job_ids: List[int] = []
         for question_id in dict.fromkeys(inp.question_ids):
             question = await ctx.db.get(Question, question_id)
             found = None
@@ -582,12 +604,13 @@ class DecomposeSolutions(Capability[SolutionDecomposeInput, dict]):
             except Invalid:
                 skipped.append(question_id)
                 continue
-            await solution_svc.enqueue(
+            job = await solution_svc.enqueue(
                 ctx.db, question, solution_no=inp.solution_no, user_id=ctx.actor.id, locale=get_locale()
             )
             queued.append(question_id)
+            job_ids.append(job.id)
         await ctx.db.commit()
-        return {"queued": queued, "skipped": skipped}
+        return {"queued": queued, "skipped": skipped, "job_ids": job_ids}
 
 
 @register

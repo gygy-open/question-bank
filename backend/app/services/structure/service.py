@@ -886,6 +886,49 @@ def question_state_filter(state: str):
 # endregion
 
 
+# region 任务状态
+
+# 结构化相关的后台任务类型(可以通过任务查询接口 / MCP 查看进度)。
+STRUCTURE_JOB_TYPES = (
+    JOB_TYPE, "structure.variant", "structure.compose", "solution.decompose", "struct_type.induce",
+)
+
+
+async def job_status(db: AsyncSession, job_id: int, user: Any) -> Dict[str, Any]:
+    """结构化任务的状态与结果:只有发起人(或超级管理员)能看。不存在或无权时抛 NotFound。
+
+    ``progress`` 里有阶段、生成的题目 id(``question_id``)或失败原因(``error_code`` / ``problems``)。
+    """
+    job = await db.get(Job, job_id)
+    if (
+        job is None
+        or job.type not in STRUCTURE_JOB_TYPES
+        or (job.user_id != getattr(user, "id", None) and not getattr(user, "is_superuser", False))
+    ):
+        raise NotFound("Job not found", ErrorCode.STRUCTURE_JOB_NOT_FOUND)
+    from app.services.jobs import job_service
+
+    progress = json.loads(job.progress) if job.progress else {}
+    queue_ahead = None
+    if job.status == JobStatus.PENDING.value:
+        queue_ahead = (await job_service.queue_positions(db, [job.id])).get(job.id)
+    return {
+        "id": job.id,
+        "type": job.type,
+        "status": job.status,
+        "target_type": job.target_type,
+        "target_id": job.target_id,
+        "paused_reason": job.paused_reason,
+        "error": job.error,
+        "progress": progress if isinstance(progress, dict) else {},
+        "queue_ahead": queue_ahead,
+        "created_at": job.created_at,
+        "finished_at": job.finished_at,
+    }
+
+# endregion
+
+
 # region 统计(首页卡片、组卷分布)
 
 async def subject_stats(db: AsyncSession, subject_id: int, viewer: Any) -> Dict[str, Any]:

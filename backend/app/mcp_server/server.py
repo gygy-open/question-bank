@@ -16,6 +16,7 @@ from starlette.types import Receive, Scope, Send
 
 from app._version import __version__
 from app.capabilities.context import ExecutionContext, Surface
+from app.core.channel import MCP as MCP_CHANNEL, current_channel
 from app.crud.crud_user import user as crud_user
 from app.db import session as db_session
 from app.services.activity_logger import log_activity
@@ -46,6 +47,11 @@ Guidelines:
    its ID (e.g. in a composition) instead of creating a copy.
 6. Delete tools remove data from the user's view (questions and compositions can only be restored inside the system); confirm with the user before running them.
 7. Content (question text, titles, etc.) may be in any language; keep the user's language when writing content.
+8. Question structure (stem decomposition into conditions / asks, parameters, element groups, solution steps):
+   structure_decompose, structure_variant, structure_group_replace, structure_compose and solution_decompose
+   run as background jobs - poll get_structure_job with the returned job IDs until the status is succeeded or
+   failed. Generated questions are drafts linked to their sources; decompositions you save are drafts too.
+   Accepting decompositions is done by teachers inside the system, never through MCP.
 """
 
 
@@ -114,6 +120,7 @@ async def execute_tool(
         error: Optional[Dict[str, Any]] = None
         data: Dict[str, Any] = {}
         auth_token = current_auth.set(auth)
+        channel_token = current_channel.set(MCP_CHANNEL)
         try:
             data = await tool.handler(ctx, args)
         except Exception as exc:  # noqa: BLE001 - 失败要回给客户端,而不是断开连接
@@ -122,6 +129,7 @@ async def execute_tool(
             if error.get("status", 500) >= 500:
                 logger.exception("MCP tool %s failed", tool.name)
         finally:
+            current_channel.reset(channel_token)
             current_auth.reset(auth_token)
 
         # 只读调用频繁且无副作用,只审计写操作(含失败的写尝试)
