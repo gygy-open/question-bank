@@ -213,7 +213,7 @@
 4. ~~难度：三期的思维量难度上线后，现有 1–5 难度是保留并行，还是迁移？~~ 已定：并行，新增 `questions.thinking_difficulty`。
 5. ~~参数取值范围（`domain`）由谁定？~~ 已定：AI 建议、老师确认；未确认时不允许 AI 自动取值。
 6. 学情的作答数据从哪里来：组卷导出后线下批改再录入、在线作答、还是对接外部系统？未定之前五期不启动。
-7. MCP 是否需要「审核」权限：倾向不开放；确有需要时做成 API Key 的权限范围（默认关闭），见 §12.3 N5。
+7. ~~MCP 是否需要「审核」权限？~~ 已定（2026-11-05，老师反馈：Agent 要经 MCP 自行处理数据、做变式命题与改动元素等验证）：生成类操作与类型树维护对 MCP 开放；**采纳仍不开放**，由老师在站内完成。见 §12.3 N5。
 
 ## 12. 后续需求与设计
 
@@ -229,7 +229,7 @@ PR 作者在自己的分支 `laozhudu/feat/element-schema` 上做了一轮扩展
 | N2 | 元素组：几条条件作为整体替换（如「过 A、B 两点」整组换） | 无 | 缺 |
 | N3 | 同源检索：按相同元素内容、相同参数模式找题 | 有「同结构题」（类型集合 Jaccard） | 只看类型，不看元素内容与参数 |
 | N4 | 跨题拼装：从多道题挑元素组成新题 | 无 | 缺（作者实现仅为文本拼接，不可用） |
-| N5 | Agent 闭环：外部 AI 经 MCP 读题、拆解、入库，并审核、维护类型树 | MCP 可读、可发起拆解、可存为待审 | 有意不开放采纳与类型树修改；Agent 提交的结果被记为「人工修改」 |
+| N5 | Agent 闭环：外部 AI 经 MCP 读题、拆解、入库，并审核、维护类型树；用 Agent 自行验证变式命题、改动元素 | MCP 可读、可发起拆解、可存为待审 | 生成类操作与类型树维护需开放；采纳不开放；Agent 产出需可区分 |
 | N6 | 学情：答题卷、作答、步骤级错因、学生对元素的掌握度 | 无 | 缺，且缺作答数据来源 |
 | N7 | 解题步骤：思维动作、步骤产出、常见错误（原 #29） | 无 | 缺 |
 | N8 | 元素对应知识点 | 无 | 缺 |
@@ -304,7 +304,12 @@ PR 作者在自己的分支 `laozhudu/feat/element-schema` 上做了一轮扩展
 
 - 外部 Agent 自己拆解后用 `structure.save` 提交的链路已可用。
 - `struct_runs.origin` 增加 `agent`：MCP 来源的保存记为 agent，审核页可按来源筛选，统计时能区分 AI（站内）/ Agent（外部）/ 人工。
-- 采纳不开放。确有需要时做成 API Key 权限范围 `structure:review`（默认关闭，仅能授予有学科审核权限的用户）；类型树修改不开放。
+- **开放范围（2026-11-05 修订）**：老师会让 Agent 经 MCP 自行处理数据、做验证（变式命题、改动元素等），因此对 MCP 开放：
+  - 生成类：`structure.variant`、`structure.group_replace`、`structure.compose`、`solution.decompose` / `solution.save`；产出都是草稿题或待审拆解；
+  - 类型树：`struct_type.*` 的增改删合并导入、`struct_type.induce` 与候选的确认（仍需用户本人有类型维护 / 学科管理权限）；
+  - 只读工具：`get_structure_job`（任务进度与结果，只能看自己发起的）、`list_group_replacement_candidates`、`list_structure_type_candidates`、`get_question_solution`。
+- **不开放**：采纳（`structure.review`、`solution.review`、保存时的 `accept`）与存量回填；参数取值范围的「确认」也只能由老师在站内完成。
+- **可区分**：MCP 调用期间设置当前渠道（`app/core/channel.py` 的 ContextVar）。在其中排队的任务把渠道写进 payload，worker 执行时恢复。题目的 `created_via` 列默认取当前渠道，因此 Agent 直接创建的题、Agent 发起的变式 / 命题生成的题都记为 `mcp`；题库与 MCP `search_questions` 可按 `created_via` 筛选，列表显示「Agent」标记，便于清理测试数据。
 
 #### N7 解题步骤与难度（三期）
 
@@ -333,7 +338,7 @@ PR 作者在自己的分支 `laozhudu/feat/element-schema` 上做了一轮扩展
 | `/variants`（只返回文本） | 改为任务 + 解题校验 + 草稿题（N1） |
 | `/similar/element-group`、`/similar/param` | 合并为同结构题的 `mode`（N3）；原实现查询条件互斥，结果恒为空 |
 | `/compose`（文本拼接） | 改为任务 + AI 改写 + 结构一致性校验 + 草稿题（N4） |
-| MCP 开放审核、回填、类型树修改 | 不采纳；改为 `origin=agent` + 可选权限范围（N5） |
+| MCP 开放审核、回填、类型树修改 | 类型树修改开放；审核与回填不开放；Agent 产出记 `origin=agent` / `created_via=mcp`（N5） |
 | 学生作答层（已被作者自行移除） | 记为 N6，五期 |
 | 新接口缺少学科权限与可见性判断 | 所有新接口走能力层判权 + 可见性过滤 |
 
