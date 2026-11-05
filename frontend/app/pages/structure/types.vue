@@ -18,6 +18,8 @@ import StructTypeTreeItem from '@/components/structure/types/StructTypeTreeItem.
 import StructTypeEditDialog from '@/components/structure/types/StructTypeEditDialog.vue'
 import StructTypeMoveDialog from '@/components/structure/types/StructTypeMoveDialog.vue'
 import StructTypeImportDialog from '@/components/structure/types/StructTypeImportDialog.vue'
+import StructCandidatesPanel from '@/components/structure/types/StructCandidatesPanel.vue'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { getApiErrorDetail } from '@/lib/apiErrors'
 import {
   buildStructTypeTree,
@@ -25,7 +27,7 @@ import {
   type StructTypeFormValue,
   type StructTypeNode,
 } from '@/lib/structure'
-import type { StructSettings, StructType, StructTypeKind } from '~/types'
+import type { KnowledgePoint, StructSettings, StructType, StructTypeKind } from '~/types'
 
 const { t } = useI18n()
 const api = useStructure()
@@ -35,6 +37,9 @@ const { refresh: refreshStructureEnabled } = useStructureEnabled()
 // region 状态
 
 const types = ref<StructType[]>([])
+// 本学科的知识点:编辑类型时用于映射(规格 §12.3 N8)。
+const knowledgePoints = ref<KnowledgePoint[]>([])
+const { $api } = useNuxtApp()
 const settings = ref<StructSettings | null>(null)
 const loading = ref(false)
 const saving = ref(false)
@@ -54,6 +59,12 @@ const moveSource = ref<StructType | null>(null)
 const importOpen = ref(false)
 
 // 存量回填的数量(后端上限 5000)。
+// 「类型树」/「待归纳」标签页;从题干结构面板的「待归类」提示跳过来时带 ?tab=candidates。
+const route = useRoute()
+const tab = ref<'tree' | 'candidates'>(route.query.tab === 'candidates' ? 'candidates' : 'tree')
+const candidateCount = ref(0)
+const candidatesPanel = ref<InstanceType<typeof StructCandidatesPanel> | null>(null)
+
 const backfillLimit = ref(500)
 const backfilling = ref(false)
 
@@ -67,11 +78,13 @@ const canManageSubject = computed(() => enabled.value && !!settings.value?.can_m
 
 const conditionTree = computed(() => filterStructTypeTree(buildStructTypeTree(types.value, 'condition'), search.value))
 const askTree = computed(() => filterStructTypeTree(buildStructTypeTree(types.value, 'ask'), search.value))
+const methodTree = computed(() => filterStructTypeTree(buildStructTypeTree(types.value, 'method'), search.value))
 const searching = computed(() => !!search.value.trim())
 
 const sections = computed(() => [
   { kind: 'condition' as StructTypeKind, title: t('structure.kinds.condition'), roots: conditionTree.value },
   { kind: 'ask' as StructTypeKind, title: t('structure.kinds.ask'), roots: askTree.value },
+  { kind: 'method' as StructTypeKind, title: t('structure.kinds.method'), roots: methodTree.value },
 ])
 
 // endregion
@@ -84,7 +97,12 @@ async function load(): Promise<void> {
   if (subjectId == null) return
   loading.value = true
   try {
-    const [typeList, structureSettings] = await Promise.all([api.listTypes(subjectId), api.getSettings(subjectId)])
+    const [typeList, structureSettings, kps] = await Promise.all([
+      api.listTypes(subjectId),
+      api.getSettings(subjectId),
+      $api<KnowledgePoint[]>('/knowledge-points', { query: { subject_id: subjectId, limit: -1 } }).catch(() => []),
+    ])
+    knowledgePoints.value = kps
     types.value = typeList.items
     settings.value = structureSettings
   } catch (e) {
@@ -117,6 +135,8 @@ async function submitEdit(value: StructTypeFormValue): Promise<void> {
         definition: value.definition || null,
         examples: value.examples.length ? value.examples : null,
         status: value.status,
+        weight: value.weight,
+        knowledge_point_ids: value.knowledge_point_ids,
       })
     } else {
       await api.createType({
@@ -128,6 +148,7 @@ async function submitEdit(value: StructTypeFormValue): Promise<void> {
         definition: value.definition || null,
         examples: value.examples.length ? value.examples : null,
         status: value.status,
+        weight: value.weight,
       })
     }
     editOpen.value = false
@@ -249,8 +270,12 @@ async function run(action: () => Promise<void>): Promise<void> {
 
 watch(currentSubjectId, () => { void load() }, { immediate: true })
 // 页面 keep-alive:重新进入时刷新(别处可能刚采纳了拆解,引用数会变)。
+watch(() => route.query.tab, (value) => {
+  if (value === 'candidates') tab.value = 'candidates'
+})
 onActivated(() => {
   void load()
+  void candidatesPanel.value?.load()
   void refreshStructureEnabled()
 })
 </script>
@@ -300,50 +325,72 @@ onActivated(() => {
         </CardContent>
       </Card>
 
-      <!-- 工具栏 -->
-      <div class="flex flex-wrap items-center gap-2">
-        <div class="relative w-full max-w-xs">
-          <Search class="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-          <Input v-model="search" class="h-9 pl-8" :placeholder="t('structure.types.searchPlaceholder')" />
-        </div>
-        <div class="ml-auto flex flex-wrap gap-2">
-          <Button variant="outline" size="sm" @click="exportTypes"><Download class="mr-2 h-4 w-4" />{{ t('structure.types.export') }}</Button>
-          <Button v-if="editable" variant="outline" size="sm" @click="importOpen = true"><Upload class="mr-2 h-4 w-4" />{{ t('structure.types.import') }}</Button>
-        </div>
-      </div>
-
-      <div v-if="loading && !types.length" class="flex items-center gap-2 py-10 text-sm text-muted-foreground">
-        <Loader2 class="h-4 w-4 animate-spin" /> {{ t('common.loading') }}
-      </div>
-
-      <!-- 条件类型 / 设问类型两棵树 -->
-      <div v-else class="grid gap-6 xl:grid-cols-2">
-        <section v-for="section in sections" :key="section.kind" class="rounded-lg border bg-card p-3">
-          <div class="mb-2 flex items-center justify-between px-2">
-            <h3 class="font-medium">{{ section.title }}</h3>
-            <Button v-if="editable" size="sm" variant="ghost" class="h-7" @click="openCreate(null, section.kind)">
-              <Plus class="mr-1 h-4 w-4" />{{ t('structure.types.addRoot') }}
-            </Button>
+      <Tabs v-model="tab" class="space-y-4">
+        <TabsList>
+          <TabsTrigger value="tree">{{ t('structure.induce.tabTree') }}</TabsTrigger>
+          <TabsTrigger value="candidates">
+            {{ t('structure.induce.tabCandidates') }}
+            <span v-if="candidateCount" class="ml-1.5 rounded-full bg-primary px-1.5 text-xs text-primary-foreground">{{ candidateCount }}</span>
+          </TabsTrigger>
+        </TabsList>
+        <TabsContent value="tree" class="space-y-6">
+          <!-- 工具栏 -->
+          <div class="flex flex-wrap items-center gap-2">
+            <div class="relative w-full max-w-xs">
+              <Search class="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+              <Input v-model="search" class="h-9 pl-8" :placeholder="t('structure.types.searchPlaceholder')" />
+            </div>
+            <div class="ml-auto flex flex-wrap gap-2">
+              <Button variant="outline" size="sm" @click="exportTypes"><Download class="mr-2 h-4 w-4" />{{ t('structure.types.export') }}</Button>
+              <Button v-if="editable" variant="outline" size="sm" @click="importOpen = true"><Upload class="mr-2 h-4 w-4" />{{ t('structure.types.import') }}</Button>
+            </div>
           </div>
-          <StructTypeTreeItem
-            v-for="node in section.roots"
-            :key="node.id"
-            :node="node"
+
+          <div v-if="loading && !types.length" class="flex items-center gap-2 py-10 text-sm text-muted-foreground">
+            <Loader2 class="h-4 w-4 animate-spin" /> {{ t('common.loading') }}
+          </div>
+
+          <!-- 条件类型 / 设问类型两棵树 -->
+          <div v-else class="grid gap-6 xl:grid-cols-2">
+            <section v-for="section in sections" :key="section.kind" class="rounded-lg border bg-card p-3">
+              <div class="mb-2 flex items-center justify-between px-2">
+                <h3 class="font-medium">{{ section.title }}</h3>
+                <Button v-if="editable" size="sm" variant="ghost" class="h-7" @click="openCreate(null, section.kind)">
+                  <Plus class="mr-1 h-4 w-4" />{{ t('structure.types.addRoot') }}
+                </Button>
+              </div>
+              <StructTypeTreeItem
+                v-for="node in section.roots"
+                :key="node.id"
+                :node="node"
+                :types="types"
+                :editable="editable"
+                :force-open="searching"
+                @add-child="openCreate($event, section.kind)"
+                @edit="openEdit"
+                @move="openMove($event, 'move')"
+                @merge="openMove($event, 'merge')"
+                @toggle-status="toggleStatus"
+                @delete="remove"
+              />
+              <p v-if="!section.roots.length" class="px-2 py-4 text-sm text-muted-foreground">
+                {{ searching ? t('structure.typeSelect.empty') : t('structure.types.empty') }}
+              </p>
+            </section>
+          </div>
+        </TabsContent>
+        <TabsContent value="candidates" :force-mount="true" :hidden="tab !== 'candidates'">
+          <StructCandidatesPanel
+            ref="candidatesPanel"
+            :subject-id="currentSubjectId ?? null"
             :types="types"
             :editable="editable"
-            :force-open="searching"
-            @add-child="openCreate($event, section.kind)"
-            @edit="openEdit"
-            @move="openMove($event, 'move')"
-            @merge="openMove($event, 'merge')"
-            @toggle-status="toggleStatus"
-            @delete="remove"
+            :can-induce="canManageSubject"
+            @changed="load"
+            @count="candidateCount = $event"
           />
-          <p v-if="!section.roots.length" class="px-2 py-4 text-sm text-muted-foreground">
-            {{ searching ? t('structure.typeSelect.empty') : t('structure.types.empty') }}
-          </p>
-        </section>
-      </div>
+        </TabsContent>
+      </Tabs>
     </div>
   </div>
 
@@ -352,6 +399,8 @@ onActivated(() => {
     :initial="editing"
     :parent-name="newParent?.name ?? null"
     :saving="saving"
+    :kind="editing?.kind ?? newKind"
+    :knowledge-points="knowledgePoints"
     @submit="submitEdit"
   />
   <StructTypeMoveDialog

@@ -17,25 +17,38 @@ import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import { toast } from 'vue-sonner'
 import {
   ArrowDown, ArrowUp, Check, ChevronDown, ChevronRight, Combine, Copy, Loader2, Pencil, RefreshCw,
-  Sparkles, Trash2, TriangleAlert, X,
+  Boxes, PackagePlus, Shuffle, Sparkles, Trash2, TriangleAlert, Variable, X,
 } from '@lucide/vue'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
+import { Input } from '@/components/ui/input'
 import { NativeSelect, NativeSelectOption } from '@/components/ui/native-select'
 import { Textarea } from '@/components/ui/textarea'
 import MathText from '@/components/structure/MathText.vue'
 import StructTypeSelect from '@/components/structure/StructTypeSelect.vue'
+import StructParamEditor, { type EditParam } from '@/components/structure/StructParamEditor.vue'
+import StructVariantDialog from '@/components/structure/StructVariantDialog.vue'
+import KnowledgeSuggestions from '@/components/structure/KnowledgeSuggestions.vue'
+import StructComposeDialog from '@/components/structure/StructComposeDialog.vue'
+import StructGroupReplaceDialog from '@/components/structure/StructGroupReplaceDialog.vue'
 import { getApiErrorDetail } from '@/lib/apiErrors'
 import { formatDateTime } from '@/lib/locale'
 import { cn } from '@/lib/utils'
-import { domainClasses, stemTokens, tokenOffset, type StemToken } from '@/lib/structure'
+import {
+  domainClasses, formatParamDomain, locateParamValue, spanInMath, stemTokens, tokenOffset, type StemToken,
+} from '@/lib/structure'
 import type {
   StructCheckIssue,
+  StructElementGroup,
+  StructGroupInput,
   StructFacet,
   StructItemInput,
+  StructParam,
+  StructParamInput,
   StructRun,
   StructSimilarItem,
+  StructSimilarMode,
   StructTargetType,
   StructType,
   StructureView,
@@ -89,7 +102,26 @@ const showing = ref<'draft' | 'accepted'>(props.preferRun)
 const editing = ref(false)
 const editElements = ref<EditItem[]>([])
 const editAsks = ref<EditItem[]>([])
+const editParams = ref<EditParam[]>([])
+// 编辑模式:正在为哪条条目输入参数值(key 为 "e:<uid>" / "a:<uid>")及输入内容。
+const paramDraftKey = ref<string | null>(null)
+const paramDraftValue = ref('')
 let nextUid = 1
+
+const variantOpen = ref(false)
+
+// 元素组:编辑中的组(成员用条件的本地 uid),以及整组替换、命题篮对话框。
+interface EditGroup {
+  uid: number
+  name: string
+  members: number[]
+  replaceable: boolean
+}
+const editGroups = ref<EditGroup[]>([])
+const replacingGroup = ref<StructElementGroup | null>(null)
+const replaceOpen = ref(false)
+const composeOpen = ref(false)
+const basket = useComposeBasket()
 
 // 悬停中的条目 key("e:<id>" / "a:<id>",编辑时用 uid),用于原文与列表的双向高亮。
 const hoveredKey = ref<string | null>(null)
@@ -101,6 +133,12 @@ const sourceBox = ref<HTMLElement | null>(null)
 const similarOpen = ref(false)
 const similarItems = ref<StructSimilarItem[] | null>(null)
 const similarLoading = ref(false)
+const similarMode = ref<StructSimilarMode>('types')
+const similarModes = computed(() => [
+  { value: 'types' as const, label: t('structure.panel.similarModes.types'), hint: t('structure.panel.similarModes.typesHint') },
+  { value: 'elements' as const, label: t('structure.panel.similarModes.elements'), hint: t('structure.panel.similarModes.elementsHint') },
+  { value: 'params' as const, label: t('structure.panel.similarModes.params'), hint: t('structure.panel.similarModes.paramsHint') },
+])
 
 // 任务进行中时轮询的定时器。
 let pollTimer: ReturnType<typeof setInterval> | null = null
@@ -140,7 +178,34 @@ const ranges = computed(() => {
   ]
 })
 
-const tokens = computed(() => stemTokens(stemText.value, ranges.value))
+/** 参数的区间(key 以 "p:" 开头):原文中以下划线标出。 */
+const paramRanges = computed(() => {
+  if (editing.value) return editParams.value.map(p => ({ key: `p:${p.uid}`, span: p.span as [number, number] | null }))
+  return (run.value?.params ?? []).map(p => ({ key: `p:${p.id}`, span: p.span }))
+})
+
+const tokens = computed(() => stemTokens(stemText.value, [...ranges.value, ...paramRanges.value]))
+
+/** 条目 → 它的参数(查看模式)。 */
+const paramsByOwner = computed(() => {
+  const map = new Map<string, StructParam[]>()
+  for (const param of run.value?.params ?? []) {
+    const key = param.element_id != null ? `e:${param.element_id}` : `a:${param.ask_id}`
+    map.set(key, [...(map.get(key) ?? []), param])
+  }
+  return map
+})
+
+/** 当前展示的是可用于命题的版本:题目的、已采纳且未过期的拆解。 */
+const composable = computed(() =>
+  currentType.value === 'question' && !!run.value && run.value.state === 'accepted' && !run.value.stale,
+)
+
+/** 能否生成变式:题目的、未过期的拆解里有可替换的参数,且有编辑权限。 */
+const canVariant = computed(() =>
+  writable.value && currentType.value === 'question' && !!run.value && !run.value.stale
+  && run.value.state !== 'rejected' && run.value.params.some(p => p.replaceable && p.span),
+)
 
 /** key → 类型 id:原文片段按覆盖它的第一条条目所属领域着色。 */
 const typeByKey = computed(() => {
@@ -270,18 +335,46 @@ function startEdit(): void {
       depends: [],
     }
   })
-  editAsks.value = (r?.asks ?? []).map(item => ({
+  const askUid = new Map<number, number>()
+  editAsks.value = (r?.asks ?? []).map((item) => {
+    const uid = nextUid++
+    askUid.set(item.id, uid)
+    return {
+      uid,
+      content: item.content,
+      source: item.span ? stemText.value.slice(item.span[0], item.span[1]) : null,
+      span: item.span,
+      type_id: item.type_id,
+      type_hint: item.type_hint,
+      facet: null,
+      ref_element_id: null,
+      // 设问依赖用条件 id 记录,这里换成本地 uid,保存时再换成下标。
+      depends: item.depends_on.map(id => elementUid.get(id)).filter((dep): dep is number => dep != null),
+    }
+  })
+  editParams.value = (r?.params ?? []).flatMap((param) => {
+    const ownerUid = param.element_id != null ? elementUid.get(param.element_id) : askUid.get(param.ask_id ?? -1)
+    if (ownerUid == null || !param.span) return []
+    return [{
+      uid: nextUid++,
+      ownerKind: param.element_id != null ? 'element' as const : 'ask' as const,
+      ownerUid,
+      name: param.name,
+      value: param.value,
+      slot_kind: param.slot_kind,
+      span: param.span,
+      domain: param.domain ? { ...param.domain } : null,
+      domain_confirmed: param.domain_confirmed,
+      replaceable: param.replaceable,
+    }]
+  })
+  editGroups.value = (r?.groups ?? []).map(group => ({
     uid: nextUid++,
-    content: item.content,
-    source: item.span ? stemText.value.slice(item.span[0], item.span[1]) : null,
-    span: item.span,
-    type_id: item.type_id,
-    type_hint: item.type_hint,
-    facet: null,
-    ref_element_id: null,
-    // 设问依赖用条件 id 记录,这里换成本地 uid,保存时再换成下标。
-    depends: item.depends_on.map(id => elementUid.get(id)).filter((uid): uid is number => uid != null),
+    name: group.name,
+    members: group.element_ids.map(id => elementUid.get(id)).filter((uid): uid is number => uid != null),
+    replaceable: group.replaceable,
   }))
+  paramDraftKey.value = null
   editing.value = true
   selection.value = null
 }
@@ -315,12 +408,37 @@ async function saveEdit(acceptNow: boolean): Promise<void> {
         ? item.depends.map(uid => indexOfUid.get(uid)).filter((index): index is number => index != null)
         : [],
     })
+    const askIndexOfUid = new Map(editAsks.value.map((item, index) => [item.uid, index]))
+    const params: StructParamInput[] = editParams.value.flatMap((param) => {
+      const ownerIndex = (param.ownerKind === 'element' ? indexOfUid : askIndexOfUid).get(param.ownerUid)
+      if (ownerIndex == null) return []
+      return [{
+        owner: param.ownerKind,
+        owner_index: ownerIndex,
+        name: param.name.trim() || param.value,
+        value: param.value,
+        slot_kind: param.slot_kind,
+        span_start: param.span[0],
+        span_end: param.span[1],
+        domain: param.domain,
+        domain_confirmed: param.domain_confirmed && !!param.domain,
+        replaceable: param.replaceable,
+      }]
+    })
     const result = await api.save({
       target_type: currentType.value,
       target_id: currentId.value,
       base_run_id: run.value?.id ?? null,
       elements: editElements.value.map(item => toInput(item, false)),
       asks: editAsks.value.map(item => toInput(item, true)),
+      params,
+      groups: editGroups.value
+        .map((group): StructGroupInput => ({
+          name: group.name.trim(),
+          replaceable: group.replaceable,
+          element_indices: group.members.map(uid => indexOfUid.get(uid)).filter((i): i is number => i != null),
+        }))
+        .filter(group => group.name && group.element_indices.length >= 2),
       accept: acceptNow,
     })
     editing.value = false
@@ -393,6 +511,104 @@ function addEmpty(kind: 'element' | 'ask'): void {
   else editAsks.value.push(item)
 }
 
+/** 选区 → 参数:挂在原文区间包含该选区的第一条条件(其次设问)上。 */
+function addParamFromSelection(): void {
+  if (!selection.value) return
+  const { start, end } = selection.value
+  const owner = findOwner(start, end)
+  if (!owner) {
+    toast.error(t('structure.params.noOwner'))
+    return
+  }
+  addParam(owner.kind, owner.item, [start, end])
+  selection.value = null
+  window.getSelection()?.removeAllRanges()
+}
+
+/** 条目下「添加参数」:在该条目的原文区间里找输入的值(公式里的数也能找到)。 */
+function submitParamDraft(kind: 'element' | 'ask', item: EditItem): void {
+  const value = paramDraftValue.value.trim()
+  if (!value || !item.span) return
+  const occupied = editParams.value.filter(p => p.ownerKind === kind && p.ownerUid === item.uid).length
+  let span: [number, number] | null = null
+  for (let occurrence = 1; occurrence <= occupied + 1; occurrence += 1) {
+    const found = locateParamValue(stemText.value, value, item.span, occurrence)
+    if (found && !editParams.value.some(p => p.span[0] < found[1] && p.span[1] > found[0])) {
+      span = found
+      break
+    }
+  }
+  if (!span) {
+    toast.error(t('structure.params.notFound', { value }))
+    return
+  }
+  addParam(kind, item, span)
+  paramDraftKey.value = null
+  paramDraftValue.value = ''
+}
+
+function addParam(kind: 'element' | 'ask', item: EditItem, span: [number, number]): void {
+  if (editParams.value.some(p => p.span[0] < span[1] && p.span[1] > span[0])) {
+    toast.error(t('structure.params.overlap'))
+    return
+  }
+  const value = stemText.value.slice(span[0], span[1])
+  editParams.value.push({
+    uid: nextUid++,
+    ownerKind: kind,
+    ownerUid: item.uid,
+    name: value,
+    value,
+    slot_kind: /^-?[\d.]+$/.test(value) ? 'numeric' : 'expression',
+    span,
+    domain: null,
+    domain_confirmed: false,
+    replaceable: true,
+  })
+}
+
+function removeParam(uid: number): void {
+  editParams.value = editParams.value.filter(p => p.uid !== uid)
+}
+
+function paramsOf(kind: 'element' | 'ask', uid: number): EditParam[] {
+  return editParams.value.filter(p => p.ownerKind === kind && p.ownerUid === uid)
+}
+
+function openParamDraft(key: string): void {
+  paramDraftKey.value = paramDraftKey.value === key ? null : key
+  paramDraftValue.value = ''
+}
+
+function addGroup(): void {
+  editGroups.value.push({ uid: nextUid++, name: '', members: [], replaceable: true })
+}
+
+/** 一条条件只能属于一个组:勾选时从其他组移出。 */
+function toggleGroupMember(group: EditGroup, uid: number, checked: boolean | 'indeterminate'): void {
+  if (checked === true) {
+    for (const other of editGroups.value) other.members = other.members.filter(m => m !== uid)
+    group.members.push(uid)
+  } else {
+    group.members = group.members.filter(m => m !== uid)
+  }
+}
+
+function openReplace(group: StructElementGroup): void {
+  replacingGroup.value = group
+  replaceOpen.value = true
+}
+
+function groupMembers(group: StructElementGroup): string[] {
+  return (run.value?.elements ?? []).filter(e => group.element_ids.includes(e.id)).map(e => e.content)
+}
+
+/** 加入命题篮;篮中是其他学科的条目时会先清空。 */
+function addToBasket(kind: 'element' | 'ask' | 'group', id: number, content: string): void {
+  const cleared = basket.add({ kind, id, question_id: currentId.value, subject_id: view.value?.subject_id ?? null, content })
+  toast.success(t(cleared ? 'structure.compose.addedNewSubject' : 'structure.compose.added'))
+}
+
 function move(list: EditItem[], index: number, delta: -1 | 1): void {
   const target = index + delta
   if (target < 0 || target >= list.length) return
@@ -402,6 +618,10 @@ function move(list: EditItem[], index: number, delta: -1 | 1): void {
 
 function removeItem(list: EditItem[], index: number, kind: 'element' | 'ask'): void {
   const [removed] = list.splice(index, 1)
+  if (removed) editParams.value = editParams.value.filter(p => !(p.ownerKind === kind && p.ownerUid === removed.uid))
+  if (removed && kind === 'element') {
+    for (const group of editGroups.value) group.members = group.members.filter(uid => uid !== removed.uid)
+  }
   // 删除条件时,同时从各设问的依赖里去掉它。
   if (kind === 'element' && removed) {
     for (const ask of editAsks.value) ask.depends = ask.depends.filter(uid => uid !== removed.uid)
@@ -422,6 +642,12 @@ function mergeWithNext(index: number): void {
   first.source = span ? stemText.value.slice(span[0], span[1]) : first.source
   first.type_id = first.type_id ?? second.type_id
   list.splice(index + 1, 1)
+  for (const param of editParams.value) {
+    if (param.ownerKind === 'element' && param.ownerUid === second.uid) param.ownerUid = first.uid
+  }
+  for (const group of editGroups.value) {
+    group.members = [...new Set(group.members.map(uid => (uid === second.uid ? first.uid : uid)))]
+  }
   // 依赖了被合并条件的设问,改为依赖合并后的条件。
   for (const ask of editAsks.value) {
     if (ask.depends.includes(second.uid)) {
@@ -462,10 +688,22 @@ async function backToTarget(): Promise<void> {
 
 async function toggleSimilar(): Promise<void> {
   similarOpen.value = !similarOpen.value
-  if (!similarOpen.value || similarItems.value || currentType.value !== 'question') return
+  if (!similarOpen.value || similarItems.value) return
+  await loadSimilar()
+}
+
+/** 切换相关题的查找方式(类型相近 / 共享条件)并重新加载。 */
+async function setSimilarMode(mode: StructSimilarMode): Promise<void> {
+  if (similarMode.value === mode) return
+  similarMode.value = mode
+  await loadSimilar()
+}
+
+async function loadSimilar(): Promise<void> {
+  if (currentType.value !== 'question') return
   similarLoading.value = true
   try {
-    similarItems.value = (await api.similar(currentId.value)).items
+    similarItems.value = (await api.similar(currentId.value, { mode: similarMode.value })).items
   } catch (e) {
     toast.error(t('structure.panel.loadFailed'), { description: getApiErrorDetail(e, '') })
   } finally {
@@ -556,6 +794,20 @@ function resolveEdge(node: Node, offset: number, edge: 'start' | 'end'): number 
   return tokenOffset(token, probe.toString().length, edge)
 }
 
+/** 原文区间包含 [start, end) 的第一条条件(其次设问)。 */
+function findOwner(start: number, end: number): { kind: 'element' | 'ask', item: EditItem } | null {
+  const contains = (item: EditItem) => !!item.span && item.span[0] <= start && end <= item.span[1]
+  const element = editElements.value.find(contains)
+  if (element) return { kind: 'element', item: element }
+  const ask = editAsks.value.find(contains)
+  return ask ? { kind: 'ask', item: ask } : null
+}
+
+/** 参数值的展示:落在公式里的参数值是 LaTeX,包上 $ 渲染。 */
+function paramText(value: string, span: [number, number] | null): string {
+  return span && spanInMath(stemText.value, span) ? `$${value}$` : value
+}
+
 /** 按原文位置插入,让列表顺序与题干顺序一致。 */
 function insertBySpan(list: EditItem[], item: EditItem): void {
   const position = item.span?.[0] ?? Number.MAX_SAFE_INTEGER
@@ -566,10 +818,18 @@ function insertBySpan(list: EditItem[], item: EditItem): void {
 
 /** 原文单元的高亮样式:被悬停条目覆盖的加深,其余被覆盖的按领域浅色。 */
 function tokenClass(token: StemToken): string {
-  if (!token.keys.length) return ''
+  const itemKeys = token.keys.filter(key => !key.startsWith('p:'))
+  const param = token.keys.some(key => key.startsWith('p:'))
+    && 'underline decoration-primary decoration-dotted decoration-2 underline-offset-4'
+  if (!itemKeys.length) return cn(param)
   const hovered = hoveredKey.value != null && token.keys.includes(hoveredKey.value)
-  const colors = domainClasses(types.value, typeByKey.value.get(token.keys[0]!) ?? null)
-  return cn('rounded-sm transition-colors', colors.bg, hovered && 'ring-2 ring-primary/60 bg-primary/20')
+  const colors = domainClasses(types.value, typeByKey.value.get(itemKeys[0]!) ?? null)
+  return cn('rounded-sm transition-colors', colors.bg, param, hovered && 'ring-2 ring-primary/60 bg-primary/20')
+}
+
+function hoverToken(token: StemToken): void {
+  const key = token.keys.find(k => !k.startsWith('p:'))
+  if (key) hoveredKey.value = key
 }
 
 function typeLabel(path: string[]): string {
@@ -659,6 +919,12 @@ onBeforeUnmount(stopPolling)
           <Button v-if="run" size="sm" variant="outline" :disabled="busy" @click="startEdit">
             <Pencil class="mr-1 h-4 w-4" /> {{ t('structure.panel.edit') }}
           </Button>
+          <Button v-if="canVariant" size="sm" variant="outline" :disabled="busy" @click="variantOpen = true">
+            <Shuffle class="mr-1 h-4 w-4" /> {{ t('structure.variant.button') }}
+          </Button>
+          <Button v-if="basket.count.value" size="sm" variant="outline" @click="composeOpen = true">
+            <Boxes class="mr-1 h-4 w-4" /> {{ t('structure.compose.basket', { count: basket.count.value }) }}
+          </Button>
           <Button v-if="run" size="sm" variant="ghost" :disabled="busy || !!view.job" @click="redecompose">
             <RefreshCw class="mr-1 h-4 w-4" /> {{ t('structure.panel.redecompose') }}
           </Button>
@@ -737,7 +1003,7 @@ onBeforeUnmount(stopPolling)
               :key="`${token.start}-${token.end}`"
               :data-token="index"
               :class="tokenClass(token)"
-              @mouseenter="token.keys.length && (hoveredKey = token.keys[0]!)"
+              @mouseenter="hoverToken(token)"
               @mouseleave="hoveredKey = null"
             ><MathText v-if="token.math" :text="token.display ? `$$${token.value}$$` : `$${token.value}$`" /><span v-else class="whitespace-pre-wrap">{{ token.value }}</span></span>
 
@@ -753,6 +1019,9 @@ onBeforeUnmount(stopPolling)
               </Button>
               <Button size="sm" variant="ghost" class="h-7 px-2" @click="addFromSelection('ask')">
                 {{ t('structure.panel.asAsk') }}
+              </Button>
+              <Button size="sm" variant="ghost" class="h-7 px-2" @click="addParamFromSelection">
+                {{ t('structure.params.asParam') }}
               </Button>
             </div>
           </div>
@@ -784,9 +1053,13 @@ onBeforeUnmount(stopPolling)
                         v-if="item.type_path.length"
                         :class="cn('rounded border px-1.5 py-0.5', domainClasses(types, item.type_id).border, domainClasses(types, item.type_id).text)"
                       >{{ typeLabel(item.type_path) }}</span>
-                      <span v-if="item.type_hint" class="italic text-muted-foreground">
-                        {{ item.type_path.length ? item.type_hint : t('structure.panel.unclassifiedHint', { hint: item.type_hint }) }}
-                      </span>
+                      <span v-if="item.type_hint && item.type_path.length" class="italic text-muted-foreground">{{ item.type_hint }}</span>
+                      <NuxtLink
+                        v-else-if="item.type_hint"
+                        to="/structure/types?tab=candidates"
+                        class="italic text-muted-foreground underline-offset-2 hover:underline"
+                        :title="t('structure.panel.unclassifiedLink')"
+                      >{{ t('structure.panel.unclassifiedHint', { hint: item.type_hint }) }}</NuxtLink>
                       <span v-else-if="!item.type_path.length" class="italic text-muted-foreground">{{ t('structure.unclassified') }}</span>
                       <Badge v-if="item.facet" variant="secondary" class="h-5 px-1.5 text-[11px] font-normal">{{ t(`structure.facets.${item.facet}`) }}</Badge>
                       <button
@@ -795,6 +1068,26 @@ onBeforeUnmount(stopPolling)
                         class="text-primary hover:underline"
                         @click="openStimulus(item.shared_from_stimulus_id)"
                       >{{ t('structure.shared') }}</button>
+                      <button
+                        v-if="composable"
+                        type="button"
+                        :class="cn('ml-auto text-muted-foreground hover:text-primary', basket.has('element', item.id) && 'text-primary')"
+                        :title="t('structure.compose.add')"
+                        @click="addToBasket('element', item.id, item.content)"
+                      ><PackagePlus class="h-3.5 w-3.5" /></button>
+                    </div>
+                    <div v-if="paramsByOwner.get(`e:${item.id}`)?.length" class="flex flex-wrap gap-1.5 text-xs">
+                      <span
+                        v-for="param in paramsByOwner.get(`e:${item.id}`)"
+                        :key="param.id"
+                        class="inline-flex items-center gap-1 rounded border border-dashed border-primary/40 px-1.5 py-0.5"
+                        :title="formatParamDomain(param.domain)"
+                      >
+                        <Variable class="h-3 w-3 text-primary" />{{ param.name }} = <MathText :text="paramText(param.value, param.span)" />
+                        <span v-if="param.domain" :class="param.domain_confirmed ? 'text-emerald-600' : 'text-amber-600'">
+                          {{ param.domain_confirmed ? '✓' : '?' }}
+                        </span>
+                      </span>
                     </div>
                     <p
                       v-for="(issue, i) in itemIssues('element', index)"
@@ -831,6 +1124,23 @@ onBeforeUnmount(stopPolling)
                       <span v-if="item.depends_on.length" class="text-muted-foreground">
                         {{ t('structure.dependsOn', { items: item.depends_on.map(id => elementNumber.get(id)).filter(Boolean).join(t('structure.panel.listSeparator')) }) }}
                       </span>
+                      <button
+                        v-if="composable"
+                        type="button"
+                        :class="cn('ml-auto text-muted-foreground hover:text-primary', basket.has('ask', item.id) && 'text-primary')"
+                        :title="t('structure.compose.add')"
+                        @click="addToBasket('ask', item.id, item.content)"
+                      ><PackagePlus class="h-3.5 w-3.5" /></button>
+                    </div>
+                    <div v-if="paramsByOwner.get(`a:${item.id}`)?.length" class="flex flex-wrap gap-1.5 text-xs">
+                      <span
+                        v-for="param in paramsByOwner.get(`a:${item.id}`)"
+                        :key="param.id"
+                        class="inline-flex items-center gap-1 rounded border border-dashed border-primary/40 px-1.5 py-0.5"
+                        :title="formatParamDomain(param.domain)"
+                      >
+                        <Variable class="h-3 w-3 text-primary" />{{ param.name }} = <MathText :text="paramText(param.value, param.span)" />
+                      </span>
                     </div>
                     <p
                       v-for="(issue, i) in itemIssues('ask', index)"
@@ -844,6 +1154,40 @@ onBeforeUnmount(stopPolling)
             </ol>
           </section>
 
+          <section v-if="run.groups?.length">
+            <h4 class="mb-2 text-sm font-medium">{{ t('structure.groups.title') }} <span class="text-muted-foreground">({{ run.groups.length }})</span></h4>
+            <ul class="space-y-1.5">
+              <li v-for="group in run.groups" :key="group.id" class="flex flex-wrap items-center gap-2 rounded-md border border-dashed px-3 py-2 text-sm">
+                <Boxes class="h-4 w-4 text-muted-foreground" />
+                <span class="font-medium">{{ group.name }}</span>
+                <span class="text-xs text-muted-foreground">
+                  {{ t('structure.groups.members', { items: group.element_ids.map(id => elementNumber.get(id)).filter(Boolean).join(t('structure.panel.listSeparator')) }) }}
+                </span>
+                <div class="ml-auto flex gap-1">
+                  <Button
+                    v-if="composable && writable && group.replaceable"
+                    size="sm" variant="ghost" class="h-7 px-2 text-xs"
+                    :disabled="!group.type_ids.length"
+                    :title="group.type_ids.length ? '' : t('structure.groups.needTypes')"
+                    @click="openReplace(group)"
+                  >{{ t('structure.groups.replace') }}</Button>
+                  <Button
+                    v-if="composable"
+                    size="sm" variant="ghost" class="h-7 px-2 text-xs"
+                    @click="addToBasket('group', group.id, groupMembers(group).join(t('structure.panel.mergeSeparator')))"
+                  ><PackagePlus class="mr-1 h-3.5 w-3.5" />{{ t('structure.compose.add') }}</Button>
+                </div>
+              </li>
+            </ul>
+          </section>
+
+          <KnowledgeSuggestions
+            v-if="currentType === 'question' && view.accepted"
+            :question-id="currentId"
+            :editable="writable"
+            @changed="emit('changed')"
+          />
+
           <!-- 同结构题 -->
           <section v-if="currentType === 'question' && view.accepted" class="border-t pt-3">
             <button type="button" class="flex items-center gap-1 text-sm font-medium" @click="toggleSimilar">
@@ -851,17 +1195,38 @@ onBeforeUnmount(stopPolling)
               {{ t('structure.panel.similar') }}
             </button>
             <div v-if="similarOpen" class="mt-2 space-y-1.5">
+              <div class="flex gap-1">
+                <Button
+                  v-for="mode in similarModes"
+                  :key="mode.value"
+                  size="sm"
+                  :variant="similarMode === mode.value ? 'secondary' : 'ghost'"
+                  class="h-7 px-2 text-xs"
+                  :title="mode.hint"
+                  @click="setSimilarMode(mode.value)"
+                >{{ mode.label }}</Button>
+              </div>
               <div v-if="similarLoading" class="text-sm text-muted-foreground">{{ t('common.loading') }}</div>
               <p v-else-if="!similarItems?.length" class="text-sm text-muted-foreground">{{ t('structure.panel.noSimilar') }}</p>
               <NuxtLink
-                v-for="item in similarItems ?? []"
+                v-for="item in similarLoading ? [] : similarItems ?? []"
                 :key="item.question_id"
                 :to="`/questions?id=${item.question_id}`"
-                class="flex items-start gap-2 rounded-md border px-3 py-2 text-sm hover:bg-accent"
+                class="block rounded-md border px-3 py-2 text-sm hover:bg-accent"
               >
-                <span class="shrink-0 text-xs text-muted-foreground">#{{ item.question_id }}</span>
-                <MathText class="min-w-0 flex-1 line-clamp-2" :text="item.preview" />
-                <Badge variant="secondary" class="shrink-0 font-normal">{{ Math.round(item.score * 100) }}%</Badge>
+                <div class="flex items-start gap-2">
+                  <span class="shrink-0 text-xs text-muted-foreground">#{{ item.question_id }}</span>
+                  <MathText class="min-w-0 flex-1 line-clamp-2" :text="item.preview" />
+                  <Badge variant="secondary" class="shrink-0 font-normal">{{ Math.round(item.score * 100) }}%</Badge>
+                </div>
+                <p v-if="item.shared_params?.length" class="mt-1 text-xs text-muted-foreground">
+                  {{ t('structure.panel.sharedParams', { names: item.shared_params.join(t('structure.panel.listSeparator')) }) }}
+                </p>
+                <ul v-if="item.shared_elements?.length" class="mt-1.5 space-y-0.5 border-t pt-1.5 text-xs text-muted-foreground">
+                  <li v-for="(content, i) in item.shared_elements" :key="i" class="flex gap-1">
+                    <span class="shrink-0">=</span><MathText class="min-w-0" :text="content" />
+                  </li>
+                </ul>
               </NuxtLink>
             </div>
           </section>
@@ -915,6 +1280,29 @@ onBeforeUnmount(stopPolling)
                         {{ ci + 1 }}
                       </label>
                     </div>
+                    <!-- 参数槽 -->
+                    <StructParamEditor
+                      v-for="param in paramsOf(kind, item.uid)"
+                      :key="param.uid"
+                      :param="param"
+                      :is-math="spanInMath(stemText, param.span)"
+                      @remove="removeParam(param.uid)"
+                    />
+                    <div v-if="item.span" class="flex flex-wrap items-center gap-2 text-xs">
+                      <Button
+                        size="sm" variant="ghost" class="h-7 px-2 text-xs"
+                        @click="openParamDraft(`${kind}:${item.uid}`)"
+                      ><Variable class="mr-1 h-3.5 w-3.5" />{{ t('structure.params.add') }}</Button>
+                      <template v-if="paramDraftKey === `${kind}:${item.uid}`">
+                        <Input
+                          v-model="paramDraftValue"
+                          class="h-7 w-32 font-mono text-xs"
+                          :placeholder="t('structure.params.valuePlaceholder')"
+                          @keydown.enter.prevent="submitParamDraft(kind, item)"
+                        />
+                        <Button size="sm" class="h-7 px-2 text-xs" @click="submitParamDraft(kind, item)">{{ t('common.confirm') }}</Button>
+                      </template>
+                    </div>
                   </div>
                   <div class="flex shrink-0 flex-col gap-0.5">
                     <Button size="icon" variant="ghost" class="h-6 w-6" :title="t('structure.panel.moveUp')" @click="move(kind === 'element' ? editElements : editAsks, index, -1)"><ArrowUp class="h-3.5 w-3.5" /></Button>
@@ -934,8 +1322,50 @@ onBeforeUnmount(stopPolling)
               </li>
             </ol>
           </section>
+          <!-- 元素组 -->
+          <section v-if="editElements.length >= 2">
+            <div class="mb-2 flex items-center justify-between">
+              <h4 class="text-sm font-medium">{{ t('structure.groups.title') }}</h4>
+              <Button size="sm" variant="ghost" class="h-7" @click="addGroup">+ {{ t('structure.groups.add') }}</Button>
+            </div>
+            <ul class="space-y-2">
+              <li v-for="(group, gi) in editGroups" :key="group.uid" class="space-y-2 rounded-md border border-dashed px-3 py-2">
+                <div class="flex items-center gap-2">
+                  <Input v-model="group.name" class="h-8 w-48 text-sm" :placeholder="t('structure.groups.namePlaceholder')" />
+                  <label class="flex items-center gap-1 text-xs">
+                    <Checkbox :model-value="group.replaceable" @update:model-value="group.replaceable = $event === true" />{{ t('structure.params.replaceable') }}
+                  </label>
+                  <Button size="icon" variant="ghost" class="ml-auto h-7 w-7" :title="t('common.delete')" @click="editGroups.splice(gi, 1)">
+                    <Trash2 class="h-3.5 w-3.5" />
+                  </Button>
+                </div>
+                <div class="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
+                  <span class="text-muted-foreground">{{ t('structure.groups.pick') }}</span>
+                  <label v-for="(condition, ci) in editElements" :key="condition.uid" class="flex items-center gap-1" :title="condition.content">
+                    <Checkbox
+                      :model-value="group.members.includes(condition.uid)"
+                      @update:model-value="(value) => toggleGroupMember(group, condition.uid, value)"
+                    />{{ ci + 1 }}
+                  </label>
+                </div>
+                <p v-if="group.members.length < 2" class="text-xs text-amber-700 dark:text-amber-300">{{ t('structure.groups.needTwo') }}</p>
+              </li>
+            </ul>
+          </section>
         </template>
       </template>
     </template>
+    <StructGroupReplaceDialog
+      v-model:open="replaceOpen"
+      :group="replacingGroup"
+      :members="replacingGroup ? groupMembers(replacingGroup) : []"
+    />
+    <StructComposeDialog v-model:open="composeOpen" />
+    <StructVariantDialog
+      v-if="currentType === 'question'"
+      v-model:open="variantOpen"
+      :run="run"
+      :question-id="currentId"
+    />
   </div>
 </template>

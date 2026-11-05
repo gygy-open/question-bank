@@ -4,6 +4,8 @@ import {
   domainClasses,
   filterStructTypeTree,
   flattenStructTypeTree,
+  locateParamValue,
+  replaceSpans,
   segmentStem,
   splitMath,
   structTypeDescendants,
@@ -15,7 +17,7 @@ import type { StructType } from '~/types'
 
 const type = (id: number, parent: number | null, kind: 'condition' | 'ask', order = 0): StructType => ({
   id, subject_id: 1, parent_id: parent, kind, code: `t${id}`, name: `T${id}`, definition: null,
-  examples: null, status: 'active', sort_order: order, usage: 0,
+  examples: null, status: 'active', sort_order: order, weight: 1, usage: 0,
 })
 
 // 代数(1) > 函数(4) > 三次函数(5);几何(2);设问(3) > 求范围(6)
@@ -109,5 +111,21 @@ describe('filterStructTypeTree', () => {
     expect(flattenStructTypeTree(filterStructTypeTree(roots, 'T4')).map(n => n.id)).toEqual([1, 4, 5])
     expect(filterStructTypeTree(roots, '  ')).toBe(roots)
     expect(filterStructTypeTree(roots, 'nothing')).toEqual([])
+  })
+})
+
+describe('locateParamValue', () => {
+  it('skips exponents, longer numbers and LaTeX commands', () => {
+    const text = '$f(x)=x^2+12x+2$'
+    expect(locateParamValue(text, '2', [0, text.length])).toEqual([text.lastIndexOf('2'), text.lastIndexOf('2') + 1])
+    expect(locateParamValue(text, '2', [0, text.length], 2)).toBeNull()
+    expect(locateParamValue('$\\sin a + a$', 'a', [0, 12])).toEqual([6, 7])
+  })
+})
+
+describe('replaceSpans', () => {
+  it('replaces from the end and ignores overlapping spans', () => {
+    expect(replaceSpans('a=1, b=2', [{ span: [2, 3], value: '5' }, { span: [7, 8], value: '9' }])).toBe('a=5, b=9')
+    expect(replaceSpans('abcdef', [{ span: [1, 4], value: 'X' }, { span: [3, 5], value: 'Y' }])).toBe('abcYf')
   })
 })

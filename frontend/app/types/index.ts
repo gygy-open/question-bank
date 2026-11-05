@@ -250,6 +250,8 @@ export interface Question {
   q_type: QuestionType
   status: QuestionStatus
   difficulty: number
+  /** 思维量难度(解答结构三期):已采纳解答的步骤权重之和,多解取最小;没有时为空。 */
+  thinking_difficulty?: number | null
   visibility: 'public' | 'private'
   knowledge_points: KnowledgePoint[]
   tags: Tag[]
@@ -287,7 +289,7 @@ export interface QuestionPage {
 
 export interface QuestionRelationPeer {
   relation_id: number
-  relation_type: 'decomposed_from'
+  relation_type: 'decomposed_from' | 'variant_of' | 'composed_from'
   question: Pick<Question, 'id' | 'subject_id' | 'content' | 'q_type' | 'knowledge_points'>
   created_at: string
   created_by?: number
@@ -420,7 +422,25 @@ export type {
   StructReviewQueueItem,
   StructReviewQueuePage,
   StructSimilarItem,
+  StructSimilarMode,
+  StructOrigin,
   StructStats,
   StructDistribution,
   StructSettings,
+  StructTypeCandidate,
+  StructParam,
+  StructParamKind,
+  StructParamDomain,
+  StructParamInput,
+  StructVariantJob,
+  StructElementGroup,
+  StructGroupInput,
+  StructGroupCandidate,
+  StructComposeJob,
+  SolutionMisconception,
+  SolutionStep,
+  SolutionRun,
+  SolutionView,
+  SolutionStepInput,
+  StructCandidatesView,
 } from './structure'

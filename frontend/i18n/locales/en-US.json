@@ -327,7 +327,22 @@
       "type_invalid_parent": "Invalid parent type: a type cannot be moved under itself, and condition and ask types cannot be mixed",
       "type_in_use": "This type is still used by decompositions; deactivate or merge it instead",
       "type_has_children": "This type still has child types; move or delete them first",
-      "type_invalid_import": "Invalid import data (code: {code})"
+      "type_invalid_import": "Invalid import data (code: {code})",
+      "candidate_not_found": "Candidate type not found",
+      "candidate_resolved": "This candidate has already been handled",
+      "induce_not_enough_data": "Fewer than {min} unclassified conditions or asks; there is not enough data to group yet",
+      "run_stale": "The question was edited after it was decomposed. Decompose it again first",
+      "param_not_found": "The parameter does not exist or cannot be replaced",
+      "param_domain_unconfirmed": "The domain of parameter \"{name}\" is not confirmed yet, so AI cannot pick its value",
+      "param_unmappable": "The parameter position does not match the question content. Mark it again in edit mode",
+      "variant_empty": "No parameter was changed",
+      "variant_running": "A variant of this question is already being generated. Please wait",
+      "solution_needs_stem": "Accept an up-to-date stem decomposition first",
+      "solution_not_found": "Solution decomposition not found",
+      "group_not_found": "Element group not found",
+      "group_mismatch": "The two groups have different condition types, or the decomposition is not accepted",
+      "compose_invalid": "These items cannot be composed: pick conditions and asks from accepted decompositions of one subject",
+      "job_not_found": "Task not found"
     }
   },
   "validation": {
@@ -587,7 +602,11 @@
       "creator": "Creator",
       "allCreators": "All Creators",
       "reviewer": "Reviewer",
-      "allReviewers": "All Reviewers"
+      "allReviewers": "All Reviewers",
+      "sort": "Sort",
+      "sortNewest": "Newest first",
+      "sortThinkingAsc": "Thinking load: low to high",
+      "sortThinkingDesc": "Thinking load: high to low"
     },
     "batchSource": {
       "title": "Edit Source in Bulk",
@@ -2374,6 +2393,26 @@
       "AI_SOLVE_PROMPT": {
         "title": "Solution Reasoning Assistant",
         "description": "Defines the logic and formatting the AI follows when generating question explanations and answers."
+      },
+      "AI_STRUCT_DECOMPOSE_PROMPT": {
+        "title": "Stem decomposition assistant",
+        "description": "Rules for AI to split a stem into conditions and asks and classify them by structure type (stem only, never the answer)."
+      },
+      "AI_STRUCT_INDUCE_PROMPT": {
+        "title": "Type grouping assistant",
+        "description": "Rules for AI to group unclassified conditions or asks into candidate types; candidates join the type tree only after a teacher confirms them."
+      },
+      "AI_STRUCT_VARIANT_PROMPT": {
+        "title": "Variant check assistant",
+        "description": "Rules for AI to re-solve a parameter variant and decide whether it still works (unique answer, reasonable numbers, valid distractors)."
+      },
+      "AI_STRUCT_COMPOSE_PROMPT": {
+        "title": "Composition assistant",
+        "description": "Rules for AI to write a new question from chosen conditions and asks (possibly from several questions), or to rewrite a question after a group replacement; new questions are checked for structure consistency and re-solved."
+      },
+      "AI_SOLUTION_DECOMPOSE_PROMPT": {
+        "title": "Solution decomposition assistant",
+        "description": "Rules for AI to split a solution into steps (goal, method, result, the conditions and earlier steps used, typical mistakes); method weights give the thinking difficulty."
       }
     },
     "emptyTitle": "No Configurable Prompts",
@@ -2482,7 +2521,11 @@
       "current": "Current Question",
       "derived": "Derived Questions",
       "view": "View Question",
-      "noDerived": "No derived questions yet."
+      "noDerived": "No derived questions yet.",
+      "relationTypes": {
+        "variant_of": "Variant",
+        "composed_from": "Composed"
+      }
     }
   },
   "questionDedup": {
@@ -2775,7 +2818,8 @@
     },
     "origins": {
       "ai": "AI decomposition",
-      "human": "Edited manually"
+      "human": "Edited manually",
+      "agent": "External agent"
     },
     "facets": {
       "quant": "Value",
@@ -2785,7 +2829,8 @@
     },
     "kinds": {
       "condition": "Condition types",
-      "ask": "Ask types"
+      "ask": "Ask types",
+      "method": "Method"
     },
     "typeStatuses": {
       "candidate": "Pending",
@@ -2856,8 +2901,16 @@
       "asAsk": "Add as ask",
       "noConditions": "No conditions",
       "noAsks": "No asks",
-      "similar": "Similar structure",
-      "noSimilar": "No accepted questions with a similar structure yet",
+      "similar": "Related questions",
+      "similarModes": {
+        "types": "Similar types",
+        "typesHint": "Questions with similar ask and condition types",
+        "elements": "Shared conditions",
+        "elementsHint": "Questions containing the same conditions (compared by content, ignoring formatting)",
+        "params": "Changed numbers",
+        "paramsHint": "Questions with the same parameter pattern and different values"
+      },
+      "noSimilar": "No related accepted questions found yet",
       "backToQuestion": "Back to the question",
       "addItem": "Add",
       "contentPlaceholder": "One statement per item; write formulas in $...$",
@@ -2869,7 +2922,9 @@
       "mergeNext": "Merge with next",
       "mergeSeparator": "; ",
       "listSeparator": ", ",
-      "unclassifiedHint": "Unclassified: {hint}"
+      "unclassifiedHint": "Unclassified: {hint}",
+      "unclassifiedLink": "Group similar items into a new type under Pending grouping",
+      "sharedParams": "Matching parameters: {names}"
     },
     "review": {
       "title": "Structure Review",
@@ -2958,7 +3013,191 @@
       "importNotArray": "The content must be an array",
       "importBadItem": "Entry {index} is missing a valid code or name",
       "importPreview": "Entries to import: {count}",
-      "imported": "Import finished: {created} created, {updated} updated"
+      "imported": "Import finished: {created} created, {updated} updated",
+      "weight": "Thinking-load weight",
+      "weightHint": "A normal step counts as 1; special thinking moves can weigh more. A solution's thinking load is the sum of its step weights",
+      "knowledgePoints": "Knowledge points",
+      "knowledgePointsHint": "When a stem item or solution step belongs to this type, these knowledge points are suggested for the question"
+    },
+    "induce": {
+      "tabTree": "Type tree",
+      "tabCandidates": "Pending grouping",
+      "unclassified": "Unclassified items in accepted decompositions: {conditions} condition(s), {asks} ask(s)",
+      "hint": "AI groups unclassified items with similar meaning into candidate types. Candidates join the type tree only after you confirm them.",
+      "notEnough": "Grouping becomes available once there are at least {min} unclassified conditions or asks",
+      "run": "Start grouping",
+      "rerun": "Group again",
+      "queued": "Added to the background queue. Candidates will appear here when it finishes",
+      "jobStatuses": {
+        "pending": "Grouping is queued",
+        "running": "Grouping…",
+        "cancelled": "The last grouping was cancelled"
+      },
+      "jobFailed": "The last grouping failed: {error}",
+      "jobPaused": "Grouping paused: {reason}",
+      "jobDone": "Last grouped: {time}",
+      "empty": "No unclassified items",
+      "emptyWithItems": "No candidates yet. Click \"Start grouping\"",
+      "count": "Items: {count}",
+      "suggestedParent": "Suggested parent: {path}",
+      "similarType": "Similar to existing type: {path}",
+      "accept": "Create as type",
+      "merge": "Merge into existing type",
+      "ignore": "Ignore",
+      "acceptTitle": "Create \"{name}\" as a type",
+      "acceptHint": "The new type is enabled immediately and the items in this group are classified into it.",
+      "mergeTitle": "Merge \"{name}\" into an existing type",
+      "mergeHint": "The items in this group are classified into the selected type; no new type is created.",
+      "parent": "Parent type",
+      "parentDefault": "Use the suggested parent",
+      "accepted": "Type created; items classified: {count}",
+      "merged": "Merged; items classified: {count}"
+    },
+    "params": {
+      "name": "Parameter name",
+      "kinds": {
+        "numeric": "Number",
+        "symbolic": "Symbol",
+        "point": "Point",
+        "interval": "Interval",
+        "expression": "Expression"
+      },
+      "replaceable": "Replaceable",
+      "domain": "Domain",
+      "min": "Min",
+      "max": "Max",
+      "integer": "Integer",
+      "values": "Allowed values",
+      "valuesHint": "Only these values are allowed, comma-separated",
+      "note": "Note, e.g. keeps exactly 3 zeros",
+      "excludeList": "Excluding {values}",
+      "confirmDomain": "Domain confirmed (AI may then pick values within it)",
+      "asParam": "Set as parameter",
+      "add": "Add parameter",
+      "valuePlaceholder": "Value in this item, e.g. 2",
+      "noOwner": "Mark the condition or ask containing this text first, then set it as a parameter",
+      "notFound": "No standalone \"{value}\" found in this item's source text",
+      "overlap": "Overlaps an existing parameter"
+    },
+    "variant": {
+      "button": "Generate variant",
+      "title": "Generate variant",
+      "description": "Change parameter values. AI re-solves the question and checks that the variant still works; if it does, a draft question is created and linked to the original as a variant.",
+      "current": "Current",
+      "newValue": "New value",
+      "auto": "AI picks",
+      "autoShort": "AI picks",
+      "autoNeedsDomain": "AI can pick a value only after the domain is confirmed (set and confirm it in edit mode)",
+      "preview": "Preview",
+      "submit": "Generate",
+      "again": "Generate another",
+      "stages": {
+        "queued": "Queued…",
+        "choosing": "AI is picking values…",
+        "verifying": "AI is solving and checking…"
+      },
+      "succeeded": "Draft question created",
+      "optionsRewritten": "The original options no longer fit, so AI rewrote them. Check them in the new question",
+      "open": "Open new question #{id}",
+      "change": "{name}: {from} → {to}",
+      "failed": "Failed to generate the variant",
+      "reasonSeparator": ": ",
+      "errors": {
+        "variant_invalid": "The variant does not work",
+        "out_of_domain": "AI picked a value outside the domain",
+        "duplicate": "The same question already exists in the bank",
+        "structure_stale": "The question was edited after it was decomposed. Decompose it again first",
+        "save_failed": "Failed to save the new question"
+      }
+    },
+    "solution": {
+      "tabStem": "Stem structure",
+      "tabSolution": "Solution structure",
+      "method": "Solution {no}",
+      "addMethod": "Add solution",
+      "stale": "Needs review",
+      "thinkingLoad": "Thinking load {value}",
+      "thinkingDifficulty": "Thinking load {value}",
+      "thinkingHint": "Thinking difficulty: sum of step weights in the accepted solution; the smallest one when there are several solutions",
+      "thinkingFilter": "Thinking difficulty",
+      "decompose": "Decompose solution",
+      "redecompose": "Decompose solution again",
+      "jobRunning": "Decomposing the solution…",
+      "empty": "This solution has not been decomposed yet. Decomposition splits the solution into steps and marks the conditions and methods each step uses.",
+      "needsStem": "Accept the stem decomposition of this question before decomposing its solution.",
+      "stemStale": "The stem decomposition is outdated. Decompose and accept the stem again first.",
+      "stemItems": "Stem items",
+      "key": "Key step",
+      "answers": "Answers {ask}",
+      "answersLabel": "Answers ask",
+      "uses": "Uses",
+      "goalPlaceholder": "What this step obtains",
+      "resultPlaceholder": "Result of this step (optional)",
+      "hintPlaceholder": "Method (describe if unclassified)",
+      "misconceptionPlaceholder": "A typical mistake at this step",
+      "sources": {
+        "distractor": "Distractor",
+        "response": "Response"
+      },
+      "addMisconception": "Typical mistake",
+      "addStep": "Add step",
+      "emptyGoal": "Every step needs a goal",
+      "queueSkipped": "Not queued: accept an up-to-date stem decomposition first, and you need edit permission",
+      "codes": {
+        "empty": "This step has no goal",
+        "unknown_ref": "References a condition or ask that does not exist",
+        "forward_ref": "References later steps: {detail}",
+        "no_method": "Method not classified",
+        "ask_unanswered": "No step answers {detail}"
+      }
+    },
+    "knowledge": {
+      "title": "Suggested knowledge points (from type mapping)",
+      "add": "Add to question",
+      "added": "Knowledge point added"
+    },
+    "groups": {
+      "title": "Element groups",
+      "group": "Group",
+      "add": "New group",
+      "namePlaceholder": "Group name, e.g. function and zeros",
+      "pick": "Conditions",
+      "needTwo": "Pick at least two conditions",
+      "members": "Conditions {items}",
+      "replace": "Replace group",
+      "needTypes": "Classify every condition in the group before matching replacements",
+      "replaceTitle": "Replace group \"{name}\"",
+      "replaceHint": "Pick a group with the same condition types from another question. AI rewrites the question and re-solves it; if it works, a draft question is created and linked to the original as a variant.",
+      "current": "Current group",
+      "noCandidates": "No replacement yet: another question's accepted decomposition needs a group with the same condition types"
+    },
+    "compose": {
+      "basket": "Composition basket {count}",
+      "add": "Add to composition basket",
+      "added": "Added to the composition basket",
+      "addedNewSubject": "Added to the composition basket (items from another subject were cleared)",
+      "title": "Composition basket",
+      "description": "Write a new question from the conditions, asks and groups in the basket (they may come from several questions). AI writes it, decomposes it again to check every item is used and nothing is added, then re-solves it; if it passes, a draft question is created and linked to every source question as composed.",
+      "empty": "The composition basket is empty. Use the button next to an item in the stem structure panel to add it.",
+      "qType": "Question type",
+      "notePlaceholder": "Note (optional), e.g. medium difficulty, ask for the minimum instead",
+      "needBoth": "Pick at least one condition (or group) and one ask",
+      "clear": "Clear",
+      "submit": "Write question",
+      "failed": "Generation failed",
+      "stages": {
+        "queued": "Queued…",
+        "writing": "AI is writing the question…",
+        "checking": "Checking that the structure matches…",
+        "verifying": "AI is solving and checking…"
+      },
+      "errors": {
+        "inconsistent": "The new question does not match the chosen items",
+        "variant_invalid": "The new question does not work",
+        "duplicate": "The same question already exists in the bank",
+        "invalid_input": "The chosen items are no longer valid (decomposition changed or question not visible)",
+        "save_failed": "Failed to save the new question"
+      }
     },
     "settings": {
       "saved": "Saved",
@@ -2988,7 +3227,10 @@
       "unclassified": "Unclassified items: {count}",
       "review": "Review ({count} awaiting)",
       "topTypes": "Common structure types",
-      "noTypes": "No accepted decompositions yet"
+      "noTypes": "No accepted decompositions yet",
+      "origins": "Accepted by source: AI {ai} · Manual {human} · Agent {agent}",
+      "kpCoverage": "Types mapped to knowledge points: {mapped} / {total}",
+      "withThinking": "Questions with thinking difficulty: {count}"
     }
   }
 }

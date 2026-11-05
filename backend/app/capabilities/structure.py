@@ -17,8 +17,12 @@ from app.core.api_errors import ErrorCode
 from app.core.permissions import Permission
 from app.crud.crud_question import is_question_visible
 from app.models.job import JobPriority
-from app.models.question_structure import StructRun, StructTargetType, StructType
+from app.models.question_structure import StructOrigin, StructRun, StructTargetType, StructType, StructTypeCandidate
 from app.services.activity_logger import log_activity
+from app.services.structure import compose as compose_svc
+from app.services.structure import induce as induce_svc
+from app.services.structure import solution as solution_svc
+from app.services.structure import variant as variant_svc
 from app.services.structure import service as struct_service
 from app.services.structure import settings as struct_settings
 from app.services.structure import types as type_svc
@@ -57,6 +61,33 @@ class StructureItemInput(BaseModel):
     depends_on: List[int] = Field(default_factory=list, description="Asks only: 0-based indices of conditions.")
 
 
+class StructureParamInput(BaseModel):
+    """A replaceable value (parameter slot) inside one condition or ask."""
+
+    owner: Literal["element", "ask"] = Field(..., description="Whether the parameter belongs to a condition or an ask.")
+    owner_index: int = Field(..., ge=0, description="0-based index of the owning condition / ask in this save.")
+    name: str = Field(..., min_length=1, max_length=64, description="Short label, e.g. a or constant term.")
+    value: str = Field(..., min_length=1, description="The value exactly as written in the stem (LaTeX without $).")
+    slot_kind: Literal["numeric", "symbolic", "point", "interval", "expression"] = "numeric"
+    span_start: Optional[int] = Field(None, description="Start offset in the run's stem_text.")
+    span_end: Optional[int] = Field(None, description="End offset (exclusive) in the run's stem_text.")
+    occurrence: int = Field(1, ge=1, description="Which standalone occurrence inside the owner's source (when no span).")
+    domain: Optional[Dict[str, Any]] = Field(
+        None, description="Allowed values: {min, max, integer, values, exclude, note}."
+    )
+    domain_confirmed: bool = Field(False, description="Teacher confirmed the domain (ignored via MCP).")
+    replaceable: bool = True
+
+
+class StructureGroupInput(BaseModel):
+    """Conditions treated as one unit that can be replaced together."""
+
+    name: str = Field(..., min_length=1, max_length=128)
+    description: Optional[str] = None
+    replaceable: bool = True
+    element_indices: List[int] = Field(..., min_length=2, description="0-based indices of conditions in this save.")
+
+
 class StructureSaveInput(BaseModel):
     """An edited decomposition, saved as a new draft."""
 
@@ -65,6 +96,8 @@ class StructureSaveInput(BaseModel):
     base_run_id: Optional[int] = Field(None, description="The run this edit started from, if any.")
     elements: List[StructureItemInput] = Field(default_factory=list, description="Conditions.")
     asks: List[StructureItemInput] = Field(default_factory=list, description="Asks.")
+    params: List[StructureParamInput] = Field(default_factory=list, description="Parameter slots.")
+    groups: List[StructureGroupInput] = Field(default_factory=list, description="Element groups.")
     accept: bool = Field(False, description="Accept immediately after saving (not available via MCP).")
 
 
@@ -85,13 +118,14 @@ class StructureBackfillInput(BaseModel):
 class StructTypeCreateInput(BaseModel):
     subject_id: int
     name: str = Field(..., min_length=1, max_length=128)
-    kind: Optional[Literal["condition", "ask"]] = None
+    kind: Optional[Literal["condition", "ask", "method"]] = None
     parent_id: Optional[int] = None
     code: Optional[str] = Field(None, max_length=64, pattern=r"^[A-Za-z0-9_.\-]+$")
     definition: Optional[str] = None
     examples: Optional[List[Dict[str, Any]]] = None
     status: Literal["candidate", "active", "deprecated"] = "active"
     sort_order: Optional[int] = None
+    weight: Optional[float] = Field(None, gt=0, le=100, description="Thinking-load weight (method types).")
 
 
 class StructTypeUpdateInput(BaseModel):
@@ -103,6 +137,8 @@ class StructTypeUpdateInput(BaseModel):
     examples: Optional[List[Dict[str, Any]]] = None
     status: Optional[Literal["candidate", "active", "deprecated"]] = None
     sort_order: Optional[int] = None
+    weight: Optional[float] = Field(None, gt=0, le=100)
+    knowledge_point_ids: Optional[List[int]] = Field(None, description="Replace the mapped knowledge points.")
 
 
 class StructTypeIdInput(BaseModel):
@@ -117,6 +153,98 @@ class StructTypeMergeInput(BaseModel):
 class StructTypeImportInput(BaseModel):
     subject_id: int
     items: List[Dict[str, Any]] = Field(..., min_length=1, max_length=5000)
+
+
+class StructureVariantValue(BaseModel):
+    param_id: int
+    value: str = Field(..., min_length=1, max_length=500)
+
+
+class StructureVariantInput(BaseModel):
+    """Generate a variant question by changing parameter values."""
+
+    question_id: int
+    run_id: Optional[int] = Field(None, description="Decomposition to use; defaults to the accepted one.")
+    values: List[StructureVariantValue] = Field(default_factory=list, max_length=50)
+    auto_param_ids: List[int] = Field(
+        default_factory=list, max_length=50, description="Parameters whose new value AI picks within the confirmed domain."
+    )
+
+
+class SolutionDecomposeInput(BaseModel):
+    """Queue AI decomposition of solutions into steps."""
+
+    question_ids: List[int] = Field(..., min_length=1, max_length=_BATCH_MAX)
+    solution_no: int = Field(1, ge=1, le=9, description="Which solution method (1 = first).")
+
+
+class SolutionMisconceptionInput(BaseModel):
+    description: str = Field(..., min_length=1)
+    source: Literal["distractor", "response"] = "distractor"
+
+
+class SolutionStepInput(BaseModel):
+    """One solution step; conditions / asks are IDs from the accepted stem decomposition."""
+
+    goal: str = Field(..., min_length=1)
+    result: Optional[str] = None
+    method_type_id: Optional[int] = None
+    method_hint: Optional[str] = Field(None, max_length=255)
+    is_key: bool = False
+    uses_elements: List[int] = Field(default_factory=list)
+    uses_asks: List[int] = Field(default_factory=list)
+    uses_steps: List[int] = Field(default_factory=list, description="0-based indices of earlier steps.")
+    answers: List[int] = Field(default_factory=list, description="Ask IDs this step answers.")
+    misconceptions: List[SolutionMisconceptionInput] = Field(default_factory=list)
+
+
+class SolutionSaveInput(BaseModel):
+    question_id: int
+    solution_no: int = Field(1, ge=1, le=9)
+    steps: List[SolutionStepInput] = Field(..., min_length=1, max_length=60)
+    accept: bool = False
+
+
+class SolutionReviewInput(BaseModel):
+    run_ids: List[int] = Field(..., min_length=1, max_length=_BATCH_MAX)
+    action: Literal["accept", "reject"]
+
+
+class StructureComposeInput(BaseModel):
+    """Compose a new question from conditions / asks / groups of accepted decompositions (may span questions)."""
+
+    element_ids: List[int] = Field(default_factory=list, max_length=30)
+    ask_ids: List[int] = Field(default_factory=list, max_length=10)
+    group_ids: List[int] = Field(default_factory=list, max_length=10)
+    q_type: Literal["single_choice", "multiple_choice", "true_false", "fill_in_the_blank", "free_response"] = "free_response"
+    note: Optional[str] = Field(None, max_length=1000)
+
+
+class StructureGroupReplaceInput(BaseModel):
+    """Replace an element group with another group of the same condition types."""
+
+    group_id: int
+    source_group_id: int
+
+
+class StructTypeInduceInput(BaseModel):
+    subject_id: int
+
+
+class StructCandidateAcceptInput(BaseModel):
+    id: int
+    name: Optional[str] = Field(None, min_length=1, max_length=128)
+    parent_id: Optional[int] = None
+    definition: Optional[str] = None
+
+
+class StructCandidateMergeInput(BaseModel):
+    id: int
+    type_id: int
+
+
+class StructCandidateIdInput(BaseModel):
+    id: int
 
 # endregion
 
@@ -199,8 +327,15 @@ class SaveStructure(Capability[StructureSaveInput, dict]):
             target,
             elements=[item.model_dump() for item in inp.elements],
             asks=[item.model_dump() for item in inp.asks],
+            # 取值范围只能由站内老师确认;外部 Agent 提交的范围一律待确认。
+            params=[
+                {**item.model_dump(), "domain_confirmed": item.domain_confirmed and ctx.surface != Surface.MCP}
+                for item in inp.params
+            ],
+            groups=[item.model_dump() for item in inp.groups],
             user_id=ctx.actor.id,
             base_run=base,
+            origin=StructOrigin.AGENT.value if ctx.surface == Surface.MCP else StructOrigin.HUMAN.value,
         )
         # 外部 AI 客户端只能提交待审结果,采纳必须由人在站内完成。
         if inp.accept and ctx.surface != Surface.MCP:
@@ -314,6 +449,7 @@ class CreateStructType(_TypeCapability):
             status=inp.status,
             sort_order=inp.sort_order,
             created_by=ctx.actor.id,
+            weight=inp.weight,
         )
 
 
@@ -362,6 +498,307 @@ class ImportStructTypes(_TypeCapability):
     async def execute(self, ctx: ExecutionContext, inp: StructTypeImportInput, target: Any) -> dict:
         await type_svc.ensure_roots(ctx.db, inp.subject_id)
         return await type_svc.import_types(ctx.db, inp.subject_id, inp.items, created_by=ctx.actor.id)
+
+# endregion
+
+
+# region 变式(参数槽)
+
+@register
+class GenerateVariant(Capability[StructureVariantInput, dict]):
+    name = "structure.variant"
+    description = (
+        "Queue generation of a variant question: replace parameter values by position, let AI re-solve and "
+        "verify it, then save it as a draft question linked with variant_of."
+    )
+    input_model = StructureVariantInput
+    authz = Authz.PERMISSION
+    permission = Permission.EDIT_QUESTION
+    scope = Scope.SUBJECT
+    mutating = True
+
+    async def load(self, ctx: ExecutionContext, inp: StructureVariantInput) -> struct_service.Target:
+        found = await struct_service.load_target(ctx.db, StructTargetType.QUESTION.value, inp.question_id)
+        if not is_question_visible(found.obj, ctx.actor):
+            raise NotFound("Not found", ErrorCode.STRUCTURE_TARGET_NOT_FOUND)
+        return found
+
+    async def authorize(self, ctx: ExecutionContext, inp: StructureVariantInput, target: Any) -> None:
+        if not await struct_settings.is_enabled(ctx.db):
+            raise Forbidden("Question structure is disabled", ErrorCode.STRUCTURE_DISABLED)
+        await super().authorize(ctx, inp, target)
+
+    async def execute(self, ctx: ExecutionContext, inp: StructureVariantInput, target: struct_service.Target) -> dict:
+        from app.core.locale import get_locale
+
+        plan = await variant_svc.plan_variant(
+            ctx.db,
+            target.obj,
+            run_id=inp.run_id,
+            values={item.param_id: item.value for item in inp.values},
+            auto=inp.auto_param_ids,
+        )
+        job = await variant_svc.enqueue(ctx.db, plan, user_id=ctx.actor.id, locale=get_locale())
+        await ctx.db.commit()
+        return {"job_id": job.id}
+
+# endregion
+
+
+# region 解答结构(三期)
+
+@register
+class DecomposeSolutions(Capability[SolutionDecomposeInput, dict]):
+    name = "solution.decompose"
+    description = "Queue AI decomposition of question solutions into steps (needs an accepted stem decomposition)."
+    input_model = SolutionDecomposeInput
+    authz = Authz.CUSTOM
+    scope = Scope.SUBJECT
+    mutating = True
+
+    async def authorize(self, ctx: ExecutionContext, inp: SolutionDecomposeInput, target: Any) -> None:
+        if not await struct_settings.is_enabled(ctx.db):
+            raise Forbidden("Question structure is disabled", ErrorCode.STRUCTURE_DISABLED)
+
+    async def execute(self, ctx: ExecutionContext, inp: SolutionDecomposeInput, target: Any) -> dict:
+        from app.core.locale import get_locale
+        from app.models.question import Question
+
+        queued: List[int] = []
+        skipped: List[int] = []
+        for question_id in dict.fromkeys(inp.question_ids):
+            question = await ctx.db.get(Question, question_id)
+            found = None
+            if question is not None and question.deleted_at is None:
+                found = struct_service.Target(
+                    type="question", id=question.id, subject_id=question.subject_id,
+                    revision=question.content_revision or 1, stem_text="", stimulus_id=question.stimulus_id, obj=question,
+                )
+            if found is None or not _can_edit(ctx, found):
+                skipped.append(question_id)
+                continue
+            try:
+                await solution_svc.stem_context(ctx.db, question)
+            except Invalid:
+                skipped.append(question_id)
+                continue
+            await solution_svc.enqueue(
+                ctx.db, question, solution_no=inp.solution_no, user_id=ctx.actor.id, locale=get_locale()
+            )
+            queued.append(question_id)
+        await ctx.db.commit()
+        return {"queued": queued, "skipped": skipped}
+
+
+@register
+class SaveSolution(Capability[SolutionSaveInput, dict]):
+    name = "solution.save"
+    description = "Save an edited solution decomposition as a new draft."
+    input_model = SolutionSaveInput
+    authz = Authz.PERMISSION
+    permission = Permission.EDIT_QUESTION
+    scope = Scope.SUBJECT
+    mutating = True
+
+    async def load(self, ctx: ExecutionContext, inp: SolutionSaveInput) -> Any:
+        found = await struct_service.load_target(ctx.db, StructTargetType.QUESTION.value, inp.question_id)
+        if not is_question_visible(found.obj, ctx.actor):
+            raise NotFound("Not found", ErrorCode.STRUCTURE_TARGET_NOT_FOUND)
+        return found
+
+    async def authorize(self, ctx: ExecutionContext, inp: SolutionSaveInput, target: Any) -> None:
+        if not await struct_settings.is_enabled(ctx.db):
+            raise Forbidden("Question structure is disabled", ErrorCode.STRUCTURE_DISABLED)
+        await super().authorize(ctx, inp, target)
+
+    async def execute(self, ctx: ExecutionContext, inp: SolutionSaveInput, target: Any) -> dict:
+        run = await solution_svc.save_human(
+            ctx.db,
+            target.obj,
+            steps=[step.model_dump() for step in inp.steps],
+            solution_no=inp.solution_no,
+            user_id=ctx.actor.id,
+            origin=StructOrigin.AGENT.value if ctx.surface == Surface.MCP else StructOrigin.HUMAN.value,
+        )
+        if inp.accept and ctx.surface != Surface.MCP:
+            await solution_svc.review(ctx.db, run, accept=True, reviewer_id=ctx.actor.id)
+        await log_activity(
+            ctx.db, ctx.actor.id, action="solution_save", resource_type="question", resource_id=target.id,
+            details={"run_id": run.id, "accepted": run.state == "accepted"},
+        )
+        await ctx.db.commit()
+        await ctx.db.refresh(target.obj)
+        return await solution_svc.solution_view(ctx.db, target.obj)
+
+
+@register
+class ReviewSolutions(Capability[SolutionReviewInput, dict]):
+    name = "solution.review"
+    description = "Accept or reject draft solution decompositions."
+    input_model = SolutionReviewInput
+    authz = Authz.CUSTOM
+    scope = Scope.SUBJECT
+    mutating = True
+
+    async def execute(self, ctx: ExecutionContext, inp: SolutionReviewInput, target: Any) -> dict:
+        from app.models.solution_structure import SolutionRun
+
+        updated: List[int] = []
+        skipped: List[int] = []
+        for run_id in dict.fromkeys(inp.run_ids):
+            run = await ctx.db.get(SolutionRun, run_id)
+            if run is None or run.state != "draft":
+                skipped.append(run_id)
+                continue
+            try:
+                found = await struct_service.load_target(ctx.db, StructTargetType.QUESTION.value, run.question_id)
+            except NotFound:
+                skipped.append(run_id)
+                continue
+            if not _can_edit(ctx, found):
+                skipped.append(run_id)
+                continue
+            await solution_svc.review(ctx.db, run, accept=inp.action == "accept", reviewer_id=ctx.actor.id)
+            updated.append(run_id)
+        await ctx.db.commit()
+        return {"updated": updated, "skipped": skipped}
+
+# endregion
+
+
+# region 元素重组与命题(四期)
+
+@register
+class ComposeQuestion(Capability[StructureComposeInput, dict]):
+    name = "structure.compose"
+    description = "Queue AI composition of a new draft question from chosen conditions and asks."
+    input_model = StructureComposeInput
+    authz = Authz.CUSTOM
+    scope = Scope.SUBJECT
+    mutating = True
+
+    async def authorize(self, ctx: ExecutionContext, inp: StructureComposeInput, target: Any) -> None:
+        if not await struct_settings.is_enabled(ctx.db):
+            raise Forbidden("Question structure is disabled", ErrorCode.STRUCTURE_DISABLED)
+
+    async def execute(self, ctx: ExecutionContext, inp: StructureComposeInput, target: Any) -> dict:
+        from app.core.locale import get_locale
+
+        _, _, question_ids, subject_id = await compose_svc.load_items(
+            ctx.db, ctx.actor, element_ids=inp.element_ids, ask_ids=inp.ask_ids, group_ids=inp.group_ids
+        )
+        if not permissions.can(ctx.actor, Permission.EDIT_QUESTION, subject_id=subject_id):
+            raise Forbidden("The user doesn't have enough privileges", ErrorCode.AUTH_FORBIDDEN)
+        job = await compose_svc.enqueue(
+            ctx.db, payload={"mode": "compose", **inp.model_dump()}, subject_id=subject_id,
+            user_id=ctx.actor.id, locale=get_locale(),
+        )
+        await ctx.db.commit()
+        return {"job_id": job.id, "source_question_ids": question_ids}
+
+
+@register
+class ReplaceGroup(Capability[StructureGroupReplaceInput, dict]):
+    name = "structure.group_replace"
+    description = "Queue a variant that replaces an element group with a same-type group from another question."
+    input_model = StructureGroupReplaceInput
+    authz = Authz.CUSTOM
+    scope = Scope.SUBJECT
+    mutating = True
+
+    async def authorize(self, ctx: ExecutionContext, inp: StructureGroupReplaceInput, target: Any) -> None:
+        if not await struct_settings.is_enabled(ctx.db):
+            raise Forbidden("Question structure is disabled", ErrorCode.STRUCTURE_DISABLED)
+
+    async def execute(self, ctx: ExecutionContext, inp: StructureGroupReplaceInput, target: Any) -> dict:
+        from app.core.locale import get_locale
+
+        question, *_ = await compose_svc.load_group_pair(ctx.db, ctx.actor, inp.group_id, inp.source_group_id)
+        if not permissions.can(ctx.actor, Permission.EDIT_QUESTION, subject_id=question.subject_id):
+            raise Forbidden("The user doesn't have enough privileges", ErrorCode.AUTH_FORBIDDEN)
+        job = await compose_svc.enqueue(
+            ctx.db, payload={"mode": "group", **inp.model_dump()}, subject_id=question.subject_id,
+            user_id=ctx.actor.id, locale=get_locale(),
+        )
+        await ctx.db.commit()
+        return {"job_id": job.id}
+
+# endregion
+
+
+# region 元素归纳(二期)
+
+@register
+class InduceStructTypes(Capability[StructTypeInduceInput, dict]):
+    name = "struct_type.induce"
+    description = "Queue AI grouping of unclassified conditions and asks into candidate structure types."
+    input_model = StructTypeInduceInput
+    authz = Authz.PERMISSION
+    permission = Permission.MANAGE_SUBJECT
+    scope = Scope.SUBJECT
+    mutating = True
+
+    async def authorize(self, ctx: ExecutionContext, inp: StructTypeInduceInput, target: Any) -> None:
+        if not await struct_settings.is_enabled(ctx.db):
+            raise Forbidden("Question structure is disabled", ErrorCode.STRUCTURE_DISABLED)
+        await super().authorize(ctx, inp, target)
+
+    async def execute(self, ctx: ExecutionContext, inp: StructTypeInduceInput, target: Any) -> dict:
+        from app.core.locale import get_locale
+
+        counts = await induce_svc.unclassified_counts(ctx.db, inp.subject_id)
+        if max(counts.values()) < induce_svc.MIN_ITEMS:
+            raise Invalid(
+                "Not enough unclassified items", ErrorCode.STRUCTURE_INDUCE_NOT_ENOUGH_DATA,
+                {"min": induce_svc.MIN_ITEMS},
+            )
+        job = await induce_svc.enqueue(ctx.db, inp.subject_id, user_id=ctx.actor.id, locale=get_locale())
+        await ctx.db.commit()
+        return {"job_id": job.id, "unclassified": counts}
+
+
+class _CandidateCapability(Capability):
+    """候选的确认:与类型树维护同权限(学科内「编辑知识点 / 标签」)。"""
+
+    authz = Authz.PERMISSION
+    permission = Permission.EDIT_TAXONOMY
+    scope = Scope.SUBJECT
+    mutating = True
+
+    async def load(self, ctx: ExecutionContext, inp: Any) -> StructTypeCandidate:
+        return await induce_svc.get_candidate(ctx.db, inp.id)
+
+
+@register
+class AcceptStructCandidate(_CandidateCapability):
+    name = "struct_type.candidate.accept"
+    description = "Create a structure type from an induction candidate and classify its items."
+    input_model = StructCandidateAcceptInput
+
+    async def execute(self, ctx: ExecutionContext, inp: StructCandidateAcceptInput, target: StructTypeCandidate) -> StructType:
+        return await induce_svc.accept_candidate(
+            ctx.db, target, name=inp.name, parent_id=inp.parent_id, definition=inp.definition, user_id=ctx.actor.id
+        )
+
+
+@register
+class MergeStructCandidate(_CandidateCapability):
+    name = "struct_type.candidate.merge"
+    description = "Classify the items of an induction candidate into an existing structure type."
+    input_model = StructCandidateMergeInput
+
+    async def execute(self, ctx: ExecutionContext, inp: StructCandidateMergeInput, target: StructTypeCandidate) -> StructType:
+        return await induce_svc.merge_candidate(ctx.db, target, type_id=inp.type_id, user_id=ctx.actor.id)
+
+
+@register
+class IgnoreStructCandidate(_CandidateCapability):
+    name = "struct_type.candidate.ignore"
+    description = "Dismiss an induction candidate; its items stay unclassified and are not induced again."
+    input_model = StructCandidateIdInput
+
+    async def execute(self, ctx: ExecutionContext, inp: StructCandidateIdInput, target: StructTypeCandidate) -> None:
+        await induce_svc.ignore_candidate(ctx.db, target, user_id=ctx.actor.id)
 
 # endregion
 

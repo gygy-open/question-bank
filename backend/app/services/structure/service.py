@@ -22,7 +22,10 @@ from app.models.question_structure import (
     StructAsk,
     StructAskElement,
     StructElement,
+    StructElementGroup,
+    StructElementGroupItem,
     StructOrigin,
+    StructParam,
     StructRun,
     StructRunState,
     StructTargetType,
@@ -33,7 +36,9 @@ from app.models.stimulus import Stimulus
 
 from . import settings as struct_settings
 from . import types as type_svc
-from .decompose import Draft, DraftAsk, DraftElement, SharedCondition, run_check
+from .decompose import Draft, DraftAsk, DraftElement, DraftGroup, SharedCondition, run_check
+from .params import SLOT_KINDS, DraftParam, parse_domain
+from .signature import content_signature
 from .text import build_stem_text, stimulus_text
 
 JOB_TYPE = "structure.decompose"
@@ -215,6 +220,7 @@ async def save_draft(
             run_id=run.id,
             ordinal=ordinal,
             content=item.content,
+            content_sig=content_signature(item.content),
             type_id=item.type_id,
             type_hint=item.type_hint,
             facet=item.facet,
@@ -225,6 +231,7 @@ async def save_draft(
         db.add(element)
         elements.append(element)
     await db.flush()
+    asks: List[StructAsk] = []
     for ordinal, item in enumerate(draft.asks):
         ask = StructAsk(
             run_id=run.id,
@@ -237,9 +244,43 @@ async def save_draft(
         )
         db.add(ask)
         await db.flush()
+        asks.append(ask)
         for index in sorted(set(item.depends_on)):
             if 0 <= index < len(elements):
                 db.add(StructAskElement(ask_id=ask.id, element_id=elements[index].id))
+    ordinal = 0
+    for param in draft.params:
+        owners = elements if param.owner == "element" else asks
+        # 所属条目不存在、或体检定位不到的参数不落库(问题已记在体检报告里)。
+        if not 0 <= param.owner_index < len(owners) or param.span is None:
+            continue
+        db.add(StructParam(
+            run_id=run.id,
+            ordinal=ordinal,
+            element_id=owners[param.owner_index].id if param.owner == "element" else None,
+            ask_id=owners[param.owner_index].id if param.owner == "ask" else None,
+            name=param.name,
+            slot_kind=param.slot_kind,
+            value=param.value,
+            span_start=param.span[0],
+            span_end=param.span[1],
+            domain=json.dumps(param.domain, ensure_ascii=False) if param.domain else None,
+            domain_confirmed=bool(param.domain_confirmed and param.domain),
+            replaceable=param.replaceable,
+        ))
+        ordinal += 1
+    for ordinal, group in enumerate(draft.groups):
+        members = [elements[i] for i in dict.fromkeys(group.element_indices) if 0 <= i < len(elements)]
+        if len(members) < 2:
+            continue
+        saved = StructElementGroup(
+            run_id=run.id, ordinal=ordinal, name=group.name, description=group.description,
+            replaceable=group.replaceable,
+        )
+        db.add(saved)
+        await db.flush()
+        for member in members:
+            db.add(StructElementGroupItem(group_id=saved.id, element_id=member.id))
     await db.flush()
     return run
 
@@ -252,11 +293,21 @@ async def save_human(
     asks: Sequence[Dict[str, Any]],
     user_id: Optional[int],
     base_run: Optional[StructRun] = None,
+    origin: str = StructOrigin.HUMAN.value,
+    params: Sequence[Dict[str, Any]] = (),
+    groups: Sequence[Dict[str, Any]] = (),
 ) -> StructRun:
     """保存人工修改:基于当前题干快照新建一条 human 快照(不覆盖 AI 的结果,便于对比)。
 
+    外部 Agent 经 MCP 提交时 ``origin`` 为 agent,其余与人工修改相同。
+
     ``elements`` / ``asks`` 的每项:content(必填)、source、span_start/span_end、type_id、
     type_hint、facet(仅条件)、ref_element_id(仅条件)、depends_on(仅设问,条件下标)。
+    ``params`` 的每项:owner(element / ask)、owner_index、name、value、slot_kind、
+    span_start/span_end(可选,缺省时在所属条目原文中定位)、occurrence、domain、
+    domain_confirmed、replaceable。参数随条目一并提交,所以新快照会继承参数。
+    ``groups`` 的每项:name、description、replaceable、element_indices(至少两条条件,
+    一条条件只能属于一个组)。
     基于的旧快照与当前内容版本一致时沿用它的原文快照,否则用当前题干重新生成。
     """
     if base_run is not None and base_run.source_revision == target.revision:
@@ -285,10 +336,14 @@ async def save_human(
         )
         for item in asks
     ]
+    draft_params = [_draft_param(item, target.stem_text) for item in params]
     shared = await shared_conditions(db, target.stimulus_id) if target.stimulus_id else []
-    report = run_check(target.stem_text, draft_elements, draft_asks, shared)
-    draft = Draft(elements=draft_elements, asks=draft_asks, report=report)
-    return await save_draft(db, target, draft, origin=StructOrigin.HUMAN.value, created_by=user_id)
+    report = run_check(target.stem_text, draft_elements, draft_asks, shared, draft_params)
+    draft = Draft(
+        elements=draft_elements, asks=draft_asks, report=report, params=draft_params,
+        groups=_draft_groups(groups, len(draft_elements)),
+    )
+    return await save_draft(db, target, draft, origin=origin, created_by=user_id)
 
 
 async def review(db: AsyncSession, run: StructRun, *, accept: bool, reviewer_id: Optional[int]) -> StructRun:
@@ -484,6 +539,40 @@ async def serialize_run(
             }
             for a in run.asks
         ],
+        "params": [serialize_param(p) for p in run.params],
+        "groups": [serialize_group(g, run) for g in run.groups],
+    }
+
+
+def serialize_group(group: StructElementGroup, run: StructRun) -> Dict[str, Any]:
+    """元素组 → API 结构(成员按条件顺序,附成员的类型 id)。"""
+    member_ids = {item.element_id for item in group.items}
+    members = [e for e in run.elements if e.id in member_ids]
+    return {
+        "id": group.id,
+        "ordinal": group.ordinal,
+        "name": group.name,
+        "description": group.description,
+        "replaceable": bool(group.replaceable),
+        "element_ids": [e.id for e in members],
+        "type_ids": sorted(e.type_id for e in members if e.type_id),
+    }
+
+
+def serialize_param(param: StructParam) -> Dict[str, Any]:
+    """参数槽 → API 结构。"""
+    return {
+        "id": param.id,
+        "ordinal": param.ordinal,
+        "element_id": param.element_id,
+        "ask_id": param.ask_id,
+        "name": param.name,
+        "slot_kind": param.slot_kind,
+        "value": param.value,
+        "span": [param.span_start, param.span_end] if param.span_start is not None else None,
+        "domain": json.loads(param.domain) if param.domain else None,
+        "domain_confirmed": bool(param.domain_confirmed),
+        "replaceable": bool(param.replaceable),
     }
 
 
@@ -599,6 +688,148 @@ async def similar_question_ids(
     return scored[:limit]
 
 
+async def similar_by_elements(
+    db: AsyncSession, question: Question, *, limit: int = 10
+) -> List[Dict[str, Any]]:
+    """同源题:同学科已采纳拆解中,与本题共享相同条件(``content_sig`` 相同)的题。
+
+    相似度 = 共享条件数 / 双方条件签名的并集大小。返回 [{"question_id", "score",
+    "shared_count", "shared_elements": [本题共享的条件内容]}],按相似度降序。
+    """
+    run = await accepted_run(db, StructTargetType.QUESTION.value, question.id)
+    if run is None:
+        return []
+    mine: Dict[str, str] = {}
+    for element in run.elements:
+        if element.content_sig and element.content_sig not in mine:
+            mine[element.content_sig] = element.content
+    if not mine:
+        return []
+    accepted_question_run = and_(
+        StructRun.target_type == StructTargetType.QUESTION.value,
+        StructRun.state == StructRunState.ACCEPTED.value,
+        StructRun.subject_id == question.subject_id,
+        StructRun.target_id != question.id,
+    )
+    hit_rows = await db.execute(
+        select(StructRun.id)
+        .join(StructElement, StructElement.run_id == StructRun.id)
+        .where(accepted_question_run, StructElement.content_sig.in_(list(mine)))
+        .distinct()
+    )
+    run_ids = [row[0] for row in hit_rows.all()]
+    if not run_ids:
+        return []
+    sig_rows = await db.execute(
+        select(StructRun.target_id, StructElement.content_sig)
+        .join(StructElement, StructElement.run_id == StructRun.id)
+        .where(StructRun.id.in_(run_ids), StructElement.content_sig.is_not(None))
+    )
+    theirs: Dict[int, set] = {}
+    for target_id, sig in sig_rows.all():
+        theirs.setdefault(target_id, set()).add(sig)
+    scored = []
+    for target_id, sigs in theirs.items():
+        shared = set(mine) & sigs
+        if not shared:
+            continue
+        scored.append({
+            "question_id": target_id,
+            "score": round(len(shared) / len(set(mine) | sigs), 4),
+            "shared_count": len(shared),
+            "shared_elements": [mine[sig] for sig in mine if sig in shared],
+        })
+    scored.sort(key=lambda item: (-item["score"], -item["shared_count"], item["question_id"]))
+    return scored[:limit]
+
+
+async def similar_by_params(
+    db: AsyncSession, question: Question, *, limit: int = 10
+) -> List[Dict[str, Any]]:
+    """同参数模式的题(「同一道题换了数」):同类型的条目上有同形态的参数,而参数值不同。
+
+    参数的模式键 = (参数形态, 所属条目的类型);参数名由 AI 起,写法不稳定,不参与比较。
+    相似度 = 参数模式键集合的 Jaccard × 条目类型集合的 Jaccard;双方参数值完全相同(同一道题)
+    的不算。返回 [{"question_id", "score", "shared_params": [本题对应的参数名]}]。
+    """
+    run = await accepted_run(db, StructTargetType.QUESTION.value, question.id)
+    if run is None or not run.params:
+        return []
+    mine_keys, mine_values, mine_types = _param_pattern(run)
+    if not mine_keys:
+        return []
+    names = {}
+    owner_type = _owner_types(run)
+    for param in run.params:
+        names.setdefault((param.slot_kind, owner_type.get(_owner_key(param))), param.name)
+    candidate_runs = (
+        await db.execute(
+            _run_query().where(
+                StructRun.target_type == StructTargetType.QUESTION.value,
+                StructRun.state == StructRunState.ACCEPTED.value,
+                StructRun.subject_id == question.subject_id,
+                StructRun.target_id != question.id,
+                StructRun.id.in_(select(StructParam.run_id)),
+            )
+        )
+    ).scalars().all()
+    scored = []
+    for other in candidate_runs:
+        keys, values, types = _param_pattern(other)
+        shared = mine_keys & keys
+        if not shared or values == mine_values:
+            continue
+        type_score = len(mine_types & types) / len(mine_types | types) if (mine_types | types) else 1.0
+        score = len(shared) / len(mine_keys | keys) * type_score
+        scored.append({
+            "question_id": other.target_id,
+            "score": round(score, 4),
+            "shared_params": sorted({names[key] for key in shared if key in names}),
+        })
+    scored.sort(key=lambda item: (-item["score"], item["question_id"]))
+    return scored[:limit]
+
+
+def _owner_key(param: StructParam) -> tuple:
+    return ("e", param.element_id) if param.element_id else ("a", param.ask_id)
+
+
+def _owner_types(run: StructRun) -> Dict[tuple, Optional[int]]:
+    out: Dict[tuple, Optional[int]] = {("e", e.id): e.type_id for e in run.elements}
+    out.update({("a", a.id): a.type_id for a in run.asks})
+    return out
+
+
+def _param_pattern(run: StructRun) -> tuple:
+    """(参数模式键集合, 参数值列表, 条目类型集合)。"""
+    owner_type = _owner_types(run)
+    keys = {(p.slot_kind, owner_type.get(_owner_key(p))) for p in run.params}
+    values = sorted(p.value for p in run.params)
+    types = {e.type_id for e in run.elements if e.type_id} | {a.type_id for a in run.asks if a.type_id}
+    return keys, values, types
+
+
+SIMILAR_MODES = ("types", "elements", "params")
+
+
+async def find_similar(
+    db: AsyncSession, question: Question, *, mode: str = "types", limit: int = 10
+) -> List[Dict[str, Any]]:
+    """同结构 / 同源题的统一入口(调用方负责可见性过滤)。
+
+    - ``types``:设问类型 + 条件类型集合相近;
+    - ``elements``:共享相同条件;
+    - ``params``:参数模式相同、参数值不同。
+    """
+    if mode == "elements":
+        return await similar_by_elements(db, question, limit=limit)
+    if mode == "params":
+        return await similar_by_params(db, question, limit=limit)
+    if mode == "types":
+        return await similar_question_ids(db, question, limit=limit)
+    raise Invalid("Unknown similarity mode", ErrorCode.STRUCTURE_INVALID_ITEM)
+
+
 def question_type_filter(type_ids: Sequence[int]):
     """题目检索条件:已采纳拆解中有条件或设问属于这些类型(调用方负责展开子类型)。"""
     ids = list(set(type_ids))
@@ -661,7 +892,8 @@ async def subject_stats(db: AsyncSession, subject_id: int, viewer: Any) -> Dict[
     """学科的结构化进度与元素类型覆盖(只统计当前用户可见、未删除的题)。
 
     返回:{"total", "states": {none, draft, accepted, stale}, "queued", "top_types": [...],
-    "unclassified"}。``top_types`` 按引用题数降序,最多 15 个;``unclassified`` 是已采纳
+    "unclassified", "origins": {ai, human, agent}, "types_total", "types_mapped", "with_thinking"}。
+    ``origins`` 是已采纳拆解按来源的条数;``types_mapped`` 是映射了知识点的类型数(不含根)。``top_types`` 按引用题数降序,最多 15 个;``unclassified`` 是已采纳
     拆解中尚未归类的条件 / 设问条数(留给归纳)。
     """
     from app.crud.crud_question import visible_questions_filter
@@ -681,6 +913,19 @@ async def subject_stats(db: AsyncSession, subject_id: int, viewer: Any) -> Dict[
     ) or 0
 
     visible_ids = select(Question.id).where(*base)
+    origin_rows = await db.execute(
+        select(StructRun.origin, func.count(StructRun.id))
+        .where(
+            StructRun.target_type == StructTargetType.QUESTION.value,
+            StructRun.state == StructRunState.ACCEPTED.value,
+            StructRun.subject_id == subject_id,
+            StructRun.target_id.in_(visible_ids),
+        )
+        .group_by(StructRun.origin)
+    )
+    origins = {origin.value: 0 for origin in StructOrigin}
+    for origin, count in origin_rows.all():
+        origins[origin] = count
     counts: Dict[int, set] = {}
     unclassified = 0
     for model in (StructElement, StructAsk):
@@ -703,11 +948,21 @@ async def subject_stats(db: AsyncSession, subject_id: int, viewer: Any) -> Dict[
     by_id = {t.id: t for t in types}
     paths = type_svc.path_names(types)
     top = sorted(counts.items(), key=lambda item: (-len(item[1]), item[0]))[:15]
+    # 类型 ↔ 知识点映射的覆盖(不含根节点)与有思维量难度的题数。
+    kp_map = await type_svc.knowledge_point_map(db, subject_id)
+    leaf_types = [t for t in types if t.parent_id is not None]
+    with_thinking = await db.scalar(
+        select(func.count(Question.id)).where(*base, Question.thinking_difficulty.is_not(None))
+    ) or 0
     return {
         "total": total,
         "states": states,
         "queued": queued,
         "unclassified": unclassified,
+        "origins": origins,
+        "types_total": len(leaf_types),
+        "types_mapped": sum(1 for t in leaf_types if kp_map.get(t.id)),
+        "with_thinking": with_thinking,
         "top_types": [
             {
                 "type_id": type_id,
@@ -803,6 +1058,8 @@ def _run_query():
     return select(StructRun).options(
         selectinload(StructRun.elements),
         selectinload(StructRun.asks).selectinload(StructAsk.element_links),
+        selectinload(StructRun.params),
+        selectinload(StructRun.groups).selectinload(StructElementGroup.items),
     )
 
 
@@ -824,6 +1081,52 @@ def _checked_type(type_id: Any, allowed: Dict[int, str], kind: StructTypeKind) -
     if allowed.get(type_id) != kind.value:
         raise Invalid("Invalid structure type", ErrorCode.STRUCTURE_TYPE_NOT_FOUND)
     return type_id
+
+
+def _draft_param(item: Dict[str, Any], stem_text: str) -> DraftParam:
+    """人工提交的参数 → DraftParam(字段校验;位置交给体检)。"""
+    owner = item.get("owner")
+    if owner not in ("element", "ask"):
+        raise Invalid("Parameter owner must be element or ask", ErrorCode.STRUCTURE_INVALID_ITEM)
+    value = str(item.get("value") or "")
+    if not value.strip():
+        raise Invalid("Parameter value is required", ErrorCode.STRUCTURE_INVALID_ITEM)
+    slot_kind = item.get("slot_kind") or "numeric"
+    if slot_kind not in SLOT_KINDS:
+        raise Invalid("Unknown parameter kind", ErrorCode.STRUCTURE_INVALID_ITEM)
+    domain = parse_domain(item.get("domain"))
+    return DraftParam(
+        name=(str(item.get("name") or "").strip() or value)[:64],
+        value=value,
+        owner=owner,
+        owner_index=int(item.get("owner_index") or 0),
+        slot_kind=slot_kind,
+        span=_span(item, stem_text),
+        occurrence=int(item.get("occurrence") or 1),
+        domain=domain,
+        domain_confirmed=bool(item.get("domain_confirmed")) and domain is not None,
+        replaceable=item.get("replaceable") is not False,
+    )
+
+
+def _draft_groups(groups: Sequence[Dict[str, Any]], element_count: int) -> List[DraftGroup]:
+    """人工提交的元素组:成员下标有效、至少两条、互不重叠。"""
+    used: set = set()
+    out: List[DraftGroup] = []
+    for item in groups:
+        name = str(item.get("name") or "").strip()
+        indices = list(dict.fromkeys(int(i) for i in item.get("element_indices") or []))
+        if not name or len(indices) < 2 or any(not 0 <= i < element_count for i in indices):
+            raise Invalid("A group needs a name and at least two conditions", ErrorCode.STRUCTURE_INVALID_ITEM)
+        if used & set(indices):
+            raise Invalid("A condition can belong to only one group", ErrorCode.STRUCTURE_INVALID_ITEM)
+        used |= set(indices)
+        out.append(DraftGroup(
+            name=name[:128], element_indices=indices,
+            description=(str(item.get("description") or "").strip() or None),
+            replaceable=item.get("replaceable") is not False,
+        ))
+    return out
 
 
 def _required_text(value: Any) -> str:

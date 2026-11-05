@@ -143,6 +143,8 @@ class CRUDQuestion(CRUDBase[Question, QuestionCreate, QuestionUpdate]):
         stimulus_id: Optional[int] = None,
         struct_type_ids: Optional[List[int]] = None,
         struct_state: Optional[str] = None,
+        thinking_min: Optional[float] = None,
+        thinking_max: Optional[float] = None,
         viewer=None,
     ):
         query = select(self.model).options(
@@ -246,6 +248,11 @@ class CRUDQuestion(CRUDBase[Question, QuestionCreate, QuestionUpdate]):
             if condition is not None:
                 query = query.filter(condition)
 
+        if thinking_min is not None:
+            query = query.filter(self.model.thinking_difficulty >= thinking_min)
+        if thinking_max is not None:
+            query = query.filter(self.model.thinking_difficulty <= thinking_max)
+
         if viewer is not None:
             query = query.filter(visible_questions_filter(viewer))
 
@@ -276,6 +283,9 @@ class CRUDQuestion(CRUDBase[Question, QuestionCreate, QuestionUpdate]):
         stimulus_id: Optional[int] = None,
         struct_type_ids: Optional[List[int]] = None,
         struct_state: Optional[str] = None,
+        thinking_min: Optional[float] = None,
+        thinking_max: Optional[float] = None,
+        sort: Optional[str] = None,
         viewer=None
     ) -> List[Question]:
         query = await self._get_filter_query(
@@ -299,9 +309,18 @@ class CRUDQuestion(CRUDBase[Question, QuestionCreate, QuestionUpdate]):
             stimulus_id=stimulus_id,
             struct_type_ids=struct_type_ids,
             struct_state=struct_state,
+            thinking_min=thinking_min,
+            thinking_max=thinking_max,
             viewer=viewer
         )
-        query = query.offset(skip).limit(limit).order_by(self.model.created_at.desc())
+        if sort in ("thinking_asc", "thinking_desc"):
+            # 没有思维量难度的题排在最后。
+            column = self.model.thinking_difficulty
+            ordered = column.asc() if sort == "thinking_asc" else column.desc()
+            query = query.order_by(column.is_(None), ordered, self.model.created_at.desc())
+        else:
+            query = query.order_by(self.model.created_at.desc())
+        query = query.offset(skip).limit(limit)
         result = await db.execute(query)
         return result.scalars().all()
 
@@ -385,6 +404,8 @@ class CRUDQuestion(CRUDBase[Question, QuestionCreate, QuestionUpdate]):
         stimulus_id: Optional[int] = None,
         struct_type_ids: Optional[List[int]] = None,
         struct_state: Optional[str] = None,
+        thinking_min: Optional[float] = None,
+        thinking_max: Optional[float] = None,
         viewer=None
     ) -> int:
         query = await self._get_filter_query(
@@ -408,6 +429,8 @@ class CRUDQuestion(CRUDBase[Question, QuestionCreate, QuestionUpdate]):
             stimulus_id=stimulus_id,
             struct_type_ids=struct_type_ids,
             struct_state=struct_state,
+            thinking_min=thinking_min,
+            thinking_max=thinking_max,
             viewer=viewer
         )
         # Use subquery for count to handle joins correctly

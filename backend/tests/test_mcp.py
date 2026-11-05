@@ -776,3 +776,27 @@ async def test_mcp_duplicate_flow(mcp_client, ctx):
     assert "question.duplicate_suspected" in text and f'"question_id": {first}' in text
     allowed = await _call(mcp_client, key, "question_create", {**args, "allow_duplicate": True})
     assert allowed["isError"] is False
+
+
+async def test_structure_saved_via_mcp_is_an_agent_draft(mcp_client, db_session, ctx):
+    from app.models.question_structure import StructRun
+
+    key = await _create_key(mcp_client, ctx["alice"])
+    created = await _call(mcp_client, key, "question_create", {
+        "subject_id": ctx["math"].id, "q_type": "free_response",
+        "content": {"type": "doc", "content": [{"type": "paragraph", "content": [
+            {"type": "text", "text": "已知 "}, {"type": "inlineMath", "attrs": {"latex": "a=1"}},
+            {"type": "text", "text": "，求 "}, {"type": "inlineMath", "attrs": {"latex": "a+1"}},
+        ]}]},
+    })
+    assert created["isError"] is False, created
+    qid = created["structuredContent"]["id"]
+    saved = await _call(mcp_client, key, "structure_save", {
+        "target_id": qid,
+        "elements": [{"content": "$a=1$", "source": "$a=1$"}],
+        "asks": [{"content": "求 $a+1$", "source": "求 $a+1$", "depends_on": [0]}],
+        "accept": True,
+    })
+    assert not saved.get("isError"), saved
+    run = (await db_session.execute(select(StructRun).where(StructRun.target_id == qid))).scalars().one()
+    assert run.origin == "agent" and run.state == "draft"

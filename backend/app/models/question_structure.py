@@ -19,7 +19,7 @@
 import enum
 from datetime import datetime
 
-from sqlalchemy import Column, DateTime, ForeignKey, Index, Integer, String, Text, UniqueConstraint
+from sqlalchemy import Boolean, Column, DateTime, Float, ForeignKey, Index, Integer, String, Text, UniqueConstraint
 from sqlalchemy.dialects.mysql import LONGTEXT
 from sqlalchemy.orm import relationship
 
@@ -30,10 +30,12 @@ _LongText = LONGTEXT().with_variant(Text(), "sqlite")
 
 
 class StructTypeKind(str, enum.Enum):
-    """元素类型树里的节点用于条件还是设问。两者共用一棵树,用 kind 区分。"""
+    """元素类型树里的节点用于条件、设问,还是解题方法(三期)。共用一棵表,用 kind 区分。"""
 
     CONDITION = "condition"
     ASK = "ask"
+    # 解题方法 / 思维动作:解答步骤按它归类,权重用于计算思维量难度。
+    METHOD = "method"
 
 
 class StructTypeStatus(str, enum.Enum):
@@ -54,10 +56,11 @@ class StructTargetType(str, enum.Enum):
 
 
 class StructOrigin(str, enum.Enum):
-    """拆解来自 AI 还是人工修改。"""
+    """拆解的来源:站内 AI、站内人工修改,还是外部 Agent 经 MCP 提交。"""
 
     AI = "ai"
     HUMAN = "human"
+    AGENT = "agent"
 
 
 class StructRunState(str, enum.Enum):
@@ -108,10 +111,21 @@ class StructType(Base):
     # 取值见 StructTypeStatus。
     status = Column(String(16), nullable=False, default=StructTypeStatus.ACTIVE.value)
     sort_order = Column(Integer, nullable=False, default=0)
+    # 思维量权重(方法类型使用):一个普通步骤记 1,特殊步骤由老师加权。
+    weight = Column(Float, nullable=False, default=1.0)
 
     created_by = Column(Integer, ForeignKey("user.id", ondelete="SET NULL"), nullable=True)
     created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
     updated_at = Column(DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
+class StructTypeKnowledgePoint(Base):
+    """元素类型 ↔ 知识点(规格 §12.3 N8):老师在类型上维护一次,用于推荐与统计。"""
+
+    __tablename__ = "struct_type_knowledge_points"
+
+    type_id = Column(Integer, ForeignKey("struct_types.id", ondelete="CASCADE"), primary_key=True)
+    knowledge_point_id = Column(Integer, ForeignKey("knowledge_points.id", ondelete="CASCADE"), primary_key=True)
 
 
 class StructRun(Base):
@@ -167,6 +181,12 @@ class StructRun(Base):
     asks = relationship(
         "StructAsk", back_populates="run", cascade="all, delete-orphan", order_by="StructAsk.ordinal"
     )
+    params = relationship(
+        "StructParam", back_populates="run", cascade="all, delete-orphan", order_by="StructParam.ordinal"
+    )
+    groups = relationship(
+        "StructElementGroup", back_populates="run", cascade="all, delete-orphan", order_by="StructElementGroup.ordinal"
+    )
 
 
 class StructElement(Base):
@@ -181,6 +201,8 @@ class StructElement(Base):
     ordinal = Column(Integer, nullable=False, default=0)
     # 规范化后的单命题表述,可以与原文措辞不同。
     content = Column(_LongText, nullable=False)
+    # content 归一化(与题目查重同一套规则)后的 SHA-256:找「共享相同条件」的题(同源检索)。
+    content_sig = Column(String(64), nullable=True, index=True)
 
     # 元素类型;为空表示尚未归类(见 type_hint)。
     type_id = Column(Integer, ForeignKey("struct_types.id", ondelete="SET NULL"), nullable=True, index=True)
@@ -229,4 +251,137 @@ class StructAskElement(Base):
     __tablename__ = "struct_ask_elements"
 
     ask_id = Column(Integer, ForeignKey("struct_asks.id", ondelete="CASCADE"), primary_key=True)
+    element_id = Column(Integer, ForeignKey("struct_elements.id", ondelete="CASCADE"), primary_key=True)
+
+
+class StructCandidateStatus(str, enum.Enum):
+    """归纳候选的处理状态。"""
+
+    PENDING = "pending"
+    # 新建为类型。
+    ACCEPTED = "accepted"
+    # 并入已有类型。
+    MERGED = "merged"
+    IGNORED = "ignored"
+
+
+class StructTypeCandidate(Base):
+    """元素归纳(二期)产生的候选类型:一组含义相近、尚未归类的条件或设问。
+
+    由 ``struct_type.induce`` 任务生成,老师确认(新建 / 并入 / 忽略)后才影响类型树;
+    确认时组内条目原地回填 ``type_id``。同一学科、同一 kind 只保留最新一批 pending 候选。
+    """
+
+    __tablename__ = "struct_type_candidates"
+    __table_args__ = (Index("ix_struct_type_candidates_subject_status", "subject_id", "status"),)
+
+    id = Column(Integer, primary_key=True, index=True)
+    subject_id = Column(Integer, ForeignKey("subjects.id", ondelete="CASCADE"), nullable=False)
+    # 取值见 StructTypeKind。
+    kind = Column(String(16), nullable=False, default=StructTypeKind.CONDITION.value)
+    name = Column(String(128), nullable=False)
+    definition = Column(Text, nullable=True)
+    # AI 建议挂在哪个类型下面(通常是领域根或其子类型)。
+    suggested_parent_id = Column(Integer, ForeignKey("struct_types.id", ondelete="SET NULL"), nullable=True)
+    # AI 认为含义接近的已有类型:老师可以直接并入它。
+    similar_type_id = Column(Integer, ForeignKey("struct_types.id", ondelete="SET NULL"), nullable=True)
+    # 取值见 StructCandidateStatus。
+    status = Column(String(16), nullable=False, default=StructCandidateStatus.PENDING.value)
+    job_id = Column(Integer, nullable=True)
+    # 确认后对应的类型(新建的或并入的)。
+    resolved_type_id = Column(Integer, ForeignKey("struct_types.id", ondelete="SET NULL"), nullable=True)
+    resolved_by = Column(Integer, ForeignKey("user.id", ondelete="SET NULL"), nullable=True)
+    resolved_at = Column(DateTime, nullable=True)
+    created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+
+    items = relationship(
+        "StructTypeCandidateItem", cascade="all, delete-orphan", passive_deletes=True, back_populates="candidate"
+    )
+
+
+class StructTypeCandidateItem(Base):
+    """候选类型包含的一条条件或设问(二者恰有其一)。"""
+
+    __tablename__ = "struct_type_candidate_items"
+
+    id = Column(Integer, primary_key=True, index=True)
+    candidate_id = Column(
+        Integer, ForeignKey("struct_type_candidates.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    element_id = Column(Integer, ForeignKey("struct_elements.id", ondelete="CASCADE"), nullable=True, index=True)
+    ask_id = Column(Integer, ForeignKey("struct_asks.id", ondelete="CASCADE"), nullable=True, index=True)
+
+    candidate = relationship("StructTypeCandidate", back_populates="items")
+
+
+class StructParamKind(str, enum.Enum):
+    """参数槽的取值形态。"""
+
+    NUMERIC = "numeric"
+    SYMBOLIC = "symbolic"
+    POINT = "point"
+    INTERVAL = "interval"
+    EXPRESSION = "expression"
+
+
+class StructParam(Base):
+    """参数槽(规格 §12.3 N1):题干里可替换的值,挂在某条条件或设问上,用于生成变式。
+
+    位置用 ``stem_text`` 上的区间表示,变式按区间替换(不做字符串匹配)。与条件、设问一样
+    属于快照:人工保存时随条目一并提交,新快照继承参数。
+    """
+
+    __tablename__ = "struct_params"
+    __table_args__ = (Index("ix_struct_params_run_ordinal", "run_id", "ordinal"),)
+
+    id = Column(Integer, primary_key=True, index=True)
+    run_id = Column(Integer, ForeignKey("struct_runs.id", ondelete="CASCADE"), nullable=False)
+    ordinal = Column(Integer, nullable=False, default=0)
+    # 所属条目:条件或设问,恰有其一。
+    element_id = Column(Integer, ForeignKey("struct_elements.id", ondelete="CASCADE"), nullable=True, index=True)
+    ask_id = Column(Integer, ForeignKey("struct_asks.id", ondelete="CASCADE"), nullable=True, index=True)
+    # 参数名,如 a、常数项、点 A 的坐标。
+    name = Column(String(64), nullable=False)
+    # 取值见 StructParamKind。
+    slot_kind = Column(String(16), nullable=False, default=StructParamKind.NUMERIC.value)
+    # 原值:与 stem_text[span_start:span_end] 一致(体检校验)。
+    value = Column(Text, nullable=False)
+    span_start = Column(Integer, nullable=True)
+    span_end = Column(Integer, nullable=True)
+    # 允许的取值(JSON):{"min", "max", "integer", "values": [...], "exclude": [...], "note": "..."}。
+    domain = Column(Text, nullable=True)
+    # 取值范围经老师确认后,才允许 AI 在范围内自动取值。
+    domain_confirmed = Column(Boolean, nullable=False, default=False)
+    # 是否作为生成变式的旋钮。
+    replaceable = Column(Boolean, nullable=False, default=True)
+
+    run = relationship("StructRun", back_populates="params")
+
+
+class StructElementGroup(Base):
+    """元素组(规格 §12.3 N2):几条条件作为一个整体,可整组替换成其他题中同类型组合的元素组。
+
+    属于快照:人工保存时随条目一并提交,新快照继承。
+    """
+
+    __tablename__ = "struct_element_groups"
+    __table_args__ = (Index("ix_struct_element_groups_run_ordinal", "run_id", "ordinal"),)
+
+    id = Column(Integer, primary_key=True, index=True)
+    run_id = Column(Integer, ForeignKey("struct_runs.id", ondelete="CASCADE"), nullable=False)
+    ordinal = Column(Integer, nullable=False, default=0)
+    name = Column(String(128), nullable=False)
+    description = Column(Text, nullable=True)
+    replaceable = Column(Boolean, nullable=False, default=True)
+
+    run = relationship("StructRun", back_populates="groups")
+    items = relationship("StructElementGroupItem", cascade="all, delete-orphan", passive_deletes=True)
+
+
+class StructElementGroupItem(Base):
+    """元素组包含的条件。"""
+
+    __tablename__ = "struct_element_group_items"
+
+    group_id = Column(Integer, ForeignKey("struct_element_groups.id", ondelete="CASCADE"), primary_key=True)
     element_id = Column(Integer, ForeignKey("struct_elements.id", ondelete="CASCADE"), primary_key=True)

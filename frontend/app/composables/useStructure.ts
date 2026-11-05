@@ -1,9 +1,16 @@
 import type {
+  SolutionStepInput,
+  StructComposeJob,
+  StructGroupCandidate,
+  SolutionView,
+  StructCandidatesView,
+  StructVariantJob,
   StructDistribution,
   StructReviewQueuePage,
   StructSavePayload,
   StructSettings,
   StructSimilarItem,
+  StructSimilarMode,
   StructStats,
   StructTargetType,
   StructType,
@@ -70,8 +77,10 @@ export function useStructure() {
 
   // region 同结构题与统计
 
-  const similar = (questionId: number, limit = 10) =>
-    $api<{ items: StructSimilarItem[] }>(`/structure/questions/${questionId}/similar`, { query: { limit } })
+  const similar = (questionId: number, options: { mode?: StructSimilarMode, limit?: number } = {}) =>
+    $api<{ items: StructSimilarItem[] }>(`/structure/questions/${questionId}/similar`, {
+      query: { limit: options.limit ?? 10, mode: options.mode ?? 'types' },
+    })
 
   const stats = (subjectId: number) =>
     $api<StructStats>('/structure/stats', { query: { subject_id: subjectId } })
@@ -110,7 +119,105 @@ export function useStructure() {
 
   // endregion
 
+  // region 变式
+
+  /** 排队生成变式:values 为老师填写的新值,autoParamIds 由 AI 在已确认的范围内取值。 */
+  const createVariant = (body: {
+    question_id: number
+    run_id?: number | null
+    values: Array<{ param_id: number, value: string }>
+    auto_param_ids: number[]
+  }) => $api<{ job_id: number }>('/structure/variants', { method: 'POST', body })
+
+  const variantJob = (questionId: number) =>
+    $api<{ job: StructVariantJob | null }>(`/structure/questions/${questionId}/variant-job`)
+
+  // endregion
+
+  // region 元素组与命题
+
+  const groupCandidates = (groupId: number) =>
+    $api<{ items: StructGroupCandidate[] }>(`/structure/groups/${groupId}/candidates`)
+
+  const replaceGroup = (groupId: number, sourceGroupId: number) =>
+    $api<{ job_id: number }>('/structure/groups/replace', {
+      method: 'POST', body: { group_id: groupId, source_group_id: sourceGroupId },
+    })
+
+  const compose = (body: { element_ids: number[], ask_ids: number[], group_ids: number[], q_type: string, note?: string | null }) =>
+    $api<{ job_id: number, source_question_ids: number[] }>('/structure/compose', { method: 'POST', body })
+
+  const composeJob = (jobId: number) => $api<StructComposeJob>(`/structure/jobs/${jobId}`)
+
+  // endregion
+
+  // region 解答结构
+
+  const getSolution = (questionId: number) => $api<SolutionView>(`/structure/solutions/questions/${questionId}`)
+
+  const decomposeSolutions = (questionIds: number[], solutionNo = 1) =>
+    $api<{ queued: number[], skipped: number[] }>('/structure/solutions/decompose', {
+      method: 'POST', body: { question_ids: questionIds, solution_no: solutionNo },
+    })
+
+  const saveSolution = (body: { question_id: number, solution_no: number, steps: SolutionStepInput[], accept: boolean }) =>
+    $api<SolutionView>('/structure/solutions/save', { method: 'POST', body })
+
+  const reviewSolutions = (runIds: number[], action: 'accept' | 'reject') =>
+    $api<{ updated: number[], skipped: number[] }>('/structure/solutions/review', {
+      method: 'POST', body: { run_ids: runIds, action },
+    })
+
+  const solutionReviewQueue = (subjectId: number, query: Record<string, unknown> = {}) =>
+    $api<StructReviewQueuePage>('/structure/solutions/review-queue', { query: { subject_id: subjectId, ...query } })
+
+  /** 按元素 / 方法类型映射推荐、题目尚未标注的知识点。 */
+  const knowledgeSuggestions = (questionId: number) =>
+    $api<{ items: Array<{ id: number, name: string, matches: number }>, current_ids: number[] }>(
+      `/structure/questions/${questionId}/knowledge-suggestions`,
+    )
+
+  // endregion
+
+  // region 元素归纳
+
+  const listCandidates = (subjectId: number) =>
+    $api<StructCandidatesView>('/structure/candidates', { query: { subject_id: subjectId } })
+
+  /** 排队归纳(学科管理权限)。 */
+  const induce = (subjectId: number) =>
+    $api<{ job_id: number }>('/structure/candidates/induce', { method: 'POST', body: { subject_id: subjectId } })
+
+  /** 新建为类型;不传 parent_id 时用 AI 建议的父节点。 */
+  const acceptCandidate = (candidateId: number, body: { name?: string, parent_id?: number | null, definition?: string | null }) =>
+    $api<StructType>(`/structure/candidates/${candidateId}/accept`, { method: 'POST', body })
+
+  const mergeCandidate = (candidateId: number, typeId: number) =>
+    $api<StructType>(`/structure/candidates/${candidateId}/merge`, { method: 'POST', body: { type_id: typeId } })
+
+  const ignoreCandidate = (candidateId: number) =>
+    $api<{ ok: boolean }>(`/structure/candidates/${candidateId}/ignore`, { method: 'POST' })
+
+  // endregion
+
   return {
+    groupCandidates,
+    replaceGroup,
+    compose,
+    composeJob,
+    getSolution,
+    decomposeSolutions,
+    saveSolution,
+    reviewSolutions,
+    solutionReviewQueue,
+    knowledgeSuggestions,
+    createVariant,
+    variantJob,
+    listCandidates,
+    induce,
+    acceptCandidate,
+    mergeCandidate,
+    ignoreCandidate,
     getSettings,
     setEnabled,
     setAutoDecompose,

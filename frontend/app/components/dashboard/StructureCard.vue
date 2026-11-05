@@ -95,6 +95,13 @@ watch(() => [props.subjectId, props.refreshKey], () => { void load() }, { immedi
         <div class="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
           <span>{{ t('structure.dashboard.queued', { count: stats.queued }) }}</span>
           <span>{{ t('structure.dashboard.unclassified', { count: stats.unclassified }) }}</span>
+          <span v-if="stats.origins">{{ t('structure.dashboard.origins', {
+            ai: formatNumber(stats.origins.ai),
+            human: formatNumber(stats.origins.human),
+            agent: formatNumber(stats.origins.agent),
+          }) }}</span>
+          <span v-if="stats.types_total">{{ t('structure.dashboard.kpCoverage', { mapped: stats.types_mapped, total: stats.types_total }) }}</span>
+          <span v-if="stats.with_thinking">{{ t('structure.dashboard.withThinking', { count: formatNumber(stats.with_thinking) }) }}</span>
         </div>
         <Button
           v-if="stats.states.draft > 0"

@@ -1,6 +1,7 @@
 <script setup lang="ts">
 /**
  * 拆解审核页(规格 §8.2):当前学科的待审拆解队列 + 右侧题干结构面板。
+ * 顶部切换「题干」/「解答」两个队列(解答结构为三期,右侧换成解答面板)。
  *
  * - 队列默认把有体检错误的排在前面,可按体检结果、来源、对象筛选;
  * - 快捷键:J / K 下一条 / 上一条,A 采纳,X 驳回,E 编辑,R 重新拆解(输入框聚焦时不触发);
@@ -18,9 +19,11 @@ import { Checkbox } from '@/components/ui/checkbox'
 import { NativeSelect, NativeSelectOption } from '@/components/ui/native-select'
 import MathText from '@/components/structure/MathText.vue'
 import StructurePanel from '@/components/structure/StructurePanel.vue'
+import SolutionPanel from '@/components/structure/SolutionPanel.vue'
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { getApiErrorDetail } from '@/lib/apiErrors'
 import { cn } from '@/lib/utils'
-import type { StructReviewQueueItem } from '~/types'
+import type { StructOrigin, StructReviewQueueItem } from '~/types'
 
 const { t } = useI18n()
 const api = useStructure()
@@ -37,9 +40,11 @@ const pages = ref(0)
 const loading = ref(false)
 const busy = ref(false)
 
+// 审核哪一种:题干拆解或解答拆解。
+const mode = ref<'stem' | 'solution'>('stem')
 // 筛选:空字符串表示「全部」(不传给后端)。
 const check = ref<'' | 'errors' | 'warnings' | 'clean'>('')
-const origin = ref<'' | 'ai' | 'human'>('')
+const origin = ref<'' | StructOrigin>('')
 const targetType = ref<'' | 'question' | 'stimulus'>('')
 
 /** 当前选中的队列项(用 run id 标识,刷新队列后仍能找回位置)。 */
@@ -47,7 +52,8 @@ const selectedRunId = ref<number | null>(null)
 /** 批量采纳勾选的 run id。 */
 const checked = ref<Set<number>>(new Set())
 
-const panel = ref<InstanceType<typeof StructurePanel> | null>(null)
+// 右侧面板(题干或解答),两者暴露同一组方法供快捷键调用。
+const panel = ref<InstanceType<typeof StructurePanel> | InstanceType<typeof SolutionPanel> | null>(null)
 
 // endregion
 
@@ -66,6 +72,7 @@ const originOptions = computed(() => [
   { value: '', label: t('structure.review.allOrigins') },
   { value: 'ai', label: t('structure.origins.ai') },
   { value: 'human', label: t('structure.origins.human') },
+  { value: 'agent', label: t('structure.origins.agent') },
 ])
 const targetOptions = computed(() => [
   { value: '', label: t('structure.review.allTargets') },
@@ -88,9 +95,11 @@ async function loadQueue(keepSelection = true): Promise<void> {
   try {
     const query: Record<string, unknown> = { page: page.value, size: PAGE_SIZE }
     if (check.value) query.check = check.value
-    if (origin.value) query.origin = origin.value
-    if (targetType.value) query.target_type = targetType.value
-    const result = await api.reviewQueue(currentSubjectId.value, query)
+    if (mode.value === 'stem' && origin.value) query.origin = origin.value
+    if (mode.value === 'stem' && targetType.value) query.target_type = targetType.value
+    const result = mode.value === 'stem'
+      ? await api.reviewQueue(currentSubjectId.value, query)
+      : await api.solutionReviewQueue(currentSubjectId.value, query)
     // 当前页被审完变空了:退回上一页。
     if (!result.items.length && page.value > 1) {
       page.value -= 1
@@ -143,7 +152,8 @@ async function batchAccept(): Promise<void> {
   if (!checked.value.size || busy.value) return
   busy.value = true
   try {
-    const result = await api.review([...checked.value], 'accept')
+    const ids = [...checked.value]
+    const result = mode.value === 'stem' ? await api.review(ids, 'accept') : await api.reviewSolutions(ids, 'accept')
     toast.success(t('structure.review.batchAccepted', { count: result.updated.length }))
     checked.value = new Set()
     await loadQueue(false)
@@ -186,7 +196,11 @@ shortcut('r', () => { void panel.value?.redecompose() })
 // endregion
 
 // 筛选变化:回到第一页重新加载(若已在第一页,page 不变,需要手动加载)。
-watch([check, origin, targetType], () => {
+watch(mode, () => {
+  selectedRunId.value = null
+  checked.value = new Set()
+})
+watch([check, origin, targetType, mode], () => {
   if (page.value !== 1) page.value = 1
   else void loadQueue(false)
 })
@@ -209,13 +223,19 @@ onActivated(() => { void loadQueue(true) })
     <p class="text-sm text-muted-foreground">{{ t('structure.review.description') }}</p>
 
     <div class="flex flex-wrap items-center gap-2">
+      <Tabs v-model="mode">
+        <TabsList>
+          <TabsTrigger value="stem">{{ t('structure.solution.tabStem') }}</TabsTrigger>
+          <TabsTrigger value="solution">{{ t('structure.solution.tabSolution') }}</TabsTrigger>
+        </TabsList>
+      </Tabs>
       <NativeSelect v-model="check" class="h-9 w-36">
         <NativeSelectOption v-for="option in checkOptions" :key="option.value" :value="option.value">{{ option.label }}</NativeSelectOption>
       </NativeSelect>
-      <NativeSelect v-model="origin" class="h-9 w-32">
+      <NativeSelect v-if="mode === 'stem'" v-model="origin" class="h-9 w-32">
         <NativeSelectOption v-for="option in originOptions" :key="option.value" :value="option.value">{{ option.label }}</NativeSelectOption>
       </NativeSelect>
-      <NativeSelect v-model="targetType" class="h-9 w-32">
+      <NativeSelect v-if="mode === 'stem'" v-model="targetType" class="h-9 w-32">
         <NativeSelectOption v-for="option in targetOptions" :key="option.value" :value="option.value">{{ option.label }}</NativeSelectOption>
       </NativeSelect>
       <span class="text-sm text-muted-foreground">{{ t('structure.review.total', { count: total }) }}</span>
@@ -262,6 +282,8 @@ onActivated(() => { void loadQueue(true) })
                 <Badge v-else-if="item.check_warnings" variant="outline" class="h-5 border-amber-500/50 px-1.5 font-normal text-amber-700 dark:text-amber-300">{{ t('structure.review.warnings', { count: item.check_warnings }) }}</Badge>
                 <span>{{ t(`structure.origins.${item.origin}`) }}</span>
                 <span v-if="item.target_type === 'stimulus'">· {{ t('structure.review.material') }}</span>
+                <span v-if="item.solution_no">· {{ t('structure.solution.method', { no: item.solution_no }) }}</span>
+                <span v-if="item.thinking_load != null">· {{ t('structure.solution.thinkingLoad', { value: item.thinking_load }) }}</span>
                 <span>· #{{ item.target_id }}</span>
               </div>
             </div>
@@ -276,8 +298,17 @@ onActivated(() => { void loadQueue(true) })
 
       <!-- 右侧面板 -->
       <section class="min-h-0 overflow-y-auto rounded-lg border bg-card p-4">
+        <SolutionPanel
+          v-if="selected && mode === 'solution'"
+          :key="`s-${selected.id}`"
+          ref="panel"
+          :question-id="selected.target_id"
+          :initial-solution-no="selected.solution_no ?? 1"
+          prefer-run="draft"
+          @changed="onPanelChanged"
+        />
         <StructurePanel
-          v-if="selected"
+          v-else-if="selected"
           ref="panel"
           :target-type="selected.target_type"
           :target-id="selected.target_id"

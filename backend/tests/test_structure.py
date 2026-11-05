@@ -138,8 +138,9 @@ async def _types(client, ctx):
 # --------------------------------------------------------------------------- #
 async def test_math_subject_gets_domain_roots_and_types_can_grow(client, ctx):
     types = await _types(client, ctx)
-    assert set(types) == {"algebra", "geometry", "statistics", "ask"}
+    assert set(types) == {"algebra", "geometry", "statistics", "ask", "method"}
     assert types["ask"]["kind"] == "ask" and types["algebra"]["parent_id"] is None
+    assert types["method"]["kind"] == "method" and types["method"]["weight"] == 1
 
     created = await client.post(
         f"{API}/structure/types",
@@ -345,12 +346,18 @@ async def test_filter_similar_stats_and_distribution(client, db_session, ctx, fa
         f"{API}/structure/questions/{first['id']}/similar", headers=_auth(ctx["editor"])
     )).json()["items"]
     assert [s["question_id"] for s in similar] == [second["id"]] and similar[0]["score"] == 1.0
+    same_source = (await client.get(
+        f"{API}/structure/questions/{first['id']}/similar", params={"mode": "elements"}, headers=_auth(ctx["editor"])
+    )).json()["items"]
+    assert [s["question_id"] for s in same_source] == [second["id"]]
+    assert same_source[0]["shared_count"] == 2 and same_source[0]["shared_elements"][0] == "$f(x)=x^{3}+ax+2$"
 
     stats = (await client.get(
         f"{API}/structure/stats", params={"subject_id": ctx["subject"].id}, headers=_auth(ctx["editor"])
     )).json()
     assert stats["total"] == 3 and stats["states"] == {"draft": 0, "accepted": 2, "stale": 0, "none": 1}
     assert stats["top_types"][0]["count"] == 2
+    assert stats["origins"] == {"ai": 2, "human": 0, "agent": 0}
 
     distribution = (await client.post(
         f"{API}/structure/distribution", json={"question_ids": [first["id"], plain["id"]]}, headers=_auth(ctx["editor"])
@@ -466,3 +473,27 @@ async def test_sub_question_references_material_conditions(client, db_session, c
     assert view["draft"]["asks"][0]["depends_on"] == [shared["id"]]
     assert view["draft"]["check_errors"] == 0
     assert "Shared material conditions" in fake_ai.calls[1]["user"]
+
+
+# --------------------------------------------------------------------------- #
+# 同源检索:条件内容签名
+# --------------------------------------------------------------------------- #
+def test_content_signature_ignores_formatting_differences():
+    from app.services.structure.signature import content_signature
+
+    assert content_signature("$f(x)=\\dfrac{1}{2}x$，") == content_signature("$f(x) = \\frac{1}{2} x$")
+    assert content_signature("$a=1$") != content_signature("$a=2$")
+    assert content_signature("  ") is None
+
+
+async def test_signature_backfill_fills_missing_values(client, db_session, ctx, fake_ai):
+    from app.models.question_structure import StructElement
+    from app.services.structure.signature import backfill, content_signature
+
+    question = await _question(client, ctx)
+    await _decompose(client, db_session, ctx, question["id"])
+    await db_session.execute(StructElement.__table__.update().values(content_sig=None))
+    await db_session.commit()
+    assert await backfill(db_session) == 2
+    rows = (await db_session.execute(select(StructElement.content, StructElement.content_sig))).all()
+    assert all(sig == content_signature(content) for content, sig in rows)

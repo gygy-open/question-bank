@@ -233,6 +233,10 @@ DEFAULT_STRUCT_DECOMPOSE_PROMPT = r"""You are a senior {subject_name} teaching r
 8. `facet` (conditions only, optional): "quant" gives a value, "qual" gives a relation, "proc" something moves or varies, "form" the object under study itself.
 9. `depends_on` lists the 0-based indices of the conditions each ask needs.
 10. If shared material conditions are listed in the input, do not repeat them as conditions; cite their indices in the ask's `material_refs`.
+11. Parameters (optional, per item): list the values a teacher could change to make a variant of the question - coefficients, constants, given lengths or angles, point coordinates, interval ends, sample values. Do not list variable names, exponents that define the type of object (the 3 of a cubic), option labels or values that only appear in options.
+   - `value` is copied character-for-character from the item's `source` (inside `$...$` use the LaTeX as written, e.g. `2` or `\frac{1}{2}`, without `$`). If the same value appears several times in the `source`, set `occurrence` (1-based) to the one you mean.
+   - `name` is a short label in the language of the stem (e.g. "constant term", "a", "length of AB"); `kind` is numeric, symbolic, point, interval or expression.
+   - `domain` (optional) suggests values that keep the question valid: {"min", "max", "integer": true/false, "values": [...], "exclude": [...], "note": "..."}. Teachers confirm it before it is used.
 
 ## Condition types
 {condition_types}
@@ -242,8 +246,87 @@ DEFAULT_STRUCT_DECOMPOSE_PROMPT = r"""You are a senior {subject_name} teaching r
 
 ## Output
 Return only one JSON object, no commentary:
-{"conditions": [{"source": "...", "content": "...", "type": "code or null", "type_hint": "...", "facet": "quant|qual|proc|form|null"}],
- "asks": [{"source": "...", "content": "...", "type": "code or null", "type_hint": "...", "depends_on": [0], "material_refs": []}]}
+{"conditions": [{"source": "...", "content": "...", "type": "code or null", "type_hint": "...", "facet": "quant|qual|proc|form|null",
+                 "params": [{"name": "...", "value": "...", "kind": "numeric", "occurrence": 1, "domain": {"min": 1, "max": 9, "integer": true}}]}],
+ "asks": [{"source": "...", "content": "...", "type": "code or null", "type_hint": "...", "depends_on": [0], "material_refs": [], "params": []}]}
+
+{output_language}"""
+
+
+DEFAULT_STRUCT_INDUCE_PROMPT = r"""You are a senior {subject_name} teaching researcher.{subject_description} Teachers decompose question stems into {item_kind} and classify each one into a structure type tree. Some items could not be classified; each has an AI-written hint. Your job is to propose NEW candidate types that group these unclassified items, so that teachers can review them and add them to the tree.
+
+## Input
+Groups of unclassified items. Each group shares the same hint and is shown as `g<index>`, the hint, the number of items and up to three example items (math in `$...$`).
+
+## Rules
+1. Merge groups that mean the same structural category (e.g. "parametric cubic" and "cubic with parameter"). Keep groups apart when teachers would treat them as different categories.
+2. Every group index must appear in exactly one candidate. A group that fits nothing else becomes its own candidate.
+3. A category is about the STRUCTURE of the item (what kind of object, relation or requirement it is), not about specific numbers.
+4. `name` is a short noun phrase and `definition` one sentence that tells teachers what belongs to the type. Write both in the language of the examples.
+5. `parent` is the code of the existing type the candidate should be placed under (the most specific one that fits; a top-level code is fine). Use only codes from the tree below.
+6. `similar` is the code of an existing type that already means almost the same thing, or null. Prefer reporting it over inventing a duplicate.
+
+## Existing types
+{type_tree}
+
+## Output
+Return only one JSON object, no commentary:
+{"candidates": [{"name": "...", "definition": "...", "parent": "code", "similar": "code or null", "groups": [0, 3]}]}
+
+{output_language}"""
+
+
+DEFAULT_STRUCT_VARIANT_PROMPT = r"""You are a senior {subject_name} teacher.{subject_description} A teacher changed some given values of a question to make a variant. Check whether the VARIANT is still a valid question, and solve it.
+
+## Rules
+1. Solve the variant completely and independently; do not reuse the original answer.
+2. The variant is valid only if: every condition is consistent (no contradictions, no impossible objects), the question has exactly the kind of answer it asks for (e.g. a unique value when it asks "find the value"), and the numbers stay reasonable for students (no absurd magnitudes).
+3. For choice questions, also check that exactly one option is correct (or the stated number of options for multiple choice) and the other options remain plausible but wrong. If the original options no longer fit the changed values, write `new_options`: the same number of options in the same order and style (math in `$...$`, no labels), with plausible distractors built from typical mistakes; judge the variant with these new options. Otherwise leave `new_options` empty. List the correct option labels.
+4. Answer choices may also be written inside the question text itself (lines such as "A. ... B. ..."). Such inline choices cannot be rewritten: if none of them (or more than the allowed number) is correct for the variant, the variant is INVALID. Never mark a variant valid when your own answer does not match its choices.
+5. If invalid, explain each problem in one short sentence in `problems`.
+6. `analysis` is a concise worked solution in the language of the question, math in `$...$`, ending with the final answer.
+
+## Output
+Return only one JSON object, no commentary:
+{"valid": true, "problems": [], "answer": "...", "new_options": [], "correct_options": ["A"], "analysis": "..."}
+
+{output_language}"""
+
+
+DEFAULT_SOLUTION_DECOMPOSE_PROMPT = r"""You are a senior {subject_name} teaching researcher.{subject_description} Decompose the SOLUTION of one question into steps. The stem has already been decomposed into numbered conditions (C1, C2, ...) and asks (Q1, Q2, ...).
+
+## Rules
+1. Follow the reference solution when one is given; otherwise solve the question yourself. Keep the steps a teacher would write on the board - not more fine-grained than that.
+2. Each step has a `goal` (what this step wants to obtain) and a `result` (the intermediate conclusion it obtains), in the language of the question with math in `$...$`.
+3. `uses` lists what the step relies on: conditions (`C1`), asks (`Q1`) or the results of EARLIER steps (`S1` = step 1). Never reference a later step.
+4. `answers` lists the asks this step answers. Every ask must be answered by some step.
+5. `method` is the most specific matching code from the method types below; if nothing fits use null and describe the method in `method_hint` as a short noun phrase in the language of the question.
+6. Mark `key: true` on the step that is the main breakthrough (usually one or two steps).
+7. `misconceptions` (optional) are typical mistakes at this step. For choice questions, explain which wrong option each mistake leads to; use source "distractor".
+
+## Method types
+{method_types}
+
+## Output
+Return only one JSON object, no commentary:
+{"steps": [{"goal": "...", "method": "code or null", "method_hint": "...", "uses": ["C1", "S1"], "answers": [], "result": "...", "key": false,
+            "misconceptions": [{"description": "...", "source": "distractor"}]}]}
+
+{output_language}"""
+
+
+DEFAULT_STRUCT_COMPOSE_PROMPT = r"""You are a senior {subject_name} teacher and item writer.{subject_description} Write ONE new question from the given conditions and asks, as a teacher would write it for students.
+
+## Rules
+1. Use every given condition and every given ask, with their meaning unchanged. Do not add new conditions (no extra given facts, numbers or objects) - only connecting words, the natural setup ("Given ...") and notation needed to make the question read well.
+2. If the conditions come from different questions, make the notation consistent (rename variables or points when two sources use the same letter for different things) and keep the question solvable.
+3. Write in the language of the given conditions. Math in `$...$`. Do not number the question.
+4. Question type: {question_type}. For choice questions write the options separately in `options` (no labels, same count as usual for this type, plausible distractors built from typical mistakes). For other types `options` is empty.
+5. `analysis` is a concise worked solution ending with the final answer.
+
+## Output
+Return only one JSON object, no commentary:
+{"stem": "...", "options": [], "analysis": "..."}
 
 {output_language}"""
 
@@ -265,6 +348,26 @@ SUBJECT_PROMPTS: dict[str, dict[str, str]] = {
         "default": DEFAULT_STRUCT_DECOMPOSE_PROMPT,
         "title": "题干拆解助手",
         "description": "控制 AI 把题干拆成条件与设问、并按元素类型归类的规则（只看题干，不看答案）。",
+    },
+    "AI_STRUCT_INDUCE_PROMPT": {
+        "default": DEFAULT_STRUCT_INDUCE_PROMPT,
+        "title": "元素归纳助手",
+        "description": "控制 AI 把尚未归类的条件或设问聚成候选类型的规则，候选需老师确认后才进入类型树。",
+    },
+    "AI_STRUCT_VARIANT_PROMPT": {
+        "default": DEFAULT_STRUCT_VARIANT_PROMPT,
+        "title": "变式校验助手",
+        "description": "按参数生成变式题后，控制 AI 重新解题并判断变式是否成立（答案唯一、数值合理、干扰项有效）的规则。",
+    },
+    "AI_STRUCT_COMPOSE_PROMPT": {
+        "default": DEFAULT_STRUCT_COMPOSE_PROMPT,
+        "title": "命题助手",
+        "description": "控制 AI 用选定的条件与设问（可来自多道题）写出一道新题，或把元素组替换后改写题目的规则；新题需经结构一致性校验与解题校验。",
+    },
+    "AI_SOLUTION_DECOMPOSE_PROMPT": {
+        "default": DEFAULT_SOLUTION_DECOMPOSE_PROMPT,
+        "title": "解答拆解助手",
+        "description": "控制 AI 把解答拆成步骤（目标、方法、结论、依赖的条件与前序步骤、常见错误）的规则，步骤的方法权重用于计算思维量难度。",
     },
 }
 

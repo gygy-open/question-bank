@@ -14,7 +14,8 @@ import { Label } from '@/components/ui/label'
 import { NativeSelect, NativeSelectOption } from '@/components/ui/native-select'
 import { Textarea } from '@/components/ui/textarea'
 import type { StructTypeFormValue } from '@/lib/structure'
-import type { StructType, StructTypeStatus } from '~/types'
+import KnowledgePointSelector from '@/components/KnowledgePointSelector.vue'
+import type { KnowledgePoint, StructType, StructTypeKind, StructTypeStatus } from '~/types'
 
 const props = defineProps<{
   open: boolean
@@ -23,6 +24,10 @@ const props = defineProps<{
   /** 新建时的上级名称(用于标题提示)。 */
   parentName?: string | null
   saving?: boolean
+  /** 类型属于哪一类:方法类型可以设权重。 */
+  kind?: StructTypeKind
+  /** 本学科的知识点(用于映射,规格 §12.3 N8)。 */
+  knowledgePoints?: KnowledgePoint[]
 }>()
 
 const emit = defineEmits<{
@@ -39,6 +44,8 @@ const code = ref('')
 const definition = ref('')
 const examples = ref<Array<{ text: string, positive: boolean }>>([])
 const status = ref<StructTypeStatus>('active')
+const weight = ref(1)
+const knowledgePointIds = ref<number[]>([])
 
 // endregion
 
@@ -53,7 +60,8 @@ const isEdit = computed(() => props.initial != null)
 
 // 编码只允许字母数字与 . _ -,与后端校验一致;留空由后端按名称生成。
 const codeInvalid = computed(() => !!code.value && !/^[A-Za-z0-9_.-]{1,64}$/.test(code.value))
-const canSubmit = computed(() => !!name.value.trim() && !codeInvalid.value && !props.saving)
+const weightInvalid = computed(() => !(Number(weight.value) > 0 && Number(weight.value) <= 100))
+const canSubmit = computed(() => !!name.value.trim() && !codeInvalid.value && !weightInvalid.value && !props.saving)
 
 const statusOptions = computed(() => (['active', 'candidate', 'deprecated'] as StructTypeStatus[])
   .map(value => ({ value, label: t(`structure.typeStatuses.${value}`) })))
@@ -75,6 +83,8 @@ function submit(): void {
     // 空示例不提交。
     examples: examples.value.filter(item => item.text.trim()).map(item => ({ text: item.text.trim(), positive: item.positive })),
     status: status.value,
+    weight: Number(weight.value),
+    knowledge_point_ids: knowledgePointIds.value,
   })
 }
 
@@ -88,6 +98,8 @@ watch(() => props.open, (value) => {
   definition.value = props.initial?.definition ?? ''
   examples.value = (props.initial?.examples ?? []).map(item => ({ text: item.text, positive: item.positive !== false }))
   status.value = props.initial?.status ?? 'active'
+  weight.value = props.initial?.weight ?? 1
+  knowledgePointIds.value = [...(props.initial?.knowledge_point_ids ?? [])]
 }, { immediate: true })
 </script>
 
@@ -130,6 +142,16 @@ watch(() => props.open, (value) => {
             <Button size="icon" variant="ghost" class="h-8 w-8 shrink-0" @click="examples.splice(index, 1)"><Trash2 class="h-4 w-4" /></Button>
           </div>
           <p v-if="!examples.length" class="text-xs text-muted-foreground">{{ t('structure.types.examplesHint') }}</p>
+        </div>
+        <div v-if="kind === 'method'" class="space-y-1.5">
+          <Label>{{ t('structure.types.weight') }}</Label>
+          <Input v-model.number="weight" type="number" min="0.1" max="100" step="0.5" class="h-9 w-28" />
+          <p class="text-xs text-muted-foreground">{{ t('structure.types.weightHint') }}</p>
+        </div>
+        <div v-if="isEdit && knowledgePoints?.length" class="space-y-1.5">
+          <Label>{{ t('structure.types.knowledgePoints') }}</Label>
+          <KnowledgePointSelector v-model="knowledgePointIds" :knowledge-points="knowledgePoints" />
+          <p class="text-xs text-muted-foreground">{{ t('structure.types.knowledgePointsHint') }}</p>
         </div>
         <div class="space-y-1.5">
           <Label>{{ t('structure.types.status') }}</Label>

@@ -216,6 +216,21 @@ class ErrorCode(StrEnum):
     STRUCTURE_TYPE_IN_USE = "structure.type_in_use"
     STRUCTURE_TYPE_HAS_CHILDREN = "structure.type_has_children"
     STRUCTURE_TYPE_INVALID_IMPORT = "structure.type_invalid_import"
+    STRUCTURE_CANDIDATE_NOT_FOUND = "structure.candidate_not_found"
+    STRUCTURE_CANDIDATE_RESOLVED = "structure.candidate_resolved"
+    STRUCTURE_INDUCE_NOT_ENOUGH_DATA = "structure.induce_not_enough_data"
+    STRUCTURE_RUN_STALE = "structure.run_stale"
+    STRUCTURE_PARAM_NOT_FOUND = "structure.param_not_found"
+    STRUCTURE_PARAM_DOMAIN_UNCONFIRMED = "structure.param_domain_unconfirmed"
+    STRUCTURE_PARAM_UNMAPPABLE = "structure.param_unmappable"
+    STRUCTURE_VARIANT_EMPTY = "structure.variant_empty"
+    STRUCTURE_VARIANT_RUNNING = "structure.variant_running"
+    STRUCTURE_SOLUTION_NEEDS_STEM = "structure.solution_needs_stem"
+    STRUCTURE_SOLUTION_NOT_FOUND = "structure.solution_not_found"
+    STRUCTURE_GROUP_NOT_FOUND = "structure.group_not_found"
+    STRUCTURE_GROUP_MISMATCH = "structure.group_mismatch"
+    STRUCTURE_COMPOSE_INVALID = "structure.compose_invalid"
+    STRUCTURE_JOB_NOT_FOUND = "structure.job_not_found"
 
 
 class ApiError(HTTPException):

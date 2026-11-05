@@ -82,6 +82,9 @@ const isOpen = computed({
           <div class="border rounded-lg p-4 bg-muted/40 border-dashed relative z-10">
             <div class="flex items-center gap-2 mb-2">
               <Badge variant="outline" class="bg-background">{{ t('questionEditor.structure.source') }}</Badge>
+              <Badge v-if="source.relation_type !== 'decomposed_from'" variant="secondary" class="font-normal">
+                {{ t(`questionEditor.structure.relationTypes.${source.relation_type}`) }}
+              </Badge>
               <span class="text-sm text-muted-foreground">ID: {{ source.question.id }}</span>
               <Button variant="link" size="sm" class="h-auto p-0 ml-auto text-xs" @click="fetchQuestion(source.question.id)">
                 {{ t('questionEditor.structure.view') }}
@@ -115,6 +118,9 @@ const isOpen = computed({
               <div class="border rounded-lg p-4 bg-muted/30">
                 <div class="flex items-center gap-2 mb-2">
                   <Badge variant="outline">{{ t('questionEditor.structure.derived') }}</Badge>
+                  <Badge v-if="target.relation_type !== 'decomposed_from'" variant="secondary" class="font-normal">
+                    {{ t(`questionEditor.structure.relationTypes.${target.relation_type}`) }}
+                  </Badge>
                   <span class="text-sm text-muted-foreground">ID: {{ target.question.id }}</span>
                   <Button variant="link" size="sm" class="h-auto p-0 ml-auto text-xs" @click="fetchQuestion(target.question.id)">
                     {{ t('questionEditor.structure.view') }}

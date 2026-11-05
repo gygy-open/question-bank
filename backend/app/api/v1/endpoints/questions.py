@@ -41,6 +41,9 @@ async def read_questions(
     stimulus_id: Optional[int] = None,
     struct_type_ids: List[int] = Query(None),
     struct_state: Optional[str] = Query(None, description="none / draft / accepted / stale"),
+    thinking_min: Optional[float] = None,
+    thinking_max: Optional[float] = None,
+    sort: Optional[str] = Query(None, description="thinking_asc / thinking_desc; default newest first"),
     current_user: models.User = Depends(deps.get_current_active_user),
 ) -> Any:
     skip = (page - 1) * size
@@ -67,6 +70,9 @@ async def read_questions(
         stimulus_id=stimulus_id,
         struct_type_ids=struct_type_ids,
         struct_state=struct_state,
+        thinking_min=thinking_min,
+        thinking_max=thinking_max,
+        sort=sort,
         viewer=current_user
     )
     total = await crud.question.count_with_filters(
@@ -90,6 +96,8 @@ async def read_questions(
         stimulus_id=stimulus_id,
         struct_type_ids=struct_type_ids,
         struct_state=struct_state,
+        thinking_min=thinking_min,
+        thinking_max=thinking_max,
         viewer=current_user
     )
     relation_counts = await crud.question.get_relation_counts(

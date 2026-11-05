@@ -104,6 +104,10 @@ const filters = reactive({
   // 题干结构化:元素类型(含子类型,只匹配已采纳拆解)与结构状态。
   struct_type_ids: [] as number[],
   struct_state: undefined as string | undefined,
+  // 解答结构三期:思维量难度范围与排序。
+  thinking_min: undefined as number | undefined,
+  thinking_max: undefined as number | undefined,
+  sort: undefined as string | undefined,
 })
 
 // Initialize filters from route query
@@ -174,6 +178,9 @@ const queryParams = computed(() => {
   if (filters.membership !== 'all') params.has_stimulus = filters.membership === 'grouped'
   if (filters.struct_type_ids.length > 0) params.struct_type_ids = filters.struct_type_ids
   if (filters.struct_state && filters.struct_state !== '0') params.struct_state = filters.struct_state
+  if (typeof filters.thinking_min === 'number') params.thinking_min = filters.thinking_min
+  if (typeof filters.thinking_max === 'number') params.thinking_max = filters.thinking_max
+  if (filters.sort && filters.sort !== '0') params.sort = filters.sort
   
   return params
 })
@@ -497,6 +504,9 @@ const resetFilters = () => {
   filters.membership = 'all'
   filters.struct_type_ids = []
   filters.struct_state = undefined
+  filters.thinking_min = undefined
+  filters.thinking_max = undefined
+  filters.sort = undefined
   page.value = 1
   
   // Remove query param
@@ -563,6 +573,11 @@ watch([selectedSubjectId, showStructure], () => {
 }, { immediate: true })
 onActivated(() => { void refreshStructureEnabled() })
 if (structureEnabled.value === null) void refreshStructureEnabled()
+
+const sortOptions = computed(() => [
+  { value: 'thinking_asc', label: t('questions.filters.sortThinkingAsc') },
+  { value: 'thinking_desc', label: t('questions.filters.sortThinkingDesc') },
+])
 
 const structStateOptions = computed(() => [
   { label: t('structure.library.allStates'), value: '0' },
@@ -747,6 +762,18 @@ const viewRelations = (question: Question) => {
                   <div v-if="showStructure" class="space-y-2 min-w-[140px]">
                     <Label class="text-xs font-medium">{{ t('structure.library.stateFilter') }}</Label>
                     <ClearableSelect v-model="filters.struct_state" :options="structStateOptions" :placeholder="t('structure.library.allStates')" />
+                  </div>
+                  <div v-if="showStructure" class="space-y-2">
+                    <Label class="text-xs font-medium">{{ t('structure.solution.thinkingFilter') }}</Label>
+                    <div class="flex items-center gap-1">
+                      <Input v-model.number="filters.thinking_min" type="number" min="0" class="h-9 w-20" :placeholder="t('structure.params.min')" />
+                      <span class="text-muted-foreground">~</span>
+                      <Input v-model.number="filters.thinking_max" type="number" min="0" class="h-9 w-20" :placeholder="t('structure.params.max')" />
+                    </div>
+                  </div>
+                  <div class="space-y-2 min-w-[140px]">
+                    <Label class="text-xs font-medium">{{ t('questions.filters.sort') }}</Label>
+                    <ClearableSelect v-model="filters.sort" :options="sortOptions" :placeholder="t('questions.filters.sortNewest')" />
                   </div>
                   </div>
 

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { formatNumber } from '@/lib/locale'
 import { computed, ref } from 'vue'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -282,6 +283,12 @@ const sourcePreviewQuery = computed(() => {
                   class="h-3 w-3"
                   :class="i <= item.difficulty ? 'fill-primary text-primary' : 'fill-none text-muted-foreground/30'" />
               </div>
+              <Badge
+                v-if="(item as DbQuestion).thinking_difficulty != null"
+                variant="outline"
+                class="h-5 px-1.5 text-xs font-normal"
+                :title="t('structure.solution.thinkingHint')"
+              >{{ t('structure.solution.thinkingDifficulty', { value: formatNumber((item as DbQuestion).thinking_difficulty!) }) }}</Badge>
             </div>
           </div>
 

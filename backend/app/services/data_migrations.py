@@ -152,10 +152,19 @@ async def _import_jobs(db: AsyncSession) -> str:
     return f"created {created} import jobs"
 
 
+async def _struct_content_sig(db: AsyncSession) -> str:
+    """按当前查重归一化规则(重)算条件内容签名;规则版本变化时任务名随之变化,会再跑一遍。"""
+    from app.services.structure.signature import backfill
+
+    count = await backfill(db, recompute=True)
+    return f"updated {count} condition signatures"
+
+
 DATA_MIGRATIONS: List[DataMigration] = [
     DataMigration("legacy_media_assets", _legacy_media_assets),
     DataMigration(f"question_dedup_v{DEDUP_VERSION}", _question_dedup),
     DataMigration("import_jobs_v1", _import_jobs),
+    DataMigration(f"struct_content_sig_v{DEDUP_VERSION}", _struct_content_sig),
 ]
 
 

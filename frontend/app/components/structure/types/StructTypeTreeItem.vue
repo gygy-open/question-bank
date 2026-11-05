@@ -72,6 +72,11 @@ const STATUS_CLASS: Record<string, string> = {
         {{ node.definition }}
       </span>
       <span v-else class="flex-1" />
+      <span
+        v-if="node.kind === 'method' && node.weight !== 1"
+        class="shrink-0 rounded bg-primary/10 px-1.5 text-xs text-primary"
+        :title="t('structure.types.weight')"
+      >×{{ node.weight }}</span>
       <span class="shrink-0 text-xs text-muted-foreground" :title="t('structure.types.usageHint')">
         {{ t('structure.types.usage', { count: node.usage }) }}
       </span>

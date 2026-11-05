@@ -1,5 +1,5 @@
 from sqlalchemy import (
-    Column, Integer, SmallInteger, Boolean, Text, ForeignKey, Table, Enum,
+    Column, Float, Integer, SmallInteger, Boolean, Text, ForeignKey, Table, Enum,
     DateTime, JSON, String, text, CheckConstraint, UniqueConstraint, Index, BigInteger,
 )
 from sqlalchemy.dialects.mysql import LONGTEXT
@@ -106,6 +106,8 @@ class Question(Base):
         server_default=QuestionVisibility.PUBLIC.value, index=True,
     )
     difficulty = Column(Integer, default=1) # 难度 1-5
+    # 思维量难度(题干结构化三期):已采纳解答中步骤权重之和,多解取最小;没有采纳解答时为空。
+    thinking_difficulty = Column(Float, nullable=True)
     review_count = Column(Integer, default=0) # 审核次数
 
     subject_id = Column(Integer, ForeignKey('subjects.id'), nullable=True)

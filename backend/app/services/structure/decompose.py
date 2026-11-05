@@ -20,12 +20,13 @@ from app.services.prompts import get_default_prompt
 
 from . import types as type_svc
 from .check import CheckItem, Report, check_structure
+from .params import SLOT_KINDS, DraftParam, check_params, parse_domain
 
 logger = logging.getLogger(__name__)
 
 PROMPT_KEY = "AI_STRUCT_DECOMPOSE_PROMPT"
 # 默认提示词的版本;规则改动时递增,便于按版本比较拆解质量。学科自定义的提示词记为 "custom"。
-PROMPT_VERSION = "v2"
+PROMPT_VERSION = "v3"
 CUSTOM_PROMPT_VERSION = "custom"
 # 首次结果体检有 error 时,带着问题清单重试的次数。
 RETRY_ON_CHECK_ERRORS = 1
@@ -62,12 +63,24 @@ class DraftAsk:
 
 
 @dataclass
+class DraftGroup:
+    """一个待落库的元素组;``element_indices`` 是本拆解中条件的下标。"""
+
+    name: str
+    element_indices: List[int]
+    description: Optional[str] = None
+    replaceable: bool = True
+
+
+@dataclass
 class Draft:
     """一次拆解的结果(尚未落库)。"""
 
     elements: List[DraftElement]
     asks: List[DraftAsk]
     report: Report
+    params: List[DraftParam] = field(default_factory=list)
+    groups: List[DraftGroup] = field(default_factory=list)
     model: Optional[str] = None
     prompt_version: Optional[str] = None
     provider_id: Optional[int] = None
@@ -83,6 +96,34 @@ class SharedCondition:
 
 # region AI 输出的宽松解析模型(字段缺失、类型不对都尽量容忍,真正的错误交给体检)
 
+class _AIParam(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+
+    name: str = ""
+    value: str = ""
+    kind: Optional[str] = None
+    occurrence: int = 1
+    domain: Optional[Dict[str, Any]] = None
+
+    @field_validator("name", "value", mode="before")
+    @classmethod
+    def _text(cls, value: Any) -> str:
+        return "" if value is None else str(value).strip()
+
+    @field_validator("occurrence", mode="before")
+    @classmethod
+    def _occurrence(cls, value: Any) -> int:
+        try:
+            return max(int(value), 1)
+        except (TypeError, ValueError):
+            return 1
+
+    @field_validator("domain", mode="before")
+    @classmethod
+    def _domain(cls, value: Any) -> Optional[Dict[str, Any]]:
+        return value if isinstance(value, dict) else None
+
+
 class _AICondition(BaseModel):
     model_config = ConfigDict(extra="ignore")
 
@@ -91,6 +132,12 @@ class _AICondition(BaseModel):
     type: Optional[str] = None
     type_hint: Optional[str] = None
     facet: Optional[str] = None
+    params: List[_AIParam] = Field(default_factory=list)
+
+    @field_validator("params", mode="before")
+    @classmethod
+    def _params(cls, value: Any) -> List[Any]:
+        return [item for item in value if isinstance(item, dict)] if isinstance(value, list) else []
 
     @field_validator("source", "content", mode="before")
     @classmethod
@@ -234,11 +281,13 @@ def parse_output(
         (t.kind, t.code): t.id for t in types if t.status == "active"
     }
     elements: List[DraftElement] = []
+    params: List[DraftParam] = []
     for item in output.conditions:
         if not item.content.strip() and not item.source.strip():
             continue
         type_id, hint = _resolve_type(by_code, StructTypeKind.CONDITION, item.type, item.type_hint)
         facet = item.facet if item.facet in {f.value for f in StructFacet} else None
+        params.extend(_params_of(item, "element", len(elements)))
         elements.append(DraftElement(
             content=(item.content or item.source).strip(),
             source=item.source.strip() or None,
@@ -265,6 +314,7 @@ def parse_output(
                 shared_index[ref] = len(elements)
                 elements.append(DraftElement(content=shared[ref].content, ref_element_id=shared[ref].element_id))
             depends.append(shared_index[ref])
+        params.extend(_params_of(item, "ask", len(asks)))
         asks.append(DraftAsk(
             content=(item.content or item.source).strip(),
             source=item.source.strip() or None,
@@ -273,8 +323,8 @@ def parse_output(
             depends_on=sorted(set(depends)),
         ))
 
-    report = run_check(stem_text, elements, asks, shared)
-    return Draft(elements=elements, asks=asks, report=report)
+    report = run_check(stem_text, elements, asks, shared, params)
+    return Draft(elements=elements, asks=asks, report=report, params=params)
 
 
 def run_check(
@@ -282,8 +332,9 @@ def run_check(
     elements: Sequence[DraftElement],
     asks: Sequence[DraftAsk],
     shared: Sequence[SharedCondition] = (),
+    params: Sequence[DraftParam] = (),
 ) -> Report:
-    """体检并把定位出的原文区间写回各条目。"""
+    """体检并把定位出的原文区间写回各条目与参数。"""
     report = check_structure(
         stem_text,
         [
@@ -297,6 +348,8 @@ def run_check(
         element.span = span
     for ask, span in zip(asks, report.ask_spans):
         ask.span = span
+    if params:
+        report.issues.extend(check_params(stem_text, params, report.element_spans, report.ask_spans))
     return report
 
 
@@ -313,6 +366,10 @@ def describe_errors(draft: Draft) -> List[str]:
             lines.append(f"{label}: symbol `{issue.detail}` is used by an ask but no condition introduces it (a condition is probably missing)")
         elif issue.code == "duplicate":
             lines.append(f"{label}: duplicates another condition")
+        elif issue.code == "param_not_found":
+            lines.append(f"{label}: parameter value `{issue.detail}` is not an exact, standalone part of its item's `source`")
+        elif issue.code in ("param_outside_owner", "param_overlap", "param_value_mismatch"):
+            lines.append(f"{label}: {issue.message.lower()}; give each parameter a distinct value quoted from its own item")
         else:
             lines.append(f"{label}: {issue.message}")
     return lines
@@ -330,6 +387,24 @@ def _resolve_type(
         return by_code[(kind.value, code)], (hint[:255] if hint else None)
     fallback = hint or code
     return None, (fallback[:255] if fallback else None)
+
+
+def _params_of(item: _AICondition, owner: str, owner_index: int) -> List[DraftParam]:
+    """条目下 AI 标出的参数 → DraftParam(名称或值为空的丢弃)。"""
+    out: List[DraftParam] = []
+    for param in item.params:
+        if not param.value:
+            continue
+        out.append(DraftParam(
+            name=(param.name or param.value)[:64],
+            value=param.value,
+            owner=owner,
+            owner_index=owner_index,
+            slot_kind=param.kind if param.kind in SLOT_KINDS else "numeric",
+            occurrence=param.occurrence,
+            domain=parse_domain(param.domain),
+        ))
+    return out
 
 
 def _realign(conditions: Sequence[_AICondition], index: int) -> Optional[int]:

@@ -8,9 +8,9 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Any, List, Optional
+from typing import Any, List, Literal, Optional
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from sqlalchemy import select
 
 from app import crud, models, schemas
@@ -98,14 +98,25 @@ class QuestionReviewInput(BaseModel):
     data: schemas.QuestionReview
 
 
+RelationTypeLiteral = Literal["decomposed_from", "variant_of", "composed_from"]
+
+
 class QuestionRelationInput(BaseModel):
     source_question_id: int
     target_question_id: int
+    relation_type: RelationTypeLiteral = Field(
+        "decomposed_from",
+        description="decomposed_from: split from a composite question; variant_of: parameter variant; "
+        "composed_from: composed from elements of the source.",
+    )
 
 
 class DerivedQuestionCreateInput(BaseModel):
     source_question_id: int
     data: schemas.QuestionCreate
+    relation_type: RelationTypeLiteral = Field(
+        "decomposed_from", description="How the new question derives from the source question."
+    )
 
 
 @register
@@ -154,6 +165,7 @@ class CreateQuestionRelation(Capability[QuestionRelationInput, QuestionRelation]
             source_question_id=target.id,
             target_question_id=inp.target_question_id,
             actor=ctx.actor,
+            relation_type=inp.relation_type,
         )
 
 
@@ -178,6 +190,7 @@ class DeleteQuestionRelation(Capability[QuestionRelationInput, None]):
             source_question_id=target.id,
             target_question_id=inp.target_question_id,
             actor=ctx.actor,
+            relation_type=inp.relation_type,
         )
 
 
@@ -221,6 +234,7 @@ class CreateDerivedQuestion(Capability[DerivedQuestionCreateInput, Question]):
                 actor=ctx.actor,
                 commit=False,
                 new_target=True,
+                relation_type=inp.relation_type,
             )
             await ctx.db.commit()
             created = await crud.question.get(ctx.db, id=question.id)

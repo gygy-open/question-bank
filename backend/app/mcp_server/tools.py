@@ -63,6 +63,16 @@ EXCLUDED_CAPABILITIES: frozenset[str] = frozenset({
     "struct_type.delete",
     "struct_type.merge",
     "struct_type.import",
+    "struct_type.induce",
+    "structure.variant",
+    "solution.decompose",
+    "solution.save",
+    "solution.review",
+    "structure.compose",
+    "structure.group_replace",
+    "struct_type.candidate.accept",
+    "struct_type.candidate.merge",
+    "struct_type.candidate.ignore",
 })
 
 # capability → 输出类型,与对应 REST 端点的 response_model 一致;None 表示无返回体。
@@ -637,6 +647,13 @@ async def _get_question_structure(ctx: ExecutionContext, args: Dict[str, Any]) -
     return jsonable_encoder(await struct_service.structure_view(ctx.db, target))
 
 
+async def _get_question_solution(ctx: ExecutionContext, args: Dict[str, Any]) -> Dict[str, Any]:
+    from app.services.structure import solution as solution_svc
+
+    target = await _structure_target(ctx, "question", _int_arg(args, "question_id"))
+    return jsonable_encoder(await solution_svc.solution_view(ctx.db, target.obj))
+
+
 async def _list_structure_types(ctx: ExecutionContext, args: Dict[str, Any]) -> Dict[str, Any]:
     from app.services.structure import types as type_svc
 
@@ -659,7 +676,8 @@ async def _find_similar_structure_questions(ctx: ExecutionContext, args: Dict[st
 
     target = await _structure_target(ctx, "question", _int_arg(args, "question_id"))
     limit = _limit(args.get("limit"), default=10)
-    scored = await struct_service.similar_question_ids(ctx.db, target.obj, limit=limit * 3)
+    mode = args.get("mode") or "types"
+    scored = await struct_service.find_similar(ctx.db, target.obj, mode=mode, limit=limit * 3)
     visible = []
     for item in scored:
         question = await crud.question.get(db=ctx.db, id=item["question_id"])
@@ -858,13 +876,28 @@ def _read_tools() -> List[McpTool]:
             read_only=True,
         ),
         McpTool(
+            name="get_question_solution",
+            description=(
+                "Get the solution decomposition of a question: steps with goal, method type, result, the stem "
+                "conditions / asks / earlier steps each step uses, which asks it answers, typical mistakes, and the "
+                "thinking load (sum of method weights). thinking_difficulty is the minimum over accepted solutions."
+            ),
+            input_schema=_schema({"question_id": {"type": "integer"}}, ["question_id"]),
+            handler=_get_question_solution,
+            read_only=True,
+        ),
+        McpTool(
             name="find_similar_structure_questions",
             description=(
-                "Find questions whose accepted stem decomposition has similar ask and condition types to the given "
-                "question (Jaccard similarity of type sets). Useful for finding variants and same-pattern questions."
+                "Find questions related to the given question through their accepted stem decompositions. "
+                "mode=types (default): similar ask and condition types (Jaccard similarity of type sets), "
+                "useful for same-pattern questions. mode=elements: questions sharing identical conditions "
+                "(normalized content), useful for questions built from the same source. mode=params: questions with "
+                "the same parameter pattern but different values (the same question with changed numbers)."
             ),
             input_schema=_schema({
                 "question_id": {"type": "integer"},
+                "mode": {"type": "string", "enum": ["types", "elements", "params"], "default": "types"},
                 "limit": {"type": "integer", "minimum": 1, "maximum": _LIST_LIMIT_MAX, "default": 10},
             }, ["question_id"]),
             handler=_find_similar_structure_questions,

@@ -327,7 +327,22 @@
       "type_invalid_parent": "上级类型无效：不能移到自身之下，条件类型与设问类型也不能混挂",
       "type_in_use": "该类型仍被拆解结果引用，请改为停用或合并",
       "type_has_children": "该类型下还有子类型，请先移走或删除子类型",
-      "type_invalid_import": "导入数据有误（编码：{code}）"
+      "type_invalid_import": "导入数据有误（编码：{code}）",
+      "candidate_not_found": "候选类型不存在",
+      "candidate_resolved": "该候选已经处理过了",
+      "induce_not_enough_data": "未归类的条件或设问不足 {min} 条，暂时无法归纳",
+      "run_stale": "题目在拆解之后被修改过，请先重新拆解",
+      "param_not_found": "参数不存在或不可替换",
+      "param_domain_unconfirmed": "参数「{name}」的取值范围还没有确认，不能让 AI 取值",
+      "param_unmappable": "参数位置无法对应到题目内容，请在编辑中重新标注",
+      "variant_empty": "没有修改任何参数",
+      "variant_running": "这道题正在生成变式，请稍候",
+      "solution_needs_stem": "请先采纳未过期的题干拆解",
+      "solution_not_found": "解答拆解不存在",
+      "group_not_found": "元素组不存在",
+      "group_mismatch": "两个元素组的条件类型组合不同，或拆解尚未采纳",
+      "compose_invalid": "所选条目无法用于命题：需要来自同一学科已采纳拆解的条件和设问",
+      "job_not_found": "任务不存在"
     }
   },
   "validation": {
@@ -587,7 +602,11 @@
       "creator": "创建人",
       "allCreators": "全部创建人",
       "reviewer": "审核人",
-      "allReviewers": "全部审核人"
+      "allReviewers": "全部审核人",
+      "sort": "排序",
+      "sortNewest": "最新创建",
+      "sortThinkingAsc": "思维量从低到高",
+      "sortThinkingDesc": "思维量从高到低"
     },
     "batchSource": {
       "title": "批量修改来源",
@@ -2374,6 +2393,26 @@
       "AI_SOLVE_PROMPT": {
         "title": "解题推理分析助手",
         "description": "定义 AI 在生成题目解析和答案时应遵循的逻辑与排版格式。"
+      },
+      "AI_STRUCT_DECOMPOSE_PROMPT": {
+        "title": "题干拆解助手",
+        "description": "控制 AI 把题干拆成条件与设问、并按元素类型归类的规则（只看题干，不看答案）。"
+      },
+      "AI_STRUCT_INDUCE_PROMPT": {
+        "title": "元素归纳助手",
+        "description": "控制 AI 把尚未归类的条件或设问聚成候选类型的规则，候选需老师确认后才进入类型树。"
+      },
+      "AI_STRUCT_VARIANT_PROMPT": {
+        "title": "变式校验助手",
+        "description": "按参数生成变式题后，控制 AI 重新解题并判断变式是否成立（答案唯一、数值合理、干扰项有效）的规则。"
+      },
+      "AI_STRUCT_COMPOSE_PROMPT": {
+        "title": "命题助手",
+        "description": "控制 AI 用选定的条件与设问（可来自多道题）写出一道新题，或把元素组替换后改写题目的规则；新题需经结构一致性校验与解题校验。"
+      },
+      "AI_SOLUTION_DECOMPOSE_PROMPT": {
+        "title": "解答拆解助手",
+        "description": "控制 AI 把解答拆成步骤（目标、方法、结论、依赖的条件与前序步骤、常见错误）的规则，步骤的方法权重用于计算思维量难度。"
       }
     },
     "emptyTitle": "暂无可配置的提示词",
@@ -2482,7 +2521,11 @@
       "current": "当前题目",
       "derived": "派生题",
       "view": "查看此题",
-      "noDerived": "暂无派生题"
+      "noDerived": "暂无派生题",
+      "relationTypes": {
+        "variant_of": "变式",
+        "composed_from": "拼装"
+      }
     }
   },
   "questionDedup": {
@@ -2775,7 +2818,8 @@
     },
     "origins": {
       "ai": "AI 拆解",
-      "human": "人工修改"
+      "human": "人工修改",
+      "agent": "外部 Agent"
     },
     "facets": {
       "quant": "给值",
@@ -2785,7 +2829,8 @@
     },
     "kinds": {
       "condition": "条件类型",
-      "ask": "设问类型"
+      "ask": "设问类型",
+      "method": "方法"
     },
     "typeStatuses": {
       "candidate": "待确认",
@@ -2856,8 +2901,16 @@
       "asAsk": "设为设问",
       "noConditions": "没有条件",
       "noAsks": "没有设问",
-      "similar": "同结构题",
-      "noSimilar": "暂未找到结构相近的已采纳题目",
+      "similar": "相关题",
+      "similarModes": {
+        "types": "类型相近",
+        "typesHint": "设问类型和条件类型相近的题",
+        "elements": "共享条件",
+        "elementsHint": "含有相同条件的题（按条件内容比对，忽略排版差异）",
+        "params": "换了数",
+        "paramsHint": "参数模式相同、只是数值不同的题"
+      },
+      "noSimilar": "暂未找到相关的已采纳题目",
       "backToQuestion": "返回原题",
       "addItem": "添加",
       "contentPlaceholder": "一条只说一件事，公式写在 $...$ 中",
@@ -2869,7 +2922,9 @@
       "mergeNext": "与下一条合并",
       "mergeSeparator": "；",
       "listSeparator": "、",
-      "unclassifiedHint": "待归类：{hint}"
+      "unclassifiedHint": "待归类：{hint}",
+      "unclassifiedLink": "在「待归纳」中把同类条目归成新类型",
+      "sharedParams": "对应参数：{names}"
     },
     "review": {
       "title": "拆解审核",
@@ -2958,7 +3013,191 @@
       "importNotArray": "内容必须是数组",
       "importBadItem": "第 {index} 条缺少有效的编码或名称",
       "importPreview": "将导入 {count} 条",
-      "imported": "导入完成：新增 {created}，更新 {updated}"
+      "imported": "导入完成：新增 {created}，更新 {updated}",
+      "weight": "思维量权重",
+      "weightHint": "普通步骤记 1；特殊的思维动作可以加权，解答的思维量是各步权重之和",
+      "knowledgePoints": "对应知识点",
+      "knowledgePointsHint": "题干条目或解答步骤属于这个类型时，会向题目推荐这些知识点"
+    },
+    "induce": {
+      "tabTree": "类型树",
+      "tabCandidates": "待归纳",
+      "unclassified": "已采纳的拆解中，未归类的条件 {conditions} 条、设问 {asks} 条",
+      "hint": "AI 会把含义相近的未归类条目聚成候选类型；候选需要你确认后才进入类型树。",
+      "notEnough": "未归类的条件或设问达到 {min} 条后才能归纳",
+      "run": "开始归纳",
+      "rerun": "重新归纳",
+      "queued": "已加入后台队列，完成后候选会显示在这里",
+      "jobStatuses": {
+        "pending": "归纳排队中",
+        "running": "正在归纳…",
+        "cancelled": "上次归纳已取消"
+      },
+      "jobFailed": "上次归纳失败：{error}",
+      "jobPaused": "归纳已暂停：{reason}",
+      "jobDone": "上次归纳：{time}",
+      "empty": "没有未归类的条目",
+      "emptyWithItems": "暂无候选，可以点击「开始归纳」",
+      "count": "{count} 条",
+      "suggestedParent": "建议上级：{path}",
+      "similarType": "与已有类型相近：{path}",
+      "accept": "新建为类型",
+      "merge": "并入已有类型",
+      "ignore": "忽略",
+      "acceptTitle": "把「{name}」新建为类型",
+      "acceptHint": "新类型会立即启用，组内条目自动归入该类型。",
+      "mergeTitle": "把「{name}」并入已有类型",
+      "mergeHint": "组内条目会归入所选类型，不新建类型。",
+      "parent": "上级类型",
+      "parentDefault": "使用建议的上级",
+      "accepted": "已新建类型，归入 {count} 条",
+      "merged": "已并入，归入 {count} 条"
+    },
+    "params": {
+      "name": "参数名",
+      "kinds": {
+        "numeric": "数值",
+        "symbolic": "符号",
+        "point": "点",
+        "interval": "区间",
+        "expression": "表达式"
+      },
+      "replaceable": "可替换",
+      "domain": "取值范围",
+      "min": "最小",
+      "max": "最大",
+      "integer": "整数",
+      "values": "可选值",
+      "valuesHint": "只允许这些值，用逗号分隔",
+      "note": "说明，例如：保证有 3 个零点",
+      "excludeList": "排除 {values}",
+      "confirmDomain": "已确认取值范围（确认后可让 AI 在范围内取值）",
+      "asParam": "设为参数",
+      "add": "添加参数",
+      "valuePlaceholder": "条目中的值，如 2",
+      "noOwner": "请先把这段文字所在的条件或设问标出来，再设为参数",
+      "notFound": "在这条的原文里找不到独立的「{value}」",
+      "overlap": "与已有参数重叠"
+    },
+    "variant": {
+      "button": "生成变式",
+      "title": "生成变式",
+      "description": "修改参数的值，AI 会重新解题并检查变式是否成立；成立后生成一道草稿题，与原题以「变式」关联。",
+      "current": "原值",
+      "newValue": "新值",
+      "auto": "AI 取值",
+      "autoShort": "AI 取值",
+      "autoNeedsDomain": "取值范围确认后才能让 AI 取值（在编辑中设置并确认）",
+      "preview": "预览",
+      "submit": "生成",
+      "again": "再生成一道",
+      "stages": {
+        "queued": "排队中…",
+        "choosing": "AI 正在取值…",
+        "verifying": "AI 正在解题校验…"
+      },
+      "succeeded": "已生成草稿题",
+      "optionsRewritten": "原选项不再适用，AI 重写了选项，请在新题中核对",
+      "open": "打开新题 #{id}",
+      "change": "{name}：{from} → {to}",
+      "failed": "生成变式失败",
+      "reasonSeparator": "：",
+      "errors": {
+        "variant_invalid": "变式不成立",
+        "out_of_domain": "AI 取的值超出了取值范围",
+        "duplicate": "题库中已有相同的题",
+        "structure_stale": "题目在拆解之后被修改过，请先重新拆解",
+        "save_failed": "保存新题失败"
+      }
+    },
+    "solution": {
+      "tabStem": "题干结构",
+      "tabSolution": "解答结构",
+      "method": "解法 {no}",
+      "addMethod": "新增解法",
+      "stale": "需复核",
+      "thinkingLoad": "思维量 {value}",
+      "thinkingDifficulty": "思维量 {value}",
+      "thinkingHint": "思维量难度：已采纳解答中各步骤权重之和，多种解法取最小",
+      "thinkingFilter": "思维量难度",
+      "decompose": "拆解解答",
+      "redecompose": "重新拆解解答",
+      "jobRunning": "正在拆解解答…",
+      "empty": "这种解法还没有拆解。拆解会把解答分成步骤，并标出每步用到的条件和方法。",
+      "needsStem": "先采纳这道题的题干拆解，才能拆解解答。",
+      "stemStale": "题干拆解已过期，请先重新拆解并采纳题干。",
+      "stemItems": "题干条目",
+      "key": "关键步",
+      "answers": "解答 {ask}",
+      "answersLabel": "解答设问",
+      "uses": "用到",
+      "goalPlaceholder": "这一步要得到什么",
+      "resultPlaceholder": "这一步的结论（可选）",
+      "hintPlaceholder": "方法（未归类时描述）",
+      "misconceptionPlaceholder": "这一步的常见错误",
+      "sources": {
+        "distractor": "干扰项",
+        "response": "作答"
+      },
+      "addMisconception": "常见错误",
+      "addStep": "添加步骤",
+      "emptyGoal": "每一步都要写目标",
+      "queueSkipped": "没有排队：需要先采纳未过期的题干拆解，并且有编辑权限",
+      "codes": {
+        "empty": "这一步没有目标",
+        "unknown_ref": "引用了不存在的条件或设问",
+        "forward_ref": "引用了后面的步骤：{detail}",
+        "no_method": "方法未归类",
+        "ask_unanswered": "{detail} 没有任何步骤作答"
+      }
+    },
+    "knowledge": {
+      "title": "推荐知识点（按元素类型映射）",
+      "add": "添加到题目",
+      "added": "已添加知识点"
+    },
+    "groups": {
+      "title": "元素组",
+      "group": "元素组",
+      "add": "新建元素组",
+      "namePlaceholder": "组名，如：函数与零点",
+      "pick": "包含条件",
+      "needTwo": "至少选两条条件",
+      "members": "条件 {items}",
+      "replace": "整组替换",
+      "needTypes": "组内条件都归类后才能匹配替换",
+      "replaceTitle": "整组替换「{name}」",
+      "replaceHint": "从其他题中选一个条件类型组合相同的元素组替换进来。AI 会改写题目并重新解题校验，成立后生成一道草稿题，与原题以「变式」关联。",
+      "current": "当前元素组",
+      "noCandidates": "还没有可替换的元素组：需要其他题的已采纳拆解中有类型组合相同的元素组"
+    },
+    "compose": {
+      "basket": "命题篮 {count}",
+      "add": "加入命题篮",
+      "added": "已加入命题篮",
+      "addedNewSubject": "已加入命题篮（原有其他学科的条目已清空）",
+      "title": "命题篮",
+      "description": "用篮中的条件、设问和元素组（可来自多道题）写一道新题。AI 写好后会重新拆解，检查输入的条目都在、没有多出条件，再解题校验；通过后生成草稿题，与每道来源题以「拼装」关联。",
+      "empty": "命题篮是空的。在题干结构面板中点条目旁的按钮即可加入。",
+      "qType": "题型",
+      "notePlaceholder": "补充说明（可选），例如：难度适中、改为求最小值",
+      "needBoth": "至少需要一条条件（或元素组）和一个设问",
+      "clear": "清空",
+      "submit": "生成新题",
+      "failed": "生成失败",
+      "stages": {
+        "queued": "排队中…",
+        "writing": "AI 正在写题…",
+        "checking": "正在检查结构是否一致…",
+        "verifying": "AI 正在解题校验…"
+      },
+      "errors": {
+        "inconsistent": "新题与所选条目不一致",
+        "variant_invalid": "新题不成立",
+        "duplicate": "题库中已有相同的题",
+        "invalid_input": "所选条目已失效（拆解被修改或题目不可见）",
+        "save_failed": "保存新题失败"
+      }
     },
     "settings": {
       "saved": "已保存",
@@ -2988,7 +3227,10 @@
       "unclassified": "待归类条目：{count}",
       "review": "去审核（{count} 条待审）",
       "topTypes": "常见元素类型",
-      "noTypes": "还没有已采纳的拆解"
+      "noTypes": "还没有已采纳的拆解",
+      "origins": "已采纳来源：AI {ai} · 人工 {human} · Agent {agent}",
+      "kpCoverage": "已映射知识点的类型：{mapped} / {total}",
+      "withThinking": "有思维量难度的题：{count}"
     }
   }
 }

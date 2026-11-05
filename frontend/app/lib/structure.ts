@@ -3,7 +3,8 @@
  *
  * 不依赖 Vue / 网络,便于单元测试;组件与页面共用。
  */
-import type { StructType, StructTypeKind, StructTypeStatus } from '~/types'
+import { translate } from '@/lib/locale'
+import type { StructParamDomain, StructType, StructTypeKind, StructTypeStatus } from '~/types'
 
 /** 类型编辑对话框提交的数据(新建时含 code;留空由后端按名称生成)。 */
 export interface StructTypeFormValue {
@@ -12,6 +13,10 @@ export interface StructTypeFormValue {
   definition: string
   examples: Array<{ text: string, positive: boolean }>
   status: StructTypeStatus
+  /** 思维量权重(方法类型)。 */
+  weight: number
+  /** 映射的知识点。 */
+  knowledge_point_ids: number[]
 }
 
 /** 类型树节点:在扁平的 StructType 上挂子节点。 */
@@ -259,4 +264,73 @@ export function filterStructTypeTree(roots: StructTypeNode[], query: string): St
     return out
   }
   return walk(roots)
+}
+
+/**
+ * 在 text[within] 中找 value 的第 occurrence 次「独立」出现(与后端 params.locate_value 一致):
+ * 数字前后不能紧挨数字、小数点,也不能是上下标(x^2 里的 2);字母前后不能紧挨字母或属于 LaTeX 命令。
+ */
+export function locateParamValue(
+  text: string,
+  value: string,
+  within: [number, number],
+  occurrence = 1,
+): [number, number] | null {
+  if (!value) return null
+  const hits: Array<[number, number]> = []
+  let position = text.indexOf(value, within[0])
+  while (position !== -1 && position + value.length <= within[1]) {
+    if (isStandalone(text, position, position + value.length)) hits.push([position, position + value.length])
+    position = text.indexOf(value, position + 1)
+  }
+  return hits[Math.max(occurrence, 1) - 1] ?? null
+}
+
+function isStandalone(text: string, start: number, end: number): boolean {
+  const first = text[start]!
+  const last = text[end - 1]!
+  const before = start > 0 ? text[start - 1]! : ''
+  const after = end < text.length ? text[end]! : ''
+  const digit = (c: string) => /\d/.test(c)
+  const alpha = (c: string) => /[A-Za-z]/.test(c)
+  if (digit(first) || first === '.') {
+    if (before && (digit(before) || '.^_'.includes(before))) return false
+    if (before === '{' && start >= 2 && '^_'.includes(text[start - 2]!)) return false
+  }
+  if (alpha(first) && before && (alpha(before) || /\\[A-Za-z]*$/.test(text.slice(0, start)))) return false
+  if (digit(last) && after && (digit(after) || after === '.')) return false
+  if (alpha(last) && after && alpha(after)) return false
+  return true
+}
+
+/** 按区间替换文本(从后往前,互不影响),用于预览变式题干。重叠或越界的区间忽略。 */
+export function replaceSpans(text: string, replacements: Array<{ span: [number, number], value: string }>): string {
+  const ordered = [...replacements]
+    .filter(r => r.span[0] >= 0 && r.span[0] < r.span[1] && r.span[1] <= text.length)
+    .sort((a, b) => b.span[0] - a.span[0])
+  let out = text
+  let limit = text.length
+  for (const item of ordered) {
+    if (item.span[1] > limit) continue
+    out = out.slice(0, item.span[0]) + item.value + out.slice(item.span[1])
+    limit = item.span[0]
+  }
+  return out
+}
+
+/** 区间是否落在某个公式内部(参数值是 LaTeX,展示时需要包上 $)。 */
+export function spanInMath(text: string, span: [number, number]): boolean {
+  return stemTokens(text, []).some(token => token.math && token.start < span[0] && span[1] < token.end)
+}
+
+/** 取值范围的简短说明,例如「1 ~ 9 · 整数」;为空时返回空串。 */
+export function formatParamDomain(domain: StructParamDomain | null | undefined): string {
+  if (!domain) return ''
+  const parts: string[] = []
+  if (domain.min != null || domain.max != null) parts.push(`${domain.min ?? '-∞'} ~ ${domain.max ?? '+∞'}`)
+  if (domain.integer) parts.push(translate('structure.params.integer'))
+  if (domain.values?.length) parts.push(domain.values.join(' / '))
+  if (domain.exclude?.length) parts.push(translate('structure.params.excludeList', { values: domain.exclude.join(', ') }))
+  if (domain.note) parts.push(domain.note)
+  return parts.join(' · ')
 }
