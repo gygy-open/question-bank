@@ -22,6 +22,7 @@ from app.models.import_task import ImportTask
 from app.models.activity_log import ActivityLog
 from app.models.question_relation import QuestionRelation
 from app.models.stimulus import Stimulus
+from app.models.question_structure import StructType
 from app.core.api_errors import ErrorCode
 
 
@@ -140,6 +141,11 @@ class CRUDQuestion(CRUDBase[Question, QuestionCreate, QuestionUpdate]):
         source: Optional[str] = None,
         has_stimulus: Optional[bool] = None,
         stimulus_id: Optional[int] = None,
+        struct_type_ids: Optional[List[int]] = None,
+        struct_state: Optional[str] = None,
+        thinking_min: Optional[float] = None,
+        thinking_max: Optional[float] = None,
+        created_via: Optional[str] = None,
         viewer=None,
     ):
         query = select(self.model).options(
@@ -222,6 +228,37 @@ class CRUDQuestion(CRUDBase[Question, QuestionCreate, QuestionUpdate]):
             ).distinct()
             query = query.filter(self.model.id.in_(subquery))
 
+        if struct_type_ids:
+            # 题干结构化:已采纳拆解中有条件 / 设问属于所选类型(含其子类型)。
+            from app.services.structure import service as struct_service
+            from app.services.structure import types as struct_types
+
+            selected = await db.execute(select(StructType.subject_id).where(StructType.id.in_(struct_type_ids)))
+            expanded: set = set()
+            for type_subject_id in set(selected.scalars().all()):
+                tree = await struct_types.list_types(db, type_subject_id)
+                known = {t.id for t in tree}
+                expanded |= struct_types.descendants(tree, [i for i in struct_type_ids if i in known])
+            # 一个有效类型都没有时用不存在的 id,结果为空而不是不过滤。
+            query = query.filter(struct_service.question_type_filter(sorted(expanded) or [-1]))
+
+        if struct_state:
+            from app.services.structure import service as struct_service
+
+            condition = struct_service.question_state_filter(struct_state)
+            if condition is not None:
+                query = query.filter(condition)
+
+        if thinking_min is not None:
+            query = query.filter(self.model.thinking_difficulty >= thinking_min)
+        if thinking_max is not None:
+            query = query.filter(self.model.thinking_difficulty <= thinking_max)
+        if created_via:
+            # "app" 表示站内创建(没有渠道标记)。
+            query = query.filter(
+                self.model.created_via.is_(None) if created_via == "app" else self.model.created_via == created_via
+            )
+
         if viewer is not None:
             query = query.filter(visible_questions_filter(viewer))
 
@@ -250,6 +287,12 @@ class CRUDQuestion(CRUDBase[Question, QuestionCreate, QuestionUpdate]):
         source: Optional[str] = None,
         has_stimulus: Optional[bool] = None,
         stimulus_id: Optional[int] = None,
+        struct_type_ids: Optional[List[int]] = None,
+        struct_state: Optional[str] = None,
+        thinking_min: Optional[float] = None,
+        thinking_max: Optional[float] = None,
+        created_via: Optional[str] = None,
+        sort: Optional[str] = None,
         viewer=None
     ) -> List[Question]:
         query = await self._get_filter_query(
@@ -271,9 +314,21 @@ class CRUDQuestion(CRUDBase[Question, QuestionCreate, QuestionUpdate]):
             source=source,
             has_stimulus=has_stimulus,
             stimulus_id=stimulus_id,
+            struct_type_ids=struct_type_ids,
+            struct_state=struct_state,
+            thinking_min=thinking_min,
+            thinking_max=thinking_max,
+            created_via=created_via,
             viewer=viewer
         )
-        query = query.offset(skip).limit(limit).order_by(self.model.created_at.desc())
+        if sort in ("thinking_asc", "thinking_desc"):
+            # 没有思维量难度的题排在最后。
+            column = self.model.thinking_difficulty
+            ordered = column.asc() if sort == "thinking_asc" else column.desc()
+            query = query.order_by(column.is_(None), ordered, self.model.created_at.desc())
+        else:
+            query = query.order_by(self.model.created_at.desc())
+        query = query.offset(skip).limit(limit)
         result = await db.execute(query)
         return result.scalars().all()
 
@@ -355,6 +410,11 @@ class CRUDQuestion(CRUDBase[Question, QuestionCreate, QuestionUpdate]):
         source: Optional[str] = None,
         has_stimulus: Optional[bool] = None,
         stimulus_id: Optional[int] = None,
+        struct_type_ids: Optional[List[int]] = None,
+        struct_state: Optional[str] = None,
+        thinking_min: Optional[float] = None,
+        thinking_max: Optional[float] = None,
+        created_via: Optional[str] = None,
         viewer=None
     ) -> int:
         query = await self._get_filter_query(
@@ -376,6 +436,11 @@ class CRUDQuestion(CRUDBase[Question, QuestionCreate, QuestionUpdate]):
             source=source,
             has_stimulus=has_stimulus,
             stimulus_id=stimulus_id,
+            struct_type_ids=struct_type_ids,
+            struct_state=struct_state,
+            thinking_min=thinking_min,
+            thinking_max=thinking_max,
+            created_via=created_via,
             viewer=viewer
         )
         # Use subquery for count to handle joins correctly

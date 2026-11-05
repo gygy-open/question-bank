@@ -28,8 +28,11 @@ async def create_question_relation(
     actor: User,
     commit: bool = True,
     new_target: bool = False,
+    relation_type: str = QuestionRelationType.DECOMPOSED_FROM.value,
 ) -> QuestionRelation:
     """Create an edge through the sole transactional graph-write entrypoint.
+
+    Duplicate and cycle checks are per ``relation_type``.
 
     A database constraint cannot express graph reachability. The subject-wide
     question lock serializes MySQL writers before duplicate and cycle checks;
@@ -82,8 +85,7 @@ async def create_question_relation(
         select(QuestionRelation.id).where(
             QuestionRelation.source_question_id == source_question_id,
             QuestionRelation.target_question_id == target_question_id,
-            QuestionRelation.relation_type
-            == QuestionRelationType.DECOMPOSED_FROM.value,
+            QuestionRelation.relation_type == relation_type,
         )
     )
     if duplicate is not None:
@@ -93,10 +95,7 @@ async def create_question_relation(
             select(
                 QuestionRelation.source_question_id,
                 QuestionRelation.target_question_id,
-            ).where(
-                QuestionRelation.relation_type
-                == QuestionRelationType.DECOMPOSED_FROM.value
-            )
+            ).where(QuestionRelation.relation_type == relation_type)
         )
         adjacency: dict[int, set[int]] = {}
         for source_id, target_id in edge_result.all():
@@ -113,7 +112,7 @@ async def create_question_relation(
     relation = QuestionRelation(
         source_question_id=source_question_id,
         target_question_id=target_question_id,
-        relation_type=QuestionRelationType.DECOMPOSED_FROM.value,
+        relation_type=relation_type,
         created_by=actor.id,
     )
     db.add(relation)
@@ -131,6 +130,7 @@ async def delete_question_relation(
     target_question_id: int,
     actor: User,
     commit: bool = True,
+    relation_type: str = QuestionRelationType.DECOMPOSED_FROM.value,
 ) -> None:
     result = await db.execute(
         select(Question).where(
@@ -152,8 +152,7 @@ async def delete_question_relation(
         select(QuestionRelation).where(
             QuestionRelation.source_question_id == source_question_id,
             QuestionRelation.target_question_id == target_question_id,
-            QuestionRelation.relation_type
-            == QuestionRelationType.DECOMPOSED_FROM.value,
+            QuestionRelation.relation_type == relation_type,
         )
     )
     if relation is None:
@@ -190,8 +189,6 @@ async def get_question_relations(
             ),
         )
         .where(
-            QuestionRelation.relation_type
-            == QuestionRelationType.DECOMPOSED_FROM.value,
             or_(
                 QuestionRelation.source_question_id == question_id,
                 QuestionRelation.target_question_id == question_id,

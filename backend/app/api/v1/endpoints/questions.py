@@ -1,4 +1,4 @@
-from typing import Any, List, Optional
+from typing import Literal, Any, List, Optional
 from fastapi import APIRouter, Depends, Query
 from app import crud, schemas, models
 from app.api import deps
@@ -39,6 +39,12 @@ async def read_questions(
     source: Optional[str] = None,
     has_stimulus: Optional[bool] = None,
     stimulus_id: Optional[int] = None,
+    struct_type_ids: List[int] = Query(None),
+    struct_state: Optional[str] = Query(None, description="none / draft / accepted / stale"),
+    thinking_min: Optional[float] = None,
+    thinking_max: Optional[float] = None,
+    created_via: Optional[Literal["mcp", "app"]] = Query(None, description="mcp = created by external agents; app = in the app"),
+    sort: Optional[str] = Query(None, description="thinking_asc / thinking_desc; default newest first"),
     current_user: models.User = Depends(deps.get_current_active_user),
 ) -> Any:
     skip = (page - 1) * size
@@ -63,6 +69,12 @@ async def read_questions(
         source=source,
         has_stimulus=has_stimulus,
         stimulus_id=stimulus_id,
+        struct_type_ids=struct_type_ids,
+        struct_state=struct_state,
+        thinking_min=thinking_min,
+        thinking_max=thinking_max,
+        created_via=created_via,
+        sort=sort,
         viewer=current_user
     )
     total = await crud.question.count_with_filters(
@@ -84,6 +96,11 @@ async def read_questions(
         source=source,
         has_stimulus=has_stimulus,
         stimulus_id=stimulus_id,
+        struct_type_ids=struct_type_ids,
+        struct_state=struct_state,
+        thinking_min=thinking_min,
+        thinking_max=thinking_max,
+        created_via=created_via,
         viewer=current_user
     )
     relation_counts = await crud.question.get_relation_counts(
@@ -91,11 +108,15 @@ async def read_questions(
         question_ids=[question.id for question in questions],
         viewer=current_user,
     )
+    from app.services.structure import service as struct_service
+
+    struct_states = await struct_service.states_for_questions(db, questions)
     items = [
         schemas.QuestionListItem.model_validate(question).model_copy(
             update={
                 "incoming_relation_count": relation_counts[question.id]["incoming"],
                 "outgoing_relation_count": relation_counts[question.id]["outgoing"],
+                "struct_state": struct_states.get(question.id),
             }
         )
         for question in questions
