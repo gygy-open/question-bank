@@ -268,6 +268,8 @@ class Question(QuestionBase):
     stimulus_id: Optional[int] = None
     stimulus_position: Optional[int] = None
     content_revision: int = 1
+    # 思维量难度(题干结构化三期):已采纳解答的步骤权重之和(多解取最小);没有解答结构时为空。
+    thinking_difficulty: Optional[float] = None
     knowledge_points: List[KnowledgePoint] = []
     created_at: datetime
     updated_at: datetime
@@ -291,6 +293,8 @@ class Question(QuestionBase):
 class QuestionListItem(Question):
     incoming_relation_count: int = 0
     outgoing_relation_count: int = 0
+    # 题干结构化状态(列表徽标):none 未拆 / draft 待审 / accepted 已采纳 / stale 已过期。
+    struct_state: Optional[str] = None
 
 
 class QuestionPage(BaseModel):

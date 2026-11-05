@@ -6,13 +6,26 @@ from .subject_member import SubjectMember
 from .knowledge_point import KnowledgePoint
 from .tag import Tag
 from .tag_category import TagCategory
-from .job import Job
 from .question import Question, QuestionDedupBand
-from .question_structure import StructAsk, StructAskElement, StructElement, StructElementGroup, StructElementGroupItem, StructParam, StructRun, StructType
 from .stimulus import Stimulus
 from .question_relation import QuestionRelation
 from .question_relation_audit import LegacyQuestionParentAudit
 from .import_task import ImportTask
+from .job import Job
+from .question_structure import (
+    StructAsk,
+    StructAskElement,
+    StructElement,
+    StructElementGroup,
+    StructElementGroupItem,
+    StructParam,
+    StructRun,
+    StructType,
+    StructTypeCandidate,
+    StructTypeCandidateItem,
+    StructTypeKnowledgePoint,
+)
+from .solution_structure import SolutionMisconception, SolutionRun, SolutionStep, SolutionStepLink
 from .media_asset import LegacyMediaPath, MediaAsset, MediaReference
 from .activity_log import ActivityLog
 from .system_setting import SystemSetting

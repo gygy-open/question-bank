@@ -20,7 +20,7 @@ from app.core.permissions import Permission
 from app.crud.crud_question import is_question_visible, visible_questions_filter
 from app.crud.crud_subject import subject as crud_subject
 from app.models.question import Question
-from app.models.question_structure import StructElement, StructElementGroup, StructElementGroupItem, StructParam, StructRun, StructRunState, StructTargetType
+from app.models.question_structure import StructRun, StructRunState, StructTargetType
 from app.models.stimulus import Stimulus
 from app.services.structure import service as struct_service
 from app.services.structure import settings as struct_settings
@@ -47,6 +47,20 @@ class MergeRequest(BaseModel):
     target_id: int
 
 
+class InduceRequest(BaseModel):
+    subject_id: int
+
+
+class CandidateAcceptRequest(BaseModel):
+    name: Optional[str] = Field(None, min_length=1, max_length=128)
+    parent_id: Optional[int] = None
+    definition: Optional[str] = None
+
+
+class CandidateMergeRequest(BaseModel):
+    type_id: int
+
+
 class StructTypePatch(BaseModel):
     """类型的部分修改;请求体里出现 parent_id(含 null)表示移动。"""
 
@@ -56,6 +70,8 @@ class StructTypePatch(BaseModel):
     examples: Optional[List[Dict[str, Any]]] = None
     status: Optional[Literal["candidate", "active", "deprecated"]] = None
     sort_order: Optional[int] = None
+    weight: Optional[float] = Field(None, gt=0, le=100)
+    knowledge_point_ids: Optional[List[int]] = None
 
 
 # region 开关
@@ -175,7 +191,7 @@ async def review_queue(
     db: deps.SessionDep,
     subject_id: int,
     check: Optional[Literal["errors", "warnings", "clean"]] = None,
-    origin: Optional[Literal["ai", "human"]] = None,
+    origin: Optional[Literal["ai", "human", "agent"]] = None,
     target_type: Optional[TargetTypeParam] = None,
     page: int = 1,
     size: int = Query(20, ge=1, le=100),
@@ -249,11 +265,12 @@ async def similar_questions(
     question_id: int,
     db: deps.SessionDep,
     limit: int = Query(10, ge=1, le=50),
+    mode: Literal["types", "elements", "params"] = Query("types"),
     current_user: models.User = Depends(deps.get_current_active_user),
 ) -> Any:
-    """同结构题:设问类型与条件类型相近的已采纳题目(只返回可见的)。"""
+    """同结构 / 同源题(只返回可见的)。mode=types:类型相近;elements:共享相同条件;params:换了数的同题。"""
     target = await _visible_target(db, StructTargetType.QUESTION.value, question_id, current_user)
-    scored = await struct_service.similar_question_ids(db, target.obj, limit=limit * 3)
+    scored = await struct_service.find_similar(db, target.obj, mode=mode, limit=limit * 3)
     if not scored:
         return {"items": []}
     rows = await db.execute(
@@ -279,6 +296,43 @@ async def similar_questions(
         if len(items) >= limit:
             break
     return {"items": items}
+
+
+@router.post("/variants", response_model=dict)
+async def create_variant(
+    payload: struct_caps.StructureVariantInput,
+    db: deps.SessionDep,
+    current_user: models.User = Depends(deps.get_current_active_user),
+) -> Any:
+    """排队生成变式题(改参数值 → AI 校验 → 草稿题)。"""
+    return await capabilities.run("structure.variant", deps.api_context(db, current_user), payload)
+
+
+@router.get("/questions/{question_id}/variant-job", response_model=dict)
+async def variant_job(
+    question_id: int,
+    db: deps.SessionDep,
+    current_user: models.User = Depends(deps.get_current_active_user),
+) -> Any:
+    """这道题最近一次变式任务(进度里有生成的题目 id 或失败原因)。"""
+    import json as _json
+
+    from app.services.structure import variant as variant_svc
+
+    await _visible_target(db, StructTargetType.QUESTION.value, question_id, current_user)
+    job = await variant_svc.last_job(db, question_id)
+    if job is None:
+        return {"job": None}
+    progress = _json.loads(job.progress) if job.progress else {}
+    return {"job": {
+        "id": job.id,
+        "status": job.status,
+        "paused_reason": job.paused_reason,
+        "error": job.error,
+        "progress": progress,
+        "created_at": job.created_at,
+        "finished_at": job.finished_at,
+    }}
 
 
 @router.get("/stats", response_model=dict)
@@ -317,7 +371,8 @@ async def list_types(
     await type_svc.ensure_roots(db, subject_id)
     types = await type_svc.list_types(db, subject_id)
     usage = await type_svc.usage_counts(db, subject_id)
-    return {"items": [_type_out(t, usage.get(t.id, 0)) for t in types]}
+    kp_map = await type_svc.knowledge_point_map(db, subject_id)
+    return {"items": [{**_type_out(t, usage.get(t.id, 0)), "knowledge_point_ids": kp_map.get(t.id, [])} for t in types]}
 
 
 @router.get("/types/export", response_model=list)
@@ -369,7 +424,8 @@ async def update_type(
     )
     updated = await capabilities.run("struct_type.update", deps.api_context(db, current_user), inp)
     usage = await type_svc.usage_counts(db, updated.subject_id)
-    return _type_out(updated, usage.get(updated.id, 0))
+    kp_map = await type_svc.knowledge_point_map(db, updated.subject_id)
+    return {**_type_out(updated, usage.get(updated.id, 0)), "knowledge_point_ids": kp_map.get(updated.id, [])}
 
 
 @router.delete("/types/{type_id}", response_model=dict)
@@ -400,326 +456,316 @@ async def merge_type(
     usage = await type_svc.usage_counts(db, merged.subject_id)
     return _type_out(merged, usage.get(merged.id, 0))
 
-
-# region 参数槽与元素组:旋钮式条件重组与原创命题
-
-
-class StructParamCreate(BaseModel):
-    element_id: int
-    name: str = Field(..., min_length=1, max_length=64)
-    value_text: str
-    slot_kind: Optional[str] = None
-    domain: Optional[str] = None
-    replaceable: bool = True
+# endregion
 
 
-class StructParamUpdate(BaseModel):
-    name: Optional[str] = Field(None, min_length=1, max_length=64)
-    value_text: Optional[str] = None
-    slot_kind: Optional[str] = None
-    domain: Optional[str] = None
-    replaceable: Optional[bool] = None
+# region 解答结构(三期)
 
-
-class ElementGroupCreate(BaseModel):
-    run_id: int
-    name: str = Field(..., min_length=1, max_length=128)
-    description: Optional[str] = None
-    replaceable: bool = True
-    sort_order: int = 0
-
-
-class ElementGroupUpdate(BaseModel):
-    name: Optional[str] = Field(None, min_length=1, max_length=128)
-    description: Optional[str] = None
-    replaceable: Optional[bool] = None
-    sort_order: Optional[int] = None
-
-
-class GroupItemLink(BaseModel):
-    element_id: int
-
-
-class VariantGenerate(BaseModel):
-    run_id: int
-    assignments: Dict[int, str] = Field(default_factory=dict)
-
-
-# ---------- 参数槽 ----------
-
-@router.get("/params", response_model=list)
-async def list_struct_params(
+@router.get("/solutions/questions/{question_id}", response_model=dict)
+async def solution_view(
+    question_id: int,
     db: deps.SessionDep,
     current_user: models.User = Depends(deps.get_current_active_user),
-    element_id: Optional[int] = None,
-    replaceable_only: bool = False,
 ) -> Any:
-    """列参数槽,可按元素/可替换性过滤。"""
-    params = await struct_service.list_struct_params(
-        db, element_id=element_id, replaceable_only=replaceable_only
-    )
-    return [
-        {
-            "id": p.id,
-            "element_id": p.element_id,
-            "name": p.name,
-            "value_text": p.value_text,
-            "slot_kind": p.slot_kind,
-            "domain": p.domain,
-            "replaceable": bool(p.replaceable),
-        }
-        for p in params
+    """一道题的解答结构全貌(依据的题干拆解、各解法的已采纳 / 待审版本、进行中的任务)。"""
+    from app.services.structure import solution as solution_svc
+
+    target = await _visible_target(db, StructTargetType.QUESTION.value, question_id, current_user)
+    return await solution_svc.solution_view(db, target.obj)
+
+
+@router.post("/solutions/decompose", response_model=dict)
+async def decompose_solutions(
+    payload: struct_caps.SolutionDecomposeInput,
+    db: deps.SessionDep,
+    current_user: models.User = Depends(deps.get_current_active_user),
+) -> Any:
+    """排队拆解解答;没有已采纳题干拆解、或无权编辑的题会被跳过。"""
+    return await capabilities.run("solution.decompose", deps.api_context(db, current_user), payload)
+
+
+@router.post("/solutions/save", response_model=dict)
+async def save_solution(
+    payload: struct_caps.SolutionSaveInput,
+    db: deps.SessionDep,
+    current_user: models.User = Depends(deps.get_current_active_user),
+) -> Any:
+    return await capabilities.run("solution.save", deps.api_context(db, current_user), payload)
+
+
+@router.post("/solutions/review", response_model=dict)
+async def review_solutions(
+    payload: struct_caps.SolutionReviewInput,
+    db: deps.SessionDep,
+    current_user: models.User = Depends(deps.get_current_active_user),
+) -> Any:
+    return await capabilities.run("solution.review", deps.api_context(db, current_user), payload)
+
+
+@router.get("/solutions/review-queue", response_model=dict)
+async def solution_review_queue(
+    db: deps.SessionDep,
+    subject_id: int,
+    check: Optional[Literal["errors", "warnings", "clean"]] = None,
+    page: int = 1,
+    size: int = Query(20, ge=1, le=100),
+    current_user: models.User = Depends(deps.get_current_active_user),
+) -> Any:
+    """待审解答列表(有体检错误的在前),只列出可见的题。"""
+    from app.models.solution_structure import SolutionRun
+
+    deps.require(current_user, Permission.VIEW_QUESTION, subject_id=subject_id)
+    visible = select(Question.id).where(Question.deleted_at.is_(None), visible_questions_filter(current_user))
+    conditions = [
+        SolutionRun.subject_id == subject_id,
+        SolutionRun.state == StructRunState.DRAFT.value,
+        SolutionRun.question_id.in_(visible),
     ]
+    if check == "errors":
+        conditions.append(SolutionRun.check_errors > 0)
+    elif check == "warnings":
+        conditions.extend([SolutionRun.check_errors == 0, SolutionRun.check_warnings > 0])
+    elif check == "clean":
+        conditions.extend([SolutionRun.check_errors == 0, SolutionRun.check_warnings == 0])
+    total = await db.scalar(select(func.count(SolutionRun.id)).where(*conditions)) or 0
+    rows = (
+        await db.execute(
+            select(SolutionRun, Question.content)
+            .join(Question, Question.id == SolutionRun.question_id)
+            .where(*conditions)
+            .order_by(SolutionRun.check_errors.desc(), SolutionRun.check_warnings.desc(), SolutionRun.id)
+            .offset((max(page, 1) - 1) * size)
+            .limit(size)
+        )
+    ).all()
+    from app.services.structure.text import build_stem_text
+
+    return {
+        "items": [
+            {
+                "id": run.id,
+                "target_type": "question",
+                "target_id": run.question_id,
+                "solution_no": run.solution_no,
+                "origin": run.origin,
+                "model": run.model,
+                "thinking_load": run.thinking_load,
+                "check_errors": run.check_errors or 0,
+                "check_warnings": run.check_warnings or 0,
+                "preview": build_stem_text(content)[:160],
+                "created_at": run.created_at,
+            }
+            for run, content in rows
+        ],
+        "total": total,
+        "page": page,
+        "size": size,
+        "pages": math.ceil(total / size) if size else 0,
+    }
 
 
-@router.post("/params", response_model=dict)
-async def create_struct_param(
-    payload: StructParamCreate,
+@router.get("/questions/{question_id}/knowledge-suggestions", response_model=dict)
+async def knowledge_suggestions(
+    question_id: int,
     db: deps.SessionDep,
     current_user: models.User = Depends(deps.get_current_active_user),
 ) -> Any:
-    """在元素上新建参数槽。"""
-    param = await struct_service.create_struct_param(
-        db,
-        element_id=payload.element_id,
-        name=payload.name,
-        value_text=payload.value_text,
-        slot_kind=payload.slot_kind,
-        domain=payload.domain,
-        replaceable=payload.replaceable,
+    """按已采纳拆解中条目 / 方法的类型映射,推荐题目尚未标注的知识点(规格 §12.3 N8)。"""
+    from app.models.knowledge_point import KnowledgePoint
+    from app.models.question_structure import StructTypeKnowledgePoint
+    from app.models.solution_structure import SolutionRun, SolutionStep
+    from sqlalchemy.orm import selectinload
+
+    target = await _visible_target(db, StructTargetType.QUESTION.value, question_id, current_user)
+    run = await struct_service.accepted_run(db, StructTargetType.QUESTION.value, question_id)
+    type_ids = set()
+    if run is not None:
+        type_ids |= {e.type_id for e in run.elements if e.type_id} | {a.type_id for a in run.asks if a.type_id}
+    method_rows = await db.execute(
+        select(SolutionStep.method_type_id)
+        .join(SolutionRun, SolutionStep.run_id == SolutionRun.id)
+        .where(SolutionRun.question_id == question_id, SolutionRun.state == StructRunState.ACCEPTED.value)
     )
-    return {"id": param.id}
-
-
-@router.put("/params/{param_id}", response_model=dict)
-async def update_struct_param(
-    param_id: int,
-    payload: StructParamUpdate,
-    db: deps.SessionDep,
-    current_user: models.User = Depends(deps.get_current_active_user),
-) -> Any:
-    """更新参数槽字段。"""
-    updates = {k: v for k, v in payload.model_dump(exclude_unset=True).items()}
-    param = await struct_service.update_struct_param(db, param_id, **updates)
-    return {"id": param.id}
-
-
-@router.delete("/params/{param_id}", response_model=dict)
-async def delete_struct_param(
-    param_id: int,
-    db: deps.SessionDep,
-    current_user: models.User = Depends(deps.get_current_active_user),
-) -> Any:
-    """删除参数槽。"""
-    await struct_service.delete_struct_param(db, param_id)
-    return {"ok": True}
-
-
-# ---------- 元素组 ----------
-
-@router.get("/element-groups", response_model=list)
-async def list_element_groups(
-    run_id: int,
-    db: deps.SessionDep,
-    current_user: models.User = Depends(deps.get_current_active_user),
-) -> Any:
-    """列一个拆解快照下的全部元素组。"""
-    groups = await struct_service.list_element_groups(db, run_id)
-    return [
-        {
-            "id": g.id,
-            "run_id": g.run_id,
-            "name": g.name,
-            "description": g.description,
-            "replaceable": bool(g.replaceable),
-            "sort_order": g.sort_order,
-        }
-        for g in groups
-    ]
-
-
-@router.post("/element-groups", response_model=dict)
-async def create_element_group(
-    payload: ElementGroupCreate,
-    db: deps.SessionDep,
-    current_user: models.User = Depends(deps.get_current_active_user),
-) -> Any:
-    """新建元素组。"""
-    group = await struct_service.create_element_group(
-        db,
-        run_id=payload.run_id,
-        name=payload.name,
-        description=payload.description,
-        replaceable=payload.replaceable,
-        sort_order=payload.sort_order,
+    type_ids |= {row[0] for row in method_rows.all() if row[0]}
+    question = await db.scalar(
+        select(Question).options(selectinload(Question.knowledge_points)).where(Question.id == question_id)
     )
-    return {"id": group.id}
-
-
-@router.put("/element-groups/{group_id}", response_model=dict)
-async def update_element_group(
-    group_id: int,
-    payload: ElementGroupUpdate,
-    db: deps.SessionDep,
-    current_user: models.User = Depends(deps.get_current_active_user),
-) -> Any:
-    """更新元素组。"""
-    updates = {k: v for k, v in payload.model_dump(exclude_unset=True).items()}
-    group = await struct_service.update_element_group(db, group_id, **updates)
-    return {"id": group.id}
-
-
-@router.delete("/element-groups/{group_id}", response_model=dict)
-async def delete_element_group(
-    group_id: int,
-    db: deps.SessionDep,
-    current_user: models.User = Depends(deps.get_current_active_user),
-) -> Any:
-    """删除元素组。"""
-    await struct_service.delete_element_group(db, group_id)
-    return {"ok": True}
-
-
-@router.post("/element-groups/{group_id}/items", response_model=dict)
-async def add_group_item(
-    group_id: int,
-    payload: GroupItemLink,
-    db: deps.SessionDep,
-    current_user: models.User = Depends(deps.get_current_active_user),
-) -> Any:
-    """把元素加入元素组。"""
-    item = await struct_service.add_group_item(db, group_id=group_id, element_id=payload.element_id)
-    return {"id": item.id}
-
-
-@router.delete(
-    "/element-groups/{group_id}/items/{element_id}", response_model=dict
-)
-async def remove_group_item(
-    group_id: int,
-    element_id: int,
-    db: deps.SessionDep,
-    current_user: models.User = Depends(deps.get_current_active_user),
-) -> Any:
-    """从元素组移出元素。"""
-    await struct_service.remove_group_item(db, group_id=group_id, element_id=element_id)
-    return {"ok": True}
-
-
-@router.get("/element-groups/{group_id}/items", response_model=list)
-async def list_group_items(
-    group_id: int,
-    db: deps.SessionDep,
-    current_user: models.User = Depends(deps.get_current_active_user),
-) -> Any:
-    """列元素组包含的元素。"""
-    elems = await struct_service.list_group_items(db, group_id)
-    return [
-        {
-            "id": e.id,
-            "run_id": e.run_id,
-            "ordinal": e.ordinal,
-            "content": e.content,
-            "type_id": e.type_id,
-            "type_hint": e.type_hint,
-            "facet": e.facet,
-            "span_start": e.span_start,
-            "span_end": e.span_end,
-        }
-        for e in elems
-    ]
-
-
-# ---------- 变式生成 ----------
-
-@router.get("/params/replaceable", response_model=list)
-async def list_replaceable_params(
-    run_id: int,
-    db: deps.SessionDep,
-    current_user: models.User = Depends(deps.get_current_active_user),
-) -> Any:
-    """列一个快照下全部可替换的参数槽,用于变式生成。"""
-    params = await struct_service.list_replaceable_params(db, run_id)
-    return [
-        {
-            "id": p.id,
-            "element_id": p.element_id,
-            "name": p.name,
-            "value_text": p.value_text,
-            "slot_kind": p.slot_kind,
-            "domain": p.domain,
-        }
-        for p in params
-    ]
-
-
-@router.post("/variants", response_model=dict)
-async def generate_variant(
-    payload: VariantGenerate,
-    db: deps.SessionDep,
-    current_user: models.User = Depends(deps.get_current_active_user),
-) -> Any:
-    """把参数槽新值应用到题干快照,生成变式题干文本(不写库)。"""
-    run = await struct_service.get_run(db, payload.run_id)
-    params = await struct_service.list_replaceable_params(db, payload.run_id)
-    params_by_id = {p.id: p for p in params}
-    new_stem = struct_service.apply_param_values_to_stem(run.stem_text, payload.assignments, params_by_id)
-    return {"run_id": payload.run_id, "new_stem_text": new_stem}
-
-
-# region 同源检索与跨题拼装:题目多样化玩法
-
-
-class ComposeRequest(BaseModel):
-    element_ids: List[int] = Field(..., description="元素 id 列表,按期望顺序排列")
-    separator: str = Field("\n", description="元素间分隔符")
-
-
-# ---------- 同源检索:按元素组 ----------
-
-@router.get("/similar/element-group", response_model=list)
-async def similar_by_element_group(
-    db: deps.SessionDep,
-    current_user: models.User = Depends(deps.get_current_active_user),
-    run_id: int = Query(..., description="拆解快照 id"),
-    limit: int = Query(20, ge=1, le=100, description="返回上限"),
-) -> Any:
-    """按元素组成员查找同源题:找拥有相同元素的其他题。"""
-    results = await struct_service.find_similar_by_element_group(db, run_id, limit=limit)
-    return results
-
-
-# ---------- 同源检索:按参数槽 ----------
-
-@router.get("/similar/param", response_model=list)
-async def similar_by_param(
-    db: deps.SessionDep,
-    current_user: models.User = Depends(deps.get_current_active_user),
-    param_name: str = Query(..., description="参数槽名"),
-    param_value: str = Query(..., description="参数槽值"),
-    limit: int = Query(20, ge=1, le=100, description="返回上限"),
-) -> Any:
-    """按参数槽名/值查找同源题:找有相同参数槽的其他题。"""
-    results = await struct_service.find_similar_by_param(
-        db, param_name=param_name, param_value=param_value, limit=limit
+    have = {kp.id for kp in question.knowledge_points} if question else set()
+    if not type_ids:
+        return {"items": [], "current_ids": sorted(have)}
+    rows = await db.execute(
+        select(KnowledgePoint.id, KnowledgePoint.name, func.count(StructTypeKnowledgePoint.type_id))
+        .join(StructTypeKnowledgePoint, StructTypeKnowledgePoint.knowledge_point_id == KnowledgePoint.id)
+        .where(StructTypeKnowledgePoint.type_id.in_(type_ids), KnowledgePoint.subject_id == target.subject_id)
+        .group_by(KnowledgePoint.id, KnowledgePoint.name)
+        .order_by(func.count(StructTypeKnowledgePoint.type_id).desc(), KnowledgePoint.id)
     )
-    return results
+    return {
+        "items": [
+            {"id": kp_id, "name": name, "matches": count}
+            for kp_id, name, count in rows.all()
+            if kp_id not in have
+        ],
+        # 题目当前的知识点:前端「添加」时在此基础上追加。
+        "current_ids": sorted(have),
+    }
+
+# endregion
 
 
-# ---------- 跨题拼装 ----------
+# region 元素组与命题
+
+@router.get("/groups/{group_id}/candidates", response_model=dict)
+async def group_candidates(
+    group_id: int,
+    db: deps.SessionDep,
+    current_user: models.User = Depends(deps.get_current_active_user),
+) -> Any:
+    """可替换进来的元素组(同学科、条件类型组合相同、来自可见题目的已采纳拆解)。"""
+    from app.models.question_structure import StructElementGroup
+    from app.services.structure import compose as compose_svc
+
+    group = await db.get(StructElementGroup, group_id)
+    run = await db.get(StructRun, group.run_id) if group else None
+    if run is None:
+        raise ApiError(404, ErrorCode.STRUCTURE_GROUP_NOT_FOUND, "Not found")
+    await _visible_target(db, run.target_type, run.target_id, current_user)
+    return {"items": await compose_svc.group_candidates(db, group_id, current_user)}
+
+
+@router.post("/groups/replace", response_model=dict)
+async def replace_group(
+    payload: struct_caps.StructureGroupReplaceInput,
+    db: deps.SessionDep,
+    current_user: models.User = Depends(deps.get_current_active_user),
+) -> Any:
+    return await capabilities.run("structure.group_replace", deps.api_context(db, current_user), payload)
+
 
 @router.post("/compose", response_model=dict)
-async def compose_stem(
-    payload: ComposeRequest,
+async def compose(
+    payload: struct_caps.StructureComposeInput,
     db: deps.SessionDep,
     current_user: models.User = Depends(deps.get_current_active_user),
 ) -> Any:
-    """跨题拼装题干:按给定元素 id 顺序拼接成新题干文本(不写库)。"""
-    stem = await struct_service.compose_stem(
-        db, element_ids=payload.element_ids, separator=payload.separator
-    )
-    return {"stem_text": stem, "element_count": len(payload.element_ids)}
+    return await capabilities.run("structure.compose", deps.api_context(db, current_user), payload)
 
+
+@router.get("/jobs/{job_id}", response_model=dict)
+async def structure_job(
+    job_id: int,
+    db: deps.SessionDep,
+    current_user: models.User = Depends(deps.get_current_active_user),
+) -> Any:
+    """自己发起的命题 / 组替换任务的状态(进度里有生成的题目 id 或失败原因)。"""
+    import json as _json
+
+    from app.models.job import Job
+    from app.services.structure import compose as compose_svc
+
+    job = await db.get(Job, job_id)
+    if job is None or job.type != compose_svc.JOB_TYPE or (job.user_id != current_user.id and not current_user.is_superuser):
+        raise ApiError(404, ErrorCode.STRUCTURE_JOB_NOT_FOUND, "Not found")
+    return {
+        "id": job.id,
+        "status": job.status,
+        "paused_reason": job.paused_reason,
+        "error": job.error,
+        "progress": _json.loads(job.progress) if job.progress else {},
+        "created_at": job.created_at,
+        "finished_at": job.finished_at,
+    }
+
+# endregion
+
+
+# region 元素归纳
+
+@router.get("/candidates", response_model=dict)
+async def list_candidates(
+    subject_id: int,
+    db: deps.SessionDep,
+    current_user: models.User = Depends(deps.get_current_active_user),
+) -> Any:
+    """待确认的候选类型、各 kind 未归类条数、最近一次归纳任务。"""
+    from app.services.structure import induce as induce_svc
+
+    deps.require(current_user, Permission.VIEW_QUESTION, subject_id=subject_id)
+    job = await induce_svc.last_job(db, subject_id)
+    return {
+        "items": await induce_svc.list_candidates(db, subject_id, current_user),
+        "unclassified": await induce_svc.unclassified_counts(db, subject_id),
+        "min_items": induce_svc.MIN_ITEMS,
+        "job": {
+            "id": job.id,
+            "status": job.status,
+            "paused_reason": job.paused_reason,
+            "error": job.error,
+            "finished_at": job.finished_at,
+        } if job else None,
+    }
+
+
+@router.post("/candidates/induce", response_model=dict)
+async def induce_candidates(
+    payload: InduceRequest,
+    db: deps.SessionDep,
+    current_user: models.User = Depends(deps.get_current_active_user),
+) -> Any:
+    """排队归纳(学科管理权限)。未归类条目不足时返回 400。"""
+    return await capabilities.run(
+        "struct_type.induce",
+        deps.api_context(db, current_user, subject_id=payload.subject_id),
+        struct_caps.StructTypeInduceInput(subject_id=payload.subject_id),
+    )
+
+
+@router.post("/candidates/{candidate_id}/accept", response_model=dict)
+async def accept_candidate(
+    candidate_id: int,
+    payload: CandidateAcceptRequest,
+    db: deps.SessionDep,
+    current_user: models.User = Depends(deps.get_current_active_user),
+) -> Any:
+    """新建为类型并回填组内条目。"""
+    created = await capabilities.run(
+        "struct_type.candidate.accept",
+        deps.api_context(db, current_user),
+        struct_caps.StructCandidateAcceptInput(id=candidate_id, **payload.model_dump()),
+    )
+    usage = await type_svc.usage_counts(db, created.subject_id)
+    return _type_out(created, usage.get(created.id, 0))
+
+
+@router.post("/candidates/{candidate_id}/merge", response_model=dict)
+async def merge_candidate(
+    candidate_id: int,
+    payload: CandidateMergeRequest,
+    db: deps.SessionDep,
+    current_user: models.User = Depends(deps.get_current_active_user),
+) -> Any:
+    """并入已有类型并回填组内条目。"""
+    merged = await capabilities.run(
+        "struct_type.candidate.merge",
+        deps.api_context(db, current_user),
+        struct_caps.StructCandidateMergeInput(id=candidate_id, type_id=payload.type_id),
+    )
+    usage = await type_svc.usage_counts(db, merged.subject_id)
+    return _type_out(merged, usage.get(merged.id, 0))
+
+
+@router.post("/candidates/{candidate_id}/ignore", response_model=dict)
+async def ignore_candidate(
+    candidate_id: int,
+    db: deps.SessionDep,
+    current_user: models.User = Depends(deps.get_current_active_user),
+) -> Any:
+    await capabilities.run(
+        "struct_type.candidate.ignore",
+        deps.api_context(db, current_user),
+        struct_caps.StructCandidateIdInput(id=candidate_id),
+    )
+    return {"ok": True}
 
 # endregion
 
@@ -751,6 +797,7 @@ def _type_out(t: Any, usage: int) -> Dict[str, Any]:
         "examples": type_svc.parse_examples(t.examples),
         "status": t.status,
         "sort_order": t.sort_order,
+        "weight": t.weight,
         "usage": usage,
     }
 

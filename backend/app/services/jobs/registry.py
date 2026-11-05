@@ -26,6 +26,10 @@ if TYPE_CHECKING:  # pragma: no cover - 仅用于类型标注,避免循环导入
 _HANDLER_MODULES = (
     "app.services.importing.job",
     "app.services.structure.job",
+    "app.services.structure.induce",
+    "app.services.structure.variant",
+    "app.services.structure.solution",
+    "app.services.structure.compose",
 )
 
 _HANDLERS: Dict[str, "JobHandler"] = {}

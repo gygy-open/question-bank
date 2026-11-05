@@ -17,7 +17,7 @@ import re
 from dataclasses import dataclass
 from typing import Any, Dict, Iterable, List, Optional, Sequence
 
-from sqlalchemy import func, select, update
+from sqlalchemy import delete, func, select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -30,6 +30,7 @@ from app.models.question_structure import (
     StructRunState,
     StructType,
     StructTypeKind,
+    StructTypeKnowledgePoint,
     StructTypeStatus,
 )
 from app.models.subject import Subject
@@ -53,20 +54,32 @@ _MATH_ROOTS = (
 )
 _GENERIC_CONDITION_ROOT = _RootSpec("condition", StructTypeKind.CONDITION, "条件", "题干给出的已知条件与研究对象。")
 _ASK_ROOT = _RootSpec("ask", StructTypeKind.ASK, "设问", "题目要求回答的问题。")
+_METHOD_ROOT = _RootSpec("method", StructTypeKind.METHOD, "方法", "解题步骤用到的方法与思维动作;权重用于计算思维量难度。")
 
 
 # region 查询
 
 async def ensure_roots(db: AsyncSession, subject_id: int) -> None:
-    """学科还没有任何类型时建好根节点(幂等;并发重复插入由唯一约束兜底)。会提交。"""
-    exists = await db.scalar(select(StructType.id).where(StructType.subject_id == subject_id).limit(1))
-    if exists is not None:
-        return
-    subject = await db.get(Subject, subject_id)
-    if subject is None:
-        return
-    specs = (*(_MATH_ROOTS if _is_math(subject) else (_GENERIC_CONDITION_ROOT,)), _ASK_ROOT)
-    for order, spec in enumerate(specs):
+    """学科还没有任何类型时建好根节点;已有类型但缺方法根时补建方法根。
+
+    幂等;并发重复插入由唯一约束兜底。会提交。
+    """
+    kinds = set((await db.execute(
+        select(StructType.kind).where(StructType.subject_id == subject_id).distinct()
+    )).scalars().all())
+    if kinds:
+        # 一期建好的学科没有方法根:补建(老师删掉的其他根不会被重新建出来)。
+        if StructTypeKind.METHOD.value in kinds:
+            return
+        specs: tuple = (_METHOD_ROOT,)
+        base_order = 100
+    else:
+        subject = await db.get(Subject, subject_id)
+        if subject is None:
+            return
+        specs = (*(_MATH_ROOTS if _is_math(subject) else (_GENERIC_CONDITION_ROOT,)), _ASK_ROOT, _METHOD_ROOT)
+        base_order = 0
+    for order, spec in enumerate(specs, start=base_order):
         db.add(StructType(
             subject_id=subject_id,
             parent_id=None,
@@ -118,6 +131,21 @@ async def usage_counts(db: AsyncSession, subject_id: int) -> Dict[int, int]:
         )
         for type_id, target_type, target_id in rows.all():
             counts.setdefault(type_id, set()).add((target_type, target_id))
+    # 方法类型:被已采纳解答的步骤引用的题数。
+    from app.models.solution_structure import SolutionRun, SolutionStep
+
+    rows = await db.execute(
+        select(SolutionStep.method_type_id, SolutionRun.question_id)
+        .join(SolutionRun, SolutionStep.run_id == SolutionRun.id)
+        .where(
+            SolutionRun.subject_id == subject_id,
+            SolutionRun.state == StructRunState.ACCEPTED.value,
+            SolutionStep.method_type_id.is_not(None),
+        )
+        .distinct()
+    )
+    for type_id, question_id in rows.all():
+        counts.setdefault(type_id, set()).add(("question", question_id))
     return {type_id: len(targets) for type_id, targets in counts.items()}
 
 
@@ -154,7 +182,7 @@ def path_names(types: Sequence[StructType]) -> Dict[int, List[str]]:
 
 
 def tree_text(types: Sequence[StructType], kind: StructTypeKind) -> str:
-    """把某一类(条件 / 设问)的 active 类型渲染成缩进列表,供提示词使用。
+    """把某一类(条件 / 设问 / 方法)的 active 类型渲染成缩进列表,供提示词使用。
 
     形如 ``- algebra: 代数 — 式的结构……``,子类型多缩进两格。
     """
@@ -169,7 +197,8 @@ def tree_text(types: Sequence[StructType], kind: StructTypeKind) -> str:
     def walk(parent: Optional[int], depth: int) -> None:
         for t in children.get(parent, []):
             definition = f" — {t.definition}" if t.definition else ""
-            lines.append(f"{'  ' * depth}- {t.code}: {t.name}{definition}")
+            weight = f" (weight {t.weight:g})" if kind == StructTypeKind.METHOD and t.weight not in (None, 1) else ""
+            lines.append(f"{'  ' * depth}- {t.code}: {t.name}{weight}{definition}")
             walk(t.id, depth + 1)
 
     walk(None, 0)
@@ -193,6 +222,7 @@ async def create_type(
     status: str = StructTypeStatus.ACTIVE.value,
     sort_order: Optional[int] = None,
     created_by: Optional[int] = None,
+    weight: Optional[float] = None,
 ) -> StructType:
     """新建类型并提交。``kind`` 缺省时继承父节点;``code`` 缺省时由名称生成。"""
     parent = await _valid_parent(db, subject_id, parent_id) if parent_id else None
@@ -221,6 +251,7 @@ async def create_type(
         status=status,
         sort_order=sort_order,
         created_by=created_by,
+        weight=_valid_weight(weight),
     )
     db.add(created)
     await db.commit()
@@ -254,9 +285,52 @@ async def update_type(db: AsyncSession, target: StructType, changes: Dict[str, A
         target.status = changes["status"]
     if "sort_order" in changes and changes["sort_order"] is not None:
         target.sort_order = int(changes["sort_order"])
+    if changes.get("knowledge_point_ids") is not None:
+        await set_knowledge_points(db, target, changes["knowledge_point_ids"])
+    weight_changed = False
+    if "weight" in changes and changes["weight"] is not None:
+        weight = _valid_weight(changes["weight"])
+        weight_changed = weight != target.weight
+        target.weight = weight
     await db.commit()
+    if weight_changed:
+        # 权重变化:用到该方法的已采纳解答重算思维量。
+        from .solution import recompute_for_method
+
+        await recompute_for_method(db, target.id)
     await db.refresh(target)
     return target
+
+
+async def knowledge_point_map(db: AsyncSession, subject_id: int) -> Dict[int, List[int]]:
+    """学科内每个类型映射的知识点 id(规格 §12.3 N8)。"""
+    rows = await db.execute(
+        select(StructTypeKnowledgePoint.type_id, StructTypeKnowledgePoint.knowledge_point_id)
+        .join(StructType, StructType.id == StructTypeKnowledgePoint.type_id)
+        .where(StructType.subject_id == subject_id)
+        .order_by(StructTypeKnowledgePoint.knowledge_point_id)
+    )
+    out: Dict[int, List[int]] = {}
+    for type_id, kp_id in rows.all():
+        out.setdefault(type_id, []).append(kp_id)
+    return out
+
+
+async def set_knowledge_points(db: AsyncSession, target: StructType, kp_ids: Sequence[int]) -> None:
+    """替换类型映射的知识点(只接受本学科的知识点)。不提交。"""
+    from app.models.knowledge_point import KnowledgePoint
+
+    ids = list(dict.fromkeys(int(i) for i in kp_ids))
+    if ids:
+        valid = set((await db.execute(
+            select(KnowledgePoint.id).where(KnowledgePoint.id.in_(ids), KnowledgePoint.subject_id == target.subject_id)
+        )).scalars().all())
+        if len(valid) != len(ids):
+            raise Invalid("Unknown knowledge point", ErrorCode.STRUCTURE_INVALID_ITEM)
+    await db.execute(delete(StructTypeKnowledgePoint).where(StructTypeKnowledgePoint.type_id == target.id))
+    for kp_id in ids:
+        db.add(StructTypeKnowledgePoint(type_id=target.id, knowledge_point_id=kp_id))
+    await db.flush()
 
 
 async def merge_types(db: AsyncSession, source: StructType, target: StructType) -> StructType:
@@ -274,6 +348,22 @@ async def merge_types(db: AsyncSession, source: StructType, target: StructType) 
         update(StructType).where(StructType.parent_id == source.id).values(parent_id=target.id)
         .execution_options(synchronize_session=False)
     )
+    # 知识点映射并入目标类型(去重),解答步骤的方法引用也改指向目标。
+    from app.models.solution_structure import SolutionStep
+
+    have = set((await db.execute(
+        select(StructTypeKnowledgePoint.knowledge_point_id).where(StructTypeKnowledgePoint.type_id == target.id)
+    )).scalars().all())
+    moved = (await db.execute(
+        select(StructTypeKnowledgePoint.knowledge_point_id).where(StructTypeKnowledgePoint.type_id == source.id)
+    )).scalars().all()
+    for kp_id in moved:
+        if kp_id not in have:
+            db.add(StructTypeKnowledgePoint(type_id=target.id, knowledge_point_id=kp_id))
+    await db.execute(
+        update(SolutionStep).where(SolutionStep.method_type_id == source.id).values(method_type_id=target.id)
+        .execution_options(synchronize_session=False)
+    )
     await db.delete(source)
     await db.commit()
     await db.refresh(target)
@@ -284,8 +374,10 @@ async def delete_type(db: AsyncSession, target: StructType) -> None:
     """删除类型并提交。有子节点或仍被拆解引用时拒绝——请改用停用或合并,避免丢失分类。"""
     if await db.scalar(select(StructType.id).where(StructType.parent_id == target.id).limit(1)) is not None:
         raise Conflict("Type has children", ErrorCode.STRUCTURE_TYPE_HAS_CHILDREN)
-    for model in (StructElement, StructAsk):
-        if await db.scalar(select(model.id).where(model.type_id == target.id).limit(1)) is not None:
+    from app.models.solution_structure import SolutionStep
+
+    for column in (StructElement.type_id, StructAsk.type_id, SolutionStep.method_type_id):
+        if await db.scalar(select(column).where(column == target.id).limit(1)) is not None:
             raise Conflict("Type is in use", ErrorCode.STRUCTURE_TYPE_IN_USE)
     await db.delete(target)
     await db.commit()
@@ -318,6 +410,7 @@ async def export_types(db: AsyncSession, subject_id: int) -> List[Dict[str, Any]
             "examples": parse_examples(t.examples),
             "status": t.status,
             "sort_order": t.sort_order,
+            "weight": t.weight,
         }
         for t in ordered
     ]
@@ -368,6 +461,7 @@ async def import_types(
                 examples=json.dumps(examples, ensure_ascii=False) if examples else None,
                 status=status,
                 sort_order=int(item.get("sort_order") or 0),
+                weight=_valid_weight(item.get("weight")),
             )
             current = existing.get(code)
             if current is None:
@@ -395,6 +489,19 @@ async def import_types(
 
 
 # region 内部实现
+
+def _valid_weight(value: Any) -> float:
+    """权重:正数,缺省为 1。"""
+    if value in (None, ""):
+        return 1.0
+    try:
+        weight = float(value)
+    except (TypeError, ValueError):
+        raise Invalid("Weight must be a positive number", ErrorCode.STRUCTURE_INVALID_ITEM)
+    if not 0 < weight <= 100:
+        raise Invalid("Weight must be a positive number", ErrorCode.STRUCTURE_INVALID_ITEM)
+    return round(weight, 2)
+
 
 def _is_math(subject: Subject) -> bool:
     text = f"{subject.slug or ''} {subject.name or ''}".lower()
