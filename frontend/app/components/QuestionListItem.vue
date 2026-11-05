@@ -284,6 +284,12 @@ const sourcePreviewQuery = computed(() => {
                   :class="i <= item.difficulty ? 'fill-primary text-primary' : 'fill-none text-muted-foreground/30'" />
               </div>
               <Badge
+                v-if="(item as DbQuestion).created_via === 'mcp'"
+                variant="outline"
+                class="h-5 border-sky-500/40 px-1.5 text-xs font-normal text-sky-700 dark:text-sky-300"
+                :title="t('questionItem.viaMcpHint')"
+              >{{ t('questionItem.viaMcp') }}</Badge>
+              <Badge
                 v-if="(item as DbQuestion).thinking_difficulty != null"
                 variant="outline"
                 class="h-5 px-1.5 text-xs font-normal"

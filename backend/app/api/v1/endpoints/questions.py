@@ -1,4 +1,4 @@
-from typing import Any, List, Optional
+from typing import Literal, Any, List, Optional
 from fastapi import APIRouter, Depends, Query
 from app import crud, schemas, models
 from app.api import deps
@@ -43,6 +43,7 @@ async def read_questions(
     struct_state: Optional[str] = Query(None, description="none / draft / accepted / stale"),
     thinking_min: Optional[float] = None,
     thinking_max: Optional[float] = None,
+    created_via: Optional[Literal["mcp", "app"]] = Query(None, description="mcp = created by external agents; app = in the app"),
     sort: Optional[str] = Query(None, description="thinking_asc / thinking_desc; default newest first"),
     current_user: models.User = Depends(deps.get_current_active_user),
 ) -> Any:
@@ -72,6 +73,7 @@ async def read_questions(
         struct_state=struct_state,
         thinking_min=thinking_min,
         thinking_max=thinking_max,
+        created_via=created_via,
         sort=sort,
         viewer=current_user
     )
@@ -98,6 +100,7 @@ async def read_questions(
         struct_state=struct_state,
         thinking_min=thinking_min,
         thinking_max=thinking_max,
+        created_via=created_via,
         viewer=current_user
     )
     relation_counts = await crud.question.get_relation_counts(

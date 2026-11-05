@@ -268,3 +268,24 @@ def test_guard_rejects_choice_variants_without_a_correct_option():
     assert guard_verdict({"valid": True, "correct_options": ["A", "B"]}, "single_choice", options)["valid"] is False
     assert guard_verdict({"valid": True, "correct_options": ["B"]}, "single_choice", options)["valid"] is True
     assert guard_verdict({"valid": True}, "free_response", None)["valid"] is True
+
+
+async def test_variant_queued_by_an_agent_marks_the_generated_question(client, db_session, ctx, fake_ai):
+    from app.core.channel import channel
+    from app.services.structure import variant as variant_svc
+
+    question, draft = await _accepted_with_param(client, db_session, ctx, fake_ai)
+    source = await db_session.get(Question, question["id"])
+    assert source.created_via is None
+    with channel("mcp"):
+        plan = await variant_svc.plan_variant(
+            db_session, source, run_id=None, values={draft["params"][0]["id"]: "5"}, auto=[]
+        )
+        await variant_svc.enqueue(db_session, plan, user_id=ctx["editor"].id, locale=None)
+        await db_session.commit()
+    fake_ai.outputs = [VALID]
+    await _run_jobs(db_session)
+    job = await _variant_job(db_session, question["id"])
+    assert job.status == "succeeded", job.error
+    created = await db_session.get(Question, json.loads(job.progress)["question_id"])
+    assert created.created_via == "mcp"

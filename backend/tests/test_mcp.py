@@ -18,6 +18,7 @@ from app.mcp_server.tools import (
 )
 from app.models.activity_log import ActivityLog
 from app.models.api_key import ApiKey
+from app.models.job import Job
 from app.models.composition import Composition
 from app.models.question import Question
 from app.models.subject import Subject
@@ -800,3 +801,40 @@ async def test_structure_saved_via_mcp_is_an_agent_draft(mcp_client, db_session,
     assert not saved.get("isError"), saved
     run = (await db_session.execute(select(StructRun).where(StructRun.target_id == qid))).scalars().one()
     assert run.origin == "agent" and run.state == "draft"
+
+
+async def test_agent_can_generate_but_not_accept_and_is_marked(mcp_client, db_session, ctx):
+    tools = {t["name"] for t in (await _rpc(mcp_client, await _create_key(mcp_client, ctx["admin"]), "tools/list")).json()["result"]["tools"]}
+    assert {"structure_variant", "structure_compose", "structure_group_replace", "solution_decompose",
+            "struct_type_create", "struct_type_induce", "get_structure_job"} <= tools
+    assert not {"structure_review", "solution_review", "structure_backfill"} & tools
+
+    key = await _create_key(mcp_client, ctx["alice"])
+    created = await _call(mcp_client, key, "question_create", {
+        "subject_id": ctx["math"].id, "q_type": "free_response",
+        "content": {"type": "doc", "content": [{"type": "paragraph", "content": [{"type": "text", "text": "计算 9+9"}]}]},
+    })
+    qid = created["structuredContent"]["id"]
+    assert created["structuredContent"]["created_via"] == "mcp"
+    found = await _call(mcp_client, key, "search_questions", {"subject_id": ctx["math"].id, "created_via": "mcp"})
+    assert [q["id"] for q in found["structuredContent"]["items"]] == [qid]
+    in_app = await _call(mcp_client, key, "search_questions", {"subject_id": ctx["math"].id, "created_via": "app"})
+    assert in_app["structuredContent"]["items"] == []
+
+    # 类型树对有维护权限的用户开放
+    roots = await _call(mcp_client, key, "list_structure_types", {"subject_id": ctx["math"].id})
+    algebra = next(t for t in roots["structuredContent"]["items"] if t["code"] == "algebra")
+    made = await _call(mcp_client, key, "struct_type_create", {
+        "subject_id": ctx["math"].id, "name": "三次函数", "parent_id": algebra["id"],
+    })
+    assert made["isError"] is False and made["structuredContent"]["kind"] == "condition"
+
+    # 拆解任务排队时记下渠道;任务状态只有发起人能看
+    queued = await _call(mcp_client, key, "structure_decompose", {"target_ids": [qid]})
+    job_id = queued["structuredContent"]["job_ids"][0]
+    job = await db_session.get(Job, job_id)
+    assert '"via": "mcp"' in job.payload
+    status = await _call(mcp_client, key, "get_structure_job", {"job_id": job_id})
+    assert status["structuredContent"]["status"] == "pending"
+    other = await _call(mcp_client, await _create_key(mcp_client, ctx["bob"]), "get_structure_job", {"job_id": job_id})
+    assert other["isError"] is True

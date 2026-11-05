@@ -56,7 +56,7 @@ async def test_solution_needs_an_accepted_stem(client, db_session, ctx, fake_ai)
     response = await client.post(
         f"{API}/structure/solutions/decompose", json={"question_ids": [question["id"]]}, headers=_auth(ctx["editor"])
     )
-    assert response.json() == {"queued": [], "skipped": [question["id"]]}
+    assert response.json() == {"queued": [], "skipped": [question["id"]], "job_ids": []}
 
 
 async def test_solution_steps_thinking_load_and_difficulty(client, db_session, ctx, fake_ai):

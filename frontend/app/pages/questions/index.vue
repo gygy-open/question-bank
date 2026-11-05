@@ -107,6 +107,8 @@ const filters = reactive({
   // 解答结构三期:思维量难度范围与排序。
   thinking_min: undefined as number | undefined,
   thinking_max: undefined as number | undefined,
+  // 创建渠道:mcp(外部 Agent)/ app(站内)。
+  created_via: undefined as string | undefined,
   sort: undefined as string | undefined,
 })
 
@@ -181,6 +183,7 @@ const queryParams = computed(() => {
   if (typeof filters.thinking_min === 'number') params.thinking_min = filters.thinking_min
   if (typeof filters.thinking_max === 'number') params.thinking_max = filters.thinking_max
   if (filters.sort && filters.sort !== '0') params.sort = filters.sort
+  if (filters.created_via && filters.created_via !== '0') params.created_via = filters.created_via
   
   return params
 })
@@ -506,6 +509,7 @@ const resetFilters = () => {
   filters.struct_state = undefined
   filters.thinking_min = undefined
   filters.thinking_max = undefined
+  filters.created_via = undefined
   filters.sort = undefined
   page.value = 1
   
@@ -573,6 +577,11 @@ watch([selectedSubjectId, showStructure], () => {
 }, { immediate: true })
 onActivated(() => { void refreshStructureEnabled() })
 if (structureEnabled.value === null) void refreshStructureEnabled()
+
+const createdViaOptions = computed(() => [
+  { value: 'mcp', label: t('questions.filters.viaMcp') },
+  { value: 'app', label: t('questions.filters.viaApp') },
+])
 
 const sortOptions = computed(() => [
   { value: 'thinking_asc', label: t('questions.filters.sortThinkingAsc') },
@@ -770,6 +779,10 @@ const viewRelations = (question: Question) => {
                       <span class="text-muted-foreground">~</span>
                       <Input v-model.number="filters.thinking_max" type="number" min="0" class="h-9 w-20" :placeholder="t('structure.params.max')" />
                     </div>
+                  </div>
+                  <div class="space-y-2 min-w-[140px]">
+                    <Label class="text-xs font-medium">{{ t('questions.filters.createdVia') }}</Label>
+                    <ClearableSelect v-model="filters.created_via" :options="createdViaOptions" :placeholder="t('questions.filters.allChannels')" />
                   </div>
                   <div class="space-y-2 min-w-[140px]">
                     <Label class="text-xs font-medium">{{ t('questions.filters.sort') }}</Label>

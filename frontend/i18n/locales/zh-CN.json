@@ -606,7 +606,11 @@
       "sort": "排序",
       "sortNewest": "最新创建",
       "sortThinkingAsc": "思维量从低到高",
-      "sortThinkingDesc": "思维量从高到低"
+      "sortThinkingDesc": "思维量从高到低",
+      "createdVia": "创建渠道",
+      "allChannels": "全部渠道",
+      "viaMcp": "外部 Agent（MCP）",
+      "viaApp": "站内"
     },
     "batchSource": {
       "title": "批量修改来源",
@@ -673,7 +677,9 @@
     "createdBy": "创建:",
     "updatedBy": "更新:",
     "reviewCount": "审核次数:",
-    "source": "来源:"
+    "source": "来源:",
+    "viaMcp": "Agent",
+    "viaMcpHint": "由外部 Agent 经 MCP 创建（含 Agent 发起的变式、命题生成的题）"
   },
   "knowledgePoint": {
     "selectPlaceholder": "选择知识点...",

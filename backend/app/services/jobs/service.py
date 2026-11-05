@@ -78,6 +78,12 @@ async def enqueue(
                 active.priority = priority
             return active
 
+    # 在 MCP 调用中排队的任务记下来源渠道,worker 执行时恢复(见 app/core/channel.py)。
+    from app.core.channel import current_channel
+
+    via = current_channel.get()
+    if via:
+        payload = {**(payload or {}), "via": via}
     now = datetime.utcnow()
     job = Job(
         type=type,

@@ -232,6 +232,10 @@ async def run_job(
     set_locale(ctx.locale)
     logger.info("Starting job %s (%s) for %s #%s", ctx.job_id, ctx.type, ctx.target_type, ctx.target_id)
 
+    # 恢复排队时的创建渠道;必须在创建 runner 之前设置,ensure_future 会复制当前 context。
+    from app.core.channel import current_channel
+
+    channel_token = current_channel.set(ctx.payload.get("via"))
     runner = asyncio.ensure_future(_run_handler(handler, ctx))
     watcher = None
     if cancel_poll_seconds:
@@ -255,6 +259,7 @@ async def run_job(
         logger.exception("Job %s crashed", ctx.job_id)
         await ctx.fail(str(exc) or exc.__class__.__name__)
     finally:
+        current_channel.reset(channel_token)
         if watcher is not None and not watcher.done():
             watcher.cancel()
 

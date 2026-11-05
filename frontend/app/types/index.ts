@@ -252,6 +252,8 @@ export interface Question {
   difficulty: number
   /** 思维量难度(解答结构三期):已采纳解答的步骤权重之和,多解取最小;没有时为空。 */
   thinking_difficulty?: number | null
+  /** 创建渠道:mcp 表示由外部 Agent 经 MCP 创建;站内创建为空。 */
+  created_via?: 'mcp' | null
   visibility: 'public' | 'private'
   knowledge_points: KnowledgePoint[]
   tags: Tag[]
